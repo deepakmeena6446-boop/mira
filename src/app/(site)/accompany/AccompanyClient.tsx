@@ -322,6 +322,10 @@ function ActiveJourney({ journey, onChange }: { journey: JourneyView; onChange: 
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [extendOpen, setExtendOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, [journey.state]);
   const eta = new Date(journey.etaAt);
   const left = eta.getTime() - now.getTime();
   const due = left <= 0;
@@ -348,7 +352,9 @@ function ActiveJourney({ journey, onChange }: { journey: JourneyView; onChange: 
     <div className="flex flex-col gap-4 pb-4">
       <header>
         <p className="text-sm font-semibold text-accent">{missed ? "Check-in missed" : "Journey active"}</p>
-        <h1 className="mt-1 text-3xl font-bold text-mixed">{journey.destination.name}</h1>
+        <h1 ref={headingRef} tabIndex={-1} className="mt-1 text-3xl font-bold text-mixed outline-none">
+          {journey.destination.name}
+        </h1>
       </header>
 
       {error ? (
@@ -472,13 +478,17 @@ function ActiveJourney({ journey, onChange }: { journey: JourneyView; onChange: 
 function ClosedJourney({ journey, onNew, journeysAvailable }: { journey: JourneyView; onNew: () => void; journeysAvailable: boolean }) {
   const title = { arrived: "You've arrived. Journey complete.", ended: "Journey ended.", expired: "This journey closed automatically." }[journey.state as "arrived" | "ended" | "expired"];
   const a = journey.missedAt ? alertCopy(journey.alert) : null;
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, []);
   return (
     <div className="flex flex-col gap-4 pb-4">
       <section aria-labelledby="closed-h" className="rounded-[var(--radius-card)] border border-line bg-surface p-6 shadow-[var(--shadow-card)]">
         <span className="grid size-11 place-items-center rounded-full bg-accent-soft text-accent">
           <Icon name="check" className="size-6" />
         </span>
-        <h1 id="closed-h" className="mt-4 text-2xl font-bold">
+        <h1 id="closed-h" ref={headingRef} tabIndex={-1} className="mt-4 text-2xl font-bold outline-none">
           {title}
         </h1>
         {journey.state === "expired" ? <p className="mt-1 text-ink-muted">It closed 30 minutes after the check-in time without a check-in.</p> : null}

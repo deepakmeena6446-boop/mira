@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { MapView, type MapMarker, type MapRoute, type MapStatus } from "@/components/map/MapView";
 import { Notice } from "@/components/ui/Notice";
 import { cx } from "@/components/ui/cx";
 import type { PilotInfo } from "@/domain/know-types";
 
 type View = "map" | "list";
+
+const MapVisibleContext = createContext(false);
+/** True when a working map is on screen (not list view, not failed). */
+export function useMapVisible(): boolean {
+  return useContext(MapVisibleContext);
+}
 type Snap = "evidence" | "map";
 
 /**
@@ -38,14 +44,14 @@ export function KnowLayout({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div role="group" aria-label="Result view" className="inline-flex rounded-full border border-line-strong bg-surface p-1">
+        <div role="group" aria-label="Result view" className="inline-flex max-w-full flex-wrap rounded-[1.5rem] border border-line-strong bg-surface p-1">
           {(["map", "list"] as const).map((v) => (
             <button
               key={v}
               type="button"
               aria-pressed={view === v}
               onClick={() => setView(v)}
-              className={cx("min-h-10 rounded-full px-4 text-sm font-semibold", view === v ? "bg-accent text-accent-ink" : "text-ink-muted hover:text-ink")}
+              className={cx("min-h-11 rounded-full px-4 text-sm font-semibold", view === v ? "bg-accent text-accent-ink" : "text-ink-muted hover:text-ink")}
             >
               {v === "map" ? "Map and details" : "Text only"}
             </button>
@@ -96,7 +102,7 @@ export function KnowLayout({
           )}
         >
           {view === "map" && mapStatus !== "failed" ? <div aria-hidden className="mx-auto h-1.5 w-12 rounded-full bg-line-strong md:hidden" /> : null}
-          {children}
+          <MapVisibleContext.Provider value={showMap}>{children}</MapVisibleContext.Provider>
         </div>
       </div>
     </div>

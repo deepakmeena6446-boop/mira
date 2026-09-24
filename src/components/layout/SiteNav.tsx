@@ -48,12 +48,12 @@ export function BottomNav() {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cx(
-                  "flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs font-medium",
+                  "flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 px-1 text-xs font-medium",
                   active ? "text-accent" : "text-ink-muted",
                 )}
               >
                 <Icon name={item.icon} className="size-6" />
-                <span>{item.label}</span>
+                <span className="max-w-full truncate">{item.label}</span>
               </Link>
             </li>
           );

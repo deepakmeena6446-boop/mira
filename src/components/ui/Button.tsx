@@ -12,7 +12,9 @@ const variants: Record<Variant, string> = {
   primary: "bg-accent text-accent-ink hover:bg-accent-strong",
   secondary: "bg-surface text-ink border border-line-strong hover:bg-sunken",
   ghost: "text-accent hover:bg-accent-soft",
-  danger: "bg-surface text-error border border-error hover:bg-error-soft",
+  // Destructive/irreversible actions: strong neutral outline. Red is reserved for
+  // validation and delivery failures (UX spec §2).
+  danger: "bg-surface text-ink border-2 border-ink hover:bg-sunken",
 };
 const sizes: Record<Size, string> = {
   md: "px-4 py-2.5 text-[0.95rem]",

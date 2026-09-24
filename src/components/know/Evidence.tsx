@@ -1,7 +1,10 @@
+"use client";
+
 import type { CommunitySection, Fact, KnowResponse, RouteResult, SourceInfo } from "@/domain/know-types";
 import { TIME_BAND_LABEL } from "@/domain/time-bands";
 import { formatIstDate, relativeAge } from "@/lib/time";
 import { cx } from "@/components/ui/cx";
+import { useMapVisible } from "./KnowLayout";
 
 export function FactList({ facts }: { facts: Fact[] }) {
   return (
@@ -111,6 +114,7 @@ export function SourcesDetails({ source }: { source: SourceInfo }) {
 }
 
 export function RouteCard({ route, selected, onSelect }: { route: RouteResult; selected: boolean; onSelect?: () => void }) {
+  const mapVisible = useMapVisible();
   return (
     <article aria-labelledby={`route-${route.id}-h`} className={cx("rounded-[var(--radius-card)] border bg-surface p-5", selected ? "border-accent" : "border-line")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -120,7 +124,7 @@ export function RouteCard({ route, selected, onSelect }: { route: RouteResult; s
           </svg>
           {route.label === "Shortest" ? "Shortest mapped path" : "Alternate mapped path"}
         </h3>
-        {onSelect ? (
+        {onSelect && mapVisible ? (
           <button type="button" onClick={onSelect} aria-pressed={selected} className="min-h-11 rounded-full px-3 text-sm font-semibold text-accent hover:bg-accent-soft">
             {selected ? "Highlighted on map" : "Highlight on map"}
           </button>

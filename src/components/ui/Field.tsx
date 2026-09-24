@@ -32,7 +32,7 @@ export function TextArea({ invalid, className, ...rest }: React.TextareaHTMLAttr
 
 export function Select({ invalid, className, children, ...rest }: React.SelectHTMLAttributes<HTMLSelectElement> & { invalid?: boolean }) {
   return (
-    <select aria-invalid={invalid || undefined} className={cx(control, "appearance-none bg-[length:1rem] pr-9", className)} {...rest}>
+    <select aria-invalid={invalid || undefined} className={cx(control, "mira-select appearance-none pr-10", className)} {...rest}>
       {children}
     </select>
   );
@@ -59,7 +59,13 @@ export function ChoiceGroup<V extends string>({
   columns?: 1 | 2 | 3 | 4;
 }) {
   const errId = `${name}-error`;
-  const grid = { 1: "grid-cols-1", 2: "grid-cols-1 min-[380px]:grid-cols-2", 3: "grid-cols-1 min-[380px]:grid-cols-3", 4: "grid-cols-2 sm:grid-cols-4" }[columns];
+  // Column count follows text size (rem-based minimum), so large text reflows to one column.
+  const grid = {
+    1: "grid-cols-1",
+    2: "grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))]",
+    3: "grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))]",
+    4: "grid-cols-[repeat(auto-fit,minmax(min(100%,7rem),1fr))]",
+  }[columns];
   return (
     <fieldset aria-describedby={error ? errId : undefined} aria-invalid={error ? true : undefined}>
       <legend className="mb-1.5 font-semibold">
@@ -81,7 +87,7 @@ export function ChoiceGroup<V extends string>({
               )}
             >
               <input id={id} type="radio" name={name} value={o.value} checked={checked} onChange={() => onChange(o.value)} className="mt-1 size-4 accent-[var(--color-accent)]" />
-              <span>
+              <span className="min-w-0 break-words">
                 <span className="block font-medium">{o.label}</span>
                 {o.description ? <span className="block text-sm text-ink-muted">{o.description}</span> : null}
               </span>

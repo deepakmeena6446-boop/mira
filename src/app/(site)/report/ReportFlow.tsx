@@ -161,7 +161,7 @@ export function ReportFlow({ aiAvailable }: { aiAvailable: boolean }) {
             other people&apos;s observations — and only when enough independent people have shared similar ones.
           </p>
           <p className="mt-2 text-ink-muted">There is no status page for reports, so nobody using this browser can look it up. It is deleted within 30 days.</p>
-          <p className="mt-2 text-ink-muted">If you are in danger right now, contact emergency services (112). MIRA is not an emergency service.</p>
+          <p className="mt-2 text-ink-muted">If you need urgent help right now, call 112. MIRA is not an emergency service.</p>
           <div className="mt-5 flex flex-col gap-2 sm:flex-row">
             <Link href="/" className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-accent px-5 font-semibold text-accent-ink">
               Back home
