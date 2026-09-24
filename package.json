@@ -23,7 +23,7 @@
     "pilot:import": "tsx scripts/import-pilot.ts",
     "admin:hash": "tsx scripts/admin-hash.ts",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
