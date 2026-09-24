@@ -168,7 +168,7 @@ export function classifyPlace(tags: Record<string, string>): { placeType: PlaceT
   if (t.building === "college") return { placeType: "education", kindLabel: "College building" };
   if (t.tourism === "museum") return { placeType: "landmark", kindLabel: "Museum" };
   if (t.tourism === "attraction" || t.historic) return { placeType: "landmark", kindLabel: "Landmark" };
-  if (t.building && t.building !== "yes" && t.name) return { placeType: "landmark", kindLabel: TITLE(t.building) };
+  if (t.building && t.building !== "yes" && t.name) return { placeType: "landmark", kindLabel: `${TITLE(t.building)} building` };
   if (t.building === "yes" && t.name) return { placeType: "landmark", kindLabel: "Building" };
   return null;
 }

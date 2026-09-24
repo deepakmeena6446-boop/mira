@@ -56,6 +56,7 @@ export async function importPilot(
 
   await sql.begin(async (tx) => {
     // Replacing a snapshot removes the previous pilot rows (cascade to places/graph).
+    // Place ids are derived from the OSM identity so links stay stable across re-imports.
     await tx`DELETE FROM pilot_areas WHERE slug = ${meta.slug}`;
     const [pilot] = await tx<{ id: string }[]>`
       INSERT INTO pilot_areas (slug, name, polygon, source_date, manifest_hash, source_url, source_licence, importer_version, status)
@@ -65,8 +66,8 @@ export async function importPilot(
 
     for (const part of chunks(places)) {
       await tx`
-        INSERT INTO places (pilot_id, osm_type, osm_id, name, name_hi, place_type, point, tags, search_text, source_date)
-        SELECT ${pilot.id}::uuid, t.osm_type, t.osm_id, t.name, t.name_hi, t.place_type,
+        INSERT INTO places (id, pilot_id, osm_type, osm_id, name, name_hi, place_type, point, tags, search_text, source_date)
+        SELECT md5('osm:' || t.osm_type || '/' || t.osm_id::text)::uuid, ${pilot.id}::uuid, t.osm_type, t.osm_id, t.name, t.name_hi, t.place_type,
                ST_SetSRID(ST_MakePoint(t.lon, t.lat), 4326), t.tags::jsonb, t.search_text, ${meta.sourceDate}::timestamptz
         FROM unnest(
           ${part.map((p) => p.osmType)}::text[],

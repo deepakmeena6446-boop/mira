@@ -8,6 +8,13 @@
       "when": 1790265600000,
       "tag": "0000_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790274574951,
+      "tag": "0001_aggregate_releases",
+      "breakpoints": true
     }
   ]
 }

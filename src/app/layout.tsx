@@ -3,6 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 import { BottomNav, HeaderNav } from "@/components/layout/SiteNav";
 import { SiteFooter } from "@/components/layout/SiteFooter";
+import { ToastProvider } from "@/components/ui/Toast";
 
 export const metadata: Metadata = {
   title: { default: "MIRA — Know more. Move freely.", template: "%s · MIRA" },
@@ -41,9 +42,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <HeaderNav />
           </div>
         </header>
-        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-5xl px-4 pt-5 outline-none">
-          {children}
-        </main>
+        <ToastProvider>
+          <main id="main" tabIndex={-1} className="mx-auto w-full max-w-5xl px-4 pt-5 outline-none">
+            {children}
+          </main>
+        </ToastProvider>
         <SiteFooter />
         <BottomNav />
       </body>

@@ -13,8 +13,7 @@ export default defineConfig({
   test: {
     projects: [
       {
-        resolve: { alias },
-        plugins: [react()],
+        extends: true,
         test: {
           name: "unit",
           include: ["tests/unit/**/*.test.{ts,tsx}"],
@@ -23,7 +22,7 @@ export default defineConfig({
         },
       },
       {
-        resolve: { alias },
+        extends: true,
         test: {
           name: "integration",
           include: ["tests/integration/**/*.test.ts"],
