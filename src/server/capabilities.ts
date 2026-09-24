@@ -4,6 +4,7 @@ import { getSql } from "@/server/db/client";
 import { systemClock } from "@/server/clock";
 import { workerStatus } from "@/server/health/worker";
 import { pilotStatus } from "@/server/pilot/status";
+import { companionAvailability } from "@/domain/companion";
 
 /**
  * Server-derived feature availability (execution plan Phase 1). The UI must render
@@ -33,7 +34,7 @@ export async function getCapabilities(): Promise<Capabilities> {
       journeys: worker.healthy,
       contactEmail: worker.healthy && smtpConfigured(),
       ai: aiConfigured(),
-      companion: false,
+      companion: companionAvailability().available,
     };
   } catch {
     return {
