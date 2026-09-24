@@ -14,8 +14,8 @@ async function main() {
     process.exit(1);
   }
   const h = await hash(pw, { algorithm: 2, memoryCost: 19456, timeCost: 2, parallelism: 1 });
-  console.log("\nFor a secret store / process environment:\n" + h);
-  console.log("\nFor a .env file (dotenv expands $, so it must be escaped):\n" + h.replaceAll("$", "\\$"));
+  console.log("\nRecommended (works everywhere, including .env files):\nb64:" + Buffer.from(h, "utf8").toString("base64"));
+  console.log("\nRaw PHC form (secret stores only; dotenv would expand its $ characters):\n" + h);
 }
 
 main();

@@ -48,3 +48,6 @@ next-env.d.ts
 /playwright/.cache
 /data/pilot/cache
 /public/maplibre
+
+# e2e artifacts
+/tests/e2e/.auth

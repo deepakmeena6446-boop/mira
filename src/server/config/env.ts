@@ -48,12 +48,15 @@ const envSchema = z.object({
   APP_BASE_URL: z.url(),
   SESSION_SECRET: secret32,
   DATA_ENCRYPTION_KEY: base64Key32,
+  // Raw PHC string, or "b64:" + base64(PHC). The b64 form contains no "$", so it survives
+  // dotenv expansion (Next expands a variable defined in both the process env and a .env file).
   ADMIN_PASSWORD_HASH: z
     .string()
     .min(1)
+    .transform((v) => (v.startsWith("b64:") ? Buffer.from(v.slice(4), "base64").toString("utf8") : v))
     .refine(
       (v) => /^\$argon2id\$v=\d+\$m=\d+,t=\d+,p=\d+\$[A-Za-z0-9+/]+\$[A-Za-z0-9+/]+$/.test(v),
-      "must be an Argon2id PHC string ($argon2id$v=19$m=…). In .env files escape each $ as \\$ — dotenv expands $ even inside quotes. Generate with `npm run admin:hash`.",
+      "must be an Argon2id PHC string ($argon2id$v=19$m=…) or its b64: form. Generate with `npm run admin:hash`; prefer the b64: form in .env files because dotenv expands $.",
     ),
   PILOT_MANIFEST_PATH: z.string().min(1),
   MAP_TILE_URL: z

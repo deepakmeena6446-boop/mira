@@ -17,7 +17,7 @@ async function main() {
   if (!isIstMonday(at)) throw new Error("Releases happen on Mondays (IST) only; pass a Monday timestamp with --at.");
   const sql = postgres(process.env.DATABASE_URL!, { max: 1, onnotice: () => {} });
   try {
-    console.log(await runWeeklyAggregation(sql, { now: () => at }));
+    console.log(JSON.stringify(await runWeeklyAggregation(sql, { now: () => at })));
   } finally {
     await sql.end();
   }

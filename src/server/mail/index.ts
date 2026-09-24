@@ -42,11 +42,7 @@ export function getMailer(): Mailer | null {
         await transport.sendMail({ from: env.SMTP_FROM, to: mail.to, subject: mail.subject, text: mail.text });
         return { ok: true };
       } catch (err) {
-        const code = (err as { responseCode?: number; code?: string }).responseCode;
-        const errCode = (err as { code?: string }).code;
-        // 5xx = permanent refusal; connection errors before DATA mean nothing was accepted.
-        const definite = (typeof code === "number" && code >= 500) || errCode === "ECONNREFUSED" || errCode === "EENVELOPE";
-        return { ok: false, definite };
+        return { ok: false, definite: isDefiniteFailure(err) };
       }
     },
   };
@@ -56,4 +52,21 @@ export function getMailer(): Mailer | null {
 /** Test hook: forget the cached transport after env changes. */
 export function resetMailer(): void {
   cached = null;
+}
+
+/** SMTP commands issued before the message body: a failure here means nothing was accepted. */
+const PRE_DATA_COMMANDS = new Set(["CONN", "EHLO", "HELO", "LHLO", "STARTTLS", "AUTH PLAIN", "AUTH LOGIN", "AUTH XOAUTH2", "AUTH CRAM-MD5", "MAIL FROM", "RCPT TO"]);
+const PRE_DATA_CODES = new Set(["ECONNECTION", "EDNS", "EAUTH", "EENVELOPE", "ETLS", "ECONNREFUSED"]);
+
+/**
+ * Definite failure: a 5xx refusal, or any error before DATA was sent. Anything at or
+ * after DATA (e.g. the connection dropping before the final reply) is uncertain — the
+ * server may have accepted the message — so it is reported as unconfirmed, not failed.
+ */
+export function isDefiniteFailure(err: unknown): boolean {
+  const e = err as { responseCode?: number; code?: string; command?: string };
+  if (typeof e.responseCode === "number" && e.responseCode >= 500) return true;
+  if (e.command && PRE_DATA_COMMANDS.has(e.command.toUpperCase())) return true;
+  if (e.code && PRE_DATA_CODES.has(e.code) && e.command !== "DATA") return true;
+  return false;
 }
