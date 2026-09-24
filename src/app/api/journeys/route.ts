@@ -7,7 +7,7 @@ import { systemClock } from "@/server/clock";
 import { getMailer } from "@/server/mail";
 import { workerStatus } from "@/server/health/worker";
 import { createJourney, createJourneySchema } from "@/server/journey/service";
-import { JOURNEY_CREATE_LIMITS, JOURNEY_IP_LIMITS } from "@/server/journey/http";
+import { JOURNEY_CREATE_LIMITS, JOURNEY_GLOBAL_LIMITS, JOURNEY_IP_LIMITS } from "@/server/journey/http";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,7 @@ export const POST = handle(async (req: Request) => {
   const sql = getSql();
   const now = systemClock.now();
   await enforce(sql, [dailyKey("ip", clientIp(req), now)], JOURNEY_IP_LIMITS, now);
+  await enforce(sql, [dailyKey("global", "journeys", now)], JOURNEY_GLOBAL_LIMITS, now);
   const input = await readJson(req, createJourneySchema, 4096);
   const worker = await workerStatus(sql, systemClock);
   const actor = await ensureActor();

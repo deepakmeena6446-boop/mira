@@ -32,6 +32,9 @@ export function proxy(_request: NextRequest) { // eslint-disable-line @typescrip
   ].join("; ");
   const res = NextResponse.next();
   res.headers.set("Content-Security-Policy", csp);
+  if (!dev && (process.env.APP_BASE_URL ?? "").startsWith("https://")) {
+    res.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
   return res;
 }
 

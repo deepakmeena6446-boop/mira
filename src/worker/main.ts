@@ -48,7 +48,9 @@ async function main() {
       try {
         await job.run({ sql, clock: systemClock, log: workerLog });
       } catch (err) {
-        workerLog("job.failed", { job: job.name, error: err instanceof Error ? err.message.slice(0, 200) : "unknown" });
+        // Name/code only: error messages can embed query details.
+        const code = (err as { code?: unknown })?.code;
+        workerLog("job.failed", { job: job.name, error: err instanceof Error ? err.name : "unknown", code: typeof code === "string" ? code : null });
       } finally {
         running.delete(job.name);
       }

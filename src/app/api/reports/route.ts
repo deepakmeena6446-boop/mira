@@ -5,7 +5,7 @@ import { ensureActor } from "@/server/session/actor";
 import { clientIp, dailyKey, enforce } from "@/server/ratelimit";
 import { systemClock } from "@/server/clock";
 import { prepareReport, reportInputSchema, submitReport } from "@/server/report/submit";
-import { REPORT_LIMITS_ACTOR, REPORT_LIMITS_IP } from "@/server/report/limits";
+import { REPORT_LIMITS_ACTOR, REPORT_LIMITS_GLOBAL, REPORT_LIMITS_IP } from "@/server/report/limits";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +18,7 @@ export const POST = handle(async (req: Request) => {
   const sql = getSql();
   const now = systemClock.now();
   await enforce(sql, [dailyKey("ip", clientIp(req), now)], REPORT_LIMITS_IP, now);
+  await enforce(sql, [dailyKey("global", "reports", now)], REPORT_LIMITS_GLOBAL, now);
   const input = await readJson(req, reportInputSchema, 16_384);
   const prepared = await prepareReport(sql, input); // fully validated before any cookie exists
   const actor = await ensureActor();

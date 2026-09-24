@@ -7,3 +7,4 @@ export const JOURNEY_CREATE_LIMITS: Limit[] = [
 ];
 export const JOURNEY_IP_LIMITS: Limit[] = [{ bucket: "journey:ip:m", max: 60, windowMs: 60_000 }];
 export const INVITE_IP_LIMITS: Limit[] = [{ bucket: "invite:ip:h", max: 30, windowMs: 3600_000 }];
+export const JOURNEY_GLOBAL_LIMITS: Limit[] = [{ bucket: "journey:global:h", max: 500, windowMs: 3600_000 }];

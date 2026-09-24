@@ -38,10 +38,20 @@ export async function enforce(sql: postgres.Sql, keys: string[], limits: Limit[]
   }
 }
 
-/** Best-effort client IP from the proxy chain; only ever used inside an HMAC. */
+/**
+ * Client IP for rate limiting only (always HMAC'd, never stored raw). Clients can
+ * forge the left of X-Forwarded-For, so we take the address appended by our own
+ * proxy chain: the entry TRUSTED_PROXY_HOPS positions from the right (default 1).
+ * Production must sit behind a proxy that appends the real client address.
+ */
 export function clientIp(req: Request): string {
+  const hops = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS ?? "1") || 1);
   const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim().slice(0, 64);
+  if (xff) {
+    const parts = xff.split(",").map((p) => p.trim()).filter(Boolean);
+    const pick = parts[Math.max(0, parts.length - hops)];
+    if (pick) return pick.slice(0, 64);
+  }
   return req.headers.get("x-real-ip")?.slice(0, 64) ?? "unknown";
 }
 

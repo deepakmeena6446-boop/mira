@@ -2,24 +2,40 @@ import { getSql } from "@/server/db/client";
 import { systemClock } from "@/server/clock";
 import { workerStatus } from "@/server/health/worker";
 import { pilotStatus } from "@/server/pilot/status";
+import { smtpConfigured } from "@/server/config/env";
 
 export const dynamic = "force-dynamic";
 
-/** Readiness: database reachable and worker heartbeat fresh. No secrets or hostnames. */
+/**
+ * Readiness for monitoring: database reachable and worker heartbeat fresh (< 3 min).
+ * Also surfaces contact-alert delivery problems in the last 24 h as a count, so
+ * operators can react without any contact data appearing in logs. No secrets.
+ */
 export async function GET() {
   let db = false;
   let worker = { healthy: false, lastBeatAgeSeconds: null as number | null };
   let pilot = false;
+  let alertProblems = 0;
   try {
     const sql = getSql();
     await sql`SELECT 1`;
     db = true;
     worker = await workerStatus(sql, systemClock);
     pilot = (await pilotStatus(sql)).available;
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM journeys
+      WHERE alert_state IN ('failed', 'unconfirmed') AND missed_at > now() - interval '24 hours'`;
+    alertProblems = row.n;
   } catch {
     db = false;
   }
   const ready = db && worker.healthy;
+  if (db && !worker.healthy) {
+    console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "health.worker_stale", ageSeconds: worker.lastBeatAgeSeconds }));
+  }
+  if (alertProblems > 0) {
+    console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "health.contact_alert_delivery_problems", count24h: alertProblems }));
+  }
   return Response.json(
     {
       status: ready ? "ready" : "unavailable",
@@ -28,8 +44,10 @@ export async function GET() {
         worker: worker.healthy ? "ok" : "stale",
         workerHeartbeatAgeSeconds: worker.lastBeatAgeSeconds,
         pilotMapData: pilot ? "ok" : "unavailable",
+        contactEmail: smtpConfigured() ? (alertProblems > 0 ? "degraded" : "ok") : "not_configured",
+        contactAlertProblems24h: alertProblems,
       },
     },
-    { status: ready ? 200 : 503 },
+    { status: ready ? 200 : 503, headers: { "cache-control": "no-store" } },
   );
 }
