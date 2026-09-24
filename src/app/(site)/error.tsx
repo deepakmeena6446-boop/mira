@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 /** Route error boundary: recoverable, never shows technical details. */
 export default function RouteError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <main id="main" className="mx-auto max-w-5xl px-4 py-10" aria-labelledby="err-title">
+    <section className="py-10" aria-labelledby="err-title">
       <h1 id="err-title" className="text-2xl font-bold">
         Something went wrong
       </h1>
@@ -19,6 +19,6 @@ export default function RouteError({ reset }: { error: Error & { digest?: string
           Go home
         </Link>
       </div>
-    </main>
+    </section>
   );
 }
