@@ -1,5 +1,6 @@
 import type postgres from "postgres";
 import { purgeExpiredCounters } from "@/server/ratelimit";
+import { purgeOldReleases } from "@/server/aggregate/run";
 
 /**
  * Hard-delete expired private data (architecture §3). Runs in the worker.
@@ -11,5 +12,6 @@ export async function purgeExpired(sql: postgres.Sql, now: Date): Promise<Record
   const admins = await sql`DELETE FROM admin_sessions WHERE expires_at < ${new Date(now.getTime() - 24 * 3600_000)}`;
   const audit = await sql`DELETE FROM admin_audit WHERE created_at < ${new Date(now.getTime() - 90 * 86_400_000)}`;
   const counters = await purgeExpiredCounters(sql, now);
-  return { reports: reports.count, actorSessions: actors.count, adminSessions: admins.count, audit: audit.count, counters };
+  const releases = await purgeOldReleases(sql, now);
+  return { reports: reports.count, actorSessions: actors.count, adminSessions: admins.count, audit: audit.count, counters, releases };
 }

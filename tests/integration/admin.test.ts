@@ -11,7 +11,7 @@ import { GET as detailGET, PATCH as detailPATCH } from "@/app/api/admin/reports/
 import { POST as reportPOST } from "@/app/api/reports/route";
 import { POST as knowPOST } from "@/app/api/know/route";
 import { TEST_ADMIN_PASSWORD } from "../setup/test-env";
-import { newJar, useJar } from "../helpers/cookie-jar";
+import { newJar, switchJar } from "../helpers/cookie-jar";
 import { getRequest, jsonRequest } from "../helpers/http";
 import { loadFixturePilot, fixturePlaceId } from "../helpers/pilot";
 
@@ -30,7 +30,7 @@ async function submitReport(narrative: string, category = "environment") {
 
 async function adminJar() {
   const jar = newJar();
-  useJar(jar);
+  switchJar(jar);
   const res = await loginPOST(jsonRequest("/api/admin/login", { password: TEST_ADMIN_PASSWORD }));
   expect(res.status).toBe(200);
   return jar;
@@ -47,13 +47,14 @@ describe("moderation", () => {
     await sql`DELETE FROM reports_private`;
     await sql`DELETE FROM admin_audit`;
     await sql`DELETE FROM admin_sessions`;
+    await sql`DELETE FROM aggregate_releases`;
   });
 
   it("rejects unauthenticated and actor-cookie requests", async () => {
-    useJar(newJar());
+    switchJar(newJar());
     expect((await listGET(getRequest("/api/admin/reports"))).status).toBe(401);
     const actorJar = newJar();
-    useJar(actorJar);
+    switchJar(actorJar);
     const id = await submitReport("light broken");
     expect([...actorJar.keys()]).toEqual(["mira_actor"]);
     expect((await listGET(getRequest("/api/admin/reports"))).status).toBe(401);
@@ -62,7 +63,7 @@ describe("moderation", () => {
   });
 
   it("throttles password guessing", async () => {
-    useJar(newJar());
+    switchJar(newJar());
     const statuses: number[] = [];
     for (let i = 0; i < 7; i++) statuses.push((await loginPOST(jsonRequest("/api/admin/login", { password: `wrong-${i}` }))).status);
     expect(statuses.slice(0, 5)).toEqual([401, 401, 401, 401, 401]);
@@ -72,17 +73,17 @@ describe("moderation", () => {
   });
 
   it("requires same-origin for login and moderation actions", async () => {
-    useJar(newJar());
+    switchJar(newJar());
     expect((await loginPOST(jsonRequest("/api/admin/login", { password: TEST_ADMIN_PASSWORD }, { origin: "https://evil.example" }))).status).toBe(403);
     const jar = await adminJar();
-    useJar(newJar());
+    switchJar(newJar());
     const id = await submitReport("light broken");
-    useJar(jar);
+    switchJar(jar);
     expect((await patch(id, { action: "hold", reason: "unclear" }, "https://evil.example")).status).toBe(403);
   });
 
   it("processes a report: PII blocks approval until redacted; transitions are idempotent", async () => {
-    useJar(newJar());
+    switchJar(newJar());
     const id = await submitReport("Auto DL1RT4567 driver shouted, streetlight broken");
     await adminJar();
 
@@ -116,7 +117,7 @@ describe("moderation", () => {
   });
 
   it("rejects with a fixed reason code and deletes the private text", async () => {
-    useJar(newJar());
+    switchJar(newJar());
     const id = await submitReport("spam spam spam");
     await adminJar();
     expect((await patch(id, { action: "reject" })).status).toBe(422);
@@ -129,7 +130,7 @@ describe("moderation", () => {
   });
 
   it("does not change public output after a single approval", async () => {
-    useJar(newJar());
+    switchJar(newJar());
     const before = await (await knowPOST(jsonRequest("/api/know", { mode: "place", placeId, time: "late" }))).json();
     const id = await submitReport("very dark stretch");
     await adminJar();

@@ -26,7 +26,12 @@ export default async function QueuePage({ searchParams }: PageProps<"/admin/repo
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Review queue</h1>
-        <SignOutButton />
+        <div className="flex items-center gap-2">
+          <Link href="/admin/releases" className="inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold text-accent hover:bg-accent-soft">
+            Public summaries
+          </Link>
+          <SignOutButton />
+        </div>
       </div>
       <p className="rounded-[var(--radius-control)] border border-accent/30 bg-accent-soft px-4 py-3 font-medium">
         Approval permits aggregation only; it never publishes this report.

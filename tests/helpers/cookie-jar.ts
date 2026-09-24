@@ -5,7 +5,7 @@
 export type Jar = Map<string, string>;
 let current: Jar = new Map();
 
-export function useJar(jar: Jar): void {
+export function switchJar(jar: Jar): void {
   current = jar;
 }
 export function newJar(): Jar {
