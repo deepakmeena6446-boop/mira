@@ -1,0 +1,38 @@
+# Local development services only. Ports bind to 127.0.0.1 so nothing is exposed
+# beyond this machine. The database password below is a local-only development
+# credential for a loopback container; production DATABASE_URL must come from
+# deployment secret storage.
+name: mira
+
+services:
+  db:
+    # Multi-arch (amd64 + arm64) PostGIS build from a docker-postgis maintainer.
+    image: imresamu/postgis:17-3.5
+    environment:
+      POSTGRES_USER: mira
+      POSTGRES_PASSWORD: mira_local_dev
+      POSTGRES_DB: mira
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - mira-db:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mira -d mira"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mailpit:
+    # Captures all outgoing mail locally; nothing is delivered to real inboxes.
+    image: axllent/mailpit:v1.27
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
+volumes:
+  mira-db:

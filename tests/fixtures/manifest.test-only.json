@@ -1,0 +1,5 @@
+{
+  "testOnly": true,
+  "description": "TEST-ONLY synthetic fixture manifest. The production importer refuses to load it.",
+  "pilot": { "slug": "test-fixture", "name": "Test fixture grid", "bounds": { "south": 28.685, "north": 28.705, "west": 77.202, "east": 77.225 }, "crs": "EPSG:4326" }
+}

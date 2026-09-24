@@ -1,0 +1,37 @@
+{
+  "pilot": {
+    "slug": "du-north-campus",
+    "name": "Delhi University North Campus · Vishwavidyalaya Metro",
+    "bounds": {
+      "south": 28.685,
+      "north": 28.705,
+      "west": 77.202,
+      "east": 77.225
+    },
+    "crs": "EPSG:4326"
+  },
+  "source": {
+    "provider": "OpenStreetMap via Overpass API",
+    "url": "https://overpass-api.de/api/interpreter",
+    "query": "[out:json][timeout:180][bbox:28.685,77.202,28.705,77.225];\n(\n  way[\"highway\"];\n  node[\"name\"];\n  node[\"amenity\"];\n  node[\"shop\"];\n  node[\"railway\"];\n  node[\"public_transport\"];\n  node[\"highway\"=\"bus_stop\"];\n  node[\"healthcare\"];\n  node[\"tourism\"];\n  way[\"name\"][!\"highway\"];\n  way[\"amenity\"];\n  way[\"shop\"];\n  way[\"tourism\"];\n  way[\"leisure\"];\n  way[\"building\"=\"dormitory\"];\n);\n(._;>;);\nout body qt;",
+    "snapshotTimestamp": "2026-09-24T18:11:11Z",
+    "retrievedAt": "2026-09-24T18:13:14.097Z",
+    "licence": "ODbL-1.0",
+    "licenceUrl": "https://opendatacommons.org/licenses/odbl/1-0/",
+    "attribution": "© OpenStreetMap contributors",
+    "copyrightUrl": "https://www.openstreetmap.org/copyright",
+    "notice": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "extract": {
+    "file": "data/pilot/osm-extract.json.gz",
+    "format": "overpass-json+gzip",
+    "sha256Json": "100dea90f8967a14a40a847f307bcc11584a8ace9c89802f3b53b24cafd36a60",
+    "sha256File": "94197e609d7554ed8e96ecc3cdddd9d58170cfa30318c8d13d44244828be5ffd",
+    "bytesJson": 1467916,
+    "elementCounts": {
+      "nodes": 9266,
+      "ways": 1697
+    }
+  },
+  "importerVersion": "mira-osm-import/1.0.0"
+}
