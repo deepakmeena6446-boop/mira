@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BottomNav, HeaderNav } from "@/components/layout/SiteNav";
 import { SiteFooter } from "@/components/layout/SiteFooter";
+import { ActiveJourneyChip } from "@/components/layout/ActiveJourney";
 
 /** Consumer chrome: header, persistent navigation and footer (UX spec §1). */
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
@@ -17,6 +18,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
           <HeaderNav />
         </div>
       </header>
+      <ActiveJourneyChip />
       <main id="main" tabIndex={-1} className="mx-auto w-full max-w-5xl px-4 pt-5 outline-none">
         {children}
       </main>

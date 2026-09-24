@@ -16,10 +16,12 @@ const MONDAY = new Date("2026-09-28T03:00:00Z");
 const DAY = 86_400_000;
 let placeId = "";
 let cell = "";
+let seq = 0; // deterministic spread of submission times (never a burst unless intended)
 
 async function approved(actor: string, over: { band?: string; category?: string; tags?: string[]; daysAgo?: number; group?: string } = {}) {
   const sql = getSql();
-  const created = new Date(MONDAY.getTime() - (over.daysAgo ?? 3) * DAY - Math.floor(Math.random() * 20) * 3600_000);
+  seq += 1;
+  const created = new Date(MONDAY.getTime() - (over.daysAgo ?? 3) * DAY - (seq % 12) * 5 * 3600_000);
   const [r] = await sql`
     INSERT INTO reports_private (actor_hash, idempotency_key, involvement, category, coarse_cell_id, recency_bucket, time_band, status, created_at, expires_at)
     VALUES (${actor}, ${randomUUID()}, 'witnessed', ${over.category ?? "environment"}, ${cell}, 'past_week', ${over.band ?? "late"}, 'approved', ${created}, ${new Date(created.getTime() + 30 * DAY)})

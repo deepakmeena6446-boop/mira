@@ -2,9 +2,19 @@ import type { WorkerJob } from "./runner";
 import { pruneHeartbeats } from "@/server/health/worker";
 import { purgeExpired } from "@/server/retention";
 import { runWeeklyAggregation } from "@/server/aggregate/run";
+import { processJourneys } from "@/server/journey/worker";
+import { getMailer } from "@/server/mail";
 
 /** All periodic jobs. Each is idempotent and safe to run concurrently with the web app. */
 export const JOBS: WorkerJob[] = [
+  {
+    // Missed check-ins, one alert attempt, auto-close at ETA+30 and hard deletion.
+    name: "journeys",
+    intervalMs: 20_000,
+    run: async ({ sql, clock, log }) => {
+      await processJourneys(sql, clock, getMailer(), log);
+    },
+  },
   {
     name: "heartbeat-prune",
     intervalMs: 60 * 60_000,

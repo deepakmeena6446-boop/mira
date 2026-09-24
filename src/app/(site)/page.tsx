@@ -3,6 +3,7 @@ import { getCapabilities } from "@/server/capabilities";
 import { ServiceBanner } from "@/components/layout/ServiceBanner";
 import { HomePlacePicker } from "@/components/places/HomePlacePicker";
 import { Icon } from "@/components/ui/Icon";
+import { ActiveJourneyCard } from "@/components/layout/ActiveJourney";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,8 @@ export default async function Home() {
           </span>
         </p>
       </section>
+
+      <ActiveJourneyCard />
 
       <section aria-label="What would you like to do?">
         <ul className="grid gap-3 md:grid-cols-3">
