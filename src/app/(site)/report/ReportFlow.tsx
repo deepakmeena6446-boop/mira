@@ -67,6 +67,7 @@ export function ReportFlow({ aiAvailable }: { aiAvailable: boolean }) {
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<{ title: string; body: string } | null>(null);
+  const [aiConsent, setAiConsent] = useState(false);
   const keyRef = useRef<string>("");
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -121,7 +122,7 @@ export function ReportFlow({ aiAvailable }: { aiAvailable: boolean }) {
         recency,
         timeBand,
         narrative: cleanText,
-        aiConsent: false,
+        aiConsent: aiAvailable && aiConsent,
       },
     });
     setBusy(false);
@@ -251,7 +252,17 @@ export function ReportFlow({ aiAvailable }: { aiAvailable: boolean }) {
             Edit
           </Button>
         </div>
-        {aiAvailable ? null : null}
+        {aiAvailable && cleanText ? (
+          <AiSuggest
+            narrative={cleanText}
+            consent={aiConsent}
+            onConsent={setAiConsent}
+            currentCategory={category!}
+            currentBand={timeBand!}
+            onApplyCategory={setCategory}
+            onApplyBand={setTimeBand}
+          />
+        ) : null}
       </section>
     );
   }
@@ -362,5 +373,83 @@ export function ReportFlow({ aiAvailable }: { aiAvailable: boolean }) {
       </Button>
       <p className="text-sm text-ink-muted">Nothing is sent until you press Submit on the next screen.</p>
     </form>
+  );
+}
+
+type AiSuggestion = { category: Category | "unknown"; timeBand: "day" | "evening" | "late" | "unknown" };
+
+/**
+ * Optional, separately consented suggestion (UX spec §6). Suggestions are shown as
+ * editable options and never applied or submitted automatically.
+ */
+function AiSuggest({
+  narrative,
+  consent,
+  onConsent,
+  currentCategory,
+  currentBand,
+  onApplyCategory,
+  onApplyBand,
+}: {
+  narrative: string;
+  consent: boolean;
+  onConsent: (v: boolean) => void;
+  currentCategory: Category;
+  currentBand: ReportTimeBand;
+  onApplyCategory: (c: Category) => void;
+  onApplyBand: (b: ReportTimeBand) => void;
+}) {
+  const [state, setState] = useState<"idle" | "busy" | "done" | "none">("idle");
+  const [s, setS] = useState<AiSuggestion | null>(null);
+  return (
+    <div className="rounded-[var(--radius-card)] border border-line bg-surface p-5">
+      <h2 className="font-bold">Optional: suggest a category</h2>
+      <label className="mt-2 flex min-h-11 cursor-pointer items-start gap-3">
+        <input type="checkbox" className="mt-1 size-4" checked={consent} onChange={(e) => onConsent(e.target.checked)} />
+        <span className="text-ink-muted">
+          Send my description to OpenAI to suggest a category. Detected personal details are removed first, and no place, time or contact details are
+          sent. The request asks OpenAI not to store it, but it may keep data briefly for abuse monitoring. This is separate from submitting.
+        </span>
+      </label>
+      {consent ? (
+        <Button
+          className="mt-3"
+          variant="secondary"
+          busy={state === "busy"}
+          busyLabel="Getting a suggestion…"
+          onClick={async () => {
+            setState("busy");
+            const res = await api<{ suggestion: AiSuggestion | null }>("/api/reports/suggest", { body: { narrative, consent: true } });
+            if (res.ok && res.data.suggestion) {
+              setS(res.data.suggestion);
+              setState("done");
+            } else setState("none");
+          }}
+        >
+          Get suggestion
+        </Button>
+      ) : null}
+      {state === "none" ? <p className="mt-2 text-sm text-ink-muted">No suggestion is available right now. Your own choices are all that&apos;s needed.</p> : null}
+      {state === "done" && s ? (
+        <ul className="mt-3 space-y-2">
+          <li className="flex flex-wrap items-center gap-2">
+            <span>Suggested category: {s.category === "unknown" ? "not sure" : CATEGORY_LABEL[s.category]}</span>
+            {s.category !== "unknown" && s.category !== currentCategory ? (
+              <Button variant="ghost" onClick={() => onApplyCategory(s.category as Category)}>
+                Use this
+              </Button>
+            ) : null}
+          </li>
+          <li className="flex flex-wrap items-center gap-2">
+            <span>Suggested time of day: {s.timeBand === "unknown" ? "not stated" : REPORT_TIME_LABEL[s.timeBand]}</span>
+            {s.timeBand !== "unknown" && s.timeBand !== currentBand ? (
+              <Button variant="ghost" onClick={() => onApplyBand(s.timeBand as ReportTimeBand)}>
+                Use this
+              </Button>
+            ) : null}
+          </li>
+        </ul>
+      ) : null}
+    </div>
   );
 }
