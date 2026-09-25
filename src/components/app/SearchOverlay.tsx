@@ -58,15 +58,14 @@ export function SearchOverlay({
     const ctrl = new AbortController();
     const t = setTimeout(async () => {
       setLoading(true);
-      const qs = new URLSearchParams({ q: term, ...(near ? { lat: String(near.lat), lon: String(near.lon) } : {}) });
       try {
-        const res = await api<{ places: Hit[] }>(`/api/geo/search?${qs}`, { signal: ctrl.signal });
+        const res = await api<{ places: Hit[] }>("/api/geo/search", { body: { q: term, near: near ? { lat: near.lat, lon: near.lon } : null }, signal: ctrl.signal });
         if (res.ok) setHits(res.data.places);
       } catch {
         /* aborted */
       }
       setLoading(false);
-    }, 180);
+    }, 300); // live lookups outside the local map data: wait for a pause in typing
     return () => {
       clearTimeout(t);
       ctrl.abort();

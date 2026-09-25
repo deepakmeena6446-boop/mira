@@ -69,15 +69,23 @@ const envSchema = z.object({
   MAP_TILE_ATTRIBUTION: optionalNonEmpty,
   /** Optional vector style (e.g. OpenFreeMap placeholder, later Mapbox). Takes precedence over raster tiles. */
   MAP_STYLE_URL: optionalNonEmpty.refine((v) => v === undefined || /^https:\/\//.test(v), "must be an https:// style URL"),
+  // Placeholder area names outside the local OSM data (Nominatim-compatible). Unset = off.
+  OVERPASS_URL: optionalNonEmpty.refine((v) => v === undefined || /^https:\/\//.test(v), "must be an https:// URL"),
+  PLACE_SEARCH_URL: optionalNonEmpty.refine((v) => v === undefined || /^https:\/\//.test(v), "must be an https:// URL"),
+  REVERSE_GEOCODER_URL: optionalNonEmpty.refine((v) => v === undefined || /^https:\/\//.test(v), "must be an https:// URL"),
   SMTP_HOST: optionalNonEmpty,
   SMTP_PORT: optionalNonEmpty,
   SMTP_USER: optionalNonEmpty,
   SMTP_PASS: optionalNonEmpty,
   SMTP_FROM: optionalNonEmpty,
   SMTP_SECURE: optionalNonEmpty,
-  OPENAI_API_KEY: optionalNonEmpty,
-  OPENAI_MODEL: optionalNonEmpty,
-  OPENAI_PRIVACY_TERMS_ACCEPTED: optionalNonEmpty,
+  // Real providers (optional; placeholders are used until adapters + keys exist).
+  ANTHROPIC_API_KEY: optionalNonEmpty,
+  MAPBOX_TOKEN: optionalNonEmpty,
+  AUTH_GOOGLE_ID: optionalNonEmpty,
+  AUTH_GOOGLE_SECRET: optionalNonEmpty,
+  VAPID_PUBLIC_KEY: optionalNonEmpty,
+  VAPID_PRIVATE_KEY: optionalNonEmpty,
 });
 
 export type ServerEnv = z.infer<typeof envSchema>;
@@ -123,12 +131,6 @@ export function resetEnvCache(): void {
 
 export function smtpConfigured(env: ServerEnv = getEnv()): boolean {
   return Boolean(env.SMTP_HOST && env.SMTP_FROM);
-}
-
-export function aiConfigured(env: ServerEnv = getEnv()): boolean {
-  return Boolean(
-    env.OPENAI_API_KEY && env.OPENAI_MODEL && env.OPENAI_PRIVACY_TERMS_ACCEPTED === "true",
-  );
 }
 
 export function isProduction(env: ServerEnv = getEnv()): boolean {

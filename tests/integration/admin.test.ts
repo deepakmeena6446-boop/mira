@@ -9,7 +9,7 @@ import { POST as logoutPOST } from "@/app/api/admin/logout/route";
 import { GET as listGET } from "@/app/api/admin/reports/route";
 import { GET as detailGET, PATCH as detailPATCH } from "@/app/api/admin/reports/[id]/route";
 import { POST as reportPOST } from "@/app/api/reports/route";
-import { POST as knowPOST } from "@/app/api/know/route";
+import { POST as nearbyPOST } from "@/app/api/geo/nearby/route";
 import { TEST_ADMIN_PASSWORD } from "../setup/test-env";
 import { newJar, switchJar } from "../helpers/cookie-jar";
 import { getRequest, jsonRequest } from "../helpers/http";
@@ -131,11 +131,11 @@ describe("moderation", () => {
 
   it("does not change public output after a single approval", async () => {
     switchJar(newJar());
-    const before = await (await knowPOST(jsonRequest("/api/know", { mode: "place", placeId, time: "late" }))).json();
+    const before = await (await nearbyPOST(jsonRequest("/api/geo/nearby", { lat: 28.6901, lon: 77.2111 }))).json();
     const id = await submitReport("very dark stretch");
     await adminJar();
     await patch(id, { action: "approve", structured: { category: "environment", tags: ["poor_lighting"], timeBand: "late" } });
-    const after = await (await knowPOST(jsonRequest("/api/know", { mode: "place", placeId, time: "late" }))).json();
+    const after = await (await nearbyPOST(jsonRequest("/api/geo/nearby", { lat: 28.6901, lon: 77.2111 }))).json();
     expect(after).toEqual(before);
     const [{ n }] = await getSql()`SELECT count(*)::int AS n FROM aggregate_releases`;
     expect(n).toBe(0);

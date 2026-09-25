@@ -208,6 +208,7 @@ export async function userAction(sql: postgres.Sql, actorHash: string, id: strin
     const [updated] = await tx<JourneyRow[]>`
       UPDATE journeys SET state = ${t.next}, closed_at = ${closed}, purge_at = ${purge} WHERE id = ${id} RETURNING *`;
     await tx`UPDATE contact_invites SET expires_at = LEAST(expires_at, ${now}) WHERE journey_id = ${id}`;
+    await tx`DELETE FROM trip_locations WHERE journey_id = ${id}`; // live points never outlive the trip
     return updated;
   });
   return toView(await withPlace(sql, row), now);

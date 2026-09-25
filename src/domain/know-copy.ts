@@ -2,7 +2,11 @@
  * Copy rules for KNOW (UX spec §4). Facts are phrased as mapped/listed with their
  * limits; absent tags are unknown, never negative. No safety verdicts anywhere.
  */
-import type { Fact } from "./know-types";
+export interface Fact {
+  label: string;
+  value?: string;
+  note?: string;
+}
 import { TIME_BAND_LABEL, type TimeBand } from "./time-bands";
 
 const WHEELCHAIR: Record<string, string> = {

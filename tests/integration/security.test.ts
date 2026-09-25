@@ -12,14 +12,18 @@ import { createJourney, revokeContact } from "@/server/journey/service";
 import { acceptInvite } from "@/server/journey/invites";
 import { hashToken } from "@/server/crypto";
 import type { Mailer } from "@/server/mail";
-import { GET as pilotGET } from "@/app/api/pilot/route";
-import { GET as placesGET } from "@/app/api/places/route";
-import { POST as knowPOST } from "@/app/api/know/route";
+import { POST as searchPOST } from "@/app/api/geo/search/route";
+import { POST as reversePOST } from "@/app/api/geo/reverse/route";
+import { POST as routePOST } from "@/app/api/geo/route/route";
+import { POST as nearbyPOST } from "@/app/api/geo/nearby/route";
 import { GET as liveGET } from "@/app/api/health/live/route";
 import { GET as readyGET } from "@/app/api/health/ready/route";
 import { POST as reportPOST } from "@/app/api/reports/route";
-import { GET as currentGET } from "@/app/api/journeys/current/route";
-import { POST as journeysPOST } from "@/app/api/journeys/route";
+import { POST as demoPOST } from "@/app/api/auth/demo/route";
+import { POST as tripsPOST } from "@/app/api/trips/route";
+import { GET as currentTripGET } from "@/app/api/trips/current/route";
+import { GET as sharedGET } from "@/app/api/t/[token]/route";
+import { GET as meGET } from "@/app/api/me/route";
 import { recordHeartbeat } from "@/server/health/worker";
 import { newJar, switchJar } from "../helpers/cookie-jar";
 import { getRequest, jsonRequest, allKeys } from "../helpers/http";
@@ -36,12 +40,10 @@ const PRIVATE_TABLES = /\b(reports_private|report_structured|journeys|contact_in
 
 /** Every key a public (non-owner, non-admin) response may contain. */
 const PUBLIC_KEYS = new Set([
-  "available", "name", "bounds", "south", "north", "west", "east", "timezone", "source", "licence", "attribution", "copyrightUrl", "snapshotDate",
-  "tiles", "url", "places", "id", "kind", "placeType", "point", "lat", "lon", "coverage", "time", "context", "band", "label", "place", "facts",
-  "value", "note", "nearby", "community", "selectedBand", "matching", "otherBands", "statement", "polarity", "category", "text", "timeBand",
-  "releasedWeek", "expiresAt", "unknowns", "origin", "destination", "routes", "lengthM", "minutes", "geometry", "steps", "comparison",
-  "routeUnavailable", "reason", "message", "status", "checks", "database", "worker", "workerHeartbeatAgeSeconds", "pilotMapData",
-  "contactEmail", "contactAlertProblems24h", "received", "error", "code", "fields",
+  "places", "id", "name", "kind", "lat", "lon", "distanceM", "hours", "label", "precise", "route", "meters", "minutes", "geometry",
+  "approximate", "along", "notes", "text", "polarity", "timeBand", "week", "status", "checks", "database", "worker",
+  "workerHeartbeatAgeSeconds", "pilotMapData", "contactEmail", "contactAlertProblems24h", "received", "error", "code", "message", "fields",
+  "state", "destination", "dest", "etaAt", "location", "at", "ageSeconds",
 ]);
 
 describe("privacy red-line audit", () => {
@@ -52,11 +54,11 @@ describe("privacy red-line audit", () => {
     await getSql()`DELETE FROM abuse_counters`;
   });
 
-  it("public KNOW code never touches private tables", () => {
-    const publicFiles = [...files("src/server/know"), ...files("src/app/api/pilot"), ...files("src/app/api/places"), ...files("src/app/api/know"), ...files("src/server/pilot")];
+  it("public map/geo code never touches private tables", () => {
+    const publicFiles = [...files("src/server/know"), ...files("src/server/providers/geo"), ...files("src/app/api/geo"), ...files("src/server/pilot"), "src/server/notes/index.ts"];
     for (const f of publicFiles) expect(readFileSync(f, "utf8"), f).not.toMatch(PRIVATE_TABLES);
     // The only public community source is aggregate_releases.
-    expect(readFileSync("src/server/know/community.ts", "utf8")).toMatch(/FROM aggregate_releases/);
+    expect(readFileSync("src/server/notes/index.ts", "utf8")).toMatch(/FROM aggregate_releases/);
   });
 
   it("application code never imports test fixtures", () => {
@@ -74,45 +76,57 @@ describe("privacy red-line audit", () => {
     }
   });
 
-  it("stores no movement history: no coordinates on private tables", async () => {
-    const cols = await getSql()<{ table_name: string; column_name: string; udt_name: string }[]>`
-      SELECT table_name, column_name, udt_name FROM information_schema.columns WHERE table_schema = 'public'`;
-    const spatial = cols.filter((c) => c.udt_name === "geometry" || c.udt_name === "geography").map((c) => c.table_name);
-    expect([...new Set(spatial)].sort()).toEqual(["pilot_areas", "places", "walk_edges", "walk_nodes"]);
-    const privateCols = cols.filter((c) => ["journeys", "contact_invites", "reports_private", "report_structured"].includes(c.table_name)).map((c) => c.column_name);
-    for (const c of privateCols) expect(c).not.toMatch(/lat|lon|point|origin|track|location|coord/);
+  it("keeps coordinates only where users chose them, never in reports, and no movement history", async () => {
+    const cols = await getSql()<{ table_name: string; column_name: string }[]>`
+      SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public'`;
+    const coordTables = [...new Set(cols.filter((c) => /(^|_)(lat|lon|point|geom|polygon)$/.test(c.column_name)).map((c) => c.table_name))].sort();
+    // Map data, user-chosen saved places, trip destinations, and short-lived live trip points.
+    expect(coordTables).toEqual(["journeys", "pilot_areas", "places", "saved_places", "trip_locations", "walk_edges", "walk_nodes"]);
+    for (const t of ["reports_private", "report_structured", "aggregate_releases", "contacts", "mira_messages"]) {
+      const c = cols.filter((x) => x.table_name === t).map((x) => x.column_name);
+      for (const name of c) expect(name, `${t}.${name}`).not.toMatch(/^(lat|lon|point|origin|track|location)$/);
+    }
     const tables = [...new Set(cols.map((c) => c.table_name))];
-    expect(tables.some((t) => /history|track|location|movement/.test(t))).toBe(false);
+    expect(tables.some((t) => /history|track|movement/.test(t))).toBe(false);
+    // Live points are hard-deleted with their trip.
+    const [fk] = await getSql()`SELECT confdeltype FROM pg_constraint WHERE conrelid = 'trip_locations'::regclass AND contype = 'f'`;
+    expect(fk.confdeltype).toBe("c");
   });
 
   it("every public response uses only allowlisted keys", async () => {
     await recordHeartbeat(getSql(), "audit-worker", new Date(), "test", new Date());
     switchJar(newJar());
+    const from = { lat: 28.6927, lon: 77.2131 };
+    const to = { lat: 28.6901, lon: 77.2111 };
     const bodies: unknown[] = [];
-    bodies.push(await (await pilotGET()).json());
-    bodies.push(await (await placesGET(getRequest("/api/places?q=fixture"))).json());
-    bodies.push(await (await knowPOST(jsonRequest("/api/know", { mode: "place", placeId, time: "late" }))).json());
-    const other = await fixturePlaceId(getSql(), "Fixture Metro Gate 1");
-    bodies.push(await (await knowPOST(jsonRequest("/api/know", { mode: "route", origin: { placeId: other }, destination: { placeId }, time: "now" }))).json());
-    bodies.push(await (await knowPOST(jsonRequest("/api/know", { mode: "route", origin: { lat: 28.7, lon: 77.222 }, destination: { placeId } }))).json());
+    bodies.push(await (await searchPOST(jsonRequest("/api/geo/search", { q: "fixture", near: { lat: 28.69, lon: 77.21 } }))).json());
+    bodies.push(await (await reversePOST(jsonRequest("/api/geo/reverse", from))).json());
+    bodies.push(await (await routePOST(jsonRequest("/api/geo/route", { from, to }))).json());
+    bodies.push(await (await nearbyPOST(jsonRequest("/api/geo/nearby", from))).json());
     bodies.push(await (await liveGET()).json());
     bodies.push(await (await readyGET()).json());
     bodies.push(await (await reportPOST(jsonRequest("/api/reports", { idempotencyKey: randomUUID(), involvement: "witnessed", category: "environment", placeId, recency: "today", timeBand: "late", narrative: "call 9876543210" }))).json());
-    bodies.push(await (await knowPOST(jsonRequest("/api/know", { mode: "place", placeId: "bad" }))).json());
+    bodies.push(await (await routePOST(jsonRequest("/api/geo/route", { from: "bad" }))).json());
+    // The contact's live view of a shared trip.
+    await demoPOST(jsonRequest("/api/auth/demo", { name: "Audit User" }));
+    const { trip } = await (await tripsPOST(jsonRequest("/api/trips", { from, to: { ...to, name: "Home" }, share: true }))).json();
+    const token = trip.shareUrl.split("/t/")[1];
+    switchJar(newJar());
+    bodies.push(await (await sharedGET(getRequest(`/api/t/${token}`), { params: Promise.resolve({ token }) })).json());
     for (const b of bodies) {
       for (const k of allKeys(b)) expect(PUBLIC_KEYS.has(k), `unexpected public key "${k}"`).toBe(true);
-      expect(JSON.stringify(b)).not.toMatch(/9876543210|actor|token|@example|encrypted/i);
+      expect(JSON.stringify(b)).not.toMatch(/9876543210|actor|token|@example|encrypted|Audit User/i);
     }
   });
 
-  it("owner journey responses never contain the contact address or tokens", async () => {
+  it("owner-only data never leaks contact addresses or tokens, and needs the session", async () => {
     await recordHeartbeat(getSql(), "audit-worker", new Date(), "test", new Date());
     switchJar(newJar());
-    await getSql()`DELETE FROM journeys`;
-    const res = await journeysPOST(jsonRequest("/api/journeys", { idempotencyKey: randomUUID(), destination: { label: "Room 12" }, etaAt: new Date(Date.now() + 30 * MINUTE).toISOString() }));
-    expect(res.status).toBe(201);
-    const current = JSON.stringify(await (await currentGET()).json());
-    expect(current).not.toMatch(/token|@|encrypted|owner|actor/i);
+    expect((await (await currentTripGET()).json()).trip).toBeNull();
+    expect((await (await meGET()).json()).user).toBeNull();
+    await demoPOST(jsonRequest("/api/auth/demo", { name: "Owner" }));
+    const me = JSON.stringify(await (await meGET()).json());
+    expect(me).not.toMatch(/token|encrypted|hash/i);
   });
 
   it("stores malicious strings verbatim and inert (parameterised SQL, encrypted, escaped on render)", async () => {

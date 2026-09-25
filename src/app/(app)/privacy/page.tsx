@@ -1,136 +1,63 @@
 import type { Metadata } from "next";
-import { getCapabilities } from "@/server/capabilities";
-import { getSql } from "@/server/db/client";
-import { pilotStatus } from "@/server/pilot/status";
-import { formatIstDate } from "@/lib/time";
+import Link from "next/link";
+import { MiraOrb } from "@/components/app/MiraOrb";
+import { Icon } from "@/components/ui/Icon";
 
-export const metadata: Metadata = { title: "About MIRA and privacy" };
-export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Privacy" };
 
-function Section({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
+function Item({ emoji, title, children }: { emoji: string; title: string; children: React.ReactNode }) {
   return (
-    <section id={id} aria-labelledby={id ? `${id}-h` : undefined} className="scroll-mt-24 rounded-[var(--radius-card)] border border-line bg-surface p-5">
-      <h2 id={id ? `${id}-h` : undefined} className="text-xl font-bold">
-        {title}
-      </h2>
-      <div className="mt-2 space-y-2 text-ink-muted [&_strong]:text-ink [&_li]:ml-5 [&_li]:list-disc">{children}</div>
-    </section>
+    <li className="flex gap-4 rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--shadow-card)]">
+      <span className="text-3xl" aria-hidden>
+        {emoji}
+      </span>
+      <div>
+        <h2 className="font-extrabold">{title}</h2>
+        <div className="mt-1 space-y-1.5 text-ink-muted">{children}</div>
+      </div>
+    </li>
   );
 }
 
-export default async function PrivacyPage() {
-  const caps = await getCapabilities();
-  let pilot = null;
-  try {
-    pilot = await pilotStatus(getSql());
-  } catch {
-    pilot = null;
-  }
+export default function PrivacyPage() {
   return (
-    <article className="flex flex-col gap-4 pb-6">
-      <header>
-        <h1 className="text-3xl font-bold">About MIRA</h1>
-        <p className="mt-2 max-w-prose text-ink-muted">
-          MIRA — <em>Know more. Move freely.</em> — is a free, privacy-first companion for moving around one pilot area: Delhi University North Campus
-          around Vishwavidyalaya Metro. It shares observed conditions with their sources and limits. It does not guarantee safety, and it is not an
-          emergency service.
-        </p>
-      </header>
+    <div className="bg-companion min-h-dvh px-4 pb-32 pt-[max(1.25rem,env(safe-area-inset-top))]">
+      <article className="mx-auto max-w-xl">
+        <Link href="/me" className="mb-4 inline-flex min-h-11 items-center gap-1 font-bold text-ink-muted">
+          <Icon name="back" className="size-5" /> Back
+        </Link>
+        <div className="flex items-center gap-3">
+          <MiraOrb size={52} calm />
+          <h1 className="text-3xl font-extrabold">Your privacy</h1>
+        </div>
+        <p className="mt-3 text-lg text-ink-muted">Plain words about what MIRA keeps, who sees it, and when it&apos;s gone.</p>
 
-      <Section id="data" title="What we keep, and for how long">
-        <p>
-          <strong>No account.</strong> When you first submit an observation or start a check-in, your browser gets a random, pseudonymous cookie so
-          MIRA can recognise the same browser. It expires after 30 days. It has no name or profile, and it cannot be recovered on another device.
-        </p>
-        <p>
-          <strong>Observations you share (Report).</strong> We store the type (experienced or witnessed), a broad category, a roughly 500&nbsp;m area,
-          how recent it was (today, yesterday, past week, or earlier/unsure), and the time of day (day, evening, late, or unsure) — never an exact
-          point or exact time. Any text you write is encrypted, checked automatically for things like phone numbers, emails, plates and addresses,
-          and read only by an authorised moderator. Reports are deleted within 30 days, or sooner if rejected.
-        </p>
-        <p>
-          <strong>Check-ins (Accompany).</strong> MIRA does not track your location. It stores only what a check-in needs: the destination (a mapped
-          place or your own label, encrypted), your ETA, and the check-in state. If you invite a contact, their email is encrypted and used only for
-          the invitation and, if you miss the check-in and they accepted, one alert email. All of it is deleted within 24 hours after the journey
-          ends. There is no journey history.
-        </p>
-        <p>
-          <strong>Operational records.</strong> Rate-limit counters use a daily-changing keyed hash of your IP address or browser cookie (never the
-          raw IP) and expire within a day. Logs contain IDs and states — not report text, contact details, destinations or coordinates.
-        </p>
-      </Section>
-
-      <Section id="community" title="How observations become community information">
-        <p>
-          Individual reports are never published. A moderator reviews each report for privacy and abuse (not to judge whether you are telling the
-          truth) and may approve only its structured, non-identifying details for combining.
-        </p>
-        <p>
-          Once a week, approved observations are combined by ~500&nbsp;m area, time of day (day 06:00–18:00, evening 18:00–22:00, late 22:00–06:00
-          IST) and category. A summary appears in Know only when at least five independent browsers contributed recent observations to the same
-          area, time of day and category — and a changed summary needs five new contributors. Summaries use fixed wording, never exact counts,
-          narratives, points or times, and expire after 35 days. Reports with unsure timing stay private.
-        </p>
-      </Section>
-
-      <Section id="know" title="Place and route information">
-        <p>
-          Place search runs on MIRA&apos;s own server against a local copy of the pilot map — your searches are not sent to a third-party geocoder.
-          Walking routes are calculated from mapped walkways and are not stored. &ldquo;Use my location&rdquo; asks your browser once, only when you tap
-          it; the position is sent in the request body to find the nearest walkway and then discarded.
-        </p>
-        <p>
-          Missing map details are shown as unknown. MIRA never infers lighting, crowds, whether a business is open, or whether a place is safe.
-        </p>
-      </Section>
-
-      <Section id="map-sources" title="Map sources">
-        <p>
-          Map data © OpenStreetMap contributors, available under the Open Database Licence (ODbL).{" "}
-          {pilot?.available && pilot.sourceDate ? (
-            <>
-              The pilot snapshot was taken on <strong>{formatIstDate(pilot.sourceDate)}</strong> and includes {pilot.placeCount} mapped places.
-            </>
-          ) : (
-            <>The pilot map snapshot is not loaded on this server right now.</>
-          )}
-        </p>
-        <p>
-          Background map images are loaded directly from the OpenStreetMap tile servers, which see your IP address and the map area you view. If the
-          map images fail to load, place and route information stays available as text.
-        </p>
-      </Section>
-
-      <Section id="contacts" title="Trusted contacts">
-        <p>
-          A contact is invited for one journey only. They must accept before any alert can be sent. The invitation link works only for accepting —
-          it never shows a live location, map or route — and it expires when the journey closes. Anyone who has the link can accept it, so share it
-          only with the person you chose. You can revoke the contact at any time.
-        </p>
-        <p>Alert emails are attempted once and may be delayed or not delivered. MIRA does not contact emergency services.</p>
-      </Section>
-
-      <Section id="ai" title="Automated suggestions">
-        {caps.ai ? (
-          <p>
-            If you choose to, MIRA can suggest a category for your observation using OpenAI. Before anything is sent, detected personal details are
-            removed; no location, contact details or identifiers are included, and the request asks the provider not to store it. The provider may
-            still keep data briefly for abuse monitoring under its own terms. Suggestions are editable and never decide what is published.
-          </p>
-        ) : (
-          <p>MIRA does not currently send any report text to an AI provider. Reports are structured by you and reviewed by a person.</p>
-        )}
-      </Section>
-
-      <Section title="What MIRA will never do">
-        <ul>
-          <li>Publish reports, narratives, faces, names or details about alleged perpetrators.</li>
-          <li>Show live locations, public journeys, or exact report points or times.</li>
-          <li>Keep movement history or offer family/partner tracking.</li>
-          <li>Label places or routes &ldquo;safe&rdquo; or &ldquo;unsafe&rdquo;, score them, or predict crime.</li>
-          <li>Sell data, show ads, or use trackers and analytics.</li>
+        <ul className="mt-6 space-y-3">
+          <Item emoji="📍" title="Your location">
+            <p>Used on your device to show where you are and what&apos;s around. It isn&apos;t stored unless you&apos;re on a trip you chose to share.</p>
+            <p>During a trip, only your last few positions are kept, and they&apos;re deleted the moment the trip ends. There&apos;s no location history.</p>
+          </Item>
+          <Item emoji="💜" title="Trips you share">
+            <p>Only trusted contacts who accepted your invite get the live link. They see your position and ETA until you arrive — then the link stops working.</p>
+            <p>If you don&apos;t check in, MIRA emails them once. It&apos;s not an emergency service: in danger, call 112.</p>
+          </Item>
+          <Item emoji="👤" title="Your account">
+            <p>Your name, saved places and trusted contacts (their emails are encrypted). Delete your account in Me and all of it is erased.</p>
+          </Item>
+          <Item emoji="✨" title="Chatting with Mira">
+            <p>Your chat is saved to your account for 30 days so Mira can follow the conversation. Clear it any time in Me.</p>
+            <p>When Mira&apos;s AI is connected, messages will be processed by our AI provider to generate replies — never sold, never used for ads.</p>
+          </Item>
+          <Item emoji="📝" title="Reports">
+            <p>Only a rough area (about 1 km), roughly when, and the kind of thing are kept — never your exact spot. Notes are encrypted and read only by a moderator.</p>
+            <p>Nothing is shown on its own. A soft note appears on the map only when at least five different people have reported something similar nearby, and disappears after five weeks. Reports are deleted within 30 days.</p>
+          </Item>
+          <Item emoji="🚫" title="What MIRA never does">
+            <p>No ads, no selling data, no public profiles, no &ldquo;safe/unsafe&rdquo; scores or crime maps, and no tracking you didn&apos;t start.</p>
+          </Item>
         </ul>
-      </Section>
-    </article>
+        <p className="mt-6 text-sm text-ink-subtle">Map data © OpenStreetMap contributors. Basemap by OpenFreeMap.</p>
+      </article>
+    </div>
   );
 }

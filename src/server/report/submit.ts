@@ -1,7 +1,7 @@
 import "server-only";
 import type postgres from "postgres";
 import { z } from "zod";
-import { cellFor } from "@/domain/pilot";
+import { encodeGeohash } from "@/domain/geohash";
 import { CATEGORIES, INVOLVEMENTS, NARRATIVE_MAX, RECENCIES, REPORT_TIME_BANDS } from "@/domain/report/taxonomy";
 import { codePointLength, detectPii, normaliseNarrative, piiFlags } from "@/domain/report/text";
 import { encryptText, hmacHex } from "@/server/crypto";
@@ -14,13 +14,15 @@ export const reportInputSchema = z
     idempotencyKey: z.guid(),
     involvement: z.enum(INVOLVEMENTS),
     category: z.enum(CATEGORIES),
-    placeId: z.guid(),
+    placeId: z.guid().optional(),
+    location: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).strict().optional(),
     recency: z.enum(RECENCIES),
     timeBand: z.enum(REPORT_TIME_BANDS),
     narrative: z.string().max(4000).optional().default(""),
     aiConsent: z.boolean().optional().default(false),
   })
-  .strict();
+  .strict()
+  .refine((v) => Boolean(v.placeId) !== Boolean(v.location), { message: "Provide either a place or a location", path: ["location"] });
 export type ReportInput = z.infer<typeof reportInputSchema>;
 
 export interface SubmitResult {
@@ -45,15 +47,17 @@ export async function prepareReport(sql: postgres.Sql, input: ReportInput): Prom
   if (codePointLength(narrative) > NARRATIVE_MAX) {
     throw new ApiError(400, "narrative_too_long", `Please keep the description under ${NARRATIVE_MAX} characters.`, { fields: ["narrative"] });
   }
-  const [place] = await sql<{ lat: number; lon: number }[]>`SELECT ST_Y(point) AS lat, ST_X(point) AS lon FROM places WHERE id = ${input.placeId}`;
-  const cell = place ? cellFor(place) : null;
-  if (!cell) {
-    throw new ApiError(422, "outside_pilot", "Choose a place inside the pilot area (DU North Campus around Vishwavidyalaya Metro).", { fields: ["placeId"] });
+  // Only a coarse worldwide cell (~1.2 km geohash) is kept — never the exact point or place.
+  let point: { lat: number; lon: number } | undefined = input.location;
+  if (!point && input.placeId) {
+    [point] = await sql<{ lat: number; lon: number }[]>`SELECT ST_Y(point) AS lat, ST_X(point) AS lon FROM places WHERE id = ${input.placeId}`;
   }
+  if (!point) throw new ApiError(422, "unknown_place", "Choose where it happened.", { fields: ["placeId"] });
+  const cell = encodeGeohash(point.lat, point.lon);
   return { input, narrative, cell };
 }
 
-export async function submitReport(sql: postgres.Sql, actorHash: string, prepared: PreparedReport, clock: Clock): Promise<SubmitResult> {
+export async function submitReport(sql: postgres.Sql, actorHash: string, prepared: PreparedReport, clock: Clock, userId: string | null = null): Promise<SubmitResult> {
   const { input, narrative, cell } = prepared;
   const now = clock.now();
   const spans = narrative ? detectPii(narrative) : [];
@@ -73,11 +77,11 @@ export async function submitReport(sql: postgres.Sql, actorHash: string, prepare
 
   const rows = await sql<{ id: string; status: string }[]>`
     INSERT INTO reports_private (actor_hash, idempotency_key, involvement, category, coarse_cell_id, recency_bucket, time_band,
-                                 encrypted_text, text_fingerprint, redaction_flags, hold_reasons, ai_consent, status, created_at, expires_at)
+                                 encrypted_text, text_fingerprint, redaction_flags, hold_reasons, ai_consent, status, created_at, expires_at, user_id)
     VALUES (${actorHash}, ${input.idempotencyKey}, ${input.involvement}, ${input.category}, ${cell}, ${input.recency}, ${input.timeBand},
             ${narrative ? encryptText(narrative, "report_text") : null},
             ${narrative ? hmacHex("report-fingerprint", narrative.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()) : null},
-            ${sql.json(flags)}, ${holdReasons}, ${input.aiConsent}, ${status}, ${created}, ${expires})
+            ${sql.json(flags)}, ${holdReasons}, ${input.aiConsent}, ${status}, ${created}, ${expires}, ${userId})
     ON CONFLICT (actor_hash, idempotency_key) DO NOTHING
     RETURNING id, status`;
   if (rows.length === 0) {

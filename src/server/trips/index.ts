@@ -10,7 +10,7 @@ import type { Clock } from "@/server/clock";
 import { getGeo } from "@/server/providers/geo";
 import { emailContact } from "@/server/providers/notify";
 import { shareTargets } from "@/server/account/contacts";
-import { formatIstTime } from "@/lib/time";
+import { tripSharedEmail } from "@/server/mail/templates";
 import type { User } from "@/server/session/user";
 
 export const ARRIVAL_RADIUS_M = 75;
@@ -119,19 +119,8 @@ export async function startTrip(sql: postgres.Sql, user: User, input: z.infer<ty
     const link = new URL(`/t/${token}`, getEnv().APP_BASE_URL).toString();
     for (const t of targets) {
       await sql`INSERT INTO trip_contacts (journey_id, contact_id) VALUES (${row!.id}, ${t.id}) ON CONFLICT DO NOTHING`;
-      const sent = await emailContact(
-        t.email,
-        `${user.name.split(" ")[0]} is sharing a trip with you`,
-        [
-          `Hi ${t.name},`,
-          "",
-          `${user.name} is walking to ${input.to.name} and shared the trip with you on MIRA.`,
-          `Expected by ${formatIstTime(eta)}. Follow along live until they arrive:`,
-          link,
-          "",
-          "The link stops working once the trip ends. MIRA will let you know if they don't check in.",
-        ].join("\n"),
-      );
+      const mail = tripSharedEmail({ contactName: t.name, ownerName: user.name.split(" ")[0], destination: input.to.name, minutesToEta: Math.round((eta.getTime() - now.getTime()) / 60_000), liveUrl: link });
+      const sent = await emailContact(t.email, mail.subject, mail.text);
       if (sent.ok) await sql`UPDATE trip_contacts SET notified_at = now() WHERE journey_id = ${row!.id} AND contact_id = ${t.id}`;
     }
     if (targets.length) await sql`UPDATE journeys SET contact_state = 'accepted' WHERE id = ${row!.id}`;
@@ -166,6 +155,7 @@ export async function addLocation(sql: postgres.Sql, userId: string, id: string,
     const near = haversineMeters(p, { lat: j.dest_lat, lon: j.dest_lon }) <= ARRIVAL_RADIUS_M;
     if (near && j.near_dest_since && now.getTime() - new Date(j.near_dest_since).getTime() >= ARRIVAL_DWELL_MS) {
       await tx`UPDATE journeys SET state = 'arrived', closed_at = ${now}, purge_at = ${purgeAt(now)}, last_location_at = ${now} WHERE id = ${id}`;
+      await tx`DELETE FROM trip_locations WHERE journey_id = ${id}`;
       return { arrived: true };
     }
     await tx`UPDATE journeys SET last_location_at = ${now}, near_dest_since = ${near ? (j.near_dest_since ?? now) : null} WHERE id = ${id}`;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { haversineMeters } from "@/domain/pilot";
 
 /**
  * The user's current position, held in JS memory only (never persisted, never put in
@@ -11,9 +12,11 @@ export interface LocState {
   status: LocStatus;
   point: { lat: number; lon: number; accuracy: number } | null;
   at: number;
+  /** Human name of the area around `point` (e.g. "Kamla Nagar"), when known. */
+  area: string | null;
 }
 
-let state: LocState = { status: "idle", point: null, at: 0 };
+let state: LocState = { status: "idle", point: null, at: 0, area: null };
 const listeners = new Set<() => void>();
 const set = (s: Partial<LocState>) => {
   state = { ...state, ...s };
@@ -39,6 +42,49 @@ export function requestLocation(): Promise<LocState> {
       { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 },
     );
   });
+}
+
+export function setArea(area: string | null) {
+  if (area !== state.area) set({ area });
+}
+
+/** Ignore GPS jitter: only move the dot for real movement or a much better fix. */
+const MOVE_M = 25;
+function accept(fix: { lat: number; lon: number; accuracy: number }): boolean {
+  const prev = state.point;
+  if (!prev) return true;
+  return haversineMeters(prev, fix) >= Math.max(MOVE_M, fix.accuracy / 2) || fix.accuracy < prev.accuracy / 2;
+}
+
+/**
+ * Keep the position fresh while the app is on screen; stops when hidden so it costs
+ * no battery in the background. Returns a cleanup function.
+ */
+export function watchWhileVisible(): () => void {
+  if (typeof navigator === "undefined" || !("geolocation" in navigator)) return () => {};
+  let id: number | null = null;
+  const start = () => {
+    if (id !== null || document.visibilityState !== "visible") return;
+    id = navigator.geolocation.watchPosition(
+      (p) => {
+        const fix = { lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy };
+        if (accept(fix)) set({ status: "ok", point: fix, at: Date.now() });
+      },
+      (e) => e.code === e.PERMISSION_DENIED && set({ status: "denied" }),
+      { enableHighAccuracy: true, maximumAge: 15_000 },
+    );
+  };
+  const stop = () => {
+    if (id !== null) navigator.geolocation.clearWatch(id);
+    id = null;
+  };
+  const onVis = () => (document.visibilityState === "visible" ? start() : stop());
+  start();
+  document.addEventListener("visibilitychange", onVis);
+  return () => {
+    document.removeEventListener("visibilitychange", onVis);
+    stop();
+  };
 }
 
 export function setLocation(point: LocState["point"]) {
@@ -71,4 +117,46 @@ export function greetingFor(d: Date): { hello: string; emoji: string; late: bool
   if (h < 17) return { hello: "Good afternoon", emoji: "🌤️", late: false };
   if (h < 21) return { hello: "Good evening", emoji: "🌆", late: h >= 19 };
   return { hello: "Good evening", emoji: "🌙", late: true };
+}
+
+/** One-shot destination hand-off (e.g. Mira → Home map), in memory only. */
+let pendingDest: { name: string; lat: number; lon: number; kind?: string } | null = null;
+export function setPendingDestination(d: typeof pendingDest) {
+  pendingDest = d;
+}
+export function takePendingDestination() {
+  const d = pendingDest;
+  pendingDest = null;
+  return d;
+}
+
+/** Client clock that ticks every 30 s; null during SSR (avoids hydration mismatch). */
+let clockNow: Date | null = null;
+const clockListeners = new Set<() => void>();
+let clockTimer: ReturnType<typeof setInterval> | null = null;
+// Module-level so React keeps one subscription (an inline subscribe re-subscribes every render).
+function subscribeClock(l: () => void) {
+  clockListeners.add(l);
+  if (!clockTimer) {
+    clockTimer = setInterval(() => {
+      clockNow = new Date();
+      clockListeners.forEach((x) => x());
+    }, 30_000);
+  }
+  return () => {
+    clockListeners.delete(l);
+    if (!clockListeners.size && clockTimer) {
+      clearInterval(clockTimer);
+      clockTimer = null;
+    }
+  };
+}
+function clockSnapshot(): Date {
+  // Refresh only when stale, so repeated reads within a render return the same object.
+  if (!clockNow || Date.now() - clockNow.getTime() > 30_000) clockNow = new Date();
+  return clockNow;
+}
+
+export function useClock(): Date | null {
+  return useSyncExternalStore(subscribeClock, clockSnapshot, () => null);
 }

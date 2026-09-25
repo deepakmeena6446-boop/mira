@@ -13,5 +13,19 @@ export async function purgeExpired(sql: postgres.Sql, now: Date): Promise<Record
   const audit = await sql`DELETE FROM admin_audit WHERE created_at < ${new Date(now.getTime() - 90 * 86_400_000)}`;
   const counters = await purgeExpiredCounters(sql, now);
   const releases = await purgeOldReleases(sql, now);
-  return { reports: reports.count, actorSessions: actors.count, adminSessions: admins.count, audit: audit.count, counters, releases };
+  const monthAgo = new Date(now.getTime() - 30 * 86_400_000);
+  const chat = await sql`DELETE FROM mira_messages WHERE created_at < ${monthAgo}`;
+  const inbox = await sql`DELETE FROM notifications WHERE created_at < ${monthAgo}`;
+  const userSessions = await sql`DELETE FROM user_sessions WHERE expires_at <= ${now}`;
+  return {
+    reports: reports.count,
+    actorSessions: actors.count,
+    adminSessions: admins.count,
+    audit: audit.count,
+    counters,
+    releases,
+    miraMessages: chat.count,
+    notifications: inbox.count,
+    userSessions: userSessions.count,
+  };
 }

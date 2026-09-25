@@ -4,7 +4,8 @@ import { displayName } from "@/domain/know-copy";
 import { decryptText } from "@/server/crypto";
 import type { Clock } from "@/server/clock";
 import type { Mailer } from "@/server/mail";
-import { missedAlertEmail } from "@/server/mail/templates";
+import { getEnv } from "@/server/config/env";
+import { missedAlertEmail, tripMissedEmail } from "@/server/mail/templates";
 
 export interface JourneyTickResult {
   missed: number;
@@ -18,8 +19,7 @@ export interface JourneyTickResult {
 interface PendingAlert {
   journeyId: string;
   email: string;
-  etaAt: Date;
-  placeName: string | null;
+  message: { subject: string; text: string };
 }
 
 /**
@@ -40,8 +40,8 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
 
   const alerts: PendingAlert[] = [];
   await sql.begin(async (tx) => {
-    const due = await tx<{ id: string; state: JourneyState; eta_at: Date; contact_state: string; place_id: string | null; dest_name: string | null }[]>`
-      SELECT id, state, eta_at, contact_state, place_id, dest_name FROM journeys
+    const due = await tx<{ id: string; state: JourneyState; eta_at: Date; contact_state: string; place_id: string | null; dest_name: string | null; user_id: string | null; share_token_enc: string | null }[]>`
+      SELECT id, state, eta_at, contact_state, place_id, dest_name, user_id, share_token_enc FROM journeys
       WHERE state IN ('active', 'missed') AND eta_at <= ${new Date(now.getTime() - MISS_GRACE_MS)}
       ORDER BY eta_at LIMIT 200
       FOR UPDATE SKIP LOCKED`;
@@ -62,17 +62,32 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
         result.missed += 1;
         log("journey.missed", { journey: j.id, alert: canAlert ? "claimed" : "not_attempted" });
         if (canAlert) {
-          let placeName: string | null = j.dest_name ?? null;
-          if (!placeName && j.place_id) {
-            const [p] = await tx<{ name: string | null; kind: string }[]>`SELECT name, tags->>'mira:kind' AS kind FROM places WHERE id = ${j.place_id}`;
-            if (p) placeName = displayName(p.name, p.kind ?? "Place");
+          let message: PendingAlert["message"];
+          if (j.user_id) {
+            // MIRA 2.0 trip: the contact accepted this person once, so their first name and the
+            // still-open live link are shared (the link closes with the trip).
+            const [owner] = await tx<{ name: string }[]>`SELECT name FROM users WHERE id = ${j.user_id}`;
+            message = tripMissedEmail({
+              ownerName: (owner?.name ?? "Your contact").split(" ")[0],
+              destination: j.dest_name ?? "their destination",
+              minutesLate: Math.max(1, Math.round((now.getTime() - new Date(j.eta_at).getTime()) / 60_000)),
+              liveUrl: j.share_token_enc ? new URL(`/t/${decryptText(j.share_token_enc, "share_token")}`, getEnv().APP_BASE_URL).toString() : null,
+            });
+          } else {
+            let placeName: string | null = j.dest_name ?? null;
+            if (!placeName && j.place_id) {
+              const [p] = await tx<{ name: string | null; kind: string }[]>`SELECT name, tags->>'mira:kind' AS kind FROM places WHERE id = ${j.place_id}`;
+              if (p) placeName = displayName(p.name, p.kind ?? "Place");
+            }
+            message = missedAlertEmail({ etaAt: new Date(j.eta_at), placeName });
           }
-          for (const r of recipients) alerts.push({ journeyId: j.id, email: decryptText(r.encrypted_email, "contact_email"), etaAt: new Date(j.eta_at), placeName });
+          for (const r of recipients) alerts.push({ journeyId: j.id, email: decryptText(r.encrypted_email, "contact_email"), message });
         }
       }
       if (state === "missed" && now.getTime() >= new Date(j.eta_at).getTime() + EXPIRE_AFTER_ETA_MS) {
         await tx`UPDATE journeys SET state = 'expired', closed_at = ${now}, purge_at = ${purgeAt(now)} WHERE id = ${j.id} AND state = 'missed'`;
         await tx`UPDATE contact_invites SET expires_at = LEAST(expires_at, ${now}) WHERE journey_id = ${j.id}`;
+        await tx`DELETE FROM trip_locations WHERE journey_id = ${j.id}`;
         result.expired += 1;
         log("journey.expired", { journey: j.id });
       }
@@ -84,7 +99,7 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
   for (const [journeyId, group] of byJourney) {
     const outcomes: Array<"sent" | "failed" | "unconfirmed"> = [];
     for (const a of group) {
-      const res = await mailer!.send({ to: a.email, ...missedAlertEmail({ etaAt: a.etaAt, placeName: a.placeName }) });
+      const res = await mailer!.send({ to: a.email, ...a.message });
       outcomes.push(res.ok ? "sent" : res.definite ? "failed" : "unconfirmed");
     }
     const outcome = outcomes.includes("sent") ? "sent" : outcomes.includes("unconfirmed") ? "unconfirmed" : "failed";

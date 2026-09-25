@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api-client";
-import { greetingFor, useLocation } from "@/lib/location-store";
+import { greetingFor, setArea, takePendingDestination, useClock, useLocation, watchWhileVisible } from "@/lib/location-store";
 import type { SavedPlace } from "@/server/account/places";
 import type { Contact } from "@/server/account/contacts";
 import type { TripView } from "@/server/trips";
@@ -61,25 +61,37 @@ export function HomeScreen({
   const router = useRouter();
   const toast = useToast();
   const loc = useLocation(true);
-  const me = loc.point ? { lat: loc.point.lat, lon: loc.point.lon } : null;
-  const [now, setNow] = useState<Date | null>(null);
-  const [area, setArea] = useState<string | null>(null);
+  const lat = loc.point?.lat;
+  const lon = loc.point?.lon;
+  const me = useMemo(() => (lat !== undefined && lon !== undefined ? { lat, lon } : null), [lat, lon]);
+  const now = useClock();
+  const [initialDest] = useState(() => takePendingDestination());
+  const [poiArea, setPoiArea] = useState<string | null>(null);
   const [nearby, setNearby] = useState<{ places: Place[]; notes: Note[] }>({ places: [], notes: [] });
   const [places, setPlaces] = useState(initialPlaces);
-  const [dest, setDest] = useState<Destination | null>(null);
-  const [info, setInfo] = useState<RouteInfo | null>(null);
-  const [routeLoading, setRouteLoading] = useState(false);
+  const [dest, setDest] = useState<Destination | null>(initialDest);
+  const [routed, setRouted] = useState<{ key: string; data: RouteInfo | null } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [pinMode, setPinMode] = useState(false);
-  const [snap, setSnap] = useState<Snap>("peek");
+  const [snap, setSnap] = useState<Snap>(initialDest ? "half" : "peek");
   const [signIn, setSignIn] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
 
+  // First visit: show the short onboarding once (per-device convenience flag only).
   useEffect(() => {
-    setNow(new Date());
-    const t = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(t);
-  }, []);
+    if (user) return;
+    try {
+      if (!localStorage.getItem("mira.welcomed")) router.replace("/welcome");
+    } catch {
+      /* storage unavailable: stay on home */
+    }
+  }, [user, router]);
+
+  // Keep the dot live while Home is on screen (paused when the app is hidden).
+  const located = loc.status === "ok";
+  useEffect(() => (located ? watchWhileVisible() : undefined), [located]);
+  // Locality from the map tiles ("Kamla Nagar"), else the nearest named place we know.
+  const area = loc.area ?? poiArea;
 
   // Where am I + what's around, whenever the position settles.
   const meKey = me ? `${me.lat.toFixed(3)},${me.lon.toFixed(3)}` : "";
@@ -88,11 +100,11 @@ export function HomeScreen({
     let stop = false;
     (async () => {
       const [r, n] = await Promise.all([
-        api<{ label: string }>("/api/geo/reverse", { body: me }),
+        api<{ label: string | null }>("/api/geo/reverse", { body: me }),
         api<{ places: Place[]; notes: Note[] }>("/api/geo/nearby", { body: me }),
       ]);
       if (stop) return;
-      if (r.ok) setArea(r.data.label);
+      if (r.ok) setPoiArea(r.data.label);
       if (n.ok) setNearby(n.data);
     })();
     return () => {
@@ -101,27 +113,47 @@ export function HomeScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meKey]);
 
-  const pick = useCallback(
-    async (d: Destination) => {
-      setSearchOpen(false);
-      setPinMode(false);
-      setDest(d);
-      setInfo(null);
-      setSnap("half");
-      if (!me) return;
-      setRouteLoading(true);
-      const res = await api<RouteInfo>("/api/geo/route", { body: { from: me, to: { lat: d.lat, lon: d.lon } } });
-      setRouteLoading(false);
-      if (res.ok) setInfo(res.data);
+  const pick = useCallback((d: Destination) => {
+    setSearchOpen(false);
+    setPinMode(false);
+    setDest(d);
+    setSnap("half");
+  }, []);
+
+  // Route for the chosen destination from where I am (derived; refetches if either changes).
+  const routeKey = dest && me ? `${dest.lat},${dest.lon}|${meKey}` : null;
+  useEffect(() => {
+    if (!routeKey || !dest || !me) return;
+    let stop = false;
+    void api<RouteInfo>("/api/geo/route", { body: { from: me, to: { lat: dest.lat, lon: dest.lon } } }).then((res) => {
+      if (!stop) setRouted({ key: routeKey, data: res.ok ? res.data : null });
+    });
+    return () => {
+      stop = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeKey]);
+  const info = routed && routed.key === routeKey ? routed.data : null;
+  const routeLoading = Boolean(routeKey) && routed?.key !== routeKey;
+
+  // Pins: what's around you, or what's along the way once a destination is chosen.
+  const mapPlaces = useMemo(
+    () => (dest ? (info?.along ?? []) : nearby.places).slice(0, 20).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, emoji: kindEmoji(p.kind) })),
+    [dest, info, nearby.places],
+  );
+  const onPlaceClick = useCallback(
+    (p: { name: string; lat: number; lon: number; id: string }) => {
+      const hit = [...nearby.places, ...(info?.along ?? [])].find((x) => x.id === p.id);
+      pick({ name: p.name, lat: p.lat, lon: p.lon, kind: hit?.kind });
     },
-    [me],
+    [nearby.places, info, pick],
   );
 
   const onMapClick = useCallback(
     async (p: { lat: number; lon: number }) => {
       if (!pinMode) return;
-      const r = await api<{ label: string }>("/api/geo/reverse", { body: p });
-      void pick({ name: r.ok ? r.data.label.replace(/^Near /, "Near ") : "Dropped pin", lat: p.lat, lon: p.lon });
+      const r = await api<{ label: string | null }>("/api/geo/reverse", { body: p });
+      void pick({ name: (r.ok && r.data.label) || "Dropped pin", lat: p.lat, lon: p.lon });
     },
     [pinMode, pick],
   );
@@ -171,7 +203,7 @@ export function HomeScreen({
 
   return (
     <div className="fixed inset-0 overflow-hidden">
-      <WorldMap tiles={tiles} me={me} dest={dest} route={info?.route.geometry ?? null} notes={nearby.notes} onMapClick={onMapClick} label="Map around your location" />
+      <WorldMap tiles={tiles} me={me} dest={dest} route={info?.route.geometry ?? null} notes={nearby.notes} places={mapPlaces} onPlaceClick={onPlaceClick} onMapClick={onMapClick} onArea={setArea} label="Map around your location" />
 
       {/* Top: greeting + search */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.9rem,env(safe-area-inset-top))]">
@@ -258,7 +290,7 @@ export function HomeScreen({
                   <p className="text-ink-muted">Turn on location to see the walk from here.</p>
                 ) : null}
               </div>
-              <button type="button" aria-label="Close" onClick={() => { setDest(null); setInfo(null); setSnap("peek"); }} className="grid size-11 place-items-center rounded-full bg-sunken">
+              <button type="button" aria-label="Close" onClick={() => { setDest(null); setSnap("peek"); }} className="grid size-11 place-items-center rounded-full bg-sunken">
                 <Icon name="close" className="size-4" />
               </button>
             </div>

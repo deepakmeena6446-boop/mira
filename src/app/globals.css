@@ -172,3 +172,62 @@
   border-radius: 14px !important;
   box-shadow: var(--shadow-card) !important;
 }
+
+/* Nearby place pins on the map (WorldMap). The button is the dot; the name floats below. */
+.mira-pin {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mira-pin-dot {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 2px 8px -2px rgb(50 25 120 / 0.35), 0 0 0 1px var(--color-line);
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 150ms ease;
+}
+.mira-pin:hover .mira-pin-dot,
+.mira-pin:focus-visible .mira-pin-dot {
+  transform: scale(1.15);
+}
+.mira-pin:focus-visible {
+  outline: none;
+}
+.mira-pin:focus-visible .mira-pin-dot {
+  box-shadow: 0 0 0 3px var(--color-accent);
+}
+.mira-pin-label {
+  position: absolute;
+  top: 31px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 120px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.9);
+  color: var(--color-ink);
+  font: 700 11px/16px var(--font-jakarta), system-ui, sans-serif;
+  box-shadow: 0 1px 4px -1px rgb(50 25 120 / 0.25);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mira-pin-dot {
+    transition: none;
+  }
+}

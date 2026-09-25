@@ -21,11 +21,9 @@ export function e2eServerEnv(): Record<string, string> {
     ADMIN_PASSWORD_HASH: "b64:" + Buffer.from(hashSync(E2E_ADMIN_PASSWORD, { algorithm: 2, memoryCost: 19456, timeCost: 2, parallelism: 1 })).toString("base64"),
     PILOT_MANIFEST_PATH: "data/pilot/manifest.json",
     MAP_TILE_URL: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    MAP_STYLE_URL: "https://tiles.openfreemap.org/styles/positron",
     SMTP_HOST: "127.0.0.1",
     SMTP_PORT: "1025",
     SMTP_FROM: "MIRA <no-reply@mira.test>",
-    OPENAI_API_KEY: "",
-    OPENAI_MODEL: "",
-    OPENAI_PRIVACY_TERMS_ACCEPTED: "",
   };
 }

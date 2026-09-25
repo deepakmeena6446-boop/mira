@@ -24,7 +24,9 @@ export interface WalkRoute {
 /** Everything MIRA needs from a maps provider. Mapbox implements this later. */
 export interface GeoProvider {
   search(q: string, near?: GeoPoint): Promise<PlaceHit[]>;
-  reverse(p: GeoPoint): Promise<{ label: string; precise: boolean }>;
+  /** A human place name near the point, or null when unknown — never raw coordinates. */
+  reverse(p: GeoPoint): Promise<{ label: string | null; precise: boolean }>;
   walk(a: GeoPoint, b: GeoPoint): Promise<WalkRoute>;
-  nearby(p: GeoPoint, radiusM: number): Promise<PlaceHit[]>;
+  /** Nearby places, optionally limited to kinds (metro, bus, pharmacy, health, police, food, shop, toilets, finance). */
+  nearby(p: GeoPoint, radiusM: number, kinds?: string[]): Promise<PlaceHit[]>;
 }

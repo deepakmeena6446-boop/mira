@@ -1,16 +1,34 @@
-# MIRA — Know more. Move freely.
+# MIRA — your walking companion
 
-A privacy-first, mobile-first web app for one pilot area: **Delhi University North Campus around Vishwavidyalaya Metro** (28.6850–28.7050° N, 77.2020–77.2250° E). It offers three things:
+An installable, mobile-first web app (PWA) that works anywhere in the world. Open it and it already knows the time and where you are. Three taps to let the people you trust follow your walk home live:
 
-- **Know**: mapped places and walking routes, with sources, freshness and uncertainty.
-- **Accompany**: a temporary check-in with an optional, consented contact.
-- **Report**: anonymous observations that are reviewed privately and published only as thresholded weekly summaries.
+1. **Where to?** Search, or tap a saved place like 🏠 Home. You get the walking route, the ETA, what's open along the way and any community notes.
+2. **Share my trip.** Your trusted contacts get a live link. You get a trip screen with "I'm here" and "+10 min".
+3. **Arrive.** Arrival is auto-detected. The link goes dark and the live points are deleted. If you don't check in, each accepted contact gets **one** email.
 
-MIRA shares observed conditions, never safety guarantees.
+**Mira** is the in-app AI companion: warm, brief and practical. She knows your saved places, the time and your area. She can start a trip, find what's open nearby, or help you report something. She is not an emergency service and says so, pointing to 112 when someone says they're in danger.
 
-The product, UX, architecture and execution contracts are in the four `MIRA_*.md` files. This README covers running and operating the implementation.
+**Reports** take three taps: pick one of six tiles, then send. The location defaults to "here" and the time to "just now". Reports are private and reviewed by a person. They appear publicly only as calm, template-worded community notes once enough independent people report the same thing in a ~1.2 km area.
+
+> MIRA 2.0 deliberately moved away from the V0 spec documents (`MIRA_*.md`). Those documents describe the V0 pilot; this README describes the current app.
 
 ---
+
+## Placeholders now, real providers later
+
+Every external service sits behind an interface in `src/server/providers/`. The app is fully usable with **no API keys**. `GET /api/me` reports which mode each capability is in, and the Me screen shows a small "Demo" pill while any placeholder is active.
+
+| Capability | Placeholder (today) | Real (later) | Env to set |
+|---|---|---|---|
+| Maps (search, routes, nearby) | MIRA's OSM snapshot where it has data. Elsewhere, live OpenStreetMap: Photon for search, Overpass for "Around you" (server-side, ~100 m rounded, cached). Routes outside the snapshot are straight-line, flagged *approximate* (dashed) | Mapbox Search + Directions | `MAPBOX_TOKEN` (placeholder: `PLACE_SEARCH_URL`, `OVERPASS_URL`; unset = off) |
+| Area names | Nearest locality from the map's own vector tiles, then a server-side Nominatim lookup (~100 m rounded, cached, ≤ 1 req/s) | Mapbox reverse geocoding | `REVERSE_GEOCODER_URL` (placeholder only; unset = off) |
+| Basemap | OpenFreeMap vector style | Mapbox style | `MAP_STYLE_URL` |
+| Sign-in | "Continue" with a first name creates a real local account | Google OAuth | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` |
+| Mira | Scripted persona engine over the real tools, streamed as NDJSON (English + Hinglish) | Claude (`claude-opus-5`, streaming, tool use, same persona and tools) | `ANTHROPIC_API_KEY` |
+| Contact delivery | SMTP (Mailpit locally) + in-app notifications | Production SMTP / WhatsApp / SMS | `SMTP_*` |
+| Push | In-app only | Web Push | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` |
+
+Wiring a real adapter takes three steps: implement it next to `placeholder.ts`, flip its flag in `REAL_ADAPTERS` (`src/server/providers/modes.ts`), and set the env vars. A capability reports "real" only when **both** the adapter exists and its key is present, so setting a key alone never pretends a feature works.
 
 ## Run locally
 
@@ -21,13 +39,14 @@ docker compose up -d            # PostGIS (127.0.0.1:54329) + Mailpit (SMTP 1025
 npm install                     # also copies the MapLibre worker into public/maplibre
 npm run env:local               # writes an ignored .env.local with fresh secrets; prints a one-time moderator password
 npm run db:migrate
-npm run pilot:import            # imports the committed, checksummed OSM extract (no network needed)
-npm run dev                     # web on http://localhost:3100
-npm run worker:dev              # second terminal: missed check-ins, deletion, weekly release
+npm run pilot:import            # imports the committed OSM extract used by the placeholder maps provider
+npm run dev                     # web on http://localhost:3100 (open it on your phone via your LAN IP to install)
+npm run worker:dev              # second terminal: missed arrivals, deletion, weekly release
 ```
 
 - Moderator area: `http://localhost:3100/admin/login`, using the password printed by `env:local`. To get a new one, run `npm run env:local -- --force`.
-- All mail, including invitations and missed-check-in alerts, is captured in Mailpit at http://localhost:8025. Nothing reaches a real inbox.
+- Walkthrough: open `/`, follow the three welcome steps, save a place as Home from its route sheet, add a trusted contact on **Me**, open their invite from Mailpit in another browser, then tap Home → **Share my trip**.
+- All mail, including contact invites, trip links and missed-arrival alerts, is captured in Mailpit at http://localhost:8025. Nothing reaches a real inbox.
 - To re-fetch a newer OSM snapshot (one rate-respecting Overpass request), run `npm run pilot:fetch -- --refresh`, then `npm run pilot:import`.
 
 Production mode locally: `npm run build && npm run start` and `npm run worker:start`.
@@ -41,61 +60,75 @@ Production mode locally: `npm run build && npm run start` and `npm run worker:st
 | `env:local` | Generate `.env.local` with random secrets and an Argon2id moderator hash |
 | `admin:hash` | Hash a moderator password for a secret store (prints the dotenv-safe `b64:` form) |
 | `db:migrate`, `db:new-migration -- <name>` | Apply or create reviewed, forward-only SQL migrations |
-| `pilot:fetch`, `pilot:import` | Fetch the sourced OSM extract; validate checksums and import |
-| `aggregate:run -- --at <ISO Monday>` | Operator tool: run the weekly release for an IST Monday (idempotent) |
+| `pilot:fetch`, `pilot:import` | Fetch the sourced OSM extract; validate checksums and import (placeholder map data) |
+| `aggregate:run -- --at <ISO Monday>` | Operator tool: run the weekly community-notes release (idempotent) |
 | `lint`, `typecheck`, `test` | ESLint; route typegen + `tsc`; Vitest unit + integration (uses DB `mira_test`) |
-| `test:e2e` | Production build + Playwright flows A–G, mobile and desktop (uses DB `mira_e2e` and Mailpit) |
+| `test:e2e` | Production build + Playwright: share-a-trip loop, missed alerts, Mira, reports and moderation, privacy; mobile and desktop (uses DB `mira_e2e` and Mailpit) |
 | `audit:bundle` | After build: scan client assets for secrets |
 
 ## How it's built
 
-- **Next.js 16 App Router + TypeScript**: UI and same-origin route handlers (`src/app`).
-- **PostgreSQL 17 + PostGIS 3.5**: SQL migrations in `db/migrations`, run through the Drizzle migrator.
-- **Separate Node worker** (`src/worker`): the same code and database. Heartbeat every 30 s; readiness fails after 3 minutes without one.
-- **MapLibre GL v6** with raster OSM tiles. Every fact is also available as text.
-- **Pure domain rules** in `src/domain`: routing, OSM import, PII detection, moderation, aggregation, journey state machine, time bands.
-- **Server integrations** in `src/server`: crypto, sessions, rate limits, mail, the optional AI adapter, and the KNOW, report, journey and aggregation services.
+- **Next.js 16 App Router + TypeScript + Tailwind v4.** Screens live in `src/app/(app)`: Home (map + sheet), Trip, Mira, Report and Me. `/welcome` handles onboarding, `/t/[token]` is the contact's live view, `/invite` accepts a contact invite, and `/admin` is moderation.
+- **PWA**: `src/app/manifest.ts`, icons in `public/`, and `public/sw.js` (an offline shell that never caches `/api`, `/t` or `/invite`).
+- **PostgreSQL 17 + PostGIS 3.5**: SQL migrations in `db/migrations` (`0006_accounts_trips` and `0007_trip_share` are the 2.0 schema).
+- **Separate Node worker** (`src/worker`): missed-arrival alerts (at most once), expiry, purge, retention and aggregation. Heartbeat every 30 s; trips can't start while it's unhealthy.
+- **Pure domain rules** in `src/domain`: geohash cells, journey state machine, PII detection, moderation, aggregation, routing.
+- **MapLibre GL** (`src/components/map/WorldMap.tsx`) with route, community-note and "you" layers. Everything on the map is also in the sheet as text.
+
+### API map
+
+| Area | Routes |
+|---|---|
+| Account | `POST /api/auth/demo`, `POST /api/auth/signout`, `GET/PATCH/DELETE /api/me`, `/api/me/places[/id]`, `/api/me/contacts[/id]`, `/api/me/notifications` |
+| Maps | `GET /api/geo/search`, `POST /api/geo/reverse`, `POST /api/geo/route`, `POST /api/geo/nearby` (coordinates go in POST bodies, never URLs) |
+| Trips | `POST /api/trips`, `GET /api/trips/current`, `POST /api/trips/[id]/location`, `POST /api/trips/[id]/{arrive,end,extend}`, `GET /api/t/[token]` (contact view) |
+| Mira | `GET/DELETE /api/mira` (history), `POST /api/mira` (NDJSON stream: `text` / `card` / `done`) |
+| Reports | `POST /api/reports`, `/api/admin/*` (moderator session) |
 
 ### Privacy design (summary)
 
 | Data | Stored as | Deleted |
 |---|---|---|
-| Report | 500 m cell only (never the chosen place), recency bucket, time band, hour-truncated submission time; text AES-256-GCM encrypted; PII flags as types/counts | ≤ 30 days (text removed immediately on rejection; row within 24 h) |
-| Journey | Destination place ID or encrypted label, ETA, state; **no origin, no track** | ≤ 24 h after close (6 h in practice) |
-| Contact | Encrypted email; hashed single-journey bearer token | With the journey |
-| Browser | Random HttpOnly cookie, stored only as a keyed hash; created on the first POST only | 30 days |
-| Rate limits | Daily-rotated HMAC of IP/actor | 24 h |
-| Public community data | `aggregate_releases` only: weekly, ≥ 5 independent contributors (≥ 5 *new* for a changed release), fixed wording, no counts, points or times | 35 days |
+| Live location | Last 20 points of an open trip, visible only to accepted contacts via an unguessable link (hashed; encrypted copy for the owner) | **The moment the trip closes**; the trip row within 6 h |
+| Home screen location | In browser memory only; refreshed while the app is visible, paused when hidden | Never stored |
+| Saved places | Label, emoji and point, for your account only (max 10) | With your account |
+| Trusted contacts | Encrypted email + keyed hash; they accept once, with no account needed | On removal or with your account |
+| Mira chat | Your messages and Mira's replies | 30 days, or instantly with "Clear" |
+| Report | ~1.2 km geohash cell only, recency bucket, time band, hour-truncated time; text AES-256-GCM encrypted | ≤ 30 days |
+| Public community notes | `aggregate_releases` only: ≥ 5 independent contributors, fixed wording, no counts, points or times | 35 days |
 
-Logs contain IDs, states and counts only. Public responses are covered by an allowlist test, and client bundles by a secret scan.
+There's no location history, no public profile, no safety score and no heatmap. Emails never contain coordinates. Deleting your account (Me → Delete) removes places, contacts, trips, chat and sessions. Public responses are covered by an allowlist test, and client bundles by a secret scan.
 
 ## Production prerequisites
 
 - **HTTPS** (`APP_BASE_URL=https://…`, enforced at startup). Cookies become `__Host-` + `Secure`, and HSTS is sent.
 - **Two services from the same build**: `npm run start` (web) and `npm run worker:start` (worker), against one PostGIS database. Serverless-only or static hosting is not supported.
-- **Reverse proxy** that *appends* the client address to `X-Forwarded-For`; set `TRUSTED_PROXY_HOPS` to match (default 1). It must not log full request URLs for `/invite/*`, which carry bearer tokens.
-- **Secrets from a secret store**, never from files in the repo. Required: `DATABASE_URL`, `APP_BASE_URL`, `SESSION_SECRET`, `DATA_ENCRYPTION_KEY`, `ADMIN_PASSWORD_HASH`, `PILOT_MANIFEST_PATH`, `MAP_TILE_URL`. See `.env.example`, which documents each variable and the dotenv-safe `b64:` hash form.
+- **Reverse proxy** that *appends* the client address to `X-Forwarded-For`; set `TRUSTED_PROXY_HOPS` to match (default 1). It must not log full request URLs for `/invite/*` or `/t/*`, which carry bearer tokens.
+- **Secrets from a secret store**, never from files in the repo. Required: `DATABASE_URL`, `APP_BASE_URL`, `SESSION_SECRET`, `DATA_ENCRYPTION_KEY`, `ADMIN_PASSWORD_HASH`, `PILOT_MANIFEST_PATH`, `MAP_TILE_URL`. Optional provider keys are listed in the table above. See `.env.example`, which documents each variable and the dotenv-safe `b64:` hash form.
 - **Backups**: expire in 30 days or less. After any restore, run the worker (or `purgeExpired`) **before** serving traffic, so expired reports and journeys are removed again. Use database disk encryption.
 - **Monitoring**: poll `/api/health/ready`. It returns 503 when the worker is stale, and shows `contactAlertProblems24h` (a count only). Warnings are logged as `health.worker_stale` and `health.contact_alert_delivery_problems`.
-- **Map tiles**: the public OSM tile server is acceptable only for low-volume pilot use. Switch `MAP_TILE_URL` (and `MAP_TILE_ATTRIBUTION`) to a provider before scale.
+- **Map tiles and geocoding**: OpenFreeMap and the public Nominatim, Photon and Overpass servers are fine for development and demos only. Switch to Mapbox (or another provider with an SLA) before real traffic.
 
-## External blockers (not presented as working)
+## Not yet real (placeholders, clearly labelled)
 
-| Item | Status | Fallback in place | To complete |
-|---|---|---|---|
-| Production SMTP | No credentials supplied. Verified end to end with Mailpit only. | Without SMTP, contact inputs are hidden ("Contact alerts are unavailable; you can still use a private check-in"), and journeys still work. | Set `SMTP_*`, send one invite plus one missed alert to a test inbox, and watch `contactAlertProblems24h`. |
-| OpenAI suggestions (optional) | No key; provider data terms not accepted. Adapter verified against a mock provider only. | The control is hidden; manual reporting is complete. | Review retention terms, set `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_PRIVACY_TERMS_ACCEPTED=true`, and run one live suggestion. |
-| On-device voice input | Can't be verified to process audio on-device. | Text only; `microphone=()` permissions policy. | Ship only with verified on-device recognition. |
-| "Stay with me" companion | No verified conversational provider. | Not shown anywhere (`src/domain/companion.ts`). | A privacy-reviewed provider plus the constraints in that module. |
-| Hosting, HTTPS, backups | Not provisioned (deployment task). | Local and production-mode runs verified. | See Production prerequisites. |
+| Item | Today | To complete |
+|---|---|---|
+| Google sign-in | Demo sign-in with a first name (real local account and session) | Add the Auth.js Google adapter, flip `REAL_ADAPTERS.google`, set `AUTH_GOOGLE_*` |
+| Mapbox | OSM snapshot + approximate straight-line routes elsewhere; Nominatim area names | Add the adapter, flip `REAL_ADAPTERS.mapbox`, set `MAPBOX_TOKEN` |
+| Claude for Mira | Scripted persona engine | Add the streaming adapter (same tools and persona), flip `REAL_ADAPTERS.claude`, set `ANTHROPIC_API_KEY` |
+| Production SMTP / push | Mailpit + in-app | Set `SMTP_*` / `VAPID_*` |
+| Background location on iOS | Browsers can't track in the background. Contacts see the last spot and time, and the missed-arrival alert still fires | Native app shell |
+| Hosting, HTTPS, backups | Not provisioned | See Production prerequisites |
 
 ## Implementation decisions (where the documents left room)
 
 1. **PII blocks approval.** A report with detected identifying content can't be approved until the moderator redacts it (deterministic replacement in the private copy) or rejects it. This is the stricter privacy reading.
 2. **Fixed reason codes, not free text,** for hold, reject and withdraw, so the audit trail can't capture narrative.
-3. **Journey purge 6 h after close,** inside the 24 h limit. Journey *start* is disabled entirely while the worker is unhealthy, because expiry and deletion depend on it.
+3. **Trip purge 6 h after close; live points deleted at close.** Trip *start* is disabled entirely while the worker is unhealthy, because alerts, expiry and deletion depend on it.
 4. **"Other" reports are never published** (there's no factual template). Transport issues are grouped as environmental rather than incident observations.
 5. **Emergency release suppression** gets a small moderator page (`/admin/releases`). Withdrawing a report automatically suppresses any active release that drops below five contributors.
-6. **Stable place IDs** are derived from the OSM identity, so `/know/place/[id]` links survive re-imports.
-7. **`OPENAI_PRIVACY_TERMS_ACCEPTED`** turns the "don't enable until terms are accepted" rule into configuration. **`TRUSTED_PROXY_HOPS`** fixes rate-limit IP spoofing.
+6. **Stable place IDs** are derived from the OSM identity, so saved references survive re-imports.
+7. **`TRUSTED_PROXY_HOPS`** fixes rate-limit IP spoofing.
 8. **`ADMIN_PASSWORD_HASH` accepts a `b64:` form.** Next's dotenv expansion mangles `$` in a variable that appears in both the process env and a `.env` file.
+9. **Consequential actions need a tap.** Mira proposes trips, reports and SOS as cards. Nothing is shared or sent until you tap.
+10. **Relative times in emails** ("in about 18 minutes"). The app is worldwide and MIRA doesn't know the contact's timezone.

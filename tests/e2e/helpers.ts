@@ -5,16 +5,14 @@
  */
 import { execFileSync } from "node:child_process";
 import postgres from "postgres";
-import { expect, type APIRequestContext, type Browser, type Page } from "@playwright/test";
+import { expect, type APIRequestContext, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { E2E_BASE, E2E_DB, E2E_ADMIN_PASSWORD, MAILPIT_API } from "./e2e-env";
 
 export const db = postgres(E2E_DB, { max: 2, onnotice: () => {} });
 
-export async function placeId(name: string): Promise<string> {
-  const [row] = await db<{ id: string }[]>`SELECT id FROM places WHERE name = ${name} LIMIT 1`;
-  if (!row) throw new Error(`place not found: ${name}`);
-  return row.id;
-}
+/** A spot inside the imported OSM placeholder data, so search, routes and nearby work. */
+export const GEO = { latitude: 28.6951, longitude: 77.2143 };
+export const DEST = "Vishwavidyalaya Metro Gate No. 3";
 
 export const SAME_ORIGIN = { origin: E2E_BASE, "x-mira-request": "1" };
 
@@ -47,10 +45,62 @@ export function uniqueAddress(tag: string): string {
   return `${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 }
 
-export async function pickPlace(page: Page, label: RegExp, name: string) {
-  const box = page.getByRole("combobox", { name: label });
-  await box.fill(name);
-  await page.getByRole("option", { name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first().click();
+/** A fresh person: own browser context with location granted, onboarded and signed in (demo auth). */
+export async function newUser(browser: Browser, name: string): Promise<{ ctx: BrowserContext; page: Page }> {
+  const ctx = await browser.newContext({ geolocation: GEO, permissions: ["geolocation"] });
+  const page = await ctx.newPage();
+  await page.goto("/");
+  await page.waitForURL("**/welcome");
+  await page.getByRole("button", { name: "Let's go" }).click();
+  await page.getByRole("button", { name: "Use my location" }).click();
+  await page.getByPlaceholder("Your first name").fill(name);
+  await page.getByRole("button", { name: "Start using MIRA" }).click();
+  await page.waitForURL((u) => u.pathname === "/");
+  await expect(page.getByText(new RegExp(name)).first()).toBeVisible();
+  return { ctx, page };
+}
+
+/** Adds a trusted contact from the Me screen and returns their address. */
+export async function addContact(page: Page, name: string, tag: string): Promise<string> {
+  const address = uniqueAddress(tag);
+  await page.goto("/me");
+  await page.getByRole("button", { name: "+ Add" }).nth(1).click();
+  await page.getByLabel("Name").last().fill(name);
+  await page.getByLabel("Email").fill(address);
+  await page.getByRole("button", { name: "Send invite" }).click();
+  await expect(page.getByText("Invited")).toBeVisible();
+  return address;
+}
+
+/** The contact opens their emailed invite in their own browser and accepts once. */
+export async function acceptContactInvite(browser: Browser, address: string): Promise<{ ctx: BrowserContext; page: Page }> {
+  const [invite] = await waitFor(async () => {
+    const m = await mailsTo(address);
+    return m.length ? m : null;
+  });
+  const link = /http:\/\/localhost:\d+\/invite\/[A-Za-z0-9_-]+/.exec(await mailText(invite.ID))![0];
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto(link);
+  await expect(page).toHaveURL(/\/invite$/); // token moves into a cookie, out of the URL
+  await page.getByRole("button", { name: "Accept" }).click();
+  await expect(page.getByText("You've accepted")).toBeVisible();
+  return { ctx, page };
+}
+
+/** The live /t/ link from the "sharing a trip" email sent to a contact. */
+export async function shareLinkFor(address: string): Promise<string> {
+  const mail = await waitFor(async () => (await mailsTo(address)).find((m) => m.Subject.includes("sharing a trip")));
+  return /http:\/\/localhost:\d+\/t\/[A-Za-z0-9_-]+/.exec(await mailText(mail.ID))![0];
+}
+
+/** Search a destination on Home and open its route sheet. */
+export async function openRoute(page: Page, name = DEST) {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Where to\?/ }).click();
+  await page.getByPlaceholder("Where to?").fill(name);
+  await page.getByRole("button", { name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first().click();
+  await expect(page.getByRole("button", { name: /Share my trip|Start my trip/ })).toBeVisible();
 }
 
 export async function adminPage(browser: Browser): Promise<Page> {

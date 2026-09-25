@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EnvValidationError, aiConfigured, parseEnv, smtpConfigured } from "@/server/config/env";
+import { EnvValidationError, parseEnv, smtpConfigured } from "@/server/config/env";
 
 const valid = { ...process.env } as Record<string, string | undefined>;
 
@@ -26,13 +26,9 @@ describe("environment validation", () => {
     expect(() => parseEnv({ ...valid, NODE_ENV: "production", APP_BASE_URL: "http://mira.example.org" })).toThrow(/https/);
     expect(() => parseEnv({ ...valid, NODE_ENV: "production", APP_BASE_URL: "http://localhost:3100" })).not.toThrow();
   });
-  it("derives SMTP and AI capability only from complete configuration", () => {
-    const env = parseEnv(valid);
-    expect(smtpConfigured(env)).toBe(false);
-    expect(aiConfigured(env)).toBe(false);
-    const withAi = parseEnv({ ...valid, OPENAI_API_KEY: "k", OPENAI_MODEL: "m" });
-    expect(aiConfigured(withAi)).toBe(false); // privacy terms not accepted
-    expect(aiConfigured(parseEnv({ ...valid, OPENAI_API_KEY: "k", OPENAI_MODEL: "m", OPENAI_PRIVACY_TERMS_ACCEPTED: "true" }))).toBe(true);
+  it("derives SMTP capability only from complete configuration", () => {
+    expect(smtpConfigured(parseEnv(valid))).toBe(false);
+    expect(smtpConfigured(parseEnv({ ...valid, SMTP_HOST: "h", SMTP_FROM: "a@b.c" }))).toBe(true);
   });
 });
 

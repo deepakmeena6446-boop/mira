@@ -1,0 +1,64 @@
+import { expect, test } from "@playwright/test";
+import { SAME_ORIGIN, acceptContactInvite, addContact, db, newUser, openRoute, shareLinkFor } from "./helpers";
+
+test.describe("Privacy — links die, strangers see nothing, deletion is real", () => {
+  test("an ended trip's link and forged links reveal nothing; another user can't act on the trip", async ({ browser }) => {
+    test.setTimeout(360_000); // three people onboard in one flow
+    const owner = await newUser(browser, "Aditi");
+    const address = await addContact(owner.page, "Bhai", "bhai");
+    const contact = await acceptContactInvite(browser, address);
+    await openRoute(owner.page);
+    await owner.page.getByRole("button", { name: /Share my trip/ }).click();
+    await owner.page.waitForURL("**/trip");
+    const link = await shareLinkFor(address);
+    const [trip] = await db`SELECT id FROM journeys ORDER BY created_at DESC LIMIT 1`;
+
+    const stranger = await newUser(browser, "Stranger");
+    for (const action of ["end", "arrive", "extend"]) {
+      const res = await stranger.page.request.post(`/api/trips/${trip.id}/${action}`, { headers: SAME_ORIGIN, data: action === "extend" ? { minutes: 10 } : {} });
+      expect(res.status(), action).toBe(404);
+    }
+    const loc = await stranger.page.request.post(`/api/trips/${trip.id}/location`, { headers: SAME_ORIGIN, data: { lat: 28.7, lon: 77.2 } });
+    expect(loc.status(), await loc.text()).toBe(404);
+
+    await owner.page.getByRole("button", { name: "End trip without arriving" }).click();
+    await owner.page.getByRole("button", { name: "End trip", exact: true }).click();
+    await expect(owner.page.getByText("Trip ended")).toBeVisible();
+    await contact.page.goto(link);
+    await expect(contact.page.getByRole("heading", { name: /trip has ended/ })).toBeVisible();
+    const ended = await (await contact.page.request.get(`/api/t/${link.split("/t/")[1]}`)).json();
+    expect(ended).toEqual({ state: "ended", name: "Aditi", destination: expect.any(String) });
+    expect((await contact.page.goto("/t/forged-token-aaaaaaaaaaaaaaaaaaaa"))?.status()).toBe(404);
+    await contact.page.goto("/invite/forged-token-aaaaaaaaaaaaaaaaaaaaaaaa");
+    await expect(contact.page.getByRole("heading", { name: "Invitation not available" })).toBeVisible();
+
+    await owner.ctx.close();
+    await contact.ctx.close();
+    await stranger.ctx.close();
+  });
+
+  test("personal APIs need a session, and deleting the account erases places, contacts and trips", async ({ browser }) => {
+    const anon = await browser.newContext();
+    for (const path of ["/api/me/places", "/api/me/contacts", "/api/mira"]) {
+      expect((await anon.request.get(path)).status(), path).toBe(401);
+    }
+    expect(await (await anon.request.get("/api/trips/current")).json()).toEqual({ trip: null });
+    expect((await (await anon.request.get("/api/me")).json()).user).toBeNull();
+
+    const { ctx, page } = await newUser(browser, "Gone");
+    await openRoute(page);
+    await page.getByRole("button", { name: "🏠 Home" }).click();
+    await expect(page.getByText("Saved as Home")).toBeVisible();
+    await addContact(page, "Friend", "friend");
+    const [{ id: userId }] = await db`SELECT id FROM users WHERE name = 'Gone' ORDER BY created_at DESC LIMIT 1`;
+    expect((await page.request.delete("/api/me", { headers: SAME_ORIGIN })).status()).toBe(200);
+    for (const table of ["users", "saved_places", "contacts", "user_sessions", "mira_messages"]) {
+      const col = table === "users" ? "id" : "user_id";
+      const [{ n }] = await db.unsafe(`SELECT count(*)::int AS n FROM ${table} WHERE ${col} = $1`, [userId]);
+      expect(n, table).toBe(0);
+    }
+    expect((await (await page.request.get("/api/me")).json()).user).toBeNull();
+    await ctx.close();
+    await anon.close();
+  });
+});

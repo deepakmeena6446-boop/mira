@@ -1,8 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 
-vi.mock("next/headers", async () => (await import("../helpers/cookie-jar")).nextHeadersMock);
-
 import { getSql } from "@/server/db/client";
 import { resetEnvCache } from "@/server/config/env";
 import { getMailer, resetMailer, type Mailer } from "@/server/mail";
@@ -11,14 +9,7 @@ import { createJourney, currentJourney, extendJourney, revokeContact, userAction
 import { processJourneys } from "@/server/journey/worker";
 import { acceptInvite, viewInvite } from "@/server/journey/invites";
 import { hashToken } from "@/server/crypto";
-import { POST as journeysPOST } from "@/app/api/journeys/route";
-import { GET as currentGET } from "@/app/api/journeys/current/route";
-import { POST as actionPOST } from "@/app/api/journeys/[id]/[action]/route";
-import { GET as inviteLanding } from "@/app/invite/[token]/route";
-import { recordHeartbeat } from "@/server/health/worker";
 import { applyTestEnv } from "../setup/test-env";
-import { newJar, switchJar } from "../helpers/cookie-jar";
-import { jsonRequest, getRequest } from "../helpers/http";
 import { loadFixturePilot, fixturePlaceId } from "../helpers/pilot";
 
 const MAILPIT = "http://127.0.0.1:8025/api/v1";
@@ -227,44 +218,5 @@ describe("ACCOMPANY journeys (injected clock, real Mailpit)", () => {
     await processJourneys(getSql(), clock, getMailer());
     const [{ m }] = await getSql()`SELECT count(*)::int AS m FROM journeys WHERE owner_actor_hash = 'closed-tab'`;
     expect(m).toBe(0);
-  });
-
-  describe("HTTP layer", () => {
-    beforeEach(async () => {
-      await recordHeartbeat(getSql(), "test-worker", new Date(), "test", new Date());
-    });
-
-    it("keeps journeys owner-only: another browser and a missing cookie see nothing", async () => {
-      const owner = newJar();
-      switchJar(owner);
-      const res = await journeysPOST(jsonRequest("/api/journeys", { idempotencyKey: randomUUID(), destination: { placeId }, etaAt: new Date(Date.now() + 30 * MINUTE).toISOString() }));
-      expect(res.status).toBe(201);
-      const { journey } = await res.json();
-      expect(Object.keys(journey)).not.toContain("contactEmail");
-      switchJar(newJar());
-      expect((await (await currentGET()).json()).journey).toBeNull();
-      const other = newJar();
-      switchJar(other);
-      await journeysPOST(jsonRequest("/api/journeys", { idempotencyKey: randomUUID(), destination: { label: "x" }, etaAt: new Date(Date.now() + 30 * MINUTE).toISOString() }));
-      const steal = await actionPOST(jsonRequest(`/api/journeys/${journey.id}/end`, {}), { params: Promise.resolve({ id: journey.id, action: "end" }) });
-      expect(steal.status).toBe(404);
-      switchJar(owner);
-      const forged = await actionPOST(jsonRequest(`/api/journeys/${journey.id}/end`, {}, { origin: "https://evil.example" }), { params: Promise.resolve({ id: journey.id, action: "end" }) });
-      expect(forged.status).toBe(403);
-      const ok = await actionPOST(jsonRequest(`/api/journeys/${journey.id}/arrive`, {}), { params: Promise.resolve({ id: journey.id, action: "arrive" }) });
-      expect((await ok.json()).journey.state).toBe("arrived");
-    });
-
-    it("exchanges the invite token for a cookie and redirects to a clean URL", async () => {
-      const res = await inviteLanding(getRequest("/invite/abcdefghijklmnopqrstuvwxyz0123456789ABCD"), { params: Promise.resolve({ token: "abcdefghijklmnopqrstuvwxyz0123456789ABCD" }) });
-      expect(res.status).toBe(303);
-      expect(res.headers.get("location")).toBe("http://localhost:3100/invite");
-      expect(res.headers.get("referrer-policy")).toBe("no-referrer");
-      const cookie = res.headers.get("set-cookie")!;
-      expect(cookie).toMatch(/mira_invite=abcdefghij/);
-      expect(cookie).toMatch(/HttpOnly/i);
-      const bad = await inviteLanding(getRequest("/invite/%3Cscript%3E"), { params: Promise.resolve({ token: "<script>" }) });
-      expect(bad.headers.get("set-cookie")).toBeNull();
-    });
   });
 });

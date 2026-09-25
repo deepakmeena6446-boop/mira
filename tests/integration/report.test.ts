@@ -5,7 +5,7 @@ import { prepareReport, reportInputSchema, submitReport } from "@/server/report/
 import { decryptText } from "@/server/crypto";
 import { fixedClock, HOUR } from "@/server/clock";
 import { ApiError } from "@/server/http/errors";
-import { POST as knowPOST } from "@/app/api/know/route";
+import { POST as nearbyPOST } from "@/app/api/geo/nearby/route";
 import { loadFixturePilot, fixturePlaceId } from "../helpers/pilot";
 import { jsonRequest } from "../helpers/http";
 
@@ -47,7 +47,7 @@ describe("REPORT private intake", () => {
     expect(row.encrypted_text).not.toContain("Streetlight");
     expect(decryptText(row.encrypted_text, "report_text")).toBe("Streetlight near the gate not working");
     expect(() => decryptText(row.encrypted_text, "contact_email")).toThrow(); // purpose-bound
-    expect(row.coarse_cell_id).toMatch(/^c\d+-\d+$/);
+    expect(row.coarse_cell_id).toMatch(/^[0-9b-hjkmnp-z]{6}$/); // ~1.2 km geohash, worldwide
     expect(new Date(row.created_at).toISOString()).toBe("2026-09-21T15:00:00.000Z");
     expect(new Date(row.expires_at).getTime() - new Date(row.created_at).getTime()).toBe(30 * 24 * HOUR);
     expect(Object.keys(row)).not.toContain("place_id");
@@ -87,9 +87,11 @@ describe("REPORT private intake", () => {
     expect(n).toBe(1);
   });
 
-  it("rejects off-pilot places and oversized narratives before saving", async () => {
+  it("accepts a location anywhere as a coarse cell, and rejects unknown places and oversized narratives", async () => {
     const sql = getSql();
-    await expect(prepareReport(sql, input({ placeId: "00000000-0000-0000-0000-000000000000" }))).rejects.toMatchObject({ status: 422, code: "outside_pilot" });
+    const london = await prepareReport(sql, input({ placeId: undefined, location: { lat: 51.5074, lon: -0.1278 } }));
+    expect(london.cell).toMatch(/^gcpv/);
+    await expect(prepareReport(sql, input({ placeId: "00000000-0000-0000-0000-000000000000" }))).rejects.toMatchObject({ status: 422, code: "unknown_place" });
     await expect(prepareReport(sql, input({ narrative: "अ".repeat(1001) }))).rejects.toBeInstanceOf(ApiError);
     const ok = await prepareReport(sql, input({ narrative: "अ".repeat(1000) }));
     expect(ok.narrative.length).toBe(1000);
@@ -105,10 +107,10 @@ describe("REPORT private intake", () => {
   });
 
   it("does not change public KNOW output", async () => {
-    const before = await (await knowPOST(jsonRequest("/api/know", { mode: "place", placeId, time: "late" }))).json();
+    const before = await (await nearbyPOST(jsonRequest("/api/geo/nearby", { lat: 28.6901, lon: 77.2111 }))).json();
     await submit("actor-b", { narrative: "Streetlight broken" });
-    const after = await (await knowPOST(jsonRequest("/api/know", { mode: "place", placeId, time: "late" }))).json();
-    expect(after.community).toEqual(before.community);
+    const after = await (await nearbyPOST(jsonRequest("/api/geo/nearby", { lat: 28.6901, lon: 77.2111 }))).json();
+    expect(after.notes).toEqual(before.notes);
     expect(JSON.stringify(after)).not.toContain("Streetlight");
   });
 });

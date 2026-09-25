@@ -3,8 +3,8 @@ import { randomUUID } from "node:crypto";
 import { getSql } from "@/server/db/client";
 import { runWeeklyAggregation, recheckReleasesForReport, suppressRelease } from "@/server/aggregate/run";
 import { fixedClock } from "@/server/clock";
-import { cellFor } from "@/domain/pilot";
-import { POST as knowPOST } from "@/app/api/know/route";
+import { POST as nearbyPOST } from "@/app/api/geo/nearby/route";
+import { encodeGeohash } from "@/domain/geohash";
 import { loadFixturePilot, fixturePlaceId } from "../helpers/pilot";
 import { jsonRequest, allKeys, PRIVATE_FIELD_NAMES } from "../helpers/http";
 
@@ -16,6 +16,7 @@ const MONDAY = new Date("2026-09-28T03:00:00Z");
 const DAY = 86_400_000;
 let placeId = "";
 let cell = "";
+let point = { lat: 0, lon: 0 };
 let seq = 0; // deterministic spread of submission times (never a burst unless intended)
 
 async function approved(actor: string, over: { band?: string; category?: string; tags?: string[]; daysAgo?: number; group?: string } = {}) {
@@ -31,8 +32,25 @@ async function approved(actor: string, over: { band?: string; category?: string;
   return r.id as string;
 }
 
+
+/** Public community output around a fixture point (notes come only from aggregate_releases). */
+async function publicNotes(point: { lat: number; lon: number }) {
+  const body = await (await nearbyPOST(jsonRequest("/api/geo/nearby", point))).json();
+  return body.notes as Array<{ text: string; timeBand: string }>;
+}
+
+/** Adapter keeping the assertions readable: coverage + matching notes for a band. */
 async function know(time: "now" | "evening" | "late" = "late") {
-  return (await knowPOST(jsonRequest("/api/know", { mode: "place", placeId, time }))).json();
+  const notes = await publicNotes(point);
+  const band = time === "now" ? "late" : time;
+  return {
+    community: {
+      coverage: notes.length ? "multiple_independent_recent_observations" : "no_recent_community_data",
+      selectedBand: band,
+      matching: notes.filter((n) => n.timeBand === band).map((n, i) => ({ ...n, id: String(i) })),
+      otherBands: notes.filter((n) => n.timeBand !== band),
+    },
+  };
 }
 
 describe("community release end to end (synthetic test fixtures)", () => {
@@ -41,7 +59,8 @@ describe("community release end to end (synthetic test fixtures)", () => {
     await loadFixturePilot(sql);
     placeId = await fixturePlaceId(sql, "Fixture Pharmacy");
     const [p] = await sql<{ lat: number; lon: number }[]>`SELECT ST_Y(point) AS lat, ST_X(point) AS lon FROM places WHERE id = ${placeId}`;
-    cell = cellFor(p)!;
+    point = { lat: p.lat, lon: p.lon };
+    cell = encodeGeohash(p.lat, p.lon);
   });
   beforeEach(async () => {
     const sql = getSql();
@@ -64,18 +83,17 @@ describe("community release end to end (synthetic test fixtures)", () => {
     const run = await runWeeklyAggregation(getSql(), fixedClock(MONDAY));
     expect(run).toMatchObject({ ran: true, releasesCreated: 1, releaseWeek: "2026-09-28" });
     const body = await know("late");
+    const raw = await publicNotes(point);
+    for (const k of PRIVATE_FIELD_NAMES) expect(allKeys(raw).has(k)).toBe(false);
     expect(body.community.coverage).toBe("multiple_independent_recent_observations");
     expect(body.community.matching).toHaveLength(1);
     expect(body.community.matching[0].text).toBe("Multiple reviewed observations mention poor lighting in this area during late hours.");
     const json = JSON.stringify(body);
     expect(json).not.toMatch(/actor-\d|\b5 (reports|people|observations)\b/);
-    for (const k of PRIVATE_FIELD_NAMES) expect(allKeys(body).has(k)).toBe(false);
-    // Day-time view lists it only under other times of day.
-    const dayView = await know("now");
-    if (dayView.community.selectedBand !== "late") {
-      expect(dayView.community.matching).toHaveLength(0);
-      expect(dayView.community.otherBands).toHaveLength(1);
-    }
+    // Day-time notes are separate from late-hours notes.
+    const dayView = await know("evening");
+    expect(dayView.community.matching).toHaveLength(0);
+    expect(dayView.community.otherBands).toHaveLength(1);
   });
 
   it("does not count five repeats from one browser", async () => {

@@ -26,9 +26,8 @@ export function applyTestEnv(overrides: Record<string, string | undefined> = {})
     SMTP_HOST: undefined,
     SMTP_PORT: undefined,
     SMTP_FROM: undefined,
-    OPENAI_API_KEY: undefined,
-    OPENAI_MODEL: undefined,
-    OPENAI_PRIVACY_TERMS_ACCEPTED: undefined,
+    ANTHROPIC_API_KEY: undefined,
+    MAPBOX_TOKEN: undefined,
     ...overrides,
   };
   for (const [k, v] of Object.entries(base)) {

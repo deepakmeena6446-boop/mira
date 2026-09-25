@@ -2,6 +2,8 @@ import { getSql } from "@/server/db/client";
 import { handle, json, readJson } from "@/server/http/handler";
 import { assertSameOrigin } from "@/server/http/csrf";
 import { ensureActor } from "@/server/session/actor";
+import { getUser } from "@/server/session/user";
+import { hmacHex } from "@/server/crypto";
 import { clientIp, dailyKey, enforce } from "@/server/ratelimit";
 import { systemClock } from "@/server/clock";
 import { prepareReport, reportInputSchema, submitReport } from "@/server/report/submit";
@@ -21,9 +23,12 @@ export const POST = handle(async (req: Request) => {
   await enforce(sql, [dailyKey("global", "reports", now)], REPORT_LIMITS_GLOBAL, now);
   const input = await readJson(req, reportInputSchema, 16_384);
   const prepared = await prepareReport(sql, input); // fully validated before any cookie exists
-  const actor = await ensureActor();
-  await enforce(sql, [dailyKey("actor", actor.actorHash, now)], REPORT_LIMITS_ACTOR, now);
-  const result = await submitReport(sql, actor.actorHash, prepared, systemClock);
+  // Signed-in reports are keyed to a stable pseudonym of the account (better
+  // independence counting); anonymous reports keep the browser pseudonym.
+  const user = await getUser(sql);
+  const actorHash = user ? hmacHex("user-actor", user.id) : (await ensureActor()).actorHash;
+  await enforce(sql, [dailyKey("actor", actorHash, now)], REPORT_LIMITS_ACTOR, now);
+  const result = await submitReport(sql, actorHash, prepared, systemClock, user?.id ?? null);
   console.log(JSON.stringify({ t: now.toISOString(), src: "web", event: result.replay ? "report.replayed" : "report.received", report: result.id, held: result.held }));
   return json({ received: true }, result.replay ? 200 : 201);
 });

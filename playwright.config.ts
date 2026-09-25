@@ -2,14 +2,14 @@ import { defineConfig, devices } from "@playwright/test";
 import { E2E_BASE, e2eServerEnv } from "./tests/e2e/e2e-env";
 
 /**
- * End-to-end flows A–G against the production build (web + worker), a reset e2e
+ * End-to-end flows for MIRA 2.0 (placeholder providers) against the production build (web + worker), a reset e2e
  * database with the real pilot import, and local Mailpit. Serial: flows share state.
  */
 export default defineConfig({
   testDir: "tests/e2e",
   fullyParallel: false,
   workers: 1,
-  timeout: 120_000,
+  timeout: 240_000, // trip flows drive 2–3 browsers plus real worker cycles
   expect: { timeout: 15_000 },
   reporter: [["list"]],
   use: { baseURL: E2E_BASE, trace: "retain-on-failure" },

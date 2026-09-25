@@ -1,0 +1,190 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { randomUUID } from "node:crypto";
+
+vi.mock("next/headers", async () => (await import("../helpers/cookie-jar")).nextHeadersMock);
+
+import { getSql } from "@/server/db/client";
+import { resetEnvCache } from "@/server/config/env";
+import { resetMailer, getMailer } from "@/server/mail";
+import { fixedClock, MINUTE } from "@/server/clock";
+import { recordHeartbeat } from "@/server/health/worker";
+import { addLocation, sharedTrip, ARRIVAL_DWELL_MS, KEEP_POINTS } from "@/server/trips";
+import { processJourneys } from "@/server/journey/worker";
+import { POST as demoPOST } from "@/app/api/auth/demo/route";
+import { GET as meGET, DELETE as meDELETE } from "@/app/api/me/route";
+import { POST as placesPOST } from "@/app/api/me/places/route";
+import { POST as contactsPOST } from "@/app/api/me/contacts/route";
+import { POST as acceptPOST } from "@/app/api/invites/accept/route";
+import { POST as tripsPOST } from "@/app/api/trips/route";
+import { POST as tripActionPOST } from "@/app/api/trips/[id]/[action]/route";
+import { GET as sharedGET } from "@/app/api/t/[token]/route";
+import { POST as miraPOST, GET as miraGET, DELETE as miraDELETE } from "@/app/api/mira/route";
+import { POST as routePOST } from "@/app/api/geo/route/route";
+import { POST as reportPOST } from "@/app/api/reports/route";
+import { applyTestEnv } from "../setup/test-env";
+import { newJar, switchJar, type Jar } from "../helpers/cookie-jar";
+import { getRequest, jsonRequest } from "../helpers/http";
+import { loadFixturePilot } from "../helpers/pilot";
+
+const MAILPIT = "http://127.0.0.1:8025/api/v1";
+async function mailsTo(to: string) {
+  return ((await (await fetch(`${MAILPIT}/search?query=${encodeURIComponent(`to:"${to}"`)}`)).json()) as { messages: Array<{ ID: string; Subject: string }> }).messages;
+}
+async function mailText(id: string) {
+  return ((await (await fetch(`${MAILPIT}/message/${id}`)).json()) as { Text: string }).Text;
+}
+const HOME = { lat: 28.6901, lon: 77.2111 }; // Fixture Pharmacy area (test-only grid)
+const START = { lat: 28.6927, lon: 77.2131 };
+
+async function signIn(name: string): Promise<Jar> {
+  const jar = newJar();
+  switchJar(jar);
+  const r = await demoPOST(jsonRequest("/api/auth/demo", { name }));
+  expect(r.status).toBe(201);
+  return jar;
+}
+
+async function acceptInviteFor(email: string) {
+  const [m] = await mailsTo(email);
+  const token = /\/invite\/([A-Za-z0-9_-]+)/.exec(await mailText(m.ID))![1];
+  const contactJar = newJar();
+  contactJar.set("mira_invite", token);
+  switchJar(contactJar);
+  expect((await (await acceptPOST(jsonRequest("/api/invites/accept", {}))).json()).status).toBe("accepted");
+}
+
+describe("MIRA 2.0 accounts, trips, Mira (placeholders)", () => {
+  beforeAll(async () => {
+    applyTestEnv({ SMTP_HOST: "127.0.0.1", SMTP_PORT: "1025", SMTP_FROM: "MIRA <no-reply@mira.test>" });
+    resetEnvCache();
+    resetMailer();
+    await loadFixturePilot(getSql());
+  });
+  afterAll(() => {
+    applyTestEnv();
+    resetEnvCache();
+    resetMailer();
+  });
+  beforeEach(async () => {
+    const sql = getSql();
+    await sql`DELETE FROM abuse_counters`;
+    await sql`DELETE FROM journeys`;
+    await recordHeartbeat(sql, "v2-worker", new Date(), "test", new Date());
+  });
+
+  it("demo sign-in creates a real account with places and contacts; delete erases everything", async () => {
+    await signIn("Priya Sharma");
+    const me = await (await meGET()).json();
+    expect(me.user.name).toBe("Priya Sharma");
+    expect(me.modes).toMatchObject({ auth: "demo", maps: "placeholder", companion: "placeholder" });
+    expect((await placesPOST(jsonRequest("/api/me/places", { label: "Home", emoji: "🏠", ...HOME }))).status).toBe(201);
+    const email = `mum-${randomUUID().slice(0, 6)}@example.test`;
+    const c = await (await contactsPOST(jsonRequest("/api/me/contacts", { name: "Mum", email }))).json();
+    expect(c.contact).toMatchObject({ name: "Mum", status: "invited" });
+    expect(JSON.stringify(c)).not.toContain(email); // only a masked hint is returned
+    const [row] = await getSql()`SELECT encrypted_email FROM contacts WHERE name = 'Mum' ORDER BY created_at DESC LIMIT 1`;
+    expect(row.encrypted_email).not.toContain("@");
+    expect((await meDELETE(jsonRequest("/api/me", {}, { method: "DELETE" }))).status).toBe(200);
+    expect((await (await meGET()).json()).user).toBeNull();
+  });
+
+  it("shares a trip with accepted contacts only, streams live points, auto-arrives, then the link goes dark", async () => {
+    const owner = await signIn("Asha");
+    const accepted = `acc-${randomUUID().slice(0, 6)}@example.test`;
+    const pending = `pend-${randomUUID().slice(0, 6)}@example.test`;
+    await contactsPOST(jsonRequest("/api/me/contacts", { name: "Riya", email: accepted }));
+    await contactsPOST(jsonRequest("/api/me/contacts", { name: "Neha", email: pending }));
+    await acceptInviteFor(accepted);
+    switchJar(owner);
+
+    const res = await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" }, share: true }));
+    expect(res.status).toBe(201);
+    const { trip } = await res.json();
+    expect(trip.sharedWith).toEqual([{ name: "Riya" }]);
+    expect(trip.shareUrl).toMatch(/\/t\/[A-Za-z0-9_-]+$/);
+    const shareMail = (await mailsTo(accepted)).find((m) => m.Subject.includes("sharing a trip"));
+    expect(shareMail).toBeTruthy();
+    expect((await mailsTo(pending)).some((m) => m.Subject.includes("sharing a trip"))).toBe(false);
+    const token = trip.shareUrl.split("/t/")[1];
+
+    // Contact view while open: location + ETA, first name only.
+    const live = await (await sharedGET(getRequest(`/api/t/${token}`), { params: Promise.resolve({ token }) })).json();
+    expect(live).toMatchObject({ state: "active", name: "Asha", destination: "Home" });
+    expect(live.location).toBeTruthy();
+
+    // Live points are capped; dwelling at the destination auto-arrives.
+    const [{ id: userId }] = await getSql()`SELECT user_id AS id FROM journeys WHERE id = ${trip.id}`;
+    const clock = fixedClock(new Date());
+    for (let i = 0; i < KEEP_POINTS + 5; i++) {
+      clock.advance(10_000);
+      await addLocation(getSql(), userId, trip.id, { lat: START.lat - i * 0.00001, lon: START.lon }, clock);
+    }
+    const [{ n }] = await getSql()`SELECT count(*)::int AS n FROM trip_locations WHERE journey_id = ${trip.id}`;
+    expect(n).toBe(KEEP_POINTS);
+    expect((await addLocation(getSql(), userId, trip.id, HOME, clock)).arrived).toBe(false);
+    clock.advance(ARRIVAL_DWELL_MS + 1000);
+    expect((await addLocation(getSql(), userId, trip.id, HOME, clock)).arrived).toBe(true);
+
+    const [{ left }] = await getSql()`SELECT count(*)::int AS left FROM trip_locations WHERE journey_id = ${trip.id}`;
+    expect(left).toBe(0); // live points never outlive the trip
+    const after = await sharedTrip(getSql(), token, new Date());
+    expect(after).toEqual({ state: "arrived", name: "Asha", destination: "Home" });
+  });
+
+  it("alerts shared contacts once when the trip is missed; other users can't touch the trip", async () => {
+    const owner = await signIn("Meera");
+    const email = `alert-${randomUUID().slice(0, 6)}@example.test`;
+    await contactsPOST(jsonRequest("/api/me/contacts", { name: "Didi", email }));
+    await acceptInviteFor(email);
+    switchJar(owner);
+    const { trip } = await (await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Hostel" }, share: true }))).json();
+
+    await signIn("Stranger");
+    const steal = await tripActionPOST(jsonRequest(`/api/trips/${trip.id}/end`, {}), { params: Promise.resolve({ id: trip.id, action: "end" }) });
+    expect(steal.status).toBe(404);
+
+    await getSql()`UPDATE journeys SET created_at = now() - interval '40 minutes', eta_at = now() - interval '11 minutes' WHERE id = ${trip.id}`;
+    const clock = fixedClock(new Date());
+    const tick = await processJourneys(getSql(), clock, getMailer());
+    expect(tick).toMatchObject({ missed: 1, alertsSent: 1 });
+    await processJourneys(getSql(), fixedClock(new Date(Date.now() + MINUTE)), getMailer());
+    const alerts = (await mailsTo(email)).filter((m) => m.Subject.includes("missed"));
+    expect(alerts).toHaveLength(1);
+    const text = await mailText(alerts[0].ID);
+    expect(alerts[0].Subject).toBe("Meera missed their check-in on MIRA");
+    expect(text).toMatch(/expected at Hostel about 1\d minutes ago/);
+    expect(text).toMatch(/\/t\/[A-Za-z0-9_-]+/); // still-open live link for an accepted contact
+    expect(text).not.toMatch(/28\.\d{3}|77\.\d{3}/);
+  });
+
+  it("Mira streams replies with cards, keeps history per user, and can be cleared", async () => {
+    await signIn("Kavya");
+    await placesPOST(jsonRequest("/api/me/places", { label: "Home", emoji: "🏠", ...HOME }));
+    const res = await miraPOST(jsonRequest("/api/mira", { message: "take me home", context: { localTime: new Date().toISOString(), tzOffsetMin: -330, location: START } }));
+    expect(res.headers.get("content-type")).toMatch(/ndjson/);
+    const events = (await res.text()).trim().split("\n").map((l) => JSON.parse(l));
+    expect(events.filter((e) => e.type === "text").map((e) => e.delta).join("")).toMatch(/Home/);
+    expect(events.find((e) => e.type === "card")?.card).toMatchObject({ type: "trip", destination: { name: "Home" } });
+    expect(events.at(-1)).toEqual({ type: "done" });
+    const hist = await (await miraGET()).json();
+    expect(hist.messages.map((m: { role: string }) => m.role)).toEqual(["user", "assistant"]);
+    await miraDELETE(jsonRequest("/api/mira", {}, { method: "DELETE" }));
+    expect((await (await miraGET()).json()).messages).toEqual([]);
+    switchJar(newJar());
+    expect((await miraPOST(jsonRequest("/api/mira", { message: "hi", context: { localTime: new Date().toISOString(), tzOffsetMin: 0, location: null } }))).status).toBe(401);
+  });
+
+  it("works worldwide: honest approximate routes and geohash reports anywhere", async () => {
+    switchJar(newJar());
+    const r = await (await routePOST(jsonRequest("/api/geo/route", { from: { lat: 51.5007, lon: -0.1246 }, to: { lat: 51.5033, lon: -0.1196 } }))).json();
+    expect(r.route.approximate).toBe(true);
+    expect(r.route.geometry).toHaveLength(2);
+    expect(r.route.minutes).toBeGreaterThan(0);
+    const g = await (await routePOST(jsonRequest("/api/geo/route", { from: START, to: HOME }))).json();
+    expect(g.route.approximate).toBe(false);
+    const rep = await reportPOST(jsonRequest("/api/reports", { idempotencyKey: randomUUID(), involvement: "witnessed", category: "environment", location: { lat: 51.5007, lon: -0.1246 }, recency: "today", timeBand: "late" }));
+    expect(rep.status).toBe(201);
+    const [row] = await getSql()`SELECT count(*)::int AS n FROM reports_private WHERE coarse_cell_id LIKE 'gcpu%'`;
+    expect(row.n).toBeGreaterThanOrEqual(1);
+  });
+});
