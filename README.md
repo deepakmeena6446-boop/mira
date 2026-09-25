@@ -26,11 +26,11 @@ Every external service sits behind an interface in `src/server/providers/`. The 
 
 | Capability | Placeholder (today) | Real (later) | Env to set |
 |---|---|---|---|
-| Maps (search, routes, nearby) | MIRA's OSM snapshot where it has data. Elsewhere, live OpenStreetMap: Photon for search, Overpass for "Around you" (server-side, ~100 m rounded, cached). Routes outside the snapshot are straight-line, flagged *approximate* (dashed) | Mapbox Search + Directions | `MAPBOX_TOKEN` (placeholder: `PLACE_SEARCH_URL`, `OVERPASS_URL`; unset = off) |
+| Maps (search, routes, nearby, area names, basemap) | MIRA's OSM snapshot + live OpenStreetMap (Photon, Overpass, Nominatim) — used when no Google key is set, and as automatic fallback | **Connected:** Google Maps Platform — Places API (New), Routes API (walking), Geocoding API, Map Tiles API (day + dark night style) — `src/server/providers/geo/google.ts`, `tiles.ts` | `GOOGLE_MAPS_SERVER_KEY`, `GOOGLE_MAPS_BROWSER_KEY` |
 | Area names | Nearest locality from the map's own vector tiles, then a server-side Nominatim lookup (~100 m rounded, cached, ≤ 1 req/s) | Mapbox reverse geocoding | `REVERSE_GEOCODER_URL` (placeholder only; unset = off) |
 | Basemap | OpenFreeMap vector style ("dark" style at night) | Mapbox day + night styles | `MAP_STYLE_URL`, `MAP_STYLE_URL_NIGHT` (optional) |
 | Sign-in | "Continue" with a first name creates a real local account | Google OAuth | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` |
-| Mira | Scripted persona engine over the real tools, streamed as NDJSON (English + Hinglish) | Claude (`claude-opus-5`, streaming, tool use, same persona and tools) | `ANTHROPIC_API_KEY` |
+| Mira | Scripted persona engine over the real tools, streamed as NDJSON (English + Hinglish) — used when no key is set, and as the automatic fallback if Claude fails before replying | **Connected:** Claude (`claude-opus-5`, low effort, streaming tool loop, cached persona; never sees coordinates; location details scrubbed from saved history) — `src/server/providers/companion/claude.ts` | `ANTHROPIC_API_KEY` |
 | Contact delivery | SMTP (Mailpit locally) + in-app notifications | Production SMTP / WhatsApp / SMS | `SMTP_*` |
 | Push | In-app only | Web Push | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` |
 
@@ -123,8 +123,8 @@ There's no location history, no public profile, no safety score and no heatmap. 
 | Item | Today | To complete |
 |---|---|---|
 | Google sign-in | Demo sign-in with a first name (real local account and session) | Add the Auth.js Google adapter, flip `REAL_ADAPTERS.google`, set `AUTH_GOOGLE_*` |
-| Mapbox | OSM snapshot + approximate straight-line routes elsewhere; Nominatim area names | Add the adapter, flip `REAL_ADAPTERS.mapbox`, set `MAPBOX_TOKEN` |
-| Claude for Mira | Scripted persona engine | Add the streaming adapter (same tools and persona), flip `REAL_ADAPTERS.claude`, set `ANTHROPIC_API_KEY` |
+| Maps for production | **Google connected** (demo key) | Split into a browser key (website-restricted, Map Tiles only) and a server key (API-restricted); set budgets/quotas; show the Google logo on the map per Google's attribution rules |
+| Claude for Mira | **Done** — live whenever `ANTHROPIC_API_KEY` is set (tests and E2E force the placeholder) | Rotate the demo key before production |
 | Production SMTP / push | Mailpit + in-app | Set `SMTP_*` / `VAPID_*` |
 | Background location on iOS | Browsers can't track in the background. Contacts see the last spot and time, and the missed-arrival alert still fires | Native app shell |
 | Hosting, HTTPS, backups | Not provisioned | See Production prerequisites |

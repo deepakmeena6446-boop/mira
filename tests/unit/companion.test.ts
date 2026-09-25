@@ -73,3 +73,12 @@ describe("Mira (placeholder engine)", () => {
   });
 });
 
+
+describe("Mira on Claude: saved history", () => {
+  it("scrubs area names, nearby places, distances and walking times before saving", async () => {
+    const { scrubForHistory } = await import("@/server/providers/companion/claude");
+    const said = "You're in Kamla Nagar. Apollo Pharmacy is 120 m away and open till 10 — about a 12-minute walk home.";
+    expect(scrubForHistory(said, ["Apollo Pharmacy"], "Kamla Nagar")).toBe("You're in your area. a nearby place is a short way away and open till 10 — a short walk home.");
+    expect(scrubForHistory("Near HPMC it's quiet.", [], "Near HPMC")).toBe("Near your area it's quiet.");
+  });
+});

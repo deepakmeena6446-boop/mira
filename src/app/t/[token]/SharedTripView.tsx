@@ -27,7 +27,7 @@ function ago(s: number) {
 const POLL_MS = 15_000;
 
 /** What someone holding the live link sees: live dot + ETA while the trip is open, then only "arrived/ended". */
-export function SharedTripView({ token, initial, tiles }: { token: string; initial: SharedTrip; tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null } }) {
+export function SharedTripView({ token, initial, tiles }: { token: string; initial: SharedTrip; tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null } }) {
   const [trip, setTrip] = useState(initial);
   const [pollFailedAt, setPollFailedAt] = useState<number | null>(null);
   const [gone, setGone] = useState(false);

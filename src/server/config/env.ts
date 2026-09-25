@@ -83,6 +83,9 @@ const envSchema = z.object({
   // Real providers (optional; placeholders are used until adapters + keys exist).
   ANTHROPIC_API_KEY: optionalNonEmpty,
   MAPBOX_TOKEN: optionalNonEmpty,
+  // Google Maps Platform: server key (Places API (New), Routes, Geocoding) and browser key (Map Tiles).
+  GOOGLE_MAPS_SERVER_KEY: optionalNonEmpty,
+  GOOGLE_MAPS_BROWSER_KEY: optionalNonEmpty,
   AUTH_GOOGLE_ID: optionalNonEmpty,
   AUTH_GOOGLE_SECRET: optionalNonEmpty,
   VAPID_PUBLIC_KEY: optionalNonEmpty,

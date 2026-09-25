@@ -13,5 +13,5 @@ export default async function SharedTripPage({ params }: PageProps<"/t/[token]">
   const { token } = await params;
   const trip = await sharedTrip(getSql(), token, systemClock.now());
   if (!trip) notFound();
-  return <SharedTripView token={token} initial={trip} tiles={tileConfig()} />;
+  return <SharedTripView token={token} initial={trip} tiles={await tileConfig()} />;
 }

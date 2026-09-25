@@ -54,14 +54,17 @@ export function SearchOverlay({
   useOverlay(open, onClose);
 
   const [failure, setFailure] = useState<string | null>(null);
+  // Pressing Enter/Search runs a deeper lookup (addresses, exact names) for exactly what's typed.
+  const [deepFor, setDeepFor] = useState<string | null>(null);
   useEffect(() => {
     const term = q.trim();
     if (term.length < 2) return;
+    const deep = deepFor === term;
     const ctrl = new AbortController();
     const t = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await api<{ places: Hit[] }>("/api/geo/search", { body: { q: term, near: near ? { lat: near.lat, lon: near.lon } : null }, signal: ctrl.signal });
+        const res = await api<{ places: Hit[] }>("/api/geo/search", { body: { q: term, near: near ? { lat: near.lat, lon: near.lon } : null, deep }, signal: ctrl.signal });
         if (res.ok) {
           setHits(res.data.places);
           setFailure(null);
@@ -73,12 +76,12 @@ export function SearchOverlay({
         /* aborted */
       }
       setLoading(false);
-    }, 300); // live lookups outside the local map data: wait for a pause in typing
+    }, deep ? 0 : 300); // as you type: wait for a pause; on Enter: right away
     return () => {
       clearTimeout(t);
       ctrl.abort();
     };
-  }, [q, near]);
+  }, [q, near, deepFor]);
 
   if (!open) return null;
   const term = q.trim().toLowerCase();
@@ -91,11 +94,20 @@ export function SearchOverlay({
         <button type="button" onClick={onClose} aria-label="Close search" className="grid size-12 shrink-0 place-items-center rounded-full bg-surface shadow-[var(--shadow-card)]">
           <Icon name="back" />
         </button>
-        <label className="flex min-h-12 flex-1 items-center gap-2 rounded-full bg-surface px-4 shadow-[var(--shadow-card)] focus-within:ring-2 focus-within:ring-accent">
-          <Icon name="know" className="size-5 text-ink-subtle" />
-          <span className="sr-only">Search for a place</span>
-          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} className="h-12 w-full bg-transparent text-lg outline-none" autoComplete="off" />
-        </label>
+        <form
+          role="search"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (q.trim().length >= 2) setDeepFor(q.trim());
+          }}
+          className="flex min-h-12 flex-1"
+        >
+          <label className="flex min-h-12 flex-1 items-center gap-2 rounded-full bg-surface px-4 shadow-[var(--shadow-card)] focus-within:ring-2 focus-within:ring-accent">
+            <Icon name="know" className="size-5 text-ink-subtle" />
+            <span className="sr-only">Search for a place</span>
+            <input autoFocus type="search" enterKeyHint="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} className="h-12 w-full bg-transparent text-lg outline-none" autoComplete="off" />
+          </label>
+        </form>
       </div>
       <div className="mt-4 flex-1 overflow-y-auto px-4 pb-10">
         {savedHits.length ? (
@@ -120,6 +132,7 @@ export function SearchOverlay({
           <section aria-label="Places" aria-busy={loading}>
             <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-ink-subtle">Places</h2>
             {hits.length ? (
+              <>
               <ul className="overflow-hidden rounded-3xl bg-surface shadow-[var(--shadow-card)]">
                 {hits.map((h) => (
                   <li key={h.id} className="border-b border-line last:border-0">
@@ -134,9 +147,16 @@ export function SearchOverlay({
                   </li>
                 ))}
               </ul>
+              {deepFor !== q.trim() ? <p className="mt-2 px-1 text-sm text-ink-subtle">Not here? Press Search on your keyboard to look harder — addresses work too.</p> : null}
+              </>
             ) : (
               <p className="rounded-3xl bg-surface p-5 text-ink-muted shadow-[var(--shadow-card)]">
-                {loading ? "Looking…" : failure ?? `No matches in the map data I have yet.${onDropPin ? " You can drop a pin instead." : ""}`}
+                {loading
+                  ? "Looking…"
+                  : failure ??
+                    (deepFor === q.trim()
+                      ? `Couldn't find that.${onDropPin ? " Try a nearby landmark, or choose the spot on the map." : " Try a nearby landmark."}`
+                      : "Nothing yet — press Search on your keyboard to look harder (addresses work too).")}
               </p>
             )}
           </section>

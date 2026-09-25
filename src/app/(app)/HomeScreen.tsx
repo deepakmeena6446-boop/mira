@@ -60,7 +60,7 @@ export function HomeScreen({
   places: SavedPlace[];
   contacts: Contact[];
   trip: TripView | null;
-  tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null };
+  tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null };
 }) {
   const router = useRouter();
   const toast = useToast();

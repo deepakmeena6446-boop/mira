@@ -43,3 +43,58 @@ export async function osmAreaName(p: GeoPoint): Promise<string | null> {
   }
   return name;
 }
+
+/** Wait for our turn under Nominatim's 1 request/second rule (only for explicit searches). */
+async function nominatimTurn(maxWaitMs = 1500): Promise<boolean> {
+  const wait = lastCall + 1000 - Date.now();
+  if (wait > maxWaitMs) return false;
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  lastCall = Date.now();
+  return true;
+}
+
+const searchCache = new Map<string, { at: number; hits: PlaceHitLite[] }>();
+export interface PlaceHitLite {
+  id: string;
+  name: string;
+  kind: string;
+  lat: number;
+  lon: number;
+}
+
+/**
+ * Deeper lookup when someone presses Enter/Search (addresses, exact names). Nominatim's
+ * policy allows explicit searches but not search-as-you-type, so this is never called
+ * per keystroke. Biased to ~50 km around a rounded position; cached for an hour.
+ */
+export async function nominatimSearch(q: string, near?: GeoPoint): Promise<PlaceHitLite[]> {
+  const base = getEnv().REVERSE_GEOCODER_URL;
+  if (!base) return [];
+  const c = near ? { lat: Number(near.lat.toFixed(2)), lon: Number(near.lon.toFixed(2)) } : null;
+  const key = `${q.toLowerCase()}|${c ? `${c.lat},${c.lon}` : ""}`;
+  const hit = searchCache.get(key);
+  if (hit && Date.now() - hit.at < 3600_000) return hit.hits;
+  if (!(await nominatimTurn())) return [];
+  try {
+    const url = new URL("/search", base);
+    const params: Record<string, string> = { q, format: "jsonv2", limit: "8", addressdetails: "1", "accept-language": "en" };
+    if (c) params.viewbox = `${c.lon - 0.5},${c.lat + 0.5},${c.lon + 0.5},${c.lat - 0.5}`; // bias, not a hard bound
+    url.search = new URLSearchParams(params).toString();
+    const res = await fetch(url, { headers: { "user-agent": `MIRA/0.1 (placeholder geocoder; ${getEnv().APP_BASE_URL})` }, signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return [];
+    type R = { osm_type?: string; osm_id?: number; lat: string; lon: string; name?: string; display_name: string; type?: string; address?: Record<string, string> };
+    const rows = (await res.json()) as R[];
+    const hits = rows.map((r) => {
+      const a = r.address ?? {};
+      const name = r.name || r.display_name.split(",")[0];
+      const where = [a.suburb ?? a.neighbourhood ?? a.city_district, a.city ?? a.town ?? a.village].filter((x) => x && x !== name).join(", ");
+      const kind = [r.type && r.type !== "yes" ? r.type.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase()) : null, where].filter(Boolean).join(" · ") || "Place";
+      return { id: `osm:${r.osm_type ?? "x"}/${r.osm_id ?? `${r.lat},${r.lon}`}`, name, kind, lat: Number(r.lat), lon: Number(r.lon) };
+    });
+    if (searchCache.size >= MAX_CACHE) searchCache.delete(searchCache.keys().next().value!);
+    searchCache.set(key, { at: Date.now(), hits });
+    return hits;
+  } catch {
+    return [];
+  }
+}

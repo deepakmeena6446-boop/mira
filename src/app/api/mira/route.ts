@@ -72,6 +72,7 @@ export const POST = handle(async (req: Request) => {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let text = ""; // what's stored: location-derived text and cards are left out (history is not a location log)
+      let scrubbed: string | null = null; // Claude supplies its own scrubbed version via a "history" event
       const cards: MiraCard[] = [];
       let open = true;
       const send = (ev: MiraEvent) => {
@@ -84,6 +85,10 @@ export const POST = handle(async (req: Request) => {
       };
       try {
         for await (const ev of respond(sql, user, message, history, context)) {
+          if (ev.type === "history") {
+            scrubbed = ev.text;
+            continue; // server-only
+          }
           if (ev.type === "text" && !ev.private) text += ev.delta;
           if (ev.type === "card") {
             const kept = storableCard(ev.card);
@@ -97,7 +102,7 @@ export const POST = handle(async (req: Request) => {
         send({ type: "text", delta: sorry });
         send({ type: "done" });
       }
-      await sql`INSERT INTO mira_messages (user_id, role, content) VALUES (${user.id}, 'assistant', ${sql.json({ text: text.trim(), cards })})`.catch(() => {});
+      await sql`INSERT INTO mira_messages (user_id, role, content) VALUES (${user.id}, 'assistant', ${sql.json({ text: (scrubbed ?? text).trim(), cards })})`.catch(() => {});
       if (open) controller.close();
     },
   });

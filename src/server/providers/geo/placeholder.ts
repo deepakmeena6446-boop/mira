@@ -1,6 +1,8 @@
 import "server-only";
 import { osmAreaName } from "./osm-reverse";
 import { overpassNearby, photonSearch } from "./osm-live";
+import { nominatimSearch } from "./osm-reverse";
+import { rankPlaces } from "@/domain/search-rank";
 import type postgres from "postgres";
 import { haversineMeters } from "@/domain/pilot";
 import { pathCoords, planRoutes, WALKING_SPEED_KMH } from "@/domain/routing";
@@ -27,7 +29,7 @@ export function placeholderGeo(sql: postgres.Sql): GeoProvider {
   });
 
   return {
-    async search(q, near) {
+    async search(q, near, opts) {
       const term = q.normalize("NFKC").trim().toLowerCase().slice(0, 80);
       if (term.length < 2) return [];
       const like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
@@ -40,13 +42,13 @@ export function placeholderGeo(sql: postgres.Sql): GeoProvider {
         FROM places
         WHERE name IS NOT NULL AND (search_text ILIKE ${like} OR search_text % ${term})
         ORDER BY (search_text ILIKE ${term + "%"}) DESC, similarity(search_text, ${term}) DESC
-        LIMIT 8`;
-      const local = rows.map(toHit).map((h) => (near ? { ...h, distanceM: Math.round(haversineMeters(near, h)) } : h));
-      // Local snapshot results that are actually near you win; live OSM fills in everywhere else.
-      const close = near ? local.filter((h) => h.distanceM! <= 5000) : local;
-      if (close.length >= 3) return local;
-      const live = await photonSearch(q.trim().slice(0, 80), near);
-      return dedupe([...close, ...live, ...local.filter((h) => !close.includes(h))]).slice(0, 8);
+        LIMIT 12`;
+      const local = rows.map(toHit);
+      // Always ask live OSM too (the local snapshot is small), and on an explicit search also
+      // Nominatim; then rank by how well the name matches, with distance only breaking ties.
+      const query = q.trim().slice(0, 80);
+      const [live, deep] = await Promise.all([photonSearch(query, near), opts?.deep ? nominatimSearch(query, near) : Promise.resolve([])]);
+      return rankPlaces([...local, ...live, ...deep], query, near, 8);
     },
 
     async reverse(p) {

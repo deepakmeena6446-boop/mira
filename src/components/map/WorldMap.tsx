@@ -101,7 +101,7 @@ export function WorldMap({
   className,
   label,
 }: {
-  tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null };
+  tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null };
   me: LngLat | null;
   dest?: LngLat | null;
   route?: Array<[number, number]> | null;
@@ -126,6 +126,7 @@ export function WorldMap({
   // Dark basemap after dark; the map is rebuilt when the style flips (a few times a day at most).
   const night = useDaypart() === "night";
   const styleUrl = (night && tiles.nightStyleUrl) || tiles.styleUrl;
+  const rasterUrl = (night && tiles.nightUrl) || tiles.url;
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
   const clickRef = useRef(onMapClick);
@@ -158,7 +159,7 @@ export function WorldMap({
           container: ref.current,
           style: styleUrl ?? {
             version: 8,
-            sources: { base: { type: "raster", tiles: [tiles.url], tileSize: 256, maxzoom: 20, attribution: tiles.attribution } },
+            sources: { base: { type: "raster", tiles: [rasterUrl], tileSize: 256, maxzoom: 22, attribution: tiles.attribution } },
             layers: [{ id: "base", type: "raster", source: "base" }],
           },
           center: me ? [me.lon, me.lat] : [77.209, 28.6139],
@@ -253,7 +254,7 @@ export function WorldMap({
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tiles.url, styleUrl]);
+  }, [rasterUrl, styleUrl]);
 
   // Data layers.
   useEffect(() => {

@@ -21,7 +21,7 @@ export default async function Home() {
       places={places}
       contacts={contacts}
       trip={trip}
-      tiles={tileConfig()}
+      tiles={await tileConfig()}
     />
   );
 }

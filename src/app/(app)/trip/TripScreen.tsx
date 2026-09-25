@@ -22,7 +22,7 @@ function haversine(a: { lat: number; lon: number }, b: { lat: number; lon: numbe
   return 12_742_000 * Math.asin(Math.sqrt(s));
 }
 
-export function TripScreen({ initial, tiles }: { initial: TripView; tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null } }) {
+export function TripScreen({ initial, tiles }: { initial: TripView; tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null } }) {
   const router = useRouter();
   const toast = useToast();
   const [trip, setTrip] = useState(initial);

@@ -25,5 +25,9 @@ export function e2eServerEnv(): Record<string, string> {
     SMTP_HOST: "127.0.0.1",
     SMTP_PORT: "1025",
     SMTP_FROM: "MIRA <no-reply@mira.test>",
+    // Keep Mira on the deterministic placeholder in E2E, even if .env.local has a real key.
+    ANTHROPIC_API_KEY: "",
+    GOOGLE_MAPS_SERVER_KEY: "",
+    GOOGLE_MAPS_BROWSER_KEY: "",
   };
 }

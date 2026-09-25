@@ -6,7 +6,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * from the runtime MAP_* settings rather than baked in at build time.
  */
 function tileOrigin(): string | null {
-  const origins = [process.env.MAP_TILE_URL, process.env.MAP_STYLE_URL]
+  const origins = [process.env.MAP_TILE_URL, process.env.MAP_STYLE_URL, process.env.GOOGLE_MAPS_BROWSER_KEY ? "https://tile.googleapis.com" : undefined]
     .filter((v): v is string => Boolean(v))
     .map((raw) => {
       try {

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { providerModes } from "@/server/providers/modes";
 import { MiraOrb } from "@/components/app/MiraOrb";
 import { Icon } from "@/components/ui/Icon";
 
@@ -36,10 +37,17 @@ export default function PrivacyPage() {
           <Item emoji="📍" title="Your location">
             <p>Used to show where you are and what&apos;s around. It isn&apos;t stored unless you&apos;re on a trip you started.</p>
             <p>During a trip, only your last few positions are kept, and they&apos;re deleted the moment the trip ends. There&apos;s no location history.</p>
-            <p>
-              To name your area and find places anywhere in the world, MIRA&apos;s server asks OpenStreetMap services (Nominatim, Photon, Overpass) using a rounded position (about
-              100 m–1 km) — never your exact spot, and never from your phone directly. The map itself loads from OpenFreeMap.
-            </p>
+            {providerModes().maps === "google" ? (
+              <p>
+                Search, walking directions and area names come from Google Maps Platform. MIRA&apos;s server makes these requests (not your phone), without your name or
+                account, rounding your position where it can (about 100 m–1 km; routes need your starting point). The map itself loads from Google.
+              </p>
+            ) : (
+              <p>
+                To name your area and find places anywhere in the world, MIRA&apos;s server asks OpenStreetMap services (Nominatim, Photon, Overpass) using a rounded position
+                (about 100 m–1 km) — never your exact spot, and never from your phone directly. The map itself loads from OpenFreeMap.
+              </p>
+            )}
           </Item>
           <Item emoji="💜" title="Trips you share">
             <p>
@@ -60,7 +68,11 @@ export default function PrivacyPage() {
               Your chat is saved to your account for 30 days so Mira can follow the conversation — without anything about where you were (area names, distances and
               nearby places are shown to you but not saved). Clear it any time in Me.
             </p>
-            <p>When Mira&apos;s AI is connected, messages will be processed by our AI provider to generate replies — never sold, never used for ads.</p>
+            <p>
+              {providerModes().companion === "claude"
+                ? "Mira's replies are written by Anthropic's Claude. Your message, recent chat, the time, your area name, and your saved places' and trusted contacts' names are sent to generate each reply — never your coordinates. Not sold, not used for ads."
+                : "Mira runs on a built-in script right now. When its AI is connected, messages will be processed by our AI provider to generate replies — never sold, never used for ads."}
+            </p>
           </Item>
           <Item emoji="📝" title="Reports">
             <p>Only a rough area (about 1 km), roughly when, and the kind of thing are kept — never your exact spot. Notes are encrypted and read only by a moderator.</p>
@@ -70,7 +82,9 @@ export default function PrivacyPage() {
             <p>No ads, no selling data, no public profiles, no &ldquo;safe/unsafe&rdquo; scores or crime maps, and no tracking you didn&apos;t start.</p>
           </Item>
         </ul>
-        <p className="mt-6 text-sm text-ink-subtle">Map data © OpenStreetMap contributors. Basemap by OpenFreeMap.</p>
+        <p className="mt-6 text-sm text-ink-subtle">
+          {providerModes().maps === "google" ? "Maps, places and directions © Google." : "Map data © OpenStreetMap contributors. Basemap by OpenFreeMap."}
+        </p>
       </article>
     </div>
   );

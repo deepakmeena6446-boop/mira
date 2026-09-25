@@ -106,13 +106,18 @@ export async function photonSearch(q: string, near?: GeoPoint): Promise<PlaceHit
   const key = `${q}|${c ? `${c.lat},${c.lon}` : ""}`;
   const hit = searchCache.get(key);
   if (hit) return hit;
-  const t = Date.now();
-  while (recentSearches.length && t - recentSearches[0] > 1000) recentSearches.shift();
-  if (recentSearches.length >= SEARCHES_PER_SECOND) return [];
-  recentSearches.push(t);
+  // Over the polite rate: wait for a slot rather than drop the query (it may be the last thing typed).
+  for (let tries = 0; ; tries++) {
+    const t = Date.now();
+    while (recentSearches.length && t - recentSearches[0] > 1000) recentSearches.shift();
+    if (recentSearches.length < SEARCHES_PER_SECOND) break;
+    if (tries >= 5) return [];
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  recentSearches.push(Date.now());
   try {
     const url = new URL("/api/", base);
-    url.search = new URLSearchParams({ q, limit: "8", lang: "en", ...(c ? { lat: String(c.lat), lon: String(c.lon) } : {}) }).toString();
+    url.search = new URLSearchParams({ q, limit: "12", lang: "en", ...(c ? { lat: String(c.lat), lon: String(c.lon), location_bias_scale: "0.4" } : {}) }).toString();
     const res = await fetch(url, { headers: { "user-agent": UA() }, signal: AbortSignal.timeout(4000) });
     if (!res.ok) return [];
     type F = { geometry: { coordinates: [number, number] }; properties: Record<string, string | undefined> };

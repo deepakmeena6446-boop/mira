@@ -28,6 +28,8 @@ export function applyTestEnv(overrides: Record<string, string | undefined> = {})
     SMTP_FROM: undefined,
     ANTHROPIC_API_KEY: undefined,
     MAPBOX_TOKEN: undefined,
+    GOOGLE_MAPS_SERVER_KEY: undefined,
+    GOOGLE_MAPS_BROWSER_KEY: undefined,
     ...overrides,
   };
   for (const [k, v] of Object.entries(base)) {

@@ -16,5 +16,5 @@ export default async function TripPage() {
   if (!user) redirect("/");
   const trip = await currentTrip(sql, user.id, systemClock.now());
   if (!trip) redirect("/");
-  return <TripScreen initial={trip} tiles={tileConfig()} />;
+  return <TripScreen initial={trip} tiles={await tileConfig()} />;
 }
