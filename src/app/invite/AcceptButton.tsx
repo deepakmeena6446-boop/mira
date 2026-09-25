@@ -11,7 +11,7 @@ export function AcceptButton() {
   if (state === "done") {
     return (
       <Notice tone="info" role="status" title="You've accepted">
-        If they miss their check-in by 10 minutes, MIRA will try to send you one email. You can close this page.
+        Thank you. MIRA will email you a live link whenever they share a trip, and let you know if they don&apos;t check in. You can close this page.
       </Notice>
     );
   }
@@ -36,7 +36,7 @@ export function AcceptButton() {
           }
         }}
       >
-        Accept for this journey
+        Accept
       </Button>
     </div>
   );

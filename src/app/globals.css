@@ -1,42 +1,83 @@
 @import "tailwindcss";
 
 /*
- * MIRA design tokens (UX spec §2): bright neutral canvas, deep ink, one composed
- * accent (indigo), a restrained warm highlight, and red reserved for validation or
- * delivery failure. All text/background pairs below meet WCAG AA (most AAA).
+ * MIRA 2.0 design tokens: a warm, companion-like consumer app.
+ * Soft lavender canvas, violet primary with a peach glow, generous radii, soft
+ * elevation. Token names are kept stable so every screen inherits the new look.
  */
 @theme {
-  --color-canvas: #f6f5f1;
+  --color-canvas: #faf7ff;
   --color-surface: #ffffff;
-  --color-sunken: #eeece6;
-  --color-ink: #16181d;
-  --color-ink-muted: #4a4f5b;
-  --color-ink-subtle: #5f6470;
-  --color-line: #d9d6cd;
-  --color-line-strong: #b9b5aa;
+  --color-sunken: #f3effb;
+  --color-ink: #1c1633;
+  --color-ink-muted: #5a546e;
+  --color-ink-subtle: #6c6682;
+  --color-line: #ebe5f6;
+  --color-line-strong: #d4cce6;
 
-  --color-accent: #3b35a8;
-  --color-accent-strong: #2c2786;
-  --color-accent-soft: #eceaf9;
+  --color-accent: #6a44f5;
+  --color-accent-strong: #5530e0;
+  --color-accent-soft: #efe9ff;
   --color-accent-ink: #ffffff;
 
-  --color-warm: #8a4a0b;
-  --color-warm-soft: #fdf1df;
+  --color-peach: #ff8a65;
+  --color-peach-soft: #fff0e9;
+  --color-mint: #15803d;
+  --color-mint-soft: #e7f7ee;
 
-  --color-error: #b42318;
+  --color-warm: #9a4d0e;
+  --color-warm-soft: #fff3e3;
+
+  --color-error: #c4281c;
   --color-error-soft: #fdecea;
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", "Helvetica Neue", Arial, sans-serif;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", sans-serif;
 
-  --radius-card: 1.25rem;
-  --radius-control: 0.875rem;
-  --shadow-card: 0 1px 2px rgb(22 24 29 / 0.06), 0 4px 16px rgb(22 24 29 / 0.05);
+  --radius-card: 1.75rem;
+  --radius-control: 1.1rem;
+  --shadow-card: 0 1px 2px rgb(40 20 90 / 0.05), 0 10px 30px -12px rgb(60 30 140 / 0.18);
+  --shadow-float: 0 16px 40px -12px rgb(50 25 120 / 0.35);
+
+  --animate-rise: rise 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  --animate-fade: fade 300ms ease-out both;
+  --animate-breathe: breathe 4s ease-in-out infinite;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: saturate(1);
+  }
+  50% {
+    transform: scale(1.06);
+    filter: saturate(1.2);
+  }
 }
 
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     background: var(--color-canvas);
@@ -45,27 +86,24 @@
     line-height: 1.5;
     min-height: 100dvh;
     overflow-x: hidden;
-    /* Long place names (e.g. "Vishwavidyalaya") must wrap under large text sizes. */
     overflow-wrap: break-word;
   }
   h1,
   h2,
   h3 {
     overflow-wrap: anywhere;
-    line-height: 1.2;
-    letter-spacing: -0.01em;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
     text-wrap: balance;
   }
   p {
     text-wrap: pretty;
   }
-  /* Visible, consistent keyboard focus everywhere. */
   :focus-visible {
     outline: 3px solid var(--color-accent);
     outline-offset: 2px;
-    border-radius: 6px;
+    border-radius: 10px;
   }
-  /* Devanagari needs extra line height to avoid clipped matras. */
   :lang(hi),
   .text-mixed {
     line-height: 1.7;
@@ -83,11 +121,29 @@
   }
 }
 
+/* Warm companion backdrop used on full-page screens. */
+@utility bg-companion {
+  background:
+    radial-gradient(120% 60% at 100% 0%, rgb(255 138 101 / 0.16), transparent 60%),
+    radial-gradient(90% 60% at 0% 10%, rgb(106 68 245 / 0.14), transparent 60%),
+    var(--color-canvas);
+}
+
+@utility bg-mira {
+  background: linear-gradient(135deg, #6a44f5 0%, #a855f7 45%, #ff8a65 100%);
+}
+
+@utility glass {
+  background: rgb(255 255 255 / 0.82);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+}
+
 @utility skeleton {
-  background: linear-gradient(90deg, var(--color-sunken) 0%, #f7f6f2 50%, var(--color-sunken) 100%);
+  background: linear-gradient(90deg, var(--color-sunken) 0%, #faf8ff 50%, var(--color-sunken) 100%);
   background-size: 200% 100%;
   animation: mira-shimmer 1.4s ease-in-out infinite;
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
 }
 
 @keyframes mira-shimmer {
@@ -99,16 +155,20 @@
   }
 }
 
-/* Visible dropdown affordance for native selects (appearance is reset for styling). */
 .mira-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2316181d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231c1633' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   background-size: 1.1rem;
 }
 
-/* MapLibre attribution must stay legible and unobscured (tile policy). */
+/* MapLibre: keep attribution legible; soften controls to match the app. */
 .maplibregl-ctrl-attrib {
-  font-size: 12px !important;
-  background: rgb(255 255 255 / 0.9) !important;
+  font-size: 11px !important;
+  background: rgb(255 255 255 / 0.85) !important;
+  border-radius: 999px 0 0 0;
+}
+.maplibregl-ctrl-group {
+  border-radius: 14px !important;
+  box-shadow: var(--shadow-card) !important;
 }

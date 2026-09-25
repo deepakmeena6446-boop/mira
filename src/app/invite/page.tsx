@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { getSql } from "@/server/db/client";
 import { systemClock } from "@/server/clock";
 import { viewInvite } from "@/server/journey/invites";
+import { contactInviteView } from "@/server/account/contacts";
+import { Avatar } from "@/components/app/Avatar";
 import { inviteCookieName } from "@/server/journey/invite-cookie";
 import { formatIstDateTime } from "@/lib/time";
 import { AcceptButton } from "./AcceptButton";
@@ -10,6 +12,29 @@ export const dynamic = "force-dynamic";
 
 export default async function InvitePage() {
   const token = (await cookies()).get(inviteCookieName())?.value ?? "";
+  const contact = await contactInviteView(getSql(), token);
+  if (contact) {
+    return (
+      <section aria-labelledby="inv-h" className="animate-rise rounded-[var(--radius-card)] bg-surface p-7 shadow-[var(--shadow-card)]">
+        <Avatar name={contact.owner} size={64} />
+        <h1 id="inv-h" className="mt-4 text-2xl font-extrabold">
+          {contact.owner} wants you as a trusted contact
+        </h1>
+        <ul className="mt-4 space-y-2 text-ink-muted">
+          <li>• When {contact.owner} shares a trip, you get a link to follow along live until they arrive.</li>
+          <li>• If they don&apos;t check in on time, MIRA lets you know.</li>
+          <li>• You only see their location during a trip they choose to share. Never otherwise.</li>
+        </ul>
+        <div className="mt-6">
+          {contact.accepted_at ? (
+            <p className="rounded-[var(--radius-control)] bg-mint-soft px-4 py-3 font-semibold text-mint">You&apos;re already one of {contact.owner}&apos;s trusted contacts.</p>
+          ) : (
+            <AcceptButton />
+          )}
+        </div>
+      </section>
+    );
+  }
   const invite = await viewInvite(getSql(), token, systemClock.now());
 
   if (invite.status !== "valid" && invite.status !== "accepted") {

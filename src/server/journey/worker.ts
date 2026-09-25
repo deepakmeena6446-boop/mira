@@ -40,18 +40,21 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
 
   const alerts: PendingAlert[] = [];
   await sql.begin(async (tx) => {
-    const due = await tx<{ id: string; state: JourneyState; eta_at: Date; contact_state: string; place_id: string | null }[]>`
-      SELECT id, state, eta_at, contact_state, place_id FROM journeys
+    const due = await tx<{ id: string; state: JourneyState; eta_at: Date; contact_state: string; place_id: string | null; dest_name: string | null }[]>`
+      SELECT id, state, eta_at, contact_state, place_id, dest_name FROM journeys
       WHERE state IN ('active', 'missed') AND eta_at <= ${new Date(now.getTime() - MISS_GRACE_MS)}
       ORDER BY eta_at LIMIT 200
       FOR UPDATE SKIP LOCKED`;
     for (const j of due) {
       let state = j.state;
       if (dueTransition({ state, etaAt: new Date(j.eta_at) }, now) === "miss") {
-        const [invite] = await tx<{ encrypted_email: string }[]>`
+        const recipients = await tx<{ encrypted_email: string }[]>`
           SELECT encrypted_email FROM contact_invites
-          WHERE journey_id = ${j.id} AND accepted_at IS NOT NULL AND revoked_at IS NULL`;
-        const canAlert = Boolean(invite) && j.contact_state === "accepted" && mailer !== null;
+          WHERE journey_id = ${j.id} AND accepted_at IS NOT NULL AND revoked_at IS NULL
+          UNION ALL
+          SELECT c.encrypted_email FROM trip_contacts tc JOIN contacts c ON c.id = tc.contact_id
+          WHERE tc.journey_id = ${j.id} AND c.accepted_at IS NOT NULL`;
+        const canAlert = recipients.length > 0 && j.contact_state === "accepted" && mailer !== null;
         await tx`UPDATE journeys SET state = 'missed', missed_at = ${now},
                    alert_state = ${canAlert ? "claimed" : "not_attempted"}, alert_claimed_at = ${canAlert ? now : null}
                  WHERE id = ${j.id} AND state = 'active'`;
@@ -59,12 +62,12 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
         result.missed += 1;
         log("journey.missed", { journey: j.id, alert: canAlert ? "claimed" : "not_attempted" });
         if (canAlert) {
-          let placeName: string | null = null;
-          if (j.place_id) {
+          let placeName: string | null = j.dest_name ?? null;
+          if (!placeName && j.place_id) {
             const [p] = await tx<{ name: string | null; kind: string }[]>`SELECT name, tags->>'mira:kind' AS kind FROM places WHERE id = ${j.place_id}`;
             if (p) placeName = displayName(p.name, p.kind ?? "Place");
           }
-          alerts.push({ journeyId: j.id, email: decryptText(invite.encrypted_email, "contact_email"), etaAt: new Date(j.eta_at), placeName });
+          for (const r of recipients) alerts.push({ journeyId: j.id, email: decryptText(r.encrypted_email, "contact_email"), etaAt: new Date(j.eta_at), placeName });
         }
       }
       if (state === "missed" && now.getTime() >= new Date(j.eta_at).getTime() + EXPIRE_AFTER_ETA_MS) {
@@ -76,14 +79,20 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
     }
   });
 
-  for (const a of alerts) {
-    const res = await mailer!.send({ to: a.email, ...missedAlertEmail({ etaAt: a.etaAt, placeName: a.placeName }) });
-    const outcome = res.ok ? "sent" : res.definite ? "failed" : "unconfirmed";
-    await sql`UPDATE journeys SET alert_state = ${outcome} WHERE id = ${a.journeyId} AND alert_state = 'claimed'`;
+  const byJourney = new Map<string, PendingAlert[]>();
+  for (const a of alerts) byJourney.set(a.journeyId, [...(byJourney.get(a.journeyId) ?? []), a]);
+  for (const [journeyId, group] of byJourney) {
+    const outcomes: Array<"sent" | "failed" | "unconfirmed"> = [];
+    for (const a of group) {
+      const res = await mailer!.send({ to: a.email, ...missedAlertEmail({ etaAt: a.etaAt, placeName: a.placeName }) });
+      outcomes.push(res.ok ? "sent" : res.definite ? "failed" : "unconfirmed");
+    }
+    const outcome = outcomes.includes("sent") ? "sent" : outcomes.includes("unconfirmed") ? "unconfirmed" : "failed";
+    await sql`UPDATE journeys SET alert_state = ${outcome} WHERE id = ${journeyId} AND alert_state = 'claimed'`;
     if (outcome === "sent") result.alertsSent += 1;
     else if (outcome === "failed") result.alertsFailed += 1;
     else result.alertsUnconfirmed += 1;
-    log("journey.alert", { journey: a.journeyId, outcome });
+    log("journey.alert", { journey: journeyId, outcome, recipients: group.length });
   }
 
   const purged = await sql`DELETE FROM journeys WHERE purge_at <= ${now}`;

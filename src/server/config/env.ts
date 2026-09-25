@@ -67,6 +67,8 @@ const envSchema = z.object({
       "must be an http(s) raster tile template containing {z}, {x} and {y}",
     ),
   MAP_TILE_ATTRIBUTION: optionalNonEmpty,
+  /** Optional vector style (e.g. OpenFreeMap placeholder, later Mapbox). Takes precedence over raster tiles. */
+  MAP_STYLE_URL: optionalNonEmpty.refine((v) => v === undefined || /^https:\/\//.test(v), "must be an https:// style URL"),
   SMTP_HOST: optionalNonEmpty,
   SMTP_PORT: optionalNonEmpty,
   SMTP_USER: optionalNonEmpty,

@@ -2,23 +2,24 @@ import { forwardRef, type ButtonHTMLAttributes } from "react";
 import Link from "next/link";
 import { cx } from "./cx";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "hero" | "secondary" | "ghost" | "danger";
 type Size = "md" | "lg";
 
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-[var(--radius-control)] font-semibold transition-colors " +
-  "disabled:cursor-not-allowed disabled:opacity-60 min-h-11 select-none text-center";
+  "inline-flex items-center justify-center gap-2 rounded-full font-bold transition-all active:scale-[0.98] " +
+  "disabled:cursor-not-allowed disabled:opacity-60 min-h-12 select-none text-center";
 const variants: Record<Variant, string> = {
-  primary: "bg-accent text-accent-ink hover:bg-accent-strong",
-  secondary: "bg-surface text-ink border border-line-strong hover:bg-sunken",
+  primary: "bg-accent text-accent-ink hover:bg-accent-strong shadow-[0_8px_20px_-8px_rgb(106_68_245/0.6)]",
+  hero: "bg-mira text-white shadow-[0_12px_28px_-10px_rgb(106_68_245/0.75)] hover:brightness-105",
+  secondary: "bg-surface text-ink border border-line hover:border-accent/40 shadow-[var(--shadow-card)]",
   ghost: "text-accent hover:bg-accent-soft",
   // Destructive/irreversible actions: strong neutral outline. Red is reserved for
   // validation and delivery failures (UX spec §2).
   danger: "bg-surface text-ink border-2 border-ink hover:bg-sunken",
 };
 const sizes: Record<Size, string> = {
-  md: "px-4 py-2.5 text-[0.95rem]",
-  lg: "px-5 py-3.5 text-base w-full sm:w-auto",
+  md: "px-5 py-2.5 text-[0.95rem]",
+  lg: "px-6 py-4 text-[1.05rem] w-full",
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

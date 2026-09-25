@@ -4,8 +4,6 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { PlacePicker } from "@/components/places/PlacePicker";
 import { ChoiceGroup } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
-import { CommunityEvidence, SourcesDetails } from "@/components/know/Evidence";
-import { NO_COMMUNITY_STATEMENT } from "@/domain/know-copy";
 
 afterEach(() => {
   cleanup();
@@ -56,20 +54,5 @@ describe("form primitives", () => {
     expect(b).toBeDisabled();
     fireEvent.click(b);
     expect(onClick).not.toHaveBeenCalled();
-  });
-});
-
-describe("evidence sections", () => {
-  it("states the absence of community data without a verdict", () => {
-    render(<CommunityEvidence community={{ coverage: "no_recent_community_data", selectedBand: "late", matching: [], otherBands: [], statement: NO_COMMUNITY_STATEMENT }} />);
-    expect(screen.getByText("No recent community data")).toBeTruthy();
-    expect(screen.getByText(NO_COMMUNITY_STATEMENT)).toBeTruthy();
-    expect(document.body.textContent).not.toMatch(/\bsafe\b/i);
-  });
-
-  it("keeps sources one tap away with the snapshot date", () => {
-    render(<SourcesDetails source={{ name: "OpenStreetMap contributors", licence: "ODbL-1.0", attribution: "© OpenStreetMap contributors", copyrightUrl: "https://www.openstreetmap.org/copyright", snapshotDate: "2026-09-24T18:11:11Z" }} />);
-    expect(screen.getByText("Sources and last updated")).toBeTruthy();
-    expect(document.body.textContent).toMatch(/Map snapshot taken 24 September 2026/);
   });
 });

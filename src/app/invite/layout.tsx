@@ -1,18 +1,17 @@
 import type { Metadata } from "next";
+import { MiraOrb } from "@/components/app/MiraOrb";
 
-export const metadata: Metadata = { title: "Check-in contact invitation", robots: { index: false, follow: false }, referrer: "no-referrer" };
+export const metadata: Metadata = { title: "Trusted contact invitation", robots: { index: false, follow: false }, referrer: "no-referrer" };
 
-/** Minimal chrome: no map, no third-party requests, nothing about the traveller's movements. */
 export default function InviteLayout({ children }: { children: React.ReactNode }) {
   return (
-    <main id="main" className="mx-auto w-full max-w-lg px-4 py-8">
-      <p className="mb-6 flex items-center gap-2 font-bold">
-        <span aria-hidden className="grid size-8 place-items-center rounded-xl bg-accent text-sm text-accent-ink">
-          M
-        </span>
-        MIRA
-      </p>
-      {children}
+    <main id="main" className="bg-companion min-h-dvh px-5 py-10">
+      <div className="mx-auto w-full max-w-md">
+        <p className="mb-8 flex items-center gap-2.5 text-lg font-extrabold tracking-tight">
+          <MiraOrb size={34} calm /> MIRA
+        </p>
+        {children}
+      </div>
     </main>
   );
 }

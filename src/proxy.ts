@@ -5,13 +5,17 @@ import { NextResponse, type NextRequest } from "next/server";
  * runtime MAP_TILE_URL rather than being baked in at build time.
  */
 function tileOrigin(): string | null {
-  const raw = process.env.MAP_TILE_URL;
-  if (!raw) return null;
-  try {
-    return new URL(raw.replace(/\{[a-z]\}/g, "0")).origin;
-  } catch {
-    return null;
-  }
+  const origins = [process.env.MAP_TILE_URL, process.env.MAP_STYLE_URL]
+    .filter((v): v is string => Boolean(v))
+    .map((raw) => {
+      try {
+        return new URL(raw.replace(/\{[a-z]\}/g, "0")).origin;
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+  return origins.length ? [...new Set(origins)].join(" ") : null;
 }
 
 export function proxy(_request: NextRequest) { // eslint-disable-line @typescript-eslint/no-unused-vars
