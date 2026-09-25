@@ -362,7 +362,7 @@ export function MeScreen({
                 </div>
               ) : (
                 <button type="button" onClick={() => setConfirmSignOut(true)} className="flex min-h-14 w-full items-center gap-3 px-5 text-left hover:bg-sunken">
-                  <Icon name="back" className="text-ink-muted" /> <span className="flex-1 font-semibold">Sign out</span>
+                  <Icon name="signout" className="text-ink-muted" /> <span className="flex-1 font-semibold">Sign out</span>
                 </button>
               )}
             </li>

@@ -97,11 +97,14 @@ const paths: Record<string, React.ReactNode> = {
     </>
   ),
   heart: <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z" />,
+  signout: <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10" />,
 };
 
-export function Icon({ name, className = "size-5" }: { name: keyof typeof paths | string; className?: string }) {
+/** 20px by default; a size-*, h-* or w-* class overrides it, colour-only classes keep the default size. */
+export function Icon({ name, className = "" }: { name: keyof typeof paths | string; className?: string }) {
+  const sized = /(^|\s)(size|h|w)-/.test(className);
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 ${sized ? "" : "size-5 "}${className}`.trim()}>
       {paths[name]}
     </svg>
   );
