@@ -2,14 +2,14 @@ import { getSql } from "@/server/db/client";
 import { handle, json } from "@/server/http/handler";
 import { assertSameOrigin } from "@/server/http/csrf";
 import { requireUser } from "@/server/session/user";
+import { listNotifications } from "@/server/providers/notify";
 
 export const dynamic = "force-dynamic";
 
 export const GET = handle(async () => {
   const sql = getSql();
   const user = await requireUser(sql);
-  const items = await sql`SELECT id, kind, title, body, href, read_at, created_at FROM notifications WHERE user_id = ${user.id} ORDER BY created_at DESC LIMIT 30`;
-  return json({ notifications: items });
+  return json({ notifications: await listNotifications(sql, user.id) });
 });
 
 /** Mark all as read. */

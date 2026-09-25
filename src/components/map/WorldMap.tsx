@@ -2,7 +2,8 @@
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState } from "react";
-import type { Map as MlMap, GeoJSONSource, MapMouseEvent, Marker } from "maplibre-gl";
+import type { Map as MlMap, GeoJSONSource, MapMouseEvent, MapTouchEvent, Marker } from "maplibre-gl";
+import { useDaypart } from "@/lib/daypart-store";
 
 export interface LngLat {
   lat: number;
@@ -35,12 +36,22 @@ function declutter(map: MlMap, markers: Map<string, Marker>) {
     .map((m) => ({ label: m.getElement().querySelector<HTMLElement>(".mira-pin-label"), pt: map.project(m.getLngLat()) }))
     .filter((x): x is typeof x & { label: HTMLElement } => Boolean(x.label))
     .sort((a, b) => Number(a.label.dataset.rank) - Number(b.label.dataset.rank));
-  const dots: Box[] = items.map(({ pt }) => ({ x0: pt.x - 16, x1: pt.x + 16, y0: pt.y - 16, y1: pt.y + 16 }));
+  // Pins first: a pin whose dot lands on a closer pin's dot is hidden (it's still in the list).
+  const dots: Box[] = [];
+  const pinVisible = items.map(({ label, pt }) => {
+    const dot = { x0: pt.x - 15, x1: pt.x + 15, y0: pt.y - 15, y1: pt.y + 15 };
+    const ok = !dots.some((d) => hit(dot, d));
+    (label.parentElement as HTMLElement).style.visibility = ok ? "" : "hidden";
+    if (ok) dots.push(dot);
+    return ok ? dot : null;
+  });
+  // Then names, closest first, skipping any that would overlap a shown name or another pin.
   const shown: Box[] = [];
   items.forEach(({ label, pt }, i) => {
+    const own = pinVisible[i];
     const w = Math.min(120, label.textContent!.length * 6.2 + 14);
     const box = { x0: pt.x - w / 2 - 3, x1: pt.x + w / 2 + 3, y0: pt.y + 14, y1: pt.y + 34 }; // name sits under the dot
-    const visible = shown.length < MAX_LABELS && !shown.some((b) => hit(box, b)) && !dots.some((d, j) => j !== i && hit(box, d));
+    const visible = Boolean(own) && shown.length < MAX_LABELS && !shown.some((b) => hit(box, b)) && !dots.some((d) => d !== own && hit(box, d));
     label.style.display = visible ? "" : "none";
     if (visible) shown.push(box);
   });
@@ -80,6 +91,8 @@ export function WorldMap({
   notes = [],
   places = [],
   onPlaceClick,
+  onLongPress,
+  recenter = 0,
   follow = true,
   onMapClick,
   onReady,
@@ -88,7 +101,7 @@ export function WorldMap({
   className,
   label,
 }: {
-  tiles: { url: string; attribution: string; styleUrl?: string | null };
+  tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null };
   me: LngLat | null;
   dest?: LngLat | null;
   route?: Array<[number, number]> | null;
@@ -96,6 +109,10 @@ export function WorldMap({
   /** Nearby places as tappable pins; the first few (closest) also show their name. */
   places?: MapPlace[];
   onPlaceClick?: (p: MapPlace) => void;
+  /** Press and hold (touch) or right-click (mouse) on the map. */
+  onLongPress?: (p: LngLat) => void;
+  /** Increment to fly back to `me` (and resume following) — e.g. the "Centre on me" button. */
+  recenter?: number;
   follow?: boolean;
   onMapClick?: (p: LngLat) => void;
   onReady?: (ok: boolean) => void;
@@ -106,20 +123,27 @@ export function WorldMap({
   label: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Dark basemap after dark; the map is rebuilt when the style flips (a few times a day at most).
+  const night = useDaypart() === "night";
+  const styleUrl = (night && tiles.nightStyleUrl) || tiles.styleUrl;
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
   const clickRef = useRef(onMapClick);
   const readyRef = useRef(onReady);
   const areaRef = useRef(onArea);
   const placeClickRef = useRef(onPlaceClick);
+  const longPressRef = useRef(onLongPress);
   const mlRef = useRef<typeof import("maplibre-gl") | null>(null);
   const markersRef = useRef(new Map<string, Marker>());
+  // Once the person pans or zooms the map themselves, stop auto-following until they recentre.
+  const userMovedRef = useRef(false);
   useEffect(() => {
     clickRef.current = onMapClick;
     readyRef.current = onReady;
     areaRef.current = onArea;
     placeClickRef.current = onPlaceClick;
-  }, [onMapClick, onReady, onArea, onPlaceClick]);
+    longPressRef.current = onLongPress;
+  }, [onMapClick, onReady, onArea, onPlaceClick, onLongPress]);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,7 +156,7 @@ export function WorldMap({
         ml.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
         const map = new ml.Map({
           container: ref.current,
-          style: tiles.styleUrl ?? {
+          style: styleUrl ?? {
             version: 8,
             sources: { base: { type: "raster", tiles: [tiles.url], tileSize: 256, maxzoom: 20, attribution: tiles.attribution } },
             layers: [{ id: "base", type: "raster", source: "base" }],
@@ -144,7 +168,46 @@ export function WorldMap({
           pitchWithRotate: false,
         });
         map.touchZoomRotate.disableRotation();
-        map.on("click", (e: MapMouseEvent) => clickRef.current?.({ lat: e.lngLat.lat, lon: e.lngLat.lng }));
+        // A tap right after a long-press shouldn't also count as a map tap.
+        let suppressClick = 0;
+        map.on("click", (e: MapMouseEvent) => {
+          if (Date.now() < suppressClick) return;
+          clickRef.current?.({ lat: e.lngLat.lat, lon: e.lngLat.lng });
+        });
+        // Long-press: hold one finger still for 550 ms (any movement is a pan, not a press).
+        let hold: ReturnType<typeof setTimeout> | null = null;
+        let start: { x: number; y: number } | null = null;
+        const cancelHold = () => {
+          if (hold) clearTimeout(hold);
+          hold = null;
+        };
+        const fire = (lat: number, lon: number) => {
+          suppressClick = Date.now() + 600;
+          navigator.vibrate?.(12);
+          longPressRef.current?.({ lat, lon });
+        };
+        map.on("touchstart", (e: MapTouchEvent) => {
+          cancelHold();
+          if (e.points.length !== 1 || !longPressRef.current) return;
+          start = { x: e.point.x, y: e.point.y };
+          const { lat, lng } = e.lngLat;
+          hold = setTimeout(() => fire(lat, lng), 550);
+        });
+        map.on("touchmove", (e: MapTouchEvent) => {
+          if (start && (e.points.length !== 1 || Math.hypot(e.point.x - start.x, e.point.y - start.y) > 10)) cancelHold();
+        });
+        map.on("touchend", cancelHold);
+        map.on("touchcancel", cancelHold);
+        map.on("movestart", cancelHold);
+        map.on("dragstart", () => (userMovedRef.current = true));
+        map.on("zoomstart", (e: { originalEvent?: Event }) => {
+          if (e.originalEvent) userMovedRef.current = true; // pinch/scroll by a person, not our own camera moves
+        });
+        map.on("contextmenu", (e: MapMouseEvent) => {
+          if (!longPressRef.current) return;
+          e.preventDefault();
+          fire(e.lngLat.lat, e.lngLat.lng);
+        });
         let loaded = false;
         map.on("error", () => !loaded && readyRef.current?.(false));
         map.on("moveend", () => declutter(map, markersRef.current));
@@ -154,17 +217,24 @@ export function WorldMap({
         map.once("load", () => {
           if (cancelled) return;
           loaded = true;
+          // Overlay colors come from the theme (globals.css), so routes stay legible at night.
+          const css = getComputedStyle(document.documentElement);
+          const token = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
+          const routeColor = token("--map-route", "#6a44f5");
+          const glowColor = token("--map-route-glow", "#a78bfa");
+          const meColor = token("--map-me", "#2563eb");
+          const ring = token("--pin-bg", "#ffffff");
           // App overlays sit on top of whichever basemap style is in use.
           map.addSource("route", { type: "geojson", data: EMPTY });
           map.addSource("points", { type: "geojson", data: EMPTY });
           map.addSource("notes", { type: "geojson", data: EMPTY });
-          map.addLayer({ id: "route-glow", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#a78bfa", "line-width": 12, "line-opacity": 0.35 } });
-          map.addLayer({ id: "route", type: "line", source: "route", filter: ["!", ["get", "approx"]], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#6a44f5", "line-width": 5 } });
-          map.addLayer({ id: "route-approx", type: "line", source: "route", filter: ["get", "approx"], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#6a44f5", "line-width": 5, "line-dasharray": [1.2, 1.6] } });
-          map.addLayer({ id: "notes", type: "circle", source: "notes", paint: { "circle-radius": 11, "circle-color": "#ff8a65", "circle-opacity": 0.85, "circle-stroke-color": "#fff", "circle-stroke-width": 3 } });
-          map.addLayer({ id: "me-halo", type: "circle", source: "points", filter: ["==", ["get", "kind"], "me"], paint: { "circle-radius": 22, "circle-color": "#3b82f6", "circle-opacity": 0.18 } });
-          map.addLayer({ id: "me", type: "circle", source: "points", filter: ["==", ["get", "kind"], "me"], paint: { "circle-radius": 8, "circle-color": "#2563eb", "circle-stroke-color": "#fff", "circle-stroke-width": 3 } });
-          map.addLayer({ id: "dest", type: "circle", source: "points", filter: ["==", ["get", "kind"], "dest"], paint: { "circle-radius": 11, "circle-color": "#6a44f5", "circle-stroke-color": "#fff", "circle-stroke-width": 4 } });
+          map.addLayer({ id: "route-glow", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": glowColor, "line-width": 12, "line-opacity": 0.35 } });
+          map.addLayer({ id: "route", type: "line", source: "route", filter: ["!", ["get", "approx"]], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": routeColor, "line-width": 5 } });
+          map.addLayer({ id: "route-approx", type: "line", source: "route", filter: ["get", "approx"], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": routeColor, "line-width": 5, "line-dasharray": [1.2, 1.6] } });
+          map.addLayer({ id: "notes", type: "circle", source: "notes", paint: { "circle-radius": 11, "circle-color": "#ff8a65", "circle-opacity": 0.85, "circle-stroke-color": ring, "circle-stroke-width": 3 } });
+          map.addLayer({ id: "me-halo", type: "circle", source: "points", filter: ["==", ["get", "kind"], "me"], paint: { "circle-radius": 22, "circle-color": meColor, "circle-opacity": 0.22 } });
+          map.addLayer({ id: "me", type: "circle", source: "points", filter: ["==", ["get", "kind"], "me"], paint: { "circle-radius": 8, "circle-color": meColor, "circle-stroke-color": ring, "circle-stroke-width": 3 } });
+          map.addLayer({ id: "dest", type: "circle", source: "points", filter: ["==", ["get", "kind"], "dest"], paint: { "circle-radius": 11, "circle-color": routeColor, "circle-stroke-color": ring, "circle-stroke-width": 4 } });
           readyRef.current?.(true);
           setReady(true);
         });
@@ -175,6 +245,7 @@ export function WorldMap({
     const markers = markersRef.current;
     return () => {
       cancelled = true;
+      setReady(false); // a rebuilt map (e.g. night style) must re-add overlays and pins
       ro?.disconnect();
       markers.forEach((m) => m.remove());
       markers.clear();
@@ -182,7 +253,7 @@ export function WorldMap({
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tiles.url, tiles.styleUrl]);
+  }, [tiles.url, styleUrl]);
 
   // Data layers.
   useEffect(() => {
@@ -253,10 +324,17 @@ export function WorldMap({
     };
   }, [me?.lat, me?.lon, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Camera: fit the route or follow the user.
+  // Camera: fit the route or follow the user — but never fight someone exploring the map.
+  const destKey = dest ? `${dest.lat},${dest.lon}` : "";
+  const lastDestKey = useRef(destKey);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
+    if (destKey !== lastDestKey.current) {
+      lastDestKey.current = destKey; // a new destination is always framed
+      userMovedRef.current = false;
+    }
+    if (userMovedRef.current) return;
     const coords: Array<[number, number]> = route && route.length > 1 ? route : dest && me ? [[me.lon, me.lat], [dest.lon, dest.lat]] : [];
     if (coords.length > 1) {
       const lons = coords.map((c) => c[0]);
@@ -274,11 +352,21 @@ export function WorldMap({
       map.easeTo({ center: [me.lon, me.lat], zoom: Math.max(map.getZoom(), 15), duration: 700, padding });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me?.lat, me?.lon, dest?.lat, dest?.lon, route, ready, follow, placesKey]);
+  }, [me?.lat, me?.lon, destKey, route, ready, follow, placesKey]);
+
+  // "Centre on me": always flies back and resumes following, even if the fix hasn't changed.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!recenter || !map || !ready || !me) return;
+    userMovedRef.current = false;
+    map.easeTo({ center: [me.lon, me.lat], zoom: Math.max(map.getZoom(), 15), duration: 600, padding });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recenter]);
 
   return (
     <div className={className ?? "absolute inset-0"}>
-      <div ref={ref} role="img" aria-label={label} className="h-full w-full bg-sunken" />
+      {/* A labelled region (not role="img"), so the place pins inside stay reachable by screen readers. */}
+      <div ref={ref} role="region" aria-label={label} className="h-full w-full bg-sunken" />
     </div>
   );
 }

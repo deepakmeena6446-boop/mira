@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { personName } from "@/server/http/person-name";
 import { getSql } from "@/server/db/client";
 import { handle, json, readJson } from "@/server/http/handler";
 import { assertSameOrigin } from "@/server/http/csrf";
@@ -22,7 +23,7 @@ export const PATCH = handle(async (req: Request) => {
   assertSameOrigin(req);
   const sql = getSql();
   const user = await requireUser(sql);
-  const body = await readJson(req, z.object({ name: z.string().trim().min(1).max(40).optional(), onboarded: z.literal(true).optional() }).strict(), 1024);
+  const body = await readJson(req, z.object({ name: personName(40).optional(), onboarded: z.literal(true).optional() }).strict(), 1024);
   await updateProfile(sql, user.id, body);
   return json({ ok: true });
 });

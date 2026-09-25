@@ -55,8 +55,11 @@ describe("worker heartbeat readiness", () => {
     const clock = fixedClock("2026-09-24T10:00:00Z");
     expect((await workerStatus(sql, clock)).healthy).toBe(false);
     await recordHeartbeat(sql, "test-worker", clock.now(), "test", clock.now());
+    await recordHeartbeat(sql, "job:journeys", clock.now(), "test", clock.now());
     expect((await workerStatus(sql, clock)).healthy).toBe(true);
+    // Alive but not completing journeys passes (e.g. failing every time) is not healthy.
     clock.advance(3 * MINUTE + 1000);
+    await recordHeartbeat(sql, "test-worker", clock.now(), "test", clock.now());
     expect((await workerStatus(sql, clock)).healthy).toBe(false);
   });
 });

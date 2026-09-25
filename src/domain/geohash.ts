@@ -57,11 +57,20 @@ export function isGeohash(s: string, precision = REPORT_CELL_PRECISION): boolean
   return new RegExp(`^[0-9b-hjkmnp-z]{${precision}}$`).test(s);
 }
 
-/** Cells within roughly `radiusM` of a point (centre cell + ring sampled on a grid). */
+/**
+ * Every cell within `radiusM` of a point (a few just outside may be included).
+ */
 export function cellsAround(lat: number, lon: number, radiusM = 1500): string[] {
   const cells = new Set<string>();
   const dLat = radiusM / 111_320;
   const dLon = radiusM / (111_320 * Math.max(0.1, Math.cos((lat * Math.PI) / 180)));
-  for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) cells.add(encodeGeohash(lat + (i * dLat) / 2, lon + (j * dLon) / 2));
+  // Precision-6 cells are 180/2^15 ° tall and 360/2^15 ° wide; step half a cell and go one
+  // step past the radius on each side, so a cell only partly inside the box is still hit.
+  const stepLat = 180 / 32768 / 2;
+  const stepLon = 360 / 32768 / 2;
+  for (let y = -dLat - stepLat; y <= dLat + stepLat; y += stepLat) {
+    for (let x = -dLon - stepLon; x <= dLon + stepLon; x += stepLon) cells.add(encodeGeohash(Math.max(-90, Math.min(90, lat + y)), ((lon + x + 540) % 360) - 180));
+  }
+  cells.add(encodeGeohash(lat, lon));
   return [...cells];
 }

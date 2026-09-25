@@ -9,7 +9,9 @@ import { resetMailer, getMailer } from "@/server/mail";
 import { fixedClock, MINUTE } from "@/server/clock";
 import { recordHeartbeat } from "@/server/health/worker";
 import { addLocation, sharedTrip, ARRIVAL_DWELL_MS, KEEP_POINTS } from "@/server/trips";
-import { processJourneys } from "@/server/journey/worker";
+import { processJourneys, STALE_AFTER_MS } from "@/server/journey/worker";
+import { GET as inboxGET, POST as inboxPOST } from "@/app/api/me/notifications/route";
+import { hmacHex } from "@/server/crypto";
 import { POST as demoPOST } from "@/app/api/auth/demo/route";
 import { GET as meGET, DELETE as meDELETE } from "@/app/api/me/route";
 import { POST as placesPOST } from "@/app/api/me/places/route";
@@ -70,6 +72,7 @@ describe("MIRA 2.0 accounts, trips, Mira (placeholders)", () => {
     await sql`DELETE FROM abuse_counters`;
     await sql`DELETE FROM journeys`;
     await recordHeartbeat(sql, "v2-worker", new Date(), "test", new Date());
+    await recordHeartbeat(sql, "job:journeys", new Date(), "test", new Date());
   });
 
   it("demo sign-in creates a real account with places and contacts; delete erases everything", async () => {
@@ -100,16 +103,18 @@ describe("MIRA 2.0 accounts, trips, Mira (placeholders)", () => {
     const res = await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" }, share: true }));
     expect(res.status).toBe(201);
     const { trip } = await res.json();
-    expect(trip.sharedWith).toEqual([{ name: "Riya" }]);
-    expect(trip.shareUrl).toMatch(/\/t\/[A-Za-z0-9_-]+$/);
+    expect(trip.sharedWith).toEqual([{ name: "Riya", notified: true }]);
+    expect(trip.shareUrl).toMatch(/\/t\/[A-Za-z0-9_-]+$/); // the traveller's own link
     const shareMail = (await mailsTo(accepted)).find((m) => m.Subject.includes("sharing a trip"));
     expect(shareMail).toBeTruthy();
     expect((await mailsTo(pending)).some((m) => m.Subject.includes("sharing a trip"))).toBe(false);
-    const token = trip.shareUrl.split("/t/")[1];
+    // Riya's emailed link is hers alone, distinct from the traveller's own link.
+    const token = /\/t\/([A-Za-z0-9_-]+)/.exec(await mailText(shareMail!.ID))![1];
+    expect(token).not.toBe(trip.shareUrl.split("/t/")[1]);
 
-    // Contact view while open: location + ETA, first name only.
+    // Contact view while open: location + ETA, first name only; she's told she'll get alerts.
     const live = await (await sharedGET(getRequest(`/api/t/${token}`), { params: Promise.resolve({ token }) })).json();
-    expect(live).toMatchObject({ state: "active", name: "Asha", destination: "Home" });
+    expect(live).toMatchObject({ state: "active", name: "Asha", destination: "Home", alertsViewer: true });
     expect(live.location).toBeTruthy();
 
     // Live points are capped; dwelling at the destination auto-arrives.
@@ -128,7 +133,8 @@ describe("MIRA 2.0 accounts, trips, Mira (placeholders)", () => {
     const [{ left }] = await getSql()`SELECT count(*)::int AS left FROM trip_locations WHERE journey_id = ${trip.id}`;
     expect(left).toBe(0); // live points never outlive the trip
     const after = await sharedTrip(getSql(), token, new Date());
-    expect(after).toEqual({ state: "arrived", name: "Asha", destination: "Home" });
+    expect(after).toEqual({ state: "arrived", name: "Asha" }); // just the good news, briefly
+    expect(await sharedTrip(getSql(), token, new Date(Date.now() + 40 * MINUTE))).toBeNull(); // then nothing
   });
 
   it("alerts shared contacts once when the trip is missed; other users can't touch the trip", async () => {
@@ -155,6 +161,9 @@ describe("MIRA 2.0 accounts, trips, Mira (placeholders)", () => {
     expect(text).toMatch(/expected at Hostel about 1\d minutes ago/);
     expect(text).toMatch(/\/t\/[A-Za-z0-9_-]+/); // still-open live link for an accepted contact
     expect(text).not.toMatch(/28\.\d{3}|77\.\d{3}/);
+    // The traveller hears about it too, in-app, naming who is being told.
+    const [note] = await getSql()`SELECT n.body FROM notifications n JOIN journeys j ON j.user_id = n.user_id WHERE j.id = ${trip.id} AND n.kind = 'trip_missed'`;
+    expect(note.body).toMatch(/emailing Didi/);
   });
 
   it("Mira streams replies with cards, keeps history per user, and can be cleared", async () => {
@@ -187,4 +196,56 @@ describe("MIRA 2.0 accounts, trips, Mira (placeholders)", () => {
     const [row] = await getSql()`SELECT count(*)::int AS n FROM reports_private WHERE coarse_cell_id LIKE 'gcpu%'`;
     expect(row.n).toBeGreaterThanOrEqual(1);
   });
+
+  it("signing in claims this browser's anonymous reports, re-keyed to the account, and forgets the anonymous cookie", async () => {
+    const jar = newJar();
+    switchJar(jar);
+    const key = randomUUID();
+    const sent = await reportPOST(jsonRequest("/api/reports", { idempotencyKey: key, involvement: "witnessed", category: "environment", location: START, recency: "today", timeBand: "day" }));
+    expect(sent.status).toBe(201);
+    expect(jar.has("mira_actor")).toBe(true);
+    expect((await demoPOST(jsonRequest("/api/auth/demo", { name: "Tanvi" }))).status).toBe(201);
+    const [row] = await getSql()`SELECT r.user_id, r.actor_hash, u.id AS uid FROM reports_private r JOIN users u ON u.id = r.user_id WHERE r.idempotency_key = ${key}`;
+    expect(row.user_id).toBe(row.uid);
+    expect(row.actor_hash).toBe(hmacHex("user-actor", row.uid)); // one person = one contributor
+    expect(jar.has("mira_actor")).toBe(false);
+    const inbox = await (await inboxGET()).json();
+    expect(inbox.notifications[0]).toMatchObject({ kind: "welcome", title: "Welcome to MIRA, Tanvi" });
+    expect(inbox.notifications[0].body).toMatch(/report you sent before signing in is now linked/);
+    // Opening the inbox marks everything read.
+    await inboxPOST(jsonRequest("/api/me/notifications", {}));
+    expect((await (await inboxGET()).json()).notifications.every((n: { read_at: string | null }) => n.read_at)).toBe(true);
+  });
+
+  it("tells the owner once when a contact accepts", async () => {
+    await signIn("Ira");
+    const email = `acc2-${randomUUID().slice(0, 6)}@example.test`;
+    await contactsPOST(jsonRequest("/api/me/contacts", { name: "Zara", email }));
+    await acceptInviteFor(email);
+    const [{ uid }] = await getSql()`SELECT user_id AS uid FROM contacts WHERE name = 'Zara' ORDER BY created_at DESC LIMIT 1`;
+    const notes = await getSql()`SELECT title FROM notifications WHERE user_id = ${uid} AND kind = 'contact_accepted'`;
+    expect(notes.map((n) => n.title)).toEqual(["Zara accepted your invite"]);
+  });
+
+  it("nudges the owner once when live location pauses, and again after it resumes and pauses", async () => {
+    await signIn("Diya");
+    const { trip } = await (await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" }, share: false }))).json();
+    const [{ user_id: uid }] = await getSql()`SELECT user_id FROM journeys WHERE id = ${trip.id}`;
+    await getSql()`UPDATE journeys SET eta_at = now() + interval '1 hour' WHERE id = ${trip.id}`; // pauses happen well before the ETA
+    const pause = () => getSql()`UPDATE journeys SET last_location_at = now() - ${`${STALE_AFTER_MS / 1000 + 60} seconds`}::interval WHERE id = ${trip.id}`;
+    const count = async () => (await getSql()`SELECT count(*)::int AS n FROM notifications WHERE user_id = ${uid} AND kind = 'location_paused'`)[0].n;
+
+    await pause();
+    expect((await processJourneys(getSql(), fixedClock(new Date()), getMailer())).staleNudged).toBe(1);
+    expect((await processJourneys(getSql(), fixedClock(new Date()), getMailer())).staleNudged).toBe(0); // once per pause
+    expect(await count()).toBe(1);
+
+    const resumed = new Date(Date.now() + 1000);
+    await addLocation(getSql(), uid, trip.id, START, fixedClock(resumed)); // points resume…
+    expect((await processJourneys(getSql(), fixedClock(new Date(resumed.getTime() + 60_000)), getMailer())).staleNudged).toBe(0);
+    // …then stop again: another nudge once the new pause is long enough (still before the ETA).
+    await processJourneys(getSql(), fixedClock(new Date(resumed.getTime() + STALE_AFTER_MS + 60_000)), getMailer());
+    expect(await count()).toBe(2);
+  });
 });
+

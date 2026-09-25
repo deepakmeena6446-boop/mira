@@ -7,11 +7,13 @@ import { MiraOrb } from "@/components/app/MiraOrb";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { kindEmoji } from "@/components/app/kinds";
 import { Button } from "@/components/ui/Button";
+import { useDaypart } from "@/lib/daypart-store";
+import type { Daypart } from "@/domain/daypart";
 import { Icon } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
 import { cx } from "@/components/ui/cx";
 import { api } from "@/lib/api-client";
-import { requestLocation, setPendingDestination, useLocation } from "@/lib/location-store";
+import { freshLocation, setPendingDestination, useLocation } from "@/lib/location-store";
 import type { MiraCard } from "@/server/providers/companion/types";
 
 interface Msg {
@@ -20,12 +22,48 @@ interface Msg {
   text: string;
   cards: MiraCard[];
   streaming?: boolean;
+  /** Not delivered: shown as a system note, not as something Mira said. */
+  failed?: boolean;
 }
 
-const QUICK = ["Take me home", "Pharmacy near me", "I feel uneasy", "Report something"];
+// Quick replies follow the time of day: errands by day, the walk home after dark.
+const QUICK: Record<Daypart, string[]> = {
+  dawn: ["What's open near me", "Take me home", "Report something", "I feel uneasy"],
+  day: ["Pharmacy near me", "Take me home", "Report something", "I feel uneasy"],
+  evening: ["Take me home", "What's open near me", "I feel uneasy", "Report something"],
+  night: ["Walk me home", "I feel uneasy", "What's open now", "What time is it?"],
+};
+const INTRO: Record<Daypart, (name: string) => string> = {
+  dawn: (n) => `Morning${n}! ☀️ Early start? I can share your trip live with people you trust, find what's open, or help you report something privately.`,
+  day: (n) => `Hi${n}! I'm Mira 👋 I can share your trip live with people you trust, find what's open nearby, or help you report something privately. What do you need?`,
+  evening: (n) => `Good evening${n} 🌆 Heading somewhere? I can share your walk live with people you trust, or find what's open nearby.`,
+  night: (n) => `Hey${n} 🌙 It's late. Want me to share your walk home with someone you trust? I can also find what's still open near you.`,
+};
 const fmtM = (m?: number) => (m === undefined ? "" : m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`);
 
-function Card({ card, onTrip }: { card: MiraCard; onTrip: (d: { name: string; lat: number; lon: number }) => void }) {
+type StartTrip = (d: { name: string; lat: number; lon: number }) => Promise<void>;
+
+/** Starting a trip can wait on a location fix: show it's working and ignore repeat taps. */
+function TripCardButton({ label, onStart }: { label: string; onStart: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      className="mt-3"
+      variant="hero"
+      busy={busy}
+      busyLabel="Starting…"
+      onClick={async () => {
+        setBusy(true);
+        await onStart();
+        setBusy(false);
+      }}
+    >
+      <Icon name="share" className="size-4" /> {label}
+    </Button>
+  );
+}
+
+function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
   const router = useRouter();
   switch (card.type) {
     case "trip":
@@ -37,9 +75,7 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: (d: { name: string; la
             {card.minutes ? `About ${card.minutes} min walk · ` : ""}
             {card.contacts.length ? `${card.contacts.join(", ")} can follow live` : "Private — I'll check you arrive"}
           </p>
-          <Button className="mt-3" variant="hero" onClick={() => onTrip(card.destination)}>
-            <Icon name="share" className="size-4" /> {card.contacts.length ? "Share my trip" : "Start my trip"}
-          </Button>
+          <TripCardButton label={card.contacts.length ? "Share my trip" : "Start my trip"} onStart={() => onTrip(card.destination)} />
         </div>
       );
     case "places":
@@ -82,9 +118,10 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: (d: { name: string; la
     case "sos":
       return (
         <div className="mt-2 rounded-3xl bg-warm-soft p-4">
-          <a href="tel:112" className="flex min-h-13 items-center justify-center gap-2 rounded-full bg-ink px-5 text-lg font-extrabold text-white">
+          <a href="tel:112" className="flex min-h-13 items-center justify-center gap-2 rounded-full bg-ink px-5 text-lg font-extrabold text-canvas">
             Call 112
           </a>
+          <p className="mt-1 text-center text-xs text-ink-subtle">112 works from most mobile phones; your local emergency number works too.</p>
           <p className="mt-2 text-center text-sm text-ink-muted">
             {card.contacts.length ? `Or share your trip below so ${card.contacts.join(", ")} can see where you are.` : "Add trusted contacts in Me so I can alert them next time."}
           </p>
@@ -102,7 +139,7 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: (d: { name: string; la
       );
     case "save_place":
       return (
-        <Link href="/me#places" className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-full bg-accent px-5 font-bold text-white">
+        <Link href="/me#places" className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-full bg-accent px-5 font-bold text-accent-ink">
           🏠 Save my home
         </Link>
       );
@@ -119,6 +156,7 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
   const [loaded, setLoaded] = useState(false);
   const [signIn, setSignIn] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const [announce, setAnnounce] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -152,6 +190,7 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
         const err = await res.json().catch(() => null);
         throw new Error(err?.error?.message ?? "Mira couldn't reply just now.");
       }
+      let spoken = ""; // the full reply, announced once to screen readers when it's done
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = "";
@@ -171,16 +210,22 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
                 : x,
             ),
           );
+          if (ev.type === "text") spoken += ev.delta ?? "";
+          if (ev.type === "done") setAnnounce(`Mira: ${spoken}`);
         }
       }
     } catch (e) {
-      setMsgs((m) => m.map((x) => (x.id === reply.id ? { ...x, text: e instanceof Error ? e.message : "Something went wrong.", streaming: false } : x)));
+      // fetch() rejects with a TypeError when the network is down; server errors carry a message.
+      const offline = e instanceof TypeError || (typeof navigator !== "undefined" && !navigator.onLine);
+      const text = offline ? "I couldn't reach the internet just now. Check your connection — your message is back in the box to resend." : e instanceof Error ? e.message : "I couldn't reply just now. Please try again.";
+      setMsgs((m) => m.filter((x) => x.id !== mine.id).map((x) => (x.id === reply.id ? { ...x, text, streaming: false, failed: true } : x)));
+      setInput(message);
     }
     setSending(false);
   };
 
-  const startTrip = async (dest: { name: string; lat: number; lon: number }) => {
-    const l = loc.point ? loc : await requestLocation();
+  const startTrip: StartTrip = async (dest) => {
+    const l = await freshLocation();
     if (!l.point) return toast("Turn on location so I can start your trip.", "error");
     const r = await api("/api/trips", { body: { from: { lat: l.point.lat, lon: l.point.lon }, to: dest, share: true } });
     if (r.ok || r.code === "trip_active") {
@@ -190,10 +235,11 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
   };
 
   const firstName = user?.name.split(" ")[0];
+  const part = useDaypart() ?? "day";
 
   return (
     <div className="bg-companion flex h-dvh flex-col">
-      <header className="glass z-10 flex items-center gap-3 border-b border-white/60 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
+      <header className="glass z-10 flex items-center gap-3 border-b border-glass-edge px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
         <MiraOrb size={44} />
         <div>
           <h1 className="text-xl font-extrabold leading-tight">Mira</h1>
@@ -203,17 +249,18 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-44 pt-4" aria-live="polite">
+      {/* The log isn't live (it would re-read every streamed word); each finished reply is announced once below. */}
+      <p className="sr-only" aria-live="polite">
+        {announce}
+      </p>
+      <div role="log" aria-live="off" aria-label="Conversation with Mira" className="flex-1 overflow-y-auto px-4 pb-44 pt-4">
         <div className="mx-auto flex max-w-xl flex-col gap-3">
           {(!user || (loaded && msgs.length === 0)) && (
             <div className="animate-rise">
               <div className="flex items-end gap-2">
                 <MiraOrb size={30} calm />
                 <div className="max-w-[85%] rounded-3xl rounded-bl-md bg-surface px-4 py-3 shadow-[var(--shadow-card)]">
-                  <p>
-                    Hi{firstName ? ` ${firstName}` : ""}! I&apos;m Mira 👋 I can share your trip live with people you trust, find what&apos;s open nearby, or help you report
-                    something privately. What do you need?
-                  </p>
+                  <p>{INTRO[part](firstName ? ` ${firstName}` : "")}</p>
                 </div>
               </div>
             </div>
@@ -221,13 +268,13 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
           {msgs.map((m) =>
             m.role === "user" ? (
               <div key={m.id} className="flex justify-end animate-rise">
-                <p className="max-w-[80%] rounded-3xl rounded-br-md bg-accent px-4 py-2.5 text-white text-mixed">{m.text}</p>
+                <p className="max-w-[80%] rounded-3xl rounded-br-md bg-accent px-4 py-2.5 text-accent-ink text-mixed">{m.text}</p>
               </div>
             ) : (
               <div key={m.id} className="flex items-end gap-2 animate-rise">
                 <MiraOrb size={30} calm />
                 <div className="min-w-0 max-w-[85%]">
-                  <div className="rounded-3xl rounded-bl-md bg-surface px-4 py-3 shadow-[var(--shadow-card)]">
+                  <div className={cx("rounded-3xl rounded-bl-md px-4 py-3 shadow-[var(--shadow-card)]", m.failed ? "bg-warm-soft text-warm" : "bg-surface")} role={m.failed ? "alert" : undefined}>
                     {m.text ? <p className="text-mixed">{m.text}</p> : <span className="inline-flex gap-1" aria-label="Mira is typing"><span className="size-2 animate-bounce rounded-full bg-ink-subtle" /><span className="size-2 animate-bounce rounded-full bg-ink-subtle [animation-delay:120ms]" /><span className="size-2 animate-bounce rounded-full bg-ink-subtle [animation-delay:240ms]" /></span>}
                   </div>
                   {m.cards.map((c, i) => (
@@ -244,8 +291,8 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
       <div className="fixed inset-x-0 bottom-[calc(5.4rem+env(safe-area-inset-bottom))] z-30 px-4">
         <div className="mx-auto max-w-xl">
           <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
-            {QUICK.map((q) => (
-              <button key={q} type="button" onClick={() => send(q)} className="shrink-0 rounded-full border border-line bg-surface px-4 py-2 text-sm font-semibold shadow-[var(--shadow-card)] hover:border-accent/40">
+            {QUICK[part].map((q) => (
+              <button key={q} type="button" onClick={() => send(q)} className="min-h-11 shrink-0 rounded-full border border-line bg-surface px-4 text-sm font-semibold shadow-[var(--shadow-card)] hover:border-accent/40">
                 {q}
               </button>
             ))}
@@ -255,7 +302,7 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
               e.preventDefault();
               void send(input);
             }}
-            className="glass flex items-center gap-2 rounded-full border border-white/70 p-1.5 pl-5 shadow-[var(--shadow-float)]"
+            className="glass flex items-center gap-2 rounded-full border border-glass-edge p-1.5 pl-5 shadow-[var(--shadow-float)]"
           >
             <label htmlFor="mira-input" className="sr-only">
               Message Mira

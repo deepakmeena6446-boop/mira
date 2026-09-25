@@ -19,6 +19,8 @@ export const POST = handle(async (req: Request, ctx: RouteContext<"/api/trips/[i
   const sql = getSql();
   const user = await requireUser(sql);
   const now = systemClock.now();
-  await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "trips:loc:m", max: 30, windowMs: 60_000 }], now);
+  // Per person (a walker sends ~3/min); an IP ceiling only against floods.
+  await enforce(sql, [dailyKey("actor", user.id, now)], [{ bucket: "trips:loc:m", max: 30, windowMs: 60_000 }], now);
+  await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "trips:loc:ip:m", max: 1200, windowMs: 60_000 }], now);
   return json(await addLocation(sql, user.id, id, await readJson(req, body, 256), systemClock));
 });

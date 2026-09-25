@@ -6,13 +6,16 @@ import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/app/Avatar";
 import { MiraOrb } from "@/components/app/MiraOrb";
 import { SignInSheet } from "@/components/app/SignInSheet";
+import { AppearancePicker } from "@/components/app/AppearancePicker";
+import { InstallCard } from "@/components/pwa/InstallCard";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
 import { cx } from "@/components/ui/cx";
 import { api } from "@/lib/api-client";
-import { requestLocation, useLocation } from "@/lib/location-store";
+import { freshLocation } from "@/lib/location-store";
 import type { SavedPlace } from "@/server/account/places";
+import { MAX_CONTACTS, MAX_SAVED_PLACES } from "@/domain/limits";
 import type { Contact } from "@/server/account/contacts";
 import type { ProviderModes } from "@/server/providers/modes";
 
@@ -51,7 +54,6 @@ export function MeScreen({
 }) {
   const router = useRouter();
   const toast = useToast();
-  const loc = useLocation(false);
   const [places, setPlaces] = useState(initialPlaces);
   const [contacts, setContacts] = useState(initialContacts);
   const [addingPlace, setAddingPlace] = useState(false);
@@ -62,6 +64,10 @@ export function MeScreen({
   const [cEmail, setCEmail] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null); // contact id awaiting "Remove?"
+  const [removing, setRemoving] = useState<string | null>(null);
+  const isDemo = modes.auth === "demo";
   const [signIn, setSignIn] = useState(false);
 
   if (!user) {
@@ -87,7 +93,7 @@ export function MeScreen({
 
   const addPlace = async () => {
     setBusy("place");
-    const l = loc.point ? loc : await requestLocation();
+    const l = await freshLocation();
     if (!l.point) {
       setBusy(null);
       return toast("I need your location to save this spot. You can also save places from the map.", "error");
@@ -131,7 +137,7 @@ export function MeScreen({
 
         {demoItems.length ? (
           <details className="rounded-3xl bg-accent-soft px-5 py-3">
-            <summary className="min-h-10 cursor-pointer py-2 font-bold text-accent-strong">✨ Demo mode</summary>
+            <summary className="min-h-11 cursor-pointer py-2 font-bold text-accent-strong">✨ Demo mode</summary>
             <p className="pb-2 text-sm text-ink-muted">Everything works end to end. These parts use stand-ins until the real services are connected: {demoItems.join(", ")}.</p>
           </details>
         ) : null}
@@ -140,9 +146,15 @@ export function MeScreen({
           id="places"
           title="Your places"
           action={
-            <button type="button" onClick={() => setAddingPlace((v) => !v)} className="min-h-10 rounded-full px-3 text-sm font-bold text-accent">
-              {addingPlace ? "Cancel" : "+ Add"}
-            </button>
+            places.length >= MAX_SAVED_PLACES && !addingPlace ? (
+              <span className="text-sm font-semibold text-ink-subtle">
+                {MAX_SAVED_PLACES} of {MAX_SAVED_PLACES}
+              </span>
+            ) : (
+              <button type="button" onClick={() => setAddingPlace((v) => !v)} className="min-h-11 rounded-full px-3 text-sm font-bold text-accent">
+                {addingPlace ? "Cancel" : "+ Add"}
+              </button>
+            )
           }
         >
           {addingPlace ? (
@@ -182,16 +194,20 @@ export function MeScreen({
                   <span className="grid size-11 place-items-center rounded-2xl bg-accent-soft text-xl">{p.emoji}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block font-bold">{p.label}</span>
-                    <span className="block truncate text-sm text-ink-muted">{p.address ?? `${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}`}</span>
+                    <span className="block truncate text-sm text-ink-muted">{p.address ?? "Pinned on the map"}</span>
                   </span>
                   <button
                     type="button"
                     aria-label={`Remove ${p.label}`}
+                    disabled={removing === p.id}
                     onClick={async () => {
+                      setRemoving(p.id);
                       const r = await api(`/api/me/places/${p.id}`, { method: "DELETE" });
+                      setRemoving(null);
                       if (r.ok) setPlaces((xs) => xs.filter((x) => x.id !== p.id));
+                      else toast(r.message, "error");
                     }}
-                    className="grid size-11 place-items-center rounded-full text-ink-subtle hover:bg-sunken"
+                    className="grid size-11 place-items-center rounded-full text-ink-subtle hover:bg-sunken disabled:opacity-50"
                   >
                     <Icon name="trash" className="size-5" />
                   </button>
@@ -205,9 +221,15 @@ export function MeScreen({
           id="contacts"
           title="Trusted contacts"
           action={
-            <button type="button" onClick={() => setAddingContact((v) => !v)} className="min-h-10 rounded-full px-3 text-sm font-bold text-accent">
-              {addingContact ? "Cancel" : "+ Add"}
-            </button>
+            contacts.length >= MAX_CONTACTS && !addingContact ? (
+              <span className="text-sm font-semibold text-ink-subtle">
+                {MAX_CONTACTS} of {MAX_CONTACTS}
+              </span>
+            ) : (
+              <button type="button" onClick={() => setAddingContact((v) => !v)} className="min-h-11 rounded-full px-3 text-sm font-bold text-accent">
+                {addingContact ? "Cancel" : "+ Add"}
+              </button>
+            )
           }
         >
           {addingContact ? (
@@ -245,21 +267,50 @@ export function MeScreen({
                   >
                     {c.status === "accepted" ? "Trusted" : c.status === "invited" ? "Invited" : "Invite failed"}
                   </span>
-                  <button
-                    type="button"
-                    aria-label={`Remove ${c.name}`}
-                    onClick={async () => {
-                      const r = await api(`/api/me/contacts/${c.id}`, { method: "DELETE" });
-                      if (r.ok) setContacts((xs) => xs.filter((x) => x.id !== c.id));
-                    }}
-                    className="grid size-11 place-items-center rounded-full text-ink-subtle hover:bg-sunken"
-                  >
-                    <Icon name="trash" className="size-5" />
-                  </button>
+                  {confirmRemove === c.id ? (
+                    <span className="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        disabled={removing === c.id}
+                        onClick={async () => {
+                          setRemoving(c.id);
+                          const r = await api(`/api/me/contacts/${c.id}`, { method: "DELETE" });
+                          setRemoving(null);
+                          setConfirmRemove(null);
+                          if (r.ok) {
+                            setContacts((xs) => xs.filter((x) => x.id !== c.id));
+                            toast(`${c.name} removed — any live link they had stops working now.`);
+                          } else toast(r.message, "error");
+                        }}
+                        className="min-h-11 rounded-full bg-ink px-3 text-sm font-bold text-canvas disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                      <button type="button" onClick={() => setConfirmRemove(null)} className="min-h-11 rounded-full px-2 text-sm font-bold text-ink-muted">
+                        Keep
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      aria-label={`Remove ${c.name}`}
+                      onClick={() => setConfirmRemove(c.id)}
+                      className="grid size-11 place-items-center rounded-full text-ink-subtle hover:bg-sunken"
+                    >
+                      <Icon name="trash" className="size-5" />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
           )}
+        </Section>
+
+        <Section id="app" title="App">
+          <div className="divide-y divide-line">
+            <AppearancePicker />
+            <InstallCard variant="row" />
+          </div>
         </Section>
 
         <Section id="privacy" title="Privacy">
@@ -282,17 +333,38 @@ export function MeScreen({
               </button>
             </li>
             <li>
-              <button
-                type="button"
-                onClick={async () => {
-                  await api("/api/auth/signout", { body: {} });
-                  router.push("/");
-                  router.refresh();
-                }}
-                className="flex min-h-14 w-full items-center gap-3 px-5 text-left hover:bg-sunken"
-              >
-                <Icon name="back" className="text-ink-muted" /> <span className="flex-1 font-semibold">Sign out</span>
-              </button>
+              {confirmSignOut ? (
+                <div className="px-5 py-4">
+                  <p className="font-semibold">
+                    {isDemo
+                      ? "This is a demo account, so there's no way back in after signing out — signing out deletes it (places, contacts, trips, chat)."
+                      : "Sign out on this device?"}
+                  </p>
+                  <div className="mt-3 flex gap-2">
+                    <Button
+                      variant="danger"
+                      busy={busy === "signout"}
+                      onClick={async () => {
+                        setBusy("signout");
+                        const r = await api("/api/auth/signout", { body: {} });
+                        setBusy(null);
+                        if (!r.ok) return toast(r.message, "error");
+                        router.push("/");
+                        router.refresh();
+                      }}
+                    >
+                      {isDemo ? "Sign out & delete" : "Sign out"}
+                    </Button>
+                    <Button variant="ghost" onClick={() => setConfirmSignOut(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setConfirmSignOut(true)} className="flex min-h-14 w-full items-center gap-3 px-5 text-left hover:bg-sunken">
+                  <Icon name="back" className="text-ink-muted" /> <span className="flex-1 font-semibold">Sign out</span>
+                </button>
+              )}
             </li>
             <li className="px-5 py-4">
               {confirmDelete ? (
@@ -304,7 +376,9 @@ export function MeScreen({
                       busy={busy === "delete"}
                       onClick={async () => {
                         setBusy("delete");
-                        await api("/api/me", { method: "DELETE" });
+                        const r = await api("/api/me", { method: "DELETE" });
+                        setBusy(null);
+                        if (!r.ok) return toast(`Your account wasn't deleted: ${r.message}`, "error");
                         router.push("/");
                         router.refresh();
                       }}
@@ -317,7 +391,7 @@ export function MeScreen({
                   </div>
                 </div>
               ) : (
-                <button type="button" onClick={() => setConfirmDelete(true)} className="min-h-10 text-sm font-bold text-ink-muted hover:text-error">
+                <button type="button" onClick={() => setConfirmDelete(true)} className="min-h-11 text-sm font-bold text-ink-muted hover:text-error">
                   Delete my account
                 </button>
               )}

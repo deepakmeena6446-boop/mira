@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { useOverlay } from "@/lib/use-overlay";
 import { useRouter } from "next/navigation";
 import { MiraOrb } from "./MiraOrb";
 import { Button } from "@/components/ui/Button";
@@ -15,13 +16,10 @@ export function SignInSheet({ open, onClose, reason }: { open: boolean; onClose:
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 50);
-  }, [open]);
+  useOverlay(open, onClose);
   if (!open) return null;
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="signin-h" className="fixed inset-0 z-50 flex items-end justify-center bg-ink/30 animate-fade sm:items-center" onClick={onClose}>
+    <div role="dialog" aria-modal="true" aria-labelledby="signin-h" className="fixed inset-0 z-50 flex items-end justify-center bg-[rgb(10_6_24/0.45)] animate-fade sm:items-center" onClick={onClose}>
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={async (e) => {
@@ -47,7 +45,7 @@ export function SignInSheet({ open, onClose, reason }: { open: boolean; onClose:
           What should I call you?
         </label>
         <input
-          ref={inputRef}
+          autoFocus
           id="signin-name"
           value={name}
           onChange={(e) => setName(e.target.value)}

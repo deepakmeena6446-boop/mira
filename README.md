@@ -8,6 +8,12 @@ An installable, mobile-first web app (PWA) that works anywhere in the world. Ope
 
 **Mira** is the in-app AI companion: warm, brief and practical. She knows your saved places, the time and your area. She can start a trip, find what's open nearby, or help you report something. She is not an emergency service and says so, pointing to 112 when someone says they're in danger.
 
+**It follows the time of day.** The theme shifts from sunrise to day to evening to night (dark mode with a dark map), set before first paint from the phone's clock. You can pin Light or Dark under Me → App. Mira knows the hour too: brisk in the morning, and after dark she leads with sharing your walk home.
+
+**Updates inbox** (bell on Home): a contact accepted your invite, you missed a check-in (and who was told), or your live location paused mid-trip. Push notifications replace the in-app inbox later.
+
+**Press and hold the map** on any spot to report something there or walk to it.
+
 **Reports** take three taps: pick one of six tiles, then send. The location defaults to "here" and the time to "just now". Reports are private and reviewed by a person. They appear publicly only as calm, template-worded community notes once enough independent people report the same thing in a ~1.2 km area.
 
 > MIRA 2.0 deliberately moved away from the V0 spec documents (`MIRA_*.md`). Those documents describe the V0 pilot; this README describes the current app.
@@ -22,7 +28,7 @@ Every external service sits behind an interface in `src/server/providers/`. The 
 |---|---|---|---|
 | Maps (search, routes, nearby) | MIRA's OSM snapshot where it has data. Elsewhere, live OpenStreetMap: Photon for search, Overpass for "Around you" (server-side, ~100 m rounded, cached). Routes outside the snapshot are straight-line, flagged *approximate* (dashed) | Mapbox Search + Directions | `MAPBOX_TOKEN` (placeholder: `PLACE_SEARCH_URL`, `OVERPASS_URL`; unset = off) |
 | Area names | Nearest locality from the map's own vector tiles, then a server-side Nominatim lookup (~100 m rounded, cached, ≤ 1 req/s) | Mapbox reverse geocoding | `REVERSE_GEOCODER_URL` (placeholder only; unset = off) |
-| Basemap | OpenFreeMap vector style | Mapbox style | `MAP_STYLE_URL` |
+| Basemap | OpenFreeMap vector style ("dark" style at night) | Mapbox day + night styles | `MAP_STYLE_URL`, `MAP_STYLE_URL_NIGHT` (optional) |
 | Sign-in | "Continue" with a first name creates a real local account | Google OAuth | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` |
 | Mira | Scripted persona engine over the real tools, streamed as NDJSON (English + Hinglish) | Claude (`claude-opus-5`, streaming, tool use, same persona and tools) | `ANTHROPIC_API_KEY` |
 | Contact delivery | SMTP (Mailpit locally) + in-app notifications | Production SMTP / WhatsApp / SMS | `SMTP_*` |
@@ -79,8 +85,8 @@ Production mode locally: `npm run build && npm run start` and `npm run worker:st
 
 | Area | Routes |
 |---|---|
-| Account | `POST /api/auth/demo`, `POST /api/auth/signout`, `GET/PATCH/DELETE /api/me`, `/api/me/places[/id]`, `/api/me/contacts[/id]`, `/api/me/notifications` |
-| Maps | `GET /api/geo/search`, `POST /api/geo/reverse`, `POST /api/geo/route`, `POST /api/geo/nearby` (coordinates go in POST bodies, never URLs) |
+| Account | `POST /api/auth/demo`, `POST /api/auth/signout`, `GET/PATCH/DELETE /api/me`, `/api/me/places[/id]`, `/api/me/contacts[/id]`, `GET/POST /api/me/notifications` (inbox / mark read) |
+| Maps | `POST /api/geo/search`, `POST /api/geo/reverse`, `POST /api/geo/route`, `POST /api/geo/nearby` (coordinates go in POST bodies, never URLs) |
 | Trips | `POST /api/trips`, `GET /api/trips/current`, `POST /api/trips/[id]/location`, `POST /api/trips/[id]/{arrive,end,extend}`, `GET /api/t/[token]` (contact view) |
 | Mira | `GET/DELETE /api/mira` (history), `POST /api/mira` (NDJSON stream: `text` / `card` / `done`) |
 | Reports | `POST /api/reports`, `/api/admin/*` (moderator session) |
@@ -89,11 +95,14 @@ Production mode locally: `npm run build && npm run start` and `npm run worker:st
 
 | Data | Stored as | Deleted |
 |---|---|---|
-| Live location | Last 20 points of an open trip, visible only to accepted contacts via an unguessable link (hashed; encrypted copy for the owner) | **The moment the trip closes**; the trip row within 6 h |
-| Home screen location | In browser memory only; refreshed while the app is visible, paused when hidden | Never stored |
+| Live location | Last 20 points of an open trip. Each accepted contact gets **their own** unguessable link (hashed), revoked the moment you remove them; you can also send your own link to anyone you choose. After the trip, links show only "arrived/ended" + first name for 30 min, then nothing | **The moment the trip closes**; the trip row within 6 h |
+| Home screen location | In browser memory only; refreshed while the app is visible, paused when hidden. A long-pressed spot goes to Report in memory, never in the URL | Never stored |
+| Offline cache (service worker) | Only an offline page and static files. Pages are never cached, because they carry your name, places and contacts | Replaced on each app update |
+| Inbox | Short in-app updates (contact accepted, missed check-in, location paused) | With your account |
+| Anonymous reports sent before signing in | Linked to your account on sign-in and re-keyed to one pseudonym (so you never count as two people); the browser's anonymous cookie is then discarded | With the report (≤ 30 days) |
 | Saved places | Label, emoji and point, for your account only (max 10) | With your account |
 | Trusted contacts | Encrypted email + keyed hash; they accept once, with no account needed | On removal or with your account |
-| Mira chat | Your messages and Mira's replies | 30 days, or instantly with "Clear" |
+| Mira chat | Your messages and Mira's replies — minus anything about where you were (area names, walking times, nearby-place lists are shown live but never saved) | 30 days, or instantly with "Clear" |
 | Report | ~1.2 km geohash cell only, recency bucket, time band, hour-truncated time; text AES-256-GCM encrypted | ≤ 30 days |
 | Public community notes | `aggregate_releases` only: ≥ 5 independent contributors, fixed wording, no counts, points or times | 35 days |
 
@@ -106,7 +115,7 @@ There's no location history, no public profile, no safety score and no heatmap. 
 - **Reverse proxy** that *appends* the client address to `X-Forwarded-For`; set `TRUSTED_PROXY_HOPS` to match (default 1). It must not log full request URLs for `/invite/*` or `/t/*`, which carry bearer tokens.
 - **Secrets from a secret store**, never from files in the repo. Required: `DATABASE_URL`, `APP_BASE_URL`, `SESSION_SECRET`, `DATA_ENCRYPTION_KEY`, `ADMIN_PASSWORD_HASH`, `PILOT_MANIFEST_PATH`, `MAP_TILE_URL`. Optional provider keys are listed in the table above. See `.env.example`, which documents each variable and the dotenv-safe `b64:` hash form.
 - **Backups**: expire in 30 days or less. After any restore, run the worker (or `purgeExpired`) **before** serving traffic, so expired reports and journeys are removed again. Use database disk encryption.
-- **Monitoring**: poll `/api/health/ready`. It returns 503 when the worker is stale, and shows `contactAlertProblems24h` (a count only). Warnings are logged as `health.worker_stale` and `health.contact_alert_delivery_problems`.
+- **Monitoring**: poll `/api/health/ready`. It returns 503 when the worker's journeys job hasn't completed a pass in 3 minutes (a running-but-failing worker counts as down). Publicly it returns only `{status}`; a signed-in moderator also sees the checks, including `contactAlertProblems24h` (a count only). Warnings are logged as `health.worker_stale` and `health.contact_alert_delivery_problems`; per-trip failures as `journey.failed`.
 - **Map tiles and geocoding**: OpenFreeMap and the public Nominatim, Photon and Overpass servers are fine for development and demos only. Switch to Mapbox (or another provider with an SLA) before real traffic.
 
 ## Not yet real (placeholders, clearly labelled)
@@ -132,3 +141,6 @@ There's no location history, no public profile, no safety score and no heatmap. 
 8. **`ADMIN_PASSWORD_HASH` accepts a `b64:` form.** Next's dotenv expansion mangles `$` in a variable that appears in both the process env and a `.env` file.
 9. **Consequential actions need a tap.** Mira proposes trips, reports and SOS as cards. Nothing is shared or sent until you tap.
 10. **Relative times in emails** ("in about 18 minutes"). The app is worldwide and MIRA doesn't know the contact's timezone.
+11. **Security hardening from the A–Z audit:** per-request script nonces in the CSP (`src/proxy.ts`); rate limits per person/link with only a high per-IP ceiling (campus Wi-Fi and carrier NAT share IPs); invite emails have a fixed subject, names can't contain links, invites are single-use and expire in 7 days; walking routes are capped at 25 km.
+12. **Honest delivery:** the trip screen only claims contacts whose link email actually went out; a failed missed-arrival email is followed by an in-app correction; contacts who got a "missed" email get an "arrived" email once.
+13. **Demo sign-out deletes the demo account** (there's no way back in), and retention removes any demo account whose session expired.

@@ -5,6 +5,7 @@ import { assertSameOrigin } from "@/server/http/csrf";
 import { clientIp, dailyKey, enforce } from "@/server/ratelimit";
 import { requireUser } from "@/server/session/user";
 import { respond, type MiraCard, type MiraTurn } from "@/server/providers/companion";
+import type { MiraEvent } from "@/server/providers/companion/types";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,16 @@ const body = z
   .strict();
 
 type Stored = { text: string; cards?: MiraCard[] };
+
+/**
+ * Cards kept in history carry nothing about where the person was: nearby-place lists
+ * (coordinates + distances from them) aren't stored, and trip cards drop the walking time.
+ */
+function storableCard(card: MiraCard): MiraCard | null {
+  if (card.type === "places") return null;
+  if (card.type === "trip") return { ...card, minutes: null };
+  return card;
+}
 
 /** Chat history (last 50 turns). */
 export const GET = handle(async () => {
@@ -49,7 +60,8 @@ export const POST = handle(async (req: Request) => {
   const sql = getSql();
   const user = await requireUser(sql);
   const now = new Date();
-  await enforce(sql, [dailyKey("actor", user.id, now), dailyKey("ip", clientIp(req), now)], [{ bucket: "mira:m", max: 20, windowMs: 60_000 }, { bucket: "mira:d", max: 400, windowMs: 86_400_000 }], now);
+  await enforce(sql, [dailyKey("actor", user.id, now)], [{ bucket: "mira:m", max: 20, windowMs: 60_000 }, { bucket: "mira:d", max: 400, windowMs: 86_400_000 }], now);
+  await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "mira:ip:m", max: 300, windowMs: 60_000 }], now);
   const { message, context } = await readJson(req, body, 8192);
   const recent = await sql<{ role: "user" | "assistant"; content: Stored }[]>`
     SELECT role, content FROM (SELECT * FROM mira_messages WHERE user_id = ${user.id} ORDER BY id DESC LIMIT 12) m ORDER BY id`;
@@ -59,22 +71,34 @@ export const POST = handle(async (req: Request) => {
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      let text = "";
+      let text = ""; // what's stored: location-derived text and cards are left out (history is not a location log)
       const cards: MiraCard[] = [];
+      let open = true;
+      const send = (ev: MiraEvent) => {
+        if (!open) return; // the client went away; keep going so the turn is still stored
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(ev) + "\n"));
+        } catch {
+          open = false;
+        }
+      };
       try {
         for await (const ev of respond(sql, user, message, history, context)) {
-          if (ev.type === "text") text += ev.delta;
-          if (ev.type === "card") cards.push(ev.card);
-          controller.enqueue(encoder.encode(JSON.stringify(ev) + "\n"));
+          if (ev.type === "text" && !ev.private) text += ev.delta;
+          if (ev.type === "card") {
+            const kept = storableCard(ev.card);
+            if (kept) cards.push(kept);
+          }
+          send(ev);
         }
       } catch {
         const sorry = "Sorry — I lost my train of thought. Could you say that again?";
-        text = text || sorry;
-        controller.enqueue(encoder.encode(JSON.stringify({ type: "text", delta: sorry }) + "\n"));
-        controller.enqueue(encoder.encode(JSON.stringify({ type: "done" }) + "\n"));
+        text = text ? `${text.trimEnd()} ${sorry}` : sorry;
+        send({ type: "text", delta: sorry });
+        send({ type: "done" });
       }
-      await sql`INSERT INTO mira_messages (user_id, role, content) VALUES (${user.id}, 'assistant', ${sql.json({ text, cards })})`.catch(() => {});
-      controller.close();
+      await sql`INSERT INTO mira_messages (user_id, role, content) VALUES (${user.id}, 'assistant', ${sql.json({ text: text.trim(), cards })})`.catch(() => {});
+      if (open) controller.close();
     },
   });
   return new Response(stream, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store" } });

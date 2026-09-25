@@ -21,7 +21,7 @@ export function TabBar() {
   const path = usePathname() ?? "/";
   return (
     <nav aria-label="Main" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-      <ul className="glass pointer-events-auto grid w-full max-w-sm grid-cols-4 rounded-full border border-white/70 p-1.5 shadow-[var(--shadow-float)]">
+      <ul className="glass pointer-events-auto grid w-full max-w-sm grid-cols-4 rounded-full border border-glass-edge p-1.5 shadow-[var(--shadow-float)]">
         {TABS.map((t) => {
           const on = active(path, t.href);
           return (

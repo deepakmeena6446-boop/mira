@@ -81,3 +81,18 @@ export function tripMissedEmail(args: { ownerName: string; destination: string; 
     ].join("\n"),
   };
 }
+
+/** Follow-up to a missed-arrival email: the person has checked in. No location, no link. */
+export function tripArrivedEmail(args: { ownerName: string; destination: string }) {
+  return {
+    subject: `${args.ownerName} has checked in on MIRA`,
+    text: [
+      "Hello,",
+      "",
+      `Good news: ${args.ownerName} has now checked in at ${args.destination}.`,
+      "Their trip is closed and live sharing has stopped.",
+      "",
+      "You don't need to do anything. This is the last email about this trip.",
+    ].join("\n"),
+  };
+}

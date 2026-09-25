@@ -34,7 +34,8 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     const live = await (await mum.page.request.get(`/api/t/${link.split("/t/")[1]}`)).json();
     expect(live).toMatchObject({ state: "active", name: "Priya", destination: "Home" });
     // Only the latest point — no trail, no email, no user id.
-    expect(Object.keys(live).sort()).toEqual(["dest", "destination", "etaAt", "location", "name", "state"]);
+    expect(Object.keys(live).sort()).toEqual(["alertsViewer", "dest", "destination", "etaAt", "location", "name", "state"]);
+    expect(live.alertsViewer).toBe(true); // she's a trusted contact: she'll get the missed-arrival email
     expect(Object.keys(live.location ?? {}).sort()).toEqual(["ageSeconds", "at", "lat", "lon"]);
 
     // Arrive: sharing stops for everyone.

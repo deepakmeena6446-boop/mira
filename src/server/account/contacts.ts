@@ -3,12 +3,17 @@ import type postgres from "postgres";
 import { z } from "zod";
 import { decryptText, encryptText, hashToken, hmacHex, randomToken } from "@/server/crypto";
 import { ApiError } from "@/server/http/errors";
+import { personName } from "@/server/http/person-name";
 import { getEnv } from "@/server/config/env";
-import { emailContact } from "@/server/providers/notify";
+import { emailContact, notifyInApp } from "@/server/providers/notify";
 
-export const MAX_CONTACTS = 5;
+export { MAX_CONTACTS } from "@/domain/limits";
+import { MAX_CONTACTS } from "@/domain/limits";
 
-export const contactSchema = z.object({ name: z.string().trim().min(1).max(60), email: z.email().max(254) }).strict();
+export const contactSchema = z.object({ name: personName(60), email: z.email().max(254) }).strict();
+
+/** Invite links are single-use and expire after a week. */
+export const INVITE_TTL_MS = 7 * 86_400_000;
 
 export interface Contact {
   id: string;
@@ -43,15 +48,20 @@ export async function listContacts(sql: postgres.Sql, userId: string): Promise<C
 /** Add a trusted contact and email them a one-time acceptance link. */
 export async function addContact(sql: postgres.Sql, userId: string, userName: string, input: z.infer<typeof contactSchema>): Promise<Contact> {
   const email = input.email.trim().toLowerCase();
-  const [{ n }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM contacts WHERE user_id = ${userId}`;
-  if (n >= MAX_CONTACTS) throw new ApiError(409, "too_many_contacts", `You can add up to ${MAX_CONTACTS} trusted contacts.`);
   const token = randomToken(32);
   let row: Row;
   try {
-    [row] = await sql<Row[]>`
-      INSERT INTO contacts (user_id, name, encrypted_email, email_hash, invite_token_hash)
-      VALUES (${userId}, ${input.name}, ${encryptText(email, "contact_email")}, ${hmacHex("contact-email", email)}, ${hashToken("invite", token)})
-      RETURNING id, name, encrypted_email, is_default, invited_at, accepted_at`;
+    // Count + insert under a per-user lock so a double tap or two tabs can't exceed the limit.
+    row = await sql.begin(async (tx) => {
+      await tx`SELECT pg_advisory_xact_lock(hashtext(${`contacts:${userId}`}))`;
+      const [{ n }] = await tx<{ n: number }[]>`SELECT count(*)::int AS n FROM contacts WHERE user_id = ${userId}`;
+      if (n >= MAX_CONTACTS) throw new ApiError(409, "too_many_contacts", `You can add up to ${MAX_CONTACTS} trusted contacts.`);
+      const [r] = await tx<Row[]>`
+        INSERT INTO contacts (user_id, name, encrypted_email, email_hash, invite_token_hash)
+        VALUES (${userId}, ${input.name}, ${encryptText(email, "contact_email")}, ${hmacHex("contact-email", email)}, ${hashToken("invite", token)})
+        RETURNING id, name, encrypted_email, is_default, invited_at, accepted_at`;
+      return r;
+    });
   } catch (err) {
     if ((err as { constraint_name?: string }).constraint_name === "contacts_user_id_email_hash_key") throw new ApiError(409, "duplicate_contact", "That person is already one of your contacts.");
     throw err;
@@ -59,7 +69,8 @@ export async function addContact(sql: postgres.Sql, userId: string, userName: st
   const link = new URL(`/invite/${token}`, getEnv().APP_BASE_URL).toString();
   const sent = await emailContact(
     email,
-    `${userName} added you as a trusted contact on MIRA`,
+    // Fixed subject: user-chosen names stay in the body only.
+    "You've been invited to be a trusted contact on MIRA",
     [
       `Hi ${input.name},`,
       "",
@@ -70,6 +81,7 @@ export async function addContact(sql: postgres.Sql, userId: string, userName: st
       link,
       "",
       "You'll only ever see their location while they're actively sharing a trip with you. You can say no by ignoring this email.",
+      "This link works once and expires in 7 days.",
     ].join("\n"),
   );
   if (sent.ok) {
@@ -98,11 +110,26 @@ export async function contactInviteView(sql: postgres.Sql, token: string) {
   if (!token || token.length > 128) return null;
   const [row] = await sql<{ id: string; name: string; accepted_at: Date | null; owner: string }[]>`
     SELECT c.id, c.name, c.accepted_at, u.name AS owner FROM contacts c JOIN users u ON u.id = c.user_id
-    WHERE c.invite_token_hash = ${hashToken("invite", token)}`;
+    WHERE c.invite_token_hash = ${hashToken("invite", token)} AND COALESCE(c.invited_at, c.created_at) > ${new Date(Date.now() - INVITE_TTL_MS)}`;
   return row ?? null;
 }
 
 export async function acceptContactInvite(sql: postgres.Sql, token: string): Promise<boolean> {
-  const res = await sql`UPDATE contacts SET accepted_at = COALESCE(accepted_at, now()) WHERE invite_token_hash = ${hashToken("invite", token)}`;
-  return res.count > 0;
+  const hash = hashToken("invite", token);
+  // First acceptance only: tells the owner once; accepting again is a harmless no-op.
+  // Single use: accepting clears the token, so an old or forwarded invite email reveals nothing later.
+  const [first] = await sql<{ user_id: string; name: string }[]>`
+    UPDATE contacts SET accepted_at = now(), invite_token_hash = NULL
+    WHERE invite_token_hash = ${hash} AND accepted_at IS NULL AND COALESCE(invited_at, created_at) > ${new Date(Date.now() - INVITE_TTL_MS)}
+    RETURNING user_id, name`;
+  if (first) {
+    await notifyInApp(sql, first.user_id, {
+      kind: "contact_accepted",
+      title: `${first.name} accepted your invite`,
+      body: `${first.name} can now follow along live whenever you share a trip.`,
+      href: "/me#contacts",
+    });
+    return true;
+  }
+  return false;
 }

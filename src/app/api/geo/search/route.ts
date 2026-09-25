@@ -13,7 +13,7 @@ const body = z.object({ q: z.string().max(80), near: point.nullable().optional()
 export const POST = handle(async (req: Request) => {
   const sql = getSql();
   const now = new Date();
-  await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "geo:search:m", max: 120, windowMs: 60_000 }], now);
+  await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "geo:search:m", max: 960, windowMs: 60_000 }], now);
   const { q, near } = await readJson(req, body, 512);
   return json({ places: await getGeo().search(q, near ?? undefined) });
 });

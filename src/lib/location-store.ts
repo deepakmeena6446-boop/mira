@@ -44,6 +44,15 @@ export function requestLocation(): Promise<LocState> {
   });
 }
 
+/** A fix older than this is refreshed before it's used for anything that matters. */
+const FRESH_MS = 2 * 60_000;
+
+/** The current position, refreshed first if it's stale (for reports, trips, saving "here"). */
+export async function freshLocation(): Promise<LocState> {
+  if (state.status === "ok" && state.point && Date.now() - state.at <= FRESH_MS) return state;
+  return requestLocation();
+}
+
 export function setArea(area: string | null) {
   if (area !== state.area) set({ area });
 }
@@ -102,9 +111,10 @@ export function useLocation(auto = true): LocState & { request: () => Promise<Lo
   );
   const request = useCallback(() => requestLocation(), []);
   useEffect(() => {
-    if (!auto || state.status !== "idle") return;
-    // Ask right away: knowing where you are is the whole point of the app.
-    void requestLocation();
+    if (!auto) return;
+    // Ask right away (knowing where you are is the whole point), and refresh a position
+    // that's gone stale — an old fix must never pass for "where you are now".
+    if (state.status === "idle" || (state.status === "ok" && Date.now() - state.at > FRESH_MS)) void requestLocation();
   }, [auto]);
   return { ...snap, request };
 }
@@ -124,6 +134,22 @@ let pendingDest: { name: string; lat: number; lon: number; kind?: string } | nul
 export function setPendingDestination(d: typeof pendingDest) {
   pendingDest = d;
 }
+/** A spot picked on the map (long-press) for the Report screen. Memory only, never in URLs. */
+export interface PickedSpot {
+  lat: number;
+  lon: number;
+  name: string | null;
+}
+let pendingReportSpot: PickedSpot | null = null;
+export function setPendingReportSpot(s: PickedSpot) {
+  pendingReportSpot = s;
+}
+export function takePendingReportSpot(): PickedSpot | null {
+  const s = pendingReportSpot;
+  pendingReportSpot = null;
+  return s;
+}
+
 export function takePendingDestination() {
   const d = pendingDest;
   pendingDest = null;

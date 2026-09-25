@@ -22,11 +22,21 @@ export interface WorkerStatus {
   lastBeatAgeSeconds: number | null;
 }
 
+/**
+ * Healthy only when a worker process is alive AND the journeys job completed a pass
+ * recently ("job:journeys" row). A worker that runs but keeps failing is not healthy —
+ * trips must not start when nobody would send their missed-arrival alert.
+ */
 export async function workerStatus(sql: postgres.Sql, clock: Clock): Promise<WorkerStatus> {
-  const [row] = await sql<{ last: Date | null }[]>`SELECT max(last_beat_at) AS last FROM worker_heartbeats`;
-  if (!row?.last) return { healthy: false, lastBeatAgeSeconds: null };
-  const age = clock.now().getTime() - new Date(row.last).getTime();
-  return { healthy: age >= -60_000 && age <= WORKER_STALE_MS, lastBeatAgeSeconds: Math.max(0, Math.round(age / 1000)) };
+  const [row] = await sql<{ proc: Date | null; job: Date | null }[]>`
+    SELECT max(last_beat_at) FILTER (WHERE worker_id NOT LIKE 'job:%') AS proc,
+           max(last_beat_at) FILTER (WHERE worker_id = 'job:journeys') AS job
+    FROM worker_heartbeats`;
+  if (!row?.proc) return { healthy: false, lastBeatAgeSeconds: null };
+  const now = clock.now().getTime();
+  const fresh = (d: Date | null) => d !== null && now - new Date(d).getTime() >= -60_000 && now - new Date(d).getTime() <= WORKER_STALE_MS;
+  const age = now - new Date(row.proc).getTime();
+  return { healthy: fresh(row.proc) && fresh(row.job), lastBeatAgeSeconds: Math.max(0, Math.round(age / 1000)) };
 }
 
 /** Drop heartbeat rows from long-dead worker instances. */

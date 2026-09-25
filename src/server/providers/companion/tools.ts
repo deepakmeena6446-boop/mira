@@ -1,4 +1,5 @@
 import "server-only";
+import { daypartFor, type Daypart } from "@/domain/daypart";
 import type postgres from "postgres";
 import { getGeo } from "@/server/providers/geo";
 import { listPlaces } from "@/server/account/places";
@@ -13,12 +14,18 @@ import type { MiraContext } from "./types";
  * The same functions back the placeholder engine and, later, Claude tool calls.
  */
 export function miraTools(sql: postgres.Sql, user: User, ctx: MiraContext) {
+  // Once per message: the reply may consult it several times (greeting, time, nudges).
+  let context: Promise<{ hour: number; minute: number; daypart: Daypart; late: boolean; area: string | null; hasLocation: boolean }> | null = null;
   return {
-    async getContext() {
-      const local = new Date(new Date(ctx.localTime).getTime());
-      const hour = (local.getUTCHours() * 60 + local.getUTCMinutes() - ctx.tzOffsetMin + 1440) % 1440 / 60;
-      const area = ctx.area || (ctx.location ? (await getGeo().reverse(ctx.location)).label : null);
-      return { hour: Math.floor(hour), late: hour >= 21 || hour < 5, area, hasLocation: Boolean(ctx.location) };
+    getContext() {
+      context ??= (async () => {
+        const local = new Date(ctx.localTime);
+        const minutes = (local.getUTCHours() * 60 + local.getUTCMinutes() - ctx.tzOffsetMin + 1440) % 1440;
+        const hour = Math.floor(minutes / 60);
+        const area = ctx.area || (ctx.location ? (await getGeo().reverse(ctx.location)).label : null);
+        return { hour, minute: minutes % 60, daypart: daypartFor(hour), late: hour >= 21 || hour < 5, area, hasLocation: Boolean(ctx.location) };
+      })();
+      return context;
     },
     listSavedPlaces: () => listPlaces(sql, user.id),
     async findNearby(kinds?: string[]) {

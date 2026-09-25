@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const POST = handle(async (req: Request) => {
   const sql = getSql();
   const now = new Date();
-  await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "geo:reverse:m", max: 60, windowMs: 60_000 }], now);
+  await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "geo:reverse:m", max: 480, windowMs: 60_000 }], now);
   const p = await readJson(req, point, 256);
   return json(await getGeo().reverse(p));
 });

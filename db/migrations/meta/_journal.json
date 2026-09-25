@@ -57,6 +57,20 @@
       "when": 1790300206384,
       "tag": "0007_trip_share",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790310118436,
+      "tag": "0008_trip_stale",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790312434817,
+      "tag": "0009_audit_fixes",
+      "breakpoints": true
     }
   ]
 }

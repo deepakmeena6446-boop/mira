@@ -5,6 +5,10 @@ import { clientIp, dailyKey, enforce } from "@/server/ratelimit";
 import { point } from "@/server/http/geo-input";
 import { getGeo } from "@/server/providers/geo";
 import { cellsAlongRoute, notesForCells } from "@/server/notes";
+import { haversineMeters } from "@/domain/pilot";
+import { ApiError } from "@/server/http/errors";
+
+const MAX_WALK_M = 25_000; // ~5 h on foot; trips are capped at 4 h anyway
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +16,10 @@ export const dynamic = "force-dynamic";
 export const POST = handle(async (req: Request) => {
   const sql = getSql();
   const now = new Date();
-  await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "geo:route:m", max: 60, windowMs: 60_000 }], now);
+  await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "geo:route:m", max: 480, windowMs: 60_000 }], now);
   const { from, to } = await readJson(req, z.object({ from: point, to: point }).strict(), 512);
+  // Walking routes only: refuse anything longer than a (long) walk before doing any work.
+  if (haversineMeters(from, to) > MAX_WALK_M) throw new ApiError(400, "too_far", "That's too far to walk. Pick a closer place.");
   const geo = getGeo();
   const route = await geo.walk(from, to);
   const mid = route.geometry[Math.floor(route.geometry.length / 2)] ?? [to.lon, to.lat];

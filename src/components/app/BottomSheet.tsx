@@ -50,8 +50,13 @@ export function BottomSheet({
   useEffect(() => {
     if (drag === null) return;
     const up = () => onUp();
+    // pointercancel: a system gesture or incoming call interrupted the drag — snap, don't freeze.
     window.addEventListener("pointerup", up);
-    return () => window.removeEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
   }, [drag, onUp]);
 
   const next: Record<Snap, Snap> = { peek: "half", half: "full", full: "peek" };
@@ -60,7 +65,7 @@ export function BottomSheet({
       ref={ref}
       aria-label={label}
       className={cx(
-        "glass fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-xl flex-col rounded-t-[2rem] border border-white/60 shadow-[0_-12px_40px_-16px_rgb(50_25_120/0.35)]",
+        "glass fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-xl flex-col rounded-t-[2rem] border border-glass-edge shadow-[0_-12px_40px_-16px_rgb(50_25_120/0.35)]",
         drag === null && "transition-[height] duration-300 ease-[cubic-bezier(0.2,0.9,0.3,1)]",
         className,
       )}
@@ -72,7 +77,7 @@ export function BottomSheet({
         onPointerDown={onDown}
         onPointerMove={onMove}
         onClick={() => drag === null && onSnap(next[snap])}
-        className="flex min-h-9 w-full touch-none cursor-grab items-center justify-center rounded-t-[2rem] pt-2"
+        className="flex min-h-11 w-full touch-none cursor-grab items-center justify-center rounded-t-[2rem] pt-2"
       >
         <span className="h-1.5 w-11 rounded-full bg-line-strong" />
       </button>

@@ -31,6 +31,8 @@
   --color-error: #c4281c;
   --color-error-soft: #fdecea;
 
+  --color-glass-edge: rgb(255 255 255 / 0.7);
+
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", sans-serif;
 
   --radius-card: 1.75rem;
@@ -42,6 +44,71 @@
   --animate-fade: fade 300ms ease-out both;
   --animate-breathe: breathe 4s ease-in-out infinite;
 }
+
+/*
+ * Time-of-day themes. <html data-daypart> is set before paint from the device clock
+ * (src/domain/daypart.ts) and kept current by DaypartSync. "day" is the base palette above.
+ */
+:root {
+  --glow-a: rgb(255 138 101 / 0.16);
+  --glow-b: rgb(106 68 245 / 0.14);
+  --glass-bg: rgb(255 255 255 / 0.82);
+  --pin-bg: #ffffff;
+  --map-route: #6a44f5;
+  --map-route-glow: #a78bfa;
+  --map-me: #2563eb;
+  color-scheme: light;
+}
+:root[data-daypart="dawn"] {
+  --color-canvas: #fff6f0;
+  --color-sunken: #fbeee8;
+  --color-line: #f5e4dc;
+  --glow-a: rgb(255 170 120 / 0.28);
+  --glow-b: rgb(236 110 170 / 0.14);
+}
+:root[data-daypart="evening"] {
+  --color-canvas: #fbf3ee;
+  --color-sunken: #f6ebe6;
+  --color-line: #efe0da;
+  --glow-a: rgb(245 140 60 / 0.24);
+  --glow-b: rgb(126 58 242 / 0.2);
+}
+:root[data-daypart="night"] {
+  color-scheme: dark;
+  --color-canvas: #120f24;
+  --color-surface: #1d1936;
+  --color-sunken: #262143;
+  --color-ink: #f2eeff;
+  --color-ink-muted: #bdb6da;
+  --color-ink-subtle: #a19abf;
+  --color-line: #2f2950;
+  --color-line-strong: #463e6e;
+  /* Lighter violet so accent text reads on the dark canvas (5.4:1); filled accents take dark text. */
+  --color-accent: #8f73ff;
+  --color-accent-strong: #a48fff;
+  --color-accent-soft: #2a2257;
+  --color-accent-ink: #140f2e;
+  --color-peach: #ff9e7f;
+  --color-peach-soft: #3a2432;
+  --color-mint: #4ade80;
+  --color-mint-soft: #15301f;
+  --color-warm: #fbbf77;
+  --color-warm-soft: #3a2a17;
+  --color-error: #ff8a80;
+  --color-error-soft: #3b1d22;
+  --color-glass-edge: rgb(255 255 255 / 0.08);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 30px -12px rgb(0 0 0 / 0.6);
+  --shadow-float: 0 16px 40px -12px rgb(0 0 0 / 0.7);
+  --glow-a: rgb(255 138 101 / 0.1);
+  --glow-b: rgb(143 115 255 / 0.18);
+  --glass-bg: rgb(29 25 54 / 0.84);
+  --pin-bg: #262143;
+  --map-route: #9d85ff;
+  --map-route-glow: #6a44f5;
+  --map-me: #60a5fa;
+}
+
+@custom-variant night (&:where([data-daypart="night"], [data-daypart="night"] *));
 
 @keyframes rise {
   from {
@@ -124,17 +191,18 @@
 /* Warm companion backdrop used on full-page screens. */
 @utility bg-companion {
   background:
-    radial-gradient(120% 60% at 100% 0%, rgb(255 138 101 / 0.16), transparent 60%),
-    radial-gradient(90% 60% at 0% 10%, rgb(106 68 245 / 0.14), transparent 60%),
+    radial-gradient(120% 60% at 100% 0%, var(--glow-a), transparent 60%),
+    radial-gradient(90% 60% at 0% 10%, var(--glow-b), transparent 60%),
     var(--color-canvas);
 }
 
+/* White text stays ≥ 4.5:1 across the whole gradient (violet → purple → rose). */
 @utility bg-mira {
-  background: linear-gradient(135deg, #6a44f5 0%, #a855f7 45%, #ff8a65 100%);
+  background: linear-gradient(135deg, #5b36e8 0%, #9333ea 50%, #c43d62 100%);
 }
 
 @utility glass {
-  background: rgb(255 255 255 / 0.82);
+  background: var(--glass-bg);
   backdrop-filter: blur(18px) saturate(1.4);
   -webkit-backdrop-filter: blur(18px) saturate(1.4);
 }
@@ -165,7 +233,8 @@
 /* MapLibre: keep attribution legible; soften controls to match the app. */
 .maplibregl-ctrl-attrib {
   font-size: 11px !important;
-  background: rgb(255 255 255 / 0.85) !important;
+  background: var(--glass-bg) !important;
+  color: var(--color-ink-muted);
   border-radius: 999px 0 0 0;
 }
 .maplibregl-ctrl-group {
@@ -192,8 +261,8 @@
   width: 30px;
   height: 30px;
   border-radius: 999px;
-  background: var(--color-surface);
-  border: 2px solid var(--color-surface);
+  background: var(--pin-bg);
+  border: 2px solid var(--pin-bg);
   box-shadow: 0 2px 8px -2px rgb(50 25 120 / 0.35), 0 0 0 1px var(--color-line);
   font-size: 15px;
   line-height: 1;
@@ -220,7 +289,7 @@
   text-overflow: ellipsis;
   padding: 1px 7px;
   border-radius: 999px;
-  background: rgb(255 255 255 / 0.9);
+  background: var(--glass-bg);
   color: var(--color-ink);
   font: 700 11px/16px var(--font-jakarta), system-ui, sans-serif;
   box-shadow: 0 1px 4px -1px rgb(50 25 120 / 0.25);

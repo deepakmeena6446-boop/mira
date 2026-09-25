@@ -7,7 +7,12 @@ export type MiraCard =
   | { type: "trip_status"; destination: string; etaAt: string; state: string }
   | { type: "save_place" };
 
-export type MiraEvent = { type: "text"; delta: string } | { type: "card"; card: MiraCard } | { type: "done" };
+/**
+ * `private` text is shown live but never stored in chat history: it's derived from where
+ * the person is right now ("Looks like you're near…", "a 12-minute walk"), and history
+ * must not become a location log.
+ */
+export type MiraEvent = { type: "text"; delta: string; private?: boolean } | { type: "card"; card: MiraCard } | { type: "done" };
 
 export interface MiraContext {
   localTime: string; // ISO string from the device

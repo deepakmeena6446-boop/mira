@@ -31,7 +31,8 @@ export function notesNear(sql: postgres.Sql, p: GeoPoint, radiusM = 1500) {
   return notesForCells(sql, cellsAround(p.lat, p.lon, radiusM));
 }
 
-/** Cells touched by a route polyline ([lon, lat] pairs), sampled every ~300 m. */
+/** Cells touched by a route polyline ([lon, lat] pairs), sampled every ~300 m, capped at 200. */
+export const MAX_ROUTE_CELLS = 200;
 export function cellsAlongRoute(geometry: Array<[number, number]>): string[] {
   const out = new Set<string>();
   for (let i = 0; i < geometry.length; i++) {
@@ -40,7 +41,8 @@ export function cellsAlongRoute(geometry: Array<[number, number]>): string[] {
     const next = geometry[i + 1];
     if (!next) continue;
     const steps = Math.ceil((Math.hypot(next[0] - lon, next[1] - lat) * 111_000) / 300);
-    for (let s = 1; s < steps; s++) out.add(encodeGeohash(lat + ((next[1] - lat) * s) / steps, lon + ((next[0] - lon) * s) / steps));
+    for (let s = 1; s < steps && out.size < MAX_ROUTE_CELLS; s++) out.add(encodeGeohash(lat + ((next[1] - lat) * s) / steps, lon + ((next[0] - lon) * s) / steps));
+    if (out.size >= MAX_ROUTE_CELLS) break;
   }
-  return [...out];
+  return [...out].slice(0, MAX_ROUTE_CELLS);
 }

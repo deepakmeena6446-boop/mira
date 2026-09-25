@@ -69,6 +69,7 @@ const envSchema = z.object({
   MAP_TILE_ATTRIBUTION: optionalNonEmpty,
   /** Optional vector style (e.g. OpenFreeMap placeholder, later Mapbox). Takes precedence over raster tiles. */
   MAP_STYLE_URL: optionalNonEmpty.refine((v) => v === undefined || /^https:\/\//.test(v), "must be an https:// style URL"),
+  MAP_STYLE_URL_NIGHT: optionalNonEmpty.refine((v) => v === undefined || /^https:\/\//.test(v), "must be an https:// style URL"),
   // Placeholder area names outside the local OSM data (Nominatim-compatible). Unset = off.
   OVERPASS_URL: optionalNonEmpty.refine((v) => v === undefined || /^https:\/\//.test(v), "must be an https:// URL"),
   PLACE_SEARCH_URL: optionalNonEmpty.refine((v) => v === undefined || /^https:\/\//.test(v), "must be an https:// URL"),

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useOverlay } from "@/lib/use-overlay";
 import { Icon } from "@/components/ui/Icon";
 import { api } from "@/lib/api-client";
 import type { SavedPlace } from "@/server/account/places";
@@ -35,23 +36,24 @@ export function SearchOverlay({
   onDropPin,
   saved,
   near,
+  placeholder = "Where to?",
 }: {
   open: boolean;
   onClose: () => void;
   onPick: (d: Destination) => void;
-  onDropPin: () => void;
+  /** Omit to hide "Choose a spot on the map" (e.g. when there's no map on screen). */
+  onDropPin?: () => void;
+  placeholder?: string;
   saved: SavedPlace[];
   near: { lat: number; lon: number } | null;
 }) {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
   const [loading, setLoading] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 30);
-  }, [open]);
+  useOverlay(open, onClose);
 
+  const [failure, setFailure] = useState<string | null>(null);
   useEffect(() => {
     const term = q.trim();
     if (term.length < 2) return;
@@ -60,7 +62,13 @@ export function SearchOverlay({
       setLoading(true);
       try {
         const res = await api<{ places: Hit[] }>("/api/geo/search", { body: { q: term, near: near ? { lat: near.lat, lon: near.lon } : null }, signal: ctrl.signal });
-        if (res.ok) setHits(res.data.places);
+        if (res.ok) {
+          setHits(res.data.places);
+          setFailure(null);
+        } else if (!ctrl.signal.aborted) {
+          setHits([]);
+          setFailure(res.network ? "You're offline — search needs a connection. You can still choose a spot on the map." : res.message);
+        }
       } catch {
         /* aborted */
       }
@@ -86,7 +94,7 @@ export function SearchOverlay({
         <label className="flex min-h-12 flex-1 items-center gap-2 rounded-full bg-surface px-4 shadow-[var(--shadow-card)] focus-within:ring-2 focus-within:ring-accent">
           <Icon name="know" className="size-5 text-ink-subtle" />
           <span className="sr-only">Search for a place</span>
-          <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Where to?" className="w-full bg-transparent text-lg outline-none" autoComplete="off" />
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} className="h-12 w-full bg-transparent text-lg outline-none" autoComplete="off" />
         </label>
       </div>
       <div className="mt-4 flex-1 overflow-y-auto px-4 pb-10">
@@ -128,19 +136,21 @@ export function SearchOverlay({
               </ul>
             ) : (
               <p className="rounded-3xl bg-surface p-5 text-ink-muted shadow-[var(--shadow-card)]">
-                {loading ? "Looking…" : "No matches in the map data I have yet. You can drop a pin instead."}
+                {loading ? "Looking…" : failure ?? `No matches in the map data I have yet.${onDropPin ? " You can drop a pin instead." : ""}`}
               </p>
             )}
           </section>
         ) : null}
-        <button
-          type="button"
-          onClick={onDropPin}
-          className="mt-4 flex min-h-14 w-full items-center gap-3 rounded-3xl bg-surface px-4 py-3 text-left font-bold shadow-[var(--shadow-card)] hover:bg-sunken"
-        >
-          <span className="grid size-10 place-items-center rounded-2xl bg-peach-soft text-xl">📍</span>
-          Choose a spot on the map
-        </button>
+        {onDropPin ? (
+          <button
+            type="button"
+            onClick={onDropPin}
+            className="mt-4 flex min-h-14 w-full items-center gap-3 rounded-3xl bg-surface px-4 py-3 text-left font-bold shadow-[var(--shadow-card)] hover:bg-sunken"
+          >
+            <span className="grid size-10 place-items-center rounded-2xl bg-peach-soft text-xl">📍</span>
+            Choose a spot on the map
+          </button>
+        ) : null}
       </div>
     </div>
   );

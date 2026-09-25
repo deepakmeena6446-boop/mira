@@ -1,6 +1,7 @@
 import "server-only";
 import type { MiraCard, MiraEvent, MiraTurn } from "./types";
 import type { MiraTools } from "./tools";
+import { daypartFor } from "@/domain/daypart";
 
 /**
  * Placeholder Mira: deterministic intent routing over the real tools, written in Mira's
@@ -16,6 +17,7 @@ const RX = {
   nearby: /\b(pharmacy|pharmacies|medic\w*|dawai|dawa|chemist|hospital|clinic|doctor|metro|atm|bank|cafe|coffee|chai|food|eat|toilet|washroom|restroom|bus|open|nearby|near me|paas)\b/i,
   report: /\b(report|harass\w*|catcall\w*|star(e|ing)|groped|touch\w*|lighting|street ?light|dark|broken|pothole|footpath)\b/i,
   trip: /\b(my trip|eta|how long|how far|am i late)\b/i,
+  time: /\b(what time|what's the time|whats the time|time kya|kitne baje|kya time|time hai)\b/i,
   hello: /^\s*(hi+|hello|hey+|namaste|hola|good (morning|afternoon|evening|night)|yo)\b/i,
   who: /\b(who are you|what can you do|what do you do|help\b|kya kar sakti)/i,
   thanks: /\b(thanks|thank you|thx|shukriya|dhanyavaad)\b/i,
@@ -44,11 +46,21 @@ function joinNames(xs: string[]): string {
   return `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 }
 
+// Marks location-derived fragments inside a reply: streamed, never stored (see MiraEvent).
+const P0 = "\u0001";
+const P1 = "\u0002";
+const priv = (s: string) => (s ? `${P0}${s}${P1}` : "");
+
 async function* speak(text: string): AsyncGenerator<MiraEvent> {
-  const parts = text.match(/\S+\s*/g) ?? [text];
-  for (const p of parts) {
-    yield { type: "text", delta: p };
-    await new Promise((r) => setTimeout(r, 18));
+  // Split into public / private runs, then stream word by word.
+  const runs = text.split(new RegExp(`(${P0}[^${P1}]*${P1})`)).filter(Boolean);
+  for (const run of runs) {
+    const isPrivate = run.startsWith(P0);
+    const body = isPrivate ? run.slice(1, -1) : run;
+    for (const p of body.match(/\S+\s*/g) ?? []) {
+      yield isPrivate ? { type: "text", delta: p, private: true } : { type: "text", delta: p };
+      await new Promise((r) => setTimeout(r, 18));
+    }
   }
 }
 
@@ -58,6 +70,8 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
   const cards: MiraCard[] = [];
   let reply: string;
 
+  const ctx0 = await tools.getContext();
+  const part = daypartFor(ctx0.hour);
   const places = await tools.listSavedPlaces();
   const home = places.find((p) => /home|hostel|pg/i.test(p.label));
   const named = places.find((p) => new RegExp(`\\b${p.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(m));
@@ -79,8 +93,8 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     if (target) {
       const t = await tools.proposeTrip({ name: target.label, lat: target.lat, lon: target.lon });
       reply = hinglish
-        ? `Chalo, ${target.label} chalte hain${t.minutes ? ` — lagbhag ${t.minutes} min ka walk` : ""}. ${t.contacts.length ? `${joinNames(t.contacts)} tumhe live dekh payenge.` : ""}`
-        : `Let's get you to ${target.label}${t.minutes ? ` — about a ${t.minutes}-minute walk` : ""}. ${t.contacts.length ? `${joinNames(t.contacts)} will be able to follow along live.` : "I'll check you arrive."}`;
+        ? `Chalo, ${target.label} chalte hain${t.minutes ? priv(` — lagbhag ${t.minutes} min ka walk`) : ""}. ${t.contacts.length ? `${joinNames(t.contacts)} tumhe live dekh payenge.` : ""}`
+        : `Let's get you to ${target.label}${t.minutes ? priv(` — about a ${t.minutes}-minute walk`) : ""}. ${t.contacts.length ? `${joinNames(t.contacts)} will be able to follow along live.` : "I'll check you arrive."}`;
       cards.push({ type: "trip", ...t });
     } else {
       reply = "I don't know where home is yet. Save it once and next time it's a single tap.";
@@ -105,23 +119,42 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
       reply = `You're on your way to ${trip.destination.name}.`;
       cards.push({ type: "trip_status", destination: trip.destination.name, etaAt: trip.etaAt, state: trip.state });
     } else reply = "You don't have a trip running. Tell me where you're headed and I'll set one up.";
+  } else if (RX.time.test(m)) {
+    const h12 = ((ctx0.hour + 11) % 12) + 1;
+    const mm = String(ctx0.minute).padStart(2, "0");
+    const clock = `${h12}:${mm} ${ctx0.hour < 12 ? "am" : "pm"}`;
+    reply = part === "night"
+      ? `It's ${clock}. ${home ? `Getting late — want me to share your walk to ${home.label}?` : "Getting late — if you're heading out, I can share your trip live."}`
+      : `It's ${clock} where you are.`;
+    if (part === "night" && home) cards.push({ type: "trip", ...(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })) });
   } else if (RX.hello.test(m) && m.length < 40) {
-    const ctx = await tools.getContext();
-    const when = ctx.hour < 12 ? "morning" : ctx.hour < 17 ? "afternoon" : "evening";
+    const ctx = ctx0;
+    const where = ctx.area ? (ctx.area.toLowerCase().startsWith("near") ? ctx.area.charAt(0).toLowerCase() + ctx.area.slice(1) : "in " + ctx.area) : null;
+    const open = {
+      dawn: `Morning, ${firstName}! ☀️ Early start?`,
+      day: `${ctx.hour < 12 ? "Good morning" : "Good afternoon"}, ${firstName}!`,
+      evening: `Good evening, ${firstName} 🌆`,
+      night: `Hey ${firstName} 🌙 It's late.`,
+    }[part];
+    const ask = part === "night" ? (home ? `Want me to share your walk to ${home.label}?` : "Heading somewhere? I can share your trip live.") : "Where are you headed?";
     reply = hinglish
-      ? `Hi ${firstName}! ${ctx.area ? `Tum ${ctx.area.replace(/^Near /, "")} ke paas ho. ` : ""}Kahan ja rahi ho?`
-      : `Good ${when}, ${firstName}! ${ctx.area ? `Looks like you're ${ctx.area.toLowerCase().startsWith("near") ? ctx.area.charAt(0).toLowerCase() + ctx.area.slice(1) : "in " + ctx.area}. ` : ""}Where are you headed?`;
+      ? `Hi ${firstName}! ${ctx.area ? priv(`Tum ${ctx.area.replace(/^Near /, "")} ke paas ho. `) : ""}${part === "night" ? "Kaafi late ho gaya hai — ghar tak ki walk share kar doon?" : "Kahan ja rahi ho?"}`
+      : `${open} ${where ? priv(`Looks like you're ${where}. `) : ""}${ask}`;
     if (ctx.late && home) cards.push({ type: "trip", ...(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })) });
   } else if (RX.thanks.test(m)) {
-    reply = hinglish ? "Koi baat nahi! Main yahin hoon." : "Anytime. I'm here whenever you're heading out.";
+    reply = hinglish ? "Koi baat nahi! Main yahin hoon." : part === "night" ? "Anytime 🌙 I'm around if you head out again." : "Anytime. I'm here whenever you're heading out.";
   } else if (RX.who.test(m)) {
     reply = `I'm Mira, your walking companion. I can share your trip live with people you trust, find what's open around you, and help you report something privately. I'm not an emergency service — for that, call 112.`;
   } else {
     reply = `I'm still learning to chat about everything. Right now I'm best at sharing your trip, finding what's open nearby, and private reports — try "take me home" or "pharmacy near me".`;
+    if (part === "night" && home) {
+      reply += ` It's late, so here's your walk to ${home.label} if you want it.`;
+      cards.push({ type: "trip", ...(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })) });
+    }
   }
 
   void history;
-  yield* speak(reply.replace(/\s+/g, " ").trim());
+  yield* speak(reply.replace(/[ \t\n]+/g, " ").trim());
   for (const card of cards) yield { type: "card", card };
   yield { type: "done" };
 }

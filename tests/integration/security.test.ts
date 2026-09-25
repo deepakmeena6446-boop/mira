@@ -43,7 +43,7 @@ const PUBLIC_KEYS = new Set([
   "places", "id", "name", "kind", "lat", "lon", "distanceM", "hours", "label", "precise", "route", "meters", "minutes", "geometry",
   "approximate", "along", "notes", "text", "polarity", "timeBand", "week", "status", "checks", "database", "worker",
   "workerHeartbeatAgeSeconds", "pilotMapData", "contactEmail", "contactAlertProblems24h", "received", "error", "code", "message", "fields",
-  "state", "destination", "dest", "etaAt", "location", "at", "ageSeconds",
+  "state", "destination", "dest", "etaAt", "location", "at", "ageSeconds", "alertsViewer",
 ]);
 
 describe("privacy red-line audit", () => {
@@ -95,6 +95,7 @@ describe("privacy red-line audit", () => {
 
   it("every public response uses only allowlisted keys", async () => {
     await recordHeartbeat(getSql(), "audit-worker", new Date(), "test", new Date());
+    await recordHeartbeat(getSql(), "job:journeys", new Date(), "test", new Date());
     switchJar(newJar());
     const from = { lat: 28.6927, lon: 77.2131 };
     const to = { lat: 28.6901, lon: 77.2111 };
@@ -121,6 +122,7 @@ describe("privacy red-line audit", () => {
 
   it("owner-only data never leaks contact addresses or tokens, and needs the session", async () => {
     await recordHeartbeat(getSql(), "audit-worker", new Date(), "test", new Date());
+    await recordHeartbeat(getSql(), "job:journeys", new Date(), "test", new Date());
     switchJar(newJar());
     expect((await (await currentTripGET()).json()).trip).toBeNull();
     expect((await (await meGET()).json()).user).toBeNull();

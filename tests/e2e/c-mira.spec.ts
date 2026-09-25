@@ -19,11 +19,11 @@ test.describe("Mira — the companion (placeholder engine)", () => {
     const box = page.getByPlaceholder("Message Mira…");
     await box.fill("pharmacy near me");
     await page.getByRole("button", { name: "Send" }).click();
-    await expect(page.getByText(/Nearby pharmacies/i)).toBeVisible();
+    await expect(page.getByRole("log").getByText(/Nearby pharmacies/i)).toBeVisible();
 
     await box.fill("take me home");
     await page.getByRole("button", { name: "Send" }).click();
-    await expect(page.getByText("To Home")).toBeVisible();
+    await expect(page.getByRole("log").getByText("To Home")).toBeVisible();
     await page.getByRole("button", { name: /Start my trip|Share my trip/ }).last().click();
     await page.waitForURL("**/trip");
     await expect(page.getByText(/To Home/).first()).toBeVisible();
@@ -35,11 +35,11 @@ test.describe("Mira — the companion (placeholder engine)", () => {
     await openMira(page);
     await page.getByPlaceholder("Message Mira…").fill("someone is following me, I'm scared");
     await page.getByRole("button", { name: "Send" }).click();
-    await expect(page.getByText(/please call 112/)).toBeVisible();
+    await expect(page.getByRole("log").getByText(/please call 112/)).toBeVisible();
     await expect(page.getByRole("link", { name: /Call 112/ })).toHaveAttribute("href", "tel:112");
     await page.getByPlaceholder("Message Mira…").fill("who are you");
     await page.getByRole("button", { name: "Send" }).click();
-    await expect(page.getByText(/I'm not an emergency service/)).toBeVisible();
+    await expect(page.getByRole("log").getByText(/I'm not an emergency service/)).toBeVisible();
     await ctx.close();
   });
 
@@ -48,7 +48,7 @@ test.describe("Mira — the companion (placeholder engine)", () => {
     await openMira(a.page);
     await a.page.getByPlaceholder("Message Mira…").fill("SECRET-MIRA-LINE hello");
     await a.page.getByRole("button", { name: "Send" }).click();
-    await expect(a.page.getByText("SECRET-MIRA-LINE hello")).toBeVisible();
+    await expect(a.page.getByRole("log").getByText("SECRET-MIRA-LINE hello")).toBeVisible();
 
     const b = await newUser(browser, "Tara");
     const hist = await (await b.page.request.get("/api/mira")).json();

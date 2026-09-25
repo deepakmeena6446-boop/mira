@@ -34,6 +34,26 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
     router.refresh();
   };
 
+  const next = async () => {
+    if (step === 0) return setStep(1);
+    if (step === 1) {
+      setBusy(true);
+      const s = await requestLocation();
+      setBusy(false);
+      if (s.status === "ok" || s.status === "denied" || s.status === "unavailable") {
+        if (s.status !== "ok") setLocMsg("No problem — you can turn it on later. You can always search for places instead.");
+        return signedIn ? finish() : setStep(2);
+      }
+      return;
+    }
+    if (!name.trim()) return;
+    setBusy(true);
+    const r = await api("/api/auth/demo", { body: { name: name.trim() } });
+    setBusy(false);
+    if (r.ok) finish();
+    else setError(r.message);
+  };
+
   const steps = [
     <div key="mira" className="flex flex-col items-center text-center">
       <MiraOrb size={120} />
@@ -72,6 +92,10 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
         onChange={(e) => setName(e.target.value)}
         maxLength={40}
         autoComplete="given-name"
+        enterKeyHint="go"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") void next();
+        }}
         placeholder="Your first name"
         className="mt-6 w-full max-w-xs min-h-14 rounded-2xl border border-line bg-surface px-5 text-center text-xl font-semibold outline-none focus:border-accent"
       />
@@ -80,25 +104,6 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
     </div>,
   ];
 
-  const next = async () => {
-    if (step === 0) return setStep(1);
-    if (step === 1) {
-      setBusy(true);
-      const s = await requestLocation();
-      setBusy(false);
-      if (s.status === "ok" || s.status === "denied" || s.status === "unavailable") {
-        if (s.status !== "ok") setLocMsg("No problem — you can turn it on later. You can always search for places instead.");
-        return signedIn ? finish() : setStep(2);
-      }
-      return;
-    }
-    if (!name.trim()) return;
-    setBusy(true);
-    const r = await api("/api/auth/demo", { body: { name: name.trim() } });
-    setBusy(false);
-    if (r.ok) finish();
-    else setError(r.message);
-  };
 
   const total = signedIn ? 2 : 3;
   return (

@@ -24,3 +24,19 @@ describe("geohash", () => {
     expect(around).toContain(encodeGeohash(28.6954, 77.2145));
   });
 });
+
+describe("cellsAround coverage", () => {
+  it("includes the cell of every point within the radius (no skipped rows or columns)", async () => {
+    const { cellsAround, encodeGeohash } = await import("@/domain/geohash");
+    for (const [lat, lon] of [[28.69, 77.21], [51.5, -0.12], [-33.87, 151.2], [59.9, 10.75]]) {
+      const cells = new Set(cellsAround(lat, lon, 1500));
+      for (let i = 0; i < 400; i++) {
+        const r = 1450 * Math.sqrt(Math.random());
+        const t = Math.random() * 2 * Math.PI;
+        const pLat = lat + (r * Math.sin(t)) / 111_320;
+        const pLon = lon + (r * Math.cos(t)) / (111_320 * Math.cos((lat * Math.PI) / 180));
+        expect(cells.has(encodeGeohash(pLat, pLon)), `${pLat},${pLon}`).toBe(true);
+      }
+    }
+  });
+});

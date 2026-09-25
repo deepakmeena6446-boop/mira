@@ -8,7 +8,7 @@ const home = { id: "h", label: "Home", emoji: "🏠", lat: 28.69, lon: 77.21, ad
 
 function tools(over: Partial<Record<keyof MiraTools, unknown>> = {}): MiraTools {
   return {
-    getContext: async () => ({ hour: 22, late: true, area: "Near Gate 3", hasLocation: true }),
+    getContext: async () => ({ hour: 22, minute: 5, daypart: "night", late: true, area: "Near Gate 3", hasLocation: true }),
     listSavedPlaces: async () => [home],
     findNearby: async (kinds?: string[]) => (kinds?.includes("pharmacy") ? [{ id: "p", name: "Apollo Pharmacy", kind: "Pharmacy", lat: 28.69, lon: 77.21, distanceM: 120 }] : []),
     proposeTrip: async (d: { name: string; lat: number; lon: number }) => ({ destination: d, minutes: 12, contacts: ["Mum"] }),
@@ -57,4 +57,19 @@ describe("Mira (placeholder engine)", () => {
     expect(MIRA_PERSONA).toMatch(/call 112/);
     expect(MIRA_PERSONA).toMatch(/Never start a trip or send anything without the person tapping to confirm/);
   });
+
+  it("knows the time of day: tells the time, and leans towards the walk home at night", async () => {
+    const at = (hour: number, minute = 0) => tools({ getContext: async () => ({ hour, minute, daypart: "day", late: hour >= 21 || hour < 5, area: null, hasLocation: true }) });
+    const late = await run("what time is it?", at(22, 5));
+    expect(late.text).toMatch(/It's 10:05 pm/);
+    expect(late.cards.map((c) => c.type)).toEqual(["trip"]);
+    const noon = await run("what time is it?", at(12, 30));
+    expect(noon.text).toBe("It's 12:30 pm where you are.");
+    expect(noon.cards).toEqual([]);
+    expect((await run("hi", at(6))).text).toMatch(/^Morning, Priya! ☀️ Early start\?/);
+    expect((await run("hi", at(19))).text).toMatch(/^Good evening, Priya 🌆/);
+    const night = await run("hi", at(23));
+    expect(night.text).toMatch(/It's late\. .*share your walk to Home/);
+  });
 });
+

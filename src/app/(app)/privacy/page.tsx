@@ -34,18 +34,32 @@ export default function PrivacyPage() {
 
         <ul className="mt-6 space-y-3">
           <Item emoji="📍" title="Your location">
-            <p>Used on your device to show where you are and what&apos;s around. It isn&apos;t stored unless you&apos;re on a trip you chose to share.</p>
+            <p>Used to show where you are and what&apos;s around. It isn&apos;t stored unless you&apos;re on a trip you started.</p>
             <p>During a trip, only your last few positions are kept, and they&apos;re deleted the moment the trip ends. There&apos;s no location history.</p>
+            <p>
+              To name your area and find places anywhere in the world, MIRA&apos;s server asks OpenStreetMap services (Nominatim, Photon, Overpass) using a rounded position (about
+              100 m–1 km) — never your exact spot, and never from your phone directly. The map itself loads from OpenFreeMap.
+            </p>
           </Item>
           <Item emoji="💜" title="Trips you share">
-            <p>Only trusted contacts who accepted your invite get the live link. They see your position and ETA until you arrive — then the link stops working.</p>
-            <p>If you don&apos;t check in, MIRA emails them once. It&apos;s not an emergency service: in danger, call 112.</p>
+            <p>
+              Each trusted contact who accepted your invite gets their own live link. They see your first name, destination, latest position and ETA until you arrive. After
+              that, the link shows only that you arrived (for 30 minutes), then nothing. Remove a contact and their link stops working at once.
+            </p>
+            <p>&ldquo;Share link&rdquo; on the trip screen lets you send a live link to anyone you choose yourself — they can follow until you arrive.</p>
+            <p>If you don&apos;t check in, MIRA emails your contacts once, and again when you arrive. It&apos;s not an emergency service: in danger, call 112 or your local emergency number.</p>
           </Item>
           <Item emoji="👤" title="Your account">
-            <p>Your name, saved places and trusted contacts (their emails are encrypted). Delete your account in Me and all of it is erased.</p>
+            <p>
+              Your name, saved places and trusted contacts (their emails are encrypted). Delete your account in Me and all of it is erased; any reports you sent stay
+              anonymous and can no longer be linked to you.
+            </p>
           </Item>
           <Item emoji="✨" title="Chatting with Mira">
-            <p>Your chat is saved to your account for 30 days so Mira can follow the conversation. Clear it any time in Me.</p>
+            <p>
+              Your chat is saved to your account for 30 days so Mira can follow the conversation — without anything about where you were (area names, distances and
+              nearby places are shown to you but not saved). Clear it any time in Me.
+            </p>
             <p>When Mira&apos;s AI is connected, messages will be processed by our AI provider to generate replies — never sold, never used for ads.</p>
           </Item>
           <Item emoji="📝" title="Reports">

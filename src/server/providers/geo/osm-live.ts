@@ -94,6 +94,9 @@ export async function overpassNearby(p: GeoPoint, radiusM: number, allowed: stri
 }
 
 const searchCache = cached<PlaceHit[]>(500, 60 * 60_000);
+// Polite global ceiling for the public Photon server (typing is already debounced client-side).
+const recentSearches: number[] = [];
+const SEARCHES_PER_SECOND = 5;
 
 /** Destination search biased to where the user is (Photon supports search-as-you-type). */
 export async function photonSearch(q: string, near?: GeoPoint): Promise<PlaceHit[]> {
@@ -103,6 +106,10 @@ export async function photonSearch(q: string, near?: GeoPoint): Promise<PlaceHit
   const key = `${q}|${c ? `${c.lat},${c.lon}` : ""}`;
   const hit = searchCache.get(key);
   if (hit) return hit;
+  const t = Date.now();
+  while (recentSearches.length && t - recentSearches[0] > 1000) recentSearches.shift();
+  if (recentSearches.length >= SEARCHES_PER_SECOND) return [];
+  recentSearches.push(t);
   try {
     const url = new URL("/api/", base);
     url.search = new URLSearchParams({ q, limit: "8", lang: "en", ...(c ? { lat: String(c.lat), lon: String(c.lon) } : {}) }).toString();

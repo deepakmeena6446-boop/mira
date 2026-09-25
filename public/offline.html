@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Offline · MIRA</title>
+<script src="/daypart.js"></script>
+<style>
+  :root { --bg: #faf7ff; --ink: #1c1633; --muted: #5a546e; --card: #fff; --accent: #6a44f5; }
+  :root[data-daypart="night"] { --bg: #120f24; --ink: #f2eeff; --muted: #bdb6da; --card: #1d1936; --accent: #8f73ff; }
+  html, body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 26rem; margin: 0 auto; padding: max(3rem, env(safe-area-inset-top)) 1.25rem 2rem; text-align: center; }
+  .orb { width: 72px; height: 72px; margin: 2rem auto 1.5rem; border-radius: 50%; background: linear-gradient(135deg, #6a44f5, #a855f7 45%, #ff8a65); }
+  h1 { font-size: 1.6rem; margin: 0 0 .5rem; }
+  p { color: var(--muted); margin: .5rem 0; }
+  .card { background: var(--card); border-radius: 1.5rem; padding: 1rem 1.25rem; margin-top: 1.5rem; text-align: left; }
+  a.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 1.5rem; margin-top: 1.5rem; border-radius: 999px; background: var(--accent); color: #fff; font-weight: 700; text-decoration: none; }
+  :root[data-daypart="night"] a.btn { color: #140f2e; }
+</style>
+</head>
+<body>
+<main>
+  <div class="orb" aria-hidden="true"></div>
+  <h1>You're offline</h1>
+  <p>MIRA needs a connection to show the map and share trips.</p>
+  <div class="card">
+    <p><strong>On a trip?</strong> Your contacts still see your last shared spot, and I'll still check in at your ETA.</p>
+    <p><strong>In danger?</strong> Call <a href="tel:112" style="color:inherit;font-weight:700">112</a> — calls work without data.</p>
+  </div>
+  <a class="btn" href="/">Try again</a>
+</main>
+</body>
+</html>

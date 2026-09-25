@@ -12,7 +12,9 @@ export const GET = handle(async (req: Request, ctx: RouteContext<"/api/t/[token]
   const { token } = await ctx.params;
   const sql = getSql();
   const now = systemClock.now();
-  await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "share:view:m", max: 60, windowMs: 60_000 }], now);
+  // Per link (a viewer polls every 15 s); an IP ceiling only against floods and token guessing.
+  await enforce(sql, [dailyKey("actor", `share:${token.slice(0, 64)}`, now)], [{ bucket: "share:view:m", max: 60, windowMs: 60_000 }], now);
+  await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "share:view:ip:m", max: 1200, windowMs: 60_000 }], now);
   const data = await sharedTrip(sql, token, now);
   if (!data) throw notFound("This trip link isn't valid.");
   return json(data, 200, { "referrer-policy": "no-referrer" });

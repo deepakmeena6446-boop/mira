@@ -29,6 +29,11 @@ const nextConfig: NextConfig = {
       { source: "/t/:token*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }, { key: "Cache-Control", value: "no-store" }, { key: "X-Robots-Tag", value: "noindex" }] },
       { source: "/api/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
       { source: "/admin/:path*", headers: [{ key: "Cache-Control", value: "no-store" }, { key: "X-Robots-Tag", value: "noindex" }] },
+      // The static offline page (served by the service worker) gets a fixed policy: same-origin script only, no inline.
+      {
+        source: "/offline.html",
+        headers: [{ key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" }],
+      },
     ];
   },
 };

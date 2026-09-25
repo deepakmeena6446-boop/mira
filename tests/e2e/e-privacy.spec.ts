@@ -27,7 +27,7 @@ test.describe("Privacy — links die, strangers see nothing, deletion is real", 
     await contact.page.goto(link);
     await expect(contact.page.getByRole("heading", { name: /trip has ended/ })).toBeVisible();
     const ended = await (await contact.page.request.get(`/api/t/${link.split("/t/")[1]}`)).json();
-    expect(ended).toEqual({ state: "ended", name: "Aditi", destination: expect.any(String) });
+    expect(ended).toEqual({ state: "ended", name: "Aditi" }); // no destination once it's over
     expect((await contact.page.goto("/t/forged-token-aaaaaaaaaaaaaaaaaaaa"))?.status()).toBe(404);
     await contact.page.goto("/invite/forged-token-aaaaaaaaaaaaaaaaaaaaaaaa");
     await expect(contact.page.getByRole("heading", { name: "Invitation not available" })).toBeVisible();

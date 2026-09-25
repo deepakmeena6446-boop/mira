@@ -39,3 +39,13 @@ export async function ensureActor(): Promise<Actor> {
   store.set(cookieName("actor"), token, cookieOptions(ACTOR_TTL_DAYS * 86_400));
   return { id: row.id, actorHash: tokenHash };
 }
+
+/**
+ * After sign-in, stop using this browser's anonymous pseudonym: anything sent later
+ * belongs to the account, and a different person signing in here can't claim it.
+ */
+export async function forgetActor(actor: Actor): Promise<void> {
+  await getSql()`DELETE FROM actor_sessions WHERE id = ${actor.id}`;
+  const store = await cookies();
+  store.delete(cookieName("actor"));
+}
