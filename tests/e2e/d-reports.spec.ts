@@ -38,7 +38,8 @@ test.describe("Reports — private until reviewed, public only as thresholded no
 
     // 3. Moderator approves the late environment reports (UI for one, API for the rest).
     const admin = await adminPage(browser);
-    const envIds = (await db`SELECT id FROM reports_private WHERE category = 'environment' AND time_band = 'late' ORDER BY id`).map((r) => r.id as string);
+    // The five anonymous late-hours reports (the signed-in "just now" one can also be "late" after 10 pm).
+    const envIds = (await db`SELECT id FROM reports_private WHERE category = 'environment' AND time_band = 'late' AND user_id IS NULL ORDER BY id`).map((r) => r.id as string);
     expect(envIds).toHaveLength(5);
     await admin.goto(`/admin/reports/${envIds[0]}`);
     await admin.getByLabel(/poor lighting/).check();

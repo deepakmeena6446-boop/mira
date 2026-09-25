@@ -32,7 +32,7 @@ type Stored = { text: string; cards?: MiraCard[] };
  */
 function storableCard(card: MiraCard): MiraCard | null {
   if (card.type === "places") return null;
-  if (card.type === "trip") return { ...card, minutes: null };
+  if (card.type === "trip") return { type: "trip", destination: card.destination, minutes: null, contacts: card.contacts };
   return card;
 }
 

@@ -78,6 +78,13 @@ export default function PrivacyPage() {
             <p>Only a rough area (about 1 km), roughly when, and the kind of thing are kept — never your exact spot. Notes are encrypted and read only by a moderator.</p>
             <p>Nothing is shown on its own. A soft note appears on the map only when at least five different people have reported something similar nearby, and disappears after five weeks. Reports are deleted within 30 days.</p>
           </Item>
+          <Item emoji="💡" title="Street lighting">
+            <p>
+              After a walk in the dark, you can tell MIRA whether the way was lit. Your answer is saved per short street stretch (about 40 m), with only the day — not
+              your name, your account, your trip, or a time — and nothing links one stretch to the next, so it can&apos;t be joined back into your route.
+            </p>
+            <p>A stretch shows as lit or dark only once at least three different people agree. Answers older than 90 days stop counting and are deleted after 120.</p>
+          </Item>
           <Item emoji="🚫" title="What MIRA never does">
             <p>No ads, no selling data, no public profiles, no &ldquo;safe/unsafe&rdquo; scores or crime maps, and no tracking you didn&apos;t start.</p>
           </Item>

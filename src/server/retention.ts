@@ -2,6 +2,7 @@ import type postgres from "postgres";
 import { purgeExpiredCounters } from "@/server/ratelimit";
 import { purgeOldReleases } from "@/server/aggregate/run";
 import { deleteAccount } from "@/server/account/users";
+import { purgeOldLitVotes } from "@/server/lighting";
 
 /**
  * Hard-delete expired private data (architecture §3). Runs in the worker.
@@ -26,6 +27,7 @@ export async function purgeExpired(sql: postgres.Sql, now: Date): Promise<Record
       AND NOT EXISTS (SELECT 1 FROM user_sessions s WHERE s.user_id = u.id AND s.expires_at > ${now})
     LIMIT 100`;
   for (const o of orphans) await deleteAccount(sql, o.id);
+  const litVotes = await purgeOldLitVotes(sql, now);
   return {
     reports: reports.count,
     actorSessions: actors.count,
@@ -37,5 +39,6 @@ export async function purgeExpired(sql: postgres.Sql, now: Date): Promise<Record
     notifications: inbox.count,
     userSessions: userSessions.count,
     orphanedDemoAccounts: orphans.length,
+    litVotes,
   };
 }

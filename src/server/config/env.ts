@@ -86,6 +86,8 @@ const envSchema = z.object({
   // Google Maps Platform: server key (Places API (New), Routes, Geocoding) and browser key (Map Tiles).
   GOOGLE_MAPS_SERVER_KEY: optionalNonEmpty,
   GOOGLE_MAPS_BROWSER_KEY: optionalNonEmpty,
+  // Street-lighting layer: streetlight poles detected in Mapillary imagery (optional).
+  MAPILLARY_TOKEN: optionalNonEmpty,
   AUTH_GOOGLE_ID: optionalNonEmpty,
   AUTH_GOOGLE_SECRET: optionalNonEmpty,
   VAPID_PUBLIC_KEY: optionalNonEmpty,

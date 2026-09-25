@@ -11,6 +11,8 @@ import { Chip } from "@/components/app/Chip";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { SearchOverlay, type Destination } from "@/components/app/SearchOverlay";
 import { kindEmoji } from "@/components/app/kinds";
+import { LightingSummary } from "@/components/app/LightingSummary";
+import type { RouteLighting } from "@/domain/lighting";
 import { InstallCard } from "@/components/pwa/InstallCard";
 import { useFlag } from "@/lib/flags";
 import { useOverlay } from "@/lib/use-overlay";
@@ -45,6 +47,7 @@ interface RouteInfo {
   route: { meters: number; minutes: number; geometry: Array<[number, number]>; approximate: boolean };
   along: Place[];
   notes: Note[];
+  lighting: RouteLighting | null;
 }
 
 const fmtM = (m: number) => (m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`);
@@ -238,7 +241,7 @@ export function HomeScreen({
   return (
     <div className="fixed inset-0 overflow-hidden">
       <h1 className="sr-only">MIRA — map and places around you</h1>
-      <WorldMap tiles={tiles} me={me} dest={dest} route={info?.route.geometry ?? null} notes={nearby.notes} places={mapPlaces} recenter={recenter} onPlaceClick={onPlaceClick} onLongPress={onLongPress} onMapClick={onMapClick} onArea={setArea} label="Map around your location" />
+      <WorldMap tiles={tiles} me={me} dest={dest} route={info?.route.geometry ?? null} notes={nearby.notes} places={mapPlaces} recenter={recenter} lighting={info?.lighting?.segments ?? null} onPlaceClick={onPlaceClick} onLongPress={onLongPress} onMapClick={onMapClick} onArea={setArea} label="Map around your location" />
 
       {/* Top: greeting + search */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.9rem,env(safe-area-inset-top))]">
@@ -405,6 +408,7 @@ export function HomeScreen({
               </p>
             </div>
 
+            {info?.lighting ? <LightingSummary lighting={info.lighting} /> : null}
             {info?.along.length ? (
               <section className="mt-5">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">Along the way</h3>

@@ -172,6 +172,9 @@ export function TripScreen({ initial, tiles }: { initial: TripView; tiles: { url
   const distance = me ? haversine(me, trip.destination) : null;
 
   if (!open) {
+    // After a walk in the dark, one tap tells everyone whether the way was lit.
+    const hour = clock?.getHours() ?? 12;
+    const askLit = trip.state === "arrived" && route !== null && route.length > 2 && (hour >= 18 || hour < 6);
     return (
       <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-32 text-center">
         <div className="animate-rise">
@@ -184,6 +187,7 @@ export function TripScreen({ initial, tiles }: { initial: TripView; tiles: { url
           {trip.state === "arrived" ? `Glad you're at ${trip.destination.name}. ${sharedOk.length ? "Live sharing has stopped for everyone." : ""}` : "Live sharing is off."} Trip details are deleted
           {trip.purgeAt && clock ? ` by ${time(trip.purgeAt)}` : " soon"}. I don&apos;t keep a history of where you&apos;ve been.
         </p>
+        {askLit ? <LitQuestion route={route!} /> : null}
         <Button className="mt-8 max-w-xs" variant="hero" size="lg" onClick={() => { router.push("/"); router.refresh(); }}>
           Back home
         </Button>
@@ -316,3 +320,28 @@ export function TripScreen({ initial, tiles }: { initial: TripView; tiles: { url
     </div>
   );
 }
+
+/** "Was the way lit?" — the walked route is turned into anonymous street cells on the server and discarded. */
+function LitQuestion({ route }: { route: Array<[number, number]> }) {
+  const [state, setState] = useState<"ask" | "sending" | "done" | "failed">("ask");
+  const send = async (vote: "lit" | "partly" | "dark") => {
+    setState("sending");
+    const r = await api("/api/lighting/vote", { body: { route, vote } });
+    setState(r.ok ? "done" : "failed");
+  };
+  if (state === "done") return <p className="mt-6 max-w-sm rounded-3xl bg-surface px-5 py-4 text-sm text-ink-muted shadow-[var(--shadow-card)] animate-rise">Thank you 💛 That helps the next person walking here at night.</p>;
+  return (
+    <div className="mt-6 w-full max-w-sm rounded-3xl bg-surface p-5 text-left shadow-[var(--shadow-card)] animate-rise">
+      <p className="font-bold">Was the way lit?</p>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        {([["lit", "💡 Yes"], ["partly", "🌗 Partly"], ["dark", "🌑 No"]] as const).map(([v, label]) => (
+          <button key={v} type="button" disabled={state === "sending"} onClick={() => send(v)} className="min-h-12 rounded-2xl bg-sunken text-sm font-bold disabled:opacity-60">
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-ink-subtle">{state === "failed" ? "Couldn't send that — check your connection and try again." : "Saved per street, not linked to you or this trip."}</p>
+    </div>
+  );
+}
+

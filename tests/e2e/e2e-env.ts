@@ -29,5 +29,10 @@ export function e2eServerEnv(): Record<string, string> {
     ANTHROPIC_API_KEY: "",
     GOOGLE_MAPS_SERVER_KEY: "",
     GOOGLE_MAPS_BROWSER_KEY: "",
+    // No live third-party lookups in E2E (Next would otherwise fill these from .env.local).
+    PLACE_SEARCH_URL: "",
+    OVERPASS_URL: "",
+    REVERSE_GEOCODER_URL: "",
+    MAPILLARY_TOKEN: "",
   };
 }

@@ -14,6 +14,8 @@ An installable, mobile-first web app (PWA) that works anywhere in the world. Ope
 
 **Press and hold the map** on any spot to report something there or walk to it.
 
+**Street lighting on the route.** The route sheet shows how much of the way is lit, and the map glows warm along lit stretches. Sources, strongest first: MIRA walkers' one-tap "Was the way lit?" after a walk in the dark (shown only when ≥ 3 people agree), OpenStreetMap `lit` tags, and streetlight poles detected in Mapillary imagery (optional `MAPILLARY_TOKEN`). Mira mentions it after dark. It's lighting information, never a safety rating.
+
 **Reports** take three taps: pick one of six tiles, then send. The location defaults to "here" and the time to "just now". Reports are private and reviewed by a person. They appear publicly only as calm, template-worded community notes once enough independent people report the same thing in a ~1.2 km area.
 
 > MIRA 2.0 deliberately moved away from the V0 spec documents (`MIRA_*.md`). Those documents describe the V0 pilot; this README describes the current app.
@@ -99,6 +101,7 @@ Production mode locally: `npm run build && npm run start` and `npm run worker:st
 | Home screen location | In browser memory only; refreshed while the app is visible, paused when hidden. A long-pressed spot goes to Report in memory, never in the URL | Never stored |
 | Offline cache (service worker) | Only an offline page and static files. Pages are never cached, because they carry your name, places and contacts | Replaced on each app update |
 | Inbox | Short in-app updates (contact accepted, missed check-in, location paused) | With your account |
+| "Was the way lit?" answers | Per ~40 m street cell + the day only; a keyed per-cell hash stops double votes without linking cells into a route; no user, trip or time | Stop counting after 90 days, deleted after 120 |
 | Anonymous reports sent before signing in | Linked to your account on sign-in and re-keyed to one pseudonym (so you never count as two people); the browser's anonymous cookie is then discarded | With the report (≤ 30 days) |
 | Saved places | Label, emoji and point, for your account only (max 10) | With your account |
 | Trusted contacts | Encrypted email + keyed hash; they accept once, with no account needed | On removal or with your account |

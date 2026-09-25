@@ -5,6 +5,7 @@ import { clientIp, dailyKey, enforce } from "@/server/ratelimit";
 import { point } from "@/server/http/geo-input";
 import { getGeo } from "@/server/providers/geo";
 import { cellsAlongRoute, notesForCells } from "@/server/notes";
+import { lightingForRoute } from "@/server/lighting";
 import { haversineMeters } from "@/domain/pilot";
 import { ApiError } from "@/server/http/errors";
 
@@ -23,9 +24,11 @@ export const POST = handle(async (req: Request) => {
   const geo = getGeo();
   const route = await geo.walk(from, to);
   const mid = route.geometry[Math.floor(route.geometry.length / 2)] ?? [to.lon, to.lat];
-  const [along, notes] = await Promise.all([
+  const [along, notes, lighting] = await Promise.all([
     geo.nearby({ lat: mid[1], lon: mid[0] }, Math.min(1500, Math.max(300, route.meters / 2))),
     notesForCells(sql, cellsAlongRoute(route.geometry)),
+    // Only real street routes: a straight-line estimate doesn't follow any street.
+    route.approximate ? Promise.resolve(null) : lightingForRoute(sql, route.geometry),
   ]);
-  return json({ route, along: along.slice(0, 12), notes });
+  return json({ route, along: along.slice(0, 12), notes, lighting });
 });

@@ -1,4 +1,5 @@
 import "server-only";
+import { lightingForRoute } from "@/server/lighting";
 import { daypartFor, type Daypart } from "@/domain/daypart";
 import type postgres from "postgres";
 import { getGeo } from "@/server/providers/geo";
@@ -16,17 +17,18 @@ import type { MiraContext } from "./types";
 export function miraTools(sql: postgres.Sql, user: User, ctx: MiraContext) {
   // Once per message: the reply may consult it several times (greeting, time, nudges).
   let context: Promise<{ hour: number; minute: number; daypart: Daypart; late: boolean; area: string | null; hasLocation: boolean }> | null = null;
+  const getContext = () => {
+    context ??= (async () => {
+      const local = new Date(ctx.localTime);
+      const minutes = (local.getUTCHours() * 60 + local.getUTCMinutes() - ctx.tzOffsetMin + 1440) % 1440;
+      const hour = Math.floor(minutes / 60);
+      const area = ctx.area || (ctx.location ? (await getGeo().reverse(ctx.location)).label : null);
+      return { hour, minute: minutes % 60, daypart: daypartFor(hour), late: hour >= 21 || hour < 5, area, hasLocation: Boolean(ctx.location) };
+    })();
+    return context;
+  };
   return {
-    getContext() {
-      context ??= (async () => {
-        const local = new Date(ctx.localTime);
-        const minutes = (local.getUTCHours() * 60 + local.getUTCMinutes() - ctx.tzOffsetMin + 1440) % 1440;
-        const hour = Math.floor(minutes / 60);
-        const area = ctx.area || (ctx.location ? (await getGeo().reverse(ctx.location)).label : null);
-        return { hour, minute: minutes % 60, daypart: daypartFor(hour), late: hour >= 21 || hour < 5, area, hasLocation: Boolean(ctx.location) };
-      })();
-      return context;
-    },
+    getContext,
     listSavedPlaces: () => listPlaces(sql, user.id),
     async findNearby(kinds?: string[]) {
       if (!ctx.location) return [];
@@ -34,7 +36,10 @@ export function miraTools(sql: postgres.Sql, user: User, ctx: MiraContext) {
     },
     async proposeTrip(dest: { name: string; lat: number; lon: number }) {
       const [contacts, route] = await Promise.all([shareTargets(sql, user.id), ctx.location ? getGeo().walk(ctx.location, dest) : Promise.resolve(null)]);
-      return { destination: dest, minutes: route?.minutes ?? null, contacts: contacts.map((c) => c.name) };
+      // After dark, lighting along the way is worth knowing (only for real street routes).
+      const { hour } = await getContext();
+      const lighting = route && !route.approximate && (hour >= 18 || hour < 6) ? await lightingForRoute(sql, route.geometry).catch(() => null) : null;
+      return { destination: dest, minutes: route?.minutes ?? null, contacts: contacts.map((c) => c.name), lighting: lighting?.summary ?? null };
     },
     tripStatus: () => currentTrip(sql, user.id, new Date()),
     async trustedContacts() {

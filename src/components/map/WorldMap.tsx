@@ -93,6 +93,7 @@ export function WorldMap({
   onPlaceClick,
   onLongPress,
   recenter = 0,
+  lighting = null,
   follow = true,
   onMapClick,
   onReady,
@@ -113,6 +114,8 @@ export function WorldMap({
   onLongPress?: (p: LngLat) => void;
   /** Increment to fly back to `me` (and resume following) — e.g. the "Centre on me" button. */
   recenter?: number;
+  /** Street lighting along the route: lit stretches glow warm, dark ones are dotted. */
+  lighting?: Array<{ status: "lit" | "dark" | "poles" | "unknown"; coords: Array<[number, number]> }> | null;
   follow?: boolean;
   onMapClick?: (p: LngLat) => void;
   onReady?: (ok: boolean) => void;
@@ -227,11 +230,16 @@ export function WorldMap({
           const ring = token("--pin-bg", "#ffffff");
           // App overlays sit on top of whichever basemap style is in use.
           map.addSource("route", { type: "geojson", data: EMPTY });
+          map.addSource("lighting", { type: "geojson", data: EMPTY });
+          // Under the route: a soft warm glow where the street is lit (or poles are mapped).
+          map.addLayer({ id: "lit-glow", type: "line", source: "lighting", filter: ["in", ["get", "status"], ["literal", ["lit", "poles"]]], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#ffc94d", "line-width": ["case", ["==", ["get", "status"], "lit"], 16, 11], "line-opacity": ["case", ["==", ["get", "status"], "lit"], 0.55, 0.3], "line-blur": 2 } });
           map.addSource("points", { type: "geojson", data: EMPTY });
           map.addSource("notes", { type: "geojson", data: EMPTY });
           map.addLayer({ id: "route-glow", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": glowColor, "line-width": 12, "line-opacity": 0.35 } });
           map.addLayer({ id: "route", type: "line", source: "route", filter: ["!", ["get", "approx"]], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": routeColor, "line-width": 5 } });
           map.addLayer({ id: "route-approx", type: "line", source: "route", filter: ["get", "approx"], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": routeColor, "line-width": 5, "line-dasharray": [1.2, 1.6] } });
+          // Over the route: dark stretches as a quiet dotted grey (information, not a warning colour).
+          map.addLayer({ id: "lit-dark", type: "line", source: "lighting", filter: ["==", ["get", "status"], "dark"], layout: { "line-cap": "round" }, paint: { "line-color": "#6b6480", "line-width": 3, "line-dasharray": [0.4, 1.8] } });
           map.addLayer({ id: "notes", type: "circle", source: "notes", paint: { "circle-radius": 11, "circle-color": "#ff8a65", "circle-opacity": 0.85, "circle-stroke-color": ring, "circle-stroke-width": 3 } });
           map.addLayer({ id: "me-halo", type: "circle", source: "points", filter: ["==", ["get", "kind"], "me"], paint: { "circle-radius": 22, "circle-color": meColor, "circle-opacity": 0.22 } });
           map.addLayer({ id: "me", type: "circle", source: "points", filter: ["==", ["get", "kind"], "me"], paint: { "circle-radius": 8, "circle-color": meColor, "circle-stroke-color": ring, "circle-stroke-width": 3 } });
@@ -265,12 +273,16 @@ export function WorldMap({
     if (dest) feats.push(pt(dest, { kind: "dest" }));
     (map.getSource("points") as GeoJSONSource).setData({ type: "FeatureCollection", features: feats });
     (map.getSource("notes") as GeoJSONSource).setData({ type: "FeatureCollection", features: notes.map((n) => pt(n, { id: n.id })) });
+    (map.getSource("lighting") as GeoJSONSource).setData({
+      type: "FeatureCollection",
+      features: (lighting ?? []).filter((s) => s.status !== "unknown").map((s) => ({ type: "Feature", properties: { status: s.status }, geometry: { type: "LineString", coordinates: s.coords } })),
+    });
     (map.getSource("route") as GeoJSONSource).setData(
       route && route.length > 1
         ? { type: "FeatureCollection", features: [{ type: "Feature", properties: { approx: route.length === 2 }, geometry: { type: "LineString", coordinates: route } }] }
         : EMPTY,
     );
-  }, [me, dest, route, notes, ready]);
+  }, [me, dest, route, notes, lighting, ready]);
 
   // Place pins (HTML markers: crisp emoji, keyboard-focusable, work on any basemap).
   const placesKey = places.map((p) => p.id).join("|");

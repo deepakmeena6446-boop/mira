@@ -41,6 +41,11 @@ const REPORT_CATEGORY: Array<[RegExp, string, string]> = [
   [/light|dark|broken|pothole|footpath/i, "environment", "a street problem"],
 ];
 
+/** A trip card carries only what the card shows (no route-derived extras like lighting). */
+function tripCard(t: { destination: { name: string; lat: number; lon: number }; minutes: number | null; contacts: string[] }) {
+  return { destination: t.destination, minutes: t.minutes, contacts: t.contacts };
+}
+
 function joinNames(xs: string[]): string {
   if (xs.length <= 1) return xs[0] ?? "";
   return `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
@@ -80,14 +85,14 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     const contacts = await tools.trustedContacts();
     reply = `If you're in danger right now, please call 112. ${contacts.length ? `I can share your live location with ${joinNames(contacts)} straight away.` : "Head towards people and lit, open places if you can."}`;
     cards.push({ type: "sos", contacts });
-    if (home) cards.push({ type: "trip", ...(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })) });
+    if (home) cards.push({ type: "trip", ...tripCard(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })) });
   } else if (RX.uneasy.test(m)) {
     const open = await tools.findNearby(["pharmacy", "metro", "police", "health", "food"]);
     reply = hinglish
       ? `Main yahin hoon, ${firstName}. ${open.length ? "Paas mein kuch jagah hain jahan log hote hain:" : ""} Chaho toh main tumhari trip share kar doon.`
       : `I'm right here, ${firstName}. ${open.length ? "There are a few places close by where people usually are." : ""} Want me to share your trip so someone you trust can follow along?`;
     if (open.length) cards.push({ type: "places", title: "Close by", places: open });
-    if (home) cards.push({ type: "trip", ...(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })) });
+    if (home) cards.push({ type: "trip", ...tripCard(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })) });
   } else if (named || RX.home.test(m)) {
     const target = named ?? home;
     if (target) {
@@ -95,7 +100,7 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
       reply = hinglish
         ? `Chalo, ${target.label} chalte hain${t.minutes ? priv(` — lagbhag ${t.minutes} min ka walk`) : ""}. ${t.contacts.length ? `${joinNames(t.contacts)} tumhe live dekh payenge.` : ""}`
         : `Let's get you to ${target.label}${t.minutes ? priv(` — about a ${t.minutes}-minute walk`) : ""}. ${t.contacts.length ? `${joinNames(t.contacts)} will be able to follow along live.` : "I'll check you arrive."}`;
-      cards.push({ type: "trip", ...t });
+      cards.push({ type: "trip", ...tripCard(t) });
     } else {
       reply = "I don't know where home is yet. Save it once and next time it's a single tap.";
       cards.push({ type: "save_place" });
@@ -126,7 +131,7 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     reply = part === "night"
       ? `It's ${clock}. ${home ? `Getting late — want me to share your walk to ${home.label}?` : "Getting late — if you're heading out, I can share your trip live."}`
       : `It's ${clock} where you are.`;
-    if (part === "night" && home) cards.push({ type: "trip", ...(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })) });
+    if (part === "night" && home) cards.push({ type: "trip", ...tripCard(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })) });
   } else if (RX.hello.test(m) && m.length < 40) {
     const ctx = ctx0;
     const where = ctx.area ? (ctx.area.toLowerCase().startsWith("near") ? ctx.area.charAt(0).toLowerCase() + ctx.area.slice(1) : "in " + ctx.area) : null;
@@ -140,7 +145,7 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     reply = hinglish
       ? `Hi ${firstName}! ${ctx.area ? priv(`Tum ${ctx.area.replace(/^Near /, "")} ke paas ho. `) : ""}${part === "night" ? "Kaafi late ho gaya hai — ghar tak ki walk share kar doon?" : "Kahan ja rahi ho?"}`
       : `${open} ${where ? priv(`Looks like you're ${where}. `) : ""}${ask}`;
-    if (ctx.late && home) cards.push({ type: "trip", ...(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })) });
+    if (ctx.late && home) cards.push({ type: "trip", ...tripCard(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })) });
   } else if (RX.thanks.test(m)) {
     reply = hinglish ? "Koi baat nahi! Main yahin hoon." : part === "night" ? "Anytime 🌙 I'm around if you head out again." : "Anytime. I'm here whenever you're heading out.";
   } else if (RX.who.test(m)) {
@@ -149,7 +154,7 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     reply = `I'm still learning to chat about everything. Right now I'm best at sharing your trip, finding what's open nearby, and private reports — try "take me home" or "pharmacy near me".`;
     if (part === "night" && home) {
       reply += ` It's late, so here's your walk to ${home.label} if you want it.`;
-      cards.push({ type: "trip", ...(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })) });
+      cards.push({ type: "trip", ...tripCard(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })) });
     }
   }
 

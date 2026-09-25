@@ -217,3 +217,38 @@ describe("audit regressions", () => {
     expect(r.status).toBe(400);
   });
 });
+
+describe("street lighting answers", () => {
+  const ROUTE: Array<[number, number]> = [
+    [77.2, 28.69],
+    [77.2031, 28.69],
+  ];
+  it("need sign-in, store nothing about who or which trip, and can't be joined into a route", async () => {
+    const { POST: votePOST } = await import("@/app/api/lighting/vote/route");
+    const { lightingForRoute } = await import("@/server/lighting");
+    const sql = getSql();
+    await sql`DELETE FROM lit_votes`;
+    await sql`DELETE FROM abuse_counters`;
+    switchJar(newJar());
+    expect((await votePOST(jsonRequest("/api/lighting/vote", { route: ROUTE, vote: "lit" }))).status).toBe(401);
+
+    for (const name of ["Mona", "Nina"]) {
+      await signIn(name);
+      expect((await votePOST(jsonRequest("/api/lighting/vote", { route: ROUTE, vote: "lit" }))).status).toBe(200);
+    }
+    // Two people: not enough to show anything yet.
+    expect((await lightingForRoute(sql, [ROUTE[0], [77.2015, 28.69], ROUTE[1]]))!.summary.unknown).toBe(100);
+    await signIn("Oja");
+    await votePOST(jsonRequest("/api/lighting/vote", { route: ROUTE, vote: "lit" }));
+    await votePOST(jsonRequest("/api/lighting/vote", { route: ROUTE, vote: "lit" })); // same person again: updates, doesn't add
+    expect((await lightingForRoute(sql, [ROUTE[0], [77.2015, 28.69], ROUTE[1]]))!.summary.lit).toBe(100);
+
+    const cols = (await sql`SELECT column_name FROM information_schema.columns WHERE table_name = 'lit_votes'`).map((c) => c.column_name).sort();
+    expect(cols).toEqual(["cell", "day", "id", "value", "voter_hash"]); // no user, no trip, no time of day
+    const perCell = await sql`SELECT cell, count(*)::int AS n, count(DISTINCT voter_hash)::int AS voters FROM lit_votes GROUP BY cell`;
+    expect(perCell.every((r) => r.n === 3 && r.voters === 3)).toBe(true);
+    // One person's rows in different cells share no identifier.
+    const hashes = await sql`SELECT voter_hash FROM lit_votes`;
+    expect(new Set(hashes.map((h) => h.voter_hash)).size).toBe(hashes.length);
+  });
+});

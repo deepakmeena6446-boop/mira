@@ -44,6 +44,8 @@ const PUBLIC_KEYS = new Set([
   "approximate", "along", "notes", "text", "polarity", "timeBand", "week", "status", "checks", "database", "worker",
   "workerHeartbeatAgeSeconds", "pilotMapData", "contactEmail", "contactAlertProblems24h", "received", "error", "code", "message", "fields",
   "state", "destination", "dest", "etaAt", "location", "at", "ageSeconds", "alertsViewer",
+  // Street lighting along a route: statuses and shares only (no voters, no counts per person).
+  "lighting", "segments", "coords", "summary", "sources", "lit", "dark", "poles", "unknown", "walkers", "osm",
 ]);
 
 describe("privacy red-line audit", () => {

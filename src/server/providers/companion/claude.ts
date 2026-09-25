@@ -169,8 +169,17 @@ export async function* claudeMira(opts: { apiKey: string; message: string; histo
         const ref = typeof input.place_ref === "string" ? refs.get(input.place_ref) : undefined;
         const dest = savedPlace ? { name: savedPlace.label, lat: savedPlace.lat, lon: savedPlace.lon } : ref ? { name: ref.name, lat: ref.lat, lon: ref.lon } : null;
         if (!dest) return { result: { error: "Unknown destination. Use a saved place label or a place_ref from find_nearby." } };
-        const t = await tools.proposeTrip(dest);
-        return { result: { destination: dest.name, walk_minutes: t.minutes, contacts_who_would_follow: t.contacts, note: "Shown as a card; nothing starts until they tap it." }, card: { type: "trip", ...t } };
+        const { lighting, ...t } = await tools.proposeTrip(dest);
+        return {
+          result: {
+            destination: dest.name,
+            walk_minutes: t.minutes,
+            contacts_who_would_follow: t.contacts,
+            ...(lighting ? { street_lighting_percent_of_route: lighting, lighting_note: "lit = walkers/OpenStreetMap say lit; poles = streetlights mapped, may not work; dark = reported dark. Mention briefly if useful; never call a route safe or unsafe." } : {}),
+            note: "Shown as a card; nothing starts until they tap it.",
+          },
+          card: { type: "trip", ...t },
+        };
       }
       case "check_trip": {
         const t = await tools.tripStatus();
