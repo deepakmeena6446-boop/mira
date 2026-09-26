@@ -19,7 +19,7 @@ import { shareLiveLink } from "@/lib/share";
 import { clearTripRoutes, keepTripRoute, tripRoute } from "@/lib/trip-route";
 import { HELP_CLASSES, hoursLine, isNight, rankHelpPoints, type HelpClass, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
 import { localTime } from "@/domain/opening-hours";
-import { setCountry, type CountryContext } from "@/lib/locale-store";
+import { setCountry, useCountry, type CountryContext } from "@/lib/locale-store";
 import { MISS_GRACE_MS } from "@/domain/journey";
 import { journeyNoun, modeWords } from "@/domain/travel-prefs";
 import type { TripView } from "@/server/trips";
@@ -62,6 +62,7 @@ export function TripScreen({
   // The planned route lives on this device only (kept when the journey was started from the route sheet).
   const [route, setRoute] = useState<Array<[number, number]> | null>(() => (typeof window === "undefined" ? null : tripRoute(initial.id)));
   const [help, setHelp] = useState<{ at: { lat: number; lon: number }; points: HelpPoint[]; failed?: boolean } | null>(null);
+  const countryIso = useCountry().iso;
   const helpInFlight = useRef(false);
   const [focus, setFocus] = useState<RankedHelpPoint | null>(null);
   const [unsafe, setUnsafe] = useState(false);
@@ -138,11 +139,11 @@ export function TripScreen({
     if (help && !help.failed && haversine(help.at, me) < HELP_REFETCH_M) return; // a failed lookup retries on the next fix
     helpInFlight.current = true;
     const at = me;
-    void api<{ helpPoints: HelpPoint[] }>("/api/geo/help", { body: at }).then((r) => {
+    void api<{ helpPoints: HelpPoint[] }>("/api/geo/help", { body: { ...at, ...(countryIso ? { country: countryIso } : {}) } }).then((r) => {
       helpInFlight.current = false;
       setHelp((cur) => (r.ok ? { at, points: r.data.helpPoints } : (cur ?? { at, points: [], failed: true })));
     });
-  }, [open, me, help]);
+  }, [open, me, help, countryIso]);
   const night = isNight((clock ?? new Date()).getHours());
   const minuteKey = clock ? Math.floor(clock.getTime() / 60_000) : 0;
   const ranked = useMemo(

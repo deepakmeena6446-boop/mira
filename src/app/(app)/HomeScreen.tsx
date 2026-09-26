@@ -161,12 +161,11 @@ export function HomeScreen({
     if (!me) return;
     let stop = false;
     (async () => {
-      const [r, n, h] = await Promise.all([
-        api<{ label: string | null; country?: CountryContext }>("/api/geo/reverse", { body: me }),
-        api<{ places: Place[]; notes: Note[] }>("/api/geo/nearby", { body: me }),
-        // The country (once known) turns on locale-weighted classes, e.g. 24-hour convenience stores in Japan.
-        api<{ helpPoints: HelpPoint[] }>("/api/geo/help", { body: { ...me, ...(countryIso ? { country: countryIso } : {}) } }),
-      ]);
+      const nearbyReq = api<{ places: Place[]; notes: Note[] }>("/api/geo/nearby", { body: me });
+      const r = await api<{ label: string | null; country?: CountryContext }>("/api/geo/reverse", { body: me });
+      // Help Points after the country is known: it turns on locale-weighted classes (24-hour convenience stores in Japan).
+      const iso = (r.ok ? r.data.country?.iso : null) ?? countryIso;
+      const [n, h] = await Promise.all([nearbyReq, api<{ helpPoints: HelpPoint[] }>("/api/geo/help", { body: { ...me, ...(iso ? { country: iso } : {}) } })]);
       if (stop) return;
       if (r.ok) {
         setPoiArea(r.data.label);

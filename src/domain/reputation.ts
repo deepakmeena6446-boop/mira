@@ -110,7 +110,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 export function stewardStatus(s: ImpactSummary, account: StewardAccount, t: StewardThresholds, now: Date): StewardStatus {
   const needs: string[] = [];
-  if (!account.durable) needs.push("An email sign-in on this account, so it's one person you can come back to");
+  if (!account.durable) needs.push("A Google or email sign-in on this account, so it's one person you can come back to");
   const ageDays = Math.floor((now.getTime() - account.createdAt.getTime()) / 86_400_000);
   if (ageDays < t.minAccountDays) needs.push(`An account at least ${t.minAccountDays} days old (${plural(t.minAccountDays - ageDays, "day", "days")} to go)`);
   if (s.verified < t.minVerified) needs.push(`${plural(t.minVerified - s.verified, "more verified contribution", "more verified contributions")}`);

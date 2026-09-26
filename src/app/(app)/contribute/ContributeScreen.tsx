@@ -83,7 +83,7 @@ function ChecksSection({ checks, durable }: { checks: CheckView[]; durable: bool
         <p className="rounded-[var(--radius-card)] bg-surface px-5 py-4 text-sm text-ink-muted shadow-[var(--shadow-card)]">
           {durable
             ? "After your journeys, MIRA may ask one quick question about something you passed."
-            : "After your journeys, MIRA may ask one quick question about something you passed. Add your email in Me first: it keeps it to one voice per person."}
+            : "After your journeys, MIRA may ask one quick question about something you passed. Sign in with Google or add your email in Me first: it keeps it to one voice per person."}
         </p>
       )}
     </section>
@@ -118,7 +118,7 @@ function CorrectSection({ durable }: { durable: boolean }) {
       <div className="p-5">
         {!durable ? (
           <p className="text-sm text-ink-muted">
-            Something MIRA shows about a place is wrong? <Link href="/me#account" className="font-bold text-accent">Add your email in Me</Link> to correct it. It keeps corrections to one voice per person.
+            Something MIRA shows about a place is wrong? <Link href="/me#account" className="font-bold text-accent">Sign in with Google or add your email in Me</Link> to correct it. It keeps corrections to one voice per person.
           </p>
         ) : place ? (
           <div>
