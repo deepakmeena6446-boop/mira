@@ -5,7 +5,8 @@ import { HELP_CLASSES, SOURCE_NAME, hoursLine, minutesIn, type HelpPoint } from 
 import { localTime, openState } from "@/domain/opening-hours";
 import { Icon } from "@/components/ui/Icon";
 import type { RouteOption } from "./RouteOptions";
-import { lightingLine } from "./LightingSummary";
+import { lightingLine, lightingWhy } from "./LightingSummary";
+import { ContextRow } from "./ContextRow";
 
 /** "4 Help Points along this journey" — a summary line (for option cards and the route sheet). */
 export function helpPointsLine(points: HelpPoint[]): string {
@@ -67,24 +68,30 @@ export function HelpPointList({ points, onPick, defaultOpen = false }: { points:
   );
 }
 
-/** Two short lines above "Start with MIRA": the route's lighting and its Help Points. Details sit below. */
+/** Why "no Help Points" may just be missing map data (shown in one tap). */
+export const NO_HELP_WHY =
+  "MIRA looks for places that are usually staffed (hospitals, police, stations, pharmacies, fuel stations, hotels) close to the way. None are on the map here, which may only mean the map has no data yet. Adding missing places to OpenStreetMap helps everyone.";
+
+/**
+ * Two short lines above "Start with MIRA": the route's lighting and its Help Points, facts only,
+ * with the unknown share always shown and why it's unknown one tap away. Details sit below.
+ */
 export function RouteContextLines({ option }: { option: RouteOption }) {
   const first = option.helpPoints[0];
   return (
-    <ul className="mt-3 space-y-1.5 text-sm" aria-label="What's known about this way">
-      <li className="flex items-start gap-2">
-        <span aria-hidden>💡</span>
-        <span>
-          <span className="font-semibold">Lighting:</span> <span className="text-ink-muted">{lightingLine(option.lighting)}</span>
-        </span>
-      </li>
-      <li className="flex items-start gap-2">
-        <span aria-hidden>{first ? HELP_CLASSES[first.cls].emoji : "📍"}</span>
-        <span>
-          <span className="font-semibold">{helpPointsLine(option.helpPoints)}</span>
-          {first ? <span className="text-ink-muted"> · first: {first.name}, {minutesIn(first.alongM ?? 0)}</span> : null}
-        </span>
-      </li>
-    </ul>
+    <dl className="mt-3" aria-label="What's known about this way">
+      <ContextRow label="Lighting" why={lightingWhy(option.lighting)}>
+        {lightingLine(option.lighting)}
+      </ContextRow>
+      <ContextRow label="Help" why={first ? undefined : NO_HELP_WHY}>
+        {helpPointsLine(option.helpPoints)}
+        {first ? (
+          <span className="text-ink-muted">
+            {" "}
+            · first: {first.name}, {minutesIn(first.alongM ?? 0)}
+          </span>
+        ) : null}
+      </ContextRow>
+    </dl>
   );
 }

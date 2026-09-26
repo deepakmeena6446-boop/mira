@@ -64,7 +64,9 @@ test.describe("Journeys that aren't walks", () => {
   test("by auto or cab: she picks the ETA, and the journey screen says how she's travelling", async ({ browser }) => {
     const { ctx, page } = await newUser(browser, "Meher");
     await openRoute(page);
-    await page.getByRole("radio", { name: "Auto / cab" }).click();
+    await page.getByRole("radio", { name: "Ride / car" }).click();
+    // No provider driving time in the E2E env (OSM placeholder): she chooses when to expect to arrive.
+    await expect(page.getByText("The driving time from here is not known.")).toBeVisible();
     await page.getByRole("radio", { name: "45 min" }).click();
     await expect(page.getByText(/expected in 45 min/)).toBeVisible();
     await page.getByRole("button", { name: /Start with MIRA/ }).click();

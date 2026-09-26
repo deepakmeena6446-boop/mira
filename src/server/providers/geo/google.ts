@@ -5,7 +5,8 @@ import { GoogleBudgetExceeded, takeGoogleCall } from "./budget";
 import { getEnv } from "@/server/config/env";
 import { scheduleFromGoogle } from "@/domain/opening-hours";
 import { GOOGLE_HELP_TYPES, HELP_CLASSES, helpClassFromGoogle, type HelpPoint } from "@/domain/help-points";
-import type { GeoPoint, GeoProvider, PlaceHit, WalkRoute } from "./types";
+import type { TravelMode } from "@/domain/travel-mode";
+import type { GeoPoint, GeoProvider, ModeRoute, PlaceHit, WalkRoute } from "./types";
 
 /**
  * Google Maps Platform provider (Places API (New), Routes API, Geocoding API). Called only
@@ -113,32 +114,48 @@ export function decodePolyline(encoded: string): Array<[number, number]> {
 
 type GRoute = { distanceMeters?: number; duration?: string; polyline?: { encodedPolyline?: string } };
 
-/** Walking routes from the Routes API; with `alternatives`, Google's alternates too (fastest first). */
-async function computeWalks(key: string, a: GeoPoint, b: GeoPoint, alternatives: boolean): Promise<WalkRoute[]> {
+/** MIRA's travel modes → Routes API travel modes. */
+const ROUTES_MODE: Record<TravelMode, "WALK" | "DRIVE" | "TRANSIT"> = { walk: "WALK", ride: "DRIVE", transit: "TRANSIT" };
+
+/**
+ * Routes API computeRoutes, fastest first (up to three). Field mask: distance, duration and
+ * polyline only (Essentials SKU). DRIVE asks for TRAFFIC_UNAWARE, the cheapest routing
+ * preference; TRANSIT takes none. An empty list is a normal answer (no transit here).
+ */
+async function computeRoutes(key: string, a: GeoPoint, b: GeoPoint, mode: TravelMode, alternatives: boolean): Promise<WalkRoute[]> {
   if (!takeGoogleCall()) throw new GoogleBudgetExceeded();
+  const travelMode = ROUTES_MODE[mode];
   const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
     method: "POST",
     headers: { "content-type": "application/json", "x-goog-api-key": key, "x-goog-fieldmask": "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline" },
     body: JSON.stringify({
       origin: { location: { latLng: { latitude: a.lat, longitude: a.lon } } },
       destination: { location: { latLng: { latitude: b.lat, longitude: b.lon } } },
-      travelMode: "WALK",
+      travelMode,
+      ...(travelMode === "DRIVE" ? { routingPreference: "TRAFFIC_UNAWARE" } : {}),
       computeAlternativeRoutes: alternatives,
       languageCode: "en",
     }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`routes_${res.status}`);
-  const routes = (((await res.json()) as { routes?: GRoute[] }).routes ?? [])
+  return (((await res.json()) as { routes?: GRoute[] }).routes ?? [])
     .filter((r) => r.polyline?.encodedPolyline)
     .map((r) => ({
       meters: r.distanceMeters ?? 0,
       minutes: Math.max(1, Math.round(Number((r.duration ?? "0s").replace("s", "")) / 60)),
       geometry: decodePolyline(r.polyline!.encodedPolyline!),
       approximate: false,
-    }));
+    }))
+    .sort((x, y) => x.minutes - y.minutes)
+    .slice(0, 3);
+}
+
+/** Walking routes; with `alternatives`, Google's alternates too. None is a failure here: the OSM router takes over. */
+async function computeWalks(key: string, a: GeoPoint, b: GeoPoint, alternatives: boolean): Promise<WalkRoute[]> {
+  const routes = await computeRoutes(key, a, b, "walk", alternatives);
   if (!routes.length) throw new Error("routes_none");
-  return routes.sort((x, y) => x.minutes - y.minutes).slice(0, 3);
+  return routes;
 }
 
 /** Google place types to ask for, by Help Point tier (src/domain/help-points.ts). */
@@ -264,6 +281,18 @@ export function googleGeo(key: string, fallback: GeoProvider): GeoProvider {
       } catch (err) {
         warn("walk_routes", err);
         return fallback.walkRoutes(a, b);
+      }
+    },
+
+    async routes(a, b, mode): Promise<ModeRoute[]> {
+      try {
+        // Ride / transit: one route. She's setting when to expect to arrive, not comparing drives.
+        const found = await computeRoutes(key, a, b, mode, mode === "walk");
+        if (mode === "walk" && !found.length) throw new Error("routes_none");
+        return found.slice(0, mode === "walk" ? 3 : 1).map((r) => ({ ...r, provider: "google" as const }));
+      } catch (err) {
+        warn(`routes_${mode}`, err);
+        return fallback.routes(a, b, mode); // walk: the OSM router; ride / transit: none ("not known")
       }
     },
 

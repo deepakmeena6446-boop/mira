@@ -32,6 +32,18 @@ export function lightingLine(lighting: RouteLighting | null): string {
   return [`${lit}% ${litLabel}`, lighting.summary.poles ? `${lighting.summary.poles}% streetlights mapped` : null, `${lighting.summary.unknown}% not known`].filter(Boolean).join(" · ");
 }
 
+/**
+ * Why part (or all) of the lighting is "not known", in one short paragraph — null when every
+ * stretch is known. Absence of data is never read as "dark" or "lit".
+ */
+export function lightingWhy(lighting: RouteLighting | null): string | null {
+  const ask = "After a walk at night, MIRA asks “Was the way lit?” — each answer fills in a stretch for the next person.";
+  if (!lighting || lighting.summary.lit + lighting.summary.poles + lighting.summary.dark === 0)
+    return `No source MIRA uses (OpenStreetMap, street imagery, MIRA walkers) has mapped the street lights here yet. That says nothing either way about tonight. ${ask}`;
+  if (lighting.summary.unknown <= 0) return null;
+  return `“Not known” is the part of this way that no source has mapped yet: it may be lit or not. ${ask}`;
+}
+
 /** Sources with their age: "OpenStreetMap (streets last edited 2016–2024)". Old is not current. */
 export function sourceList(l: RouteLighting): string {
   const f = l.freshness;

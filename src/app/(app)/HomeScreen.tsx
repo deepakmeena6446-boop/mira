@@ -12,12 +12,13 @@ import { SearchOverlay, type Destination } from "@/components/app/SearchOverlay"
 import { kindEmoji } from "@/components/app/kinds";
 import { LightingSummary } from "@/components/app/LightingSummary";
 import { HelpPointList, RouteContextLines } from "@/components/app/HelpPointList";
-import { RouteOptions, type RouteOption } from "@/components/app/RouteOptions";
+import { ArrivalContextLines, RouteOptions, type RouteOption } from "@/components/app/RouteOptions";
+import { TRAVEL_MODES, TRAVEL_MODE_INFO, distanceUnits, expectedMinutes, formatDistance, formatMinutes, type TravelMode } from "@/domain/travel-mode";
 import { EmergencyPill } from "@/components/app/EmergencyPill";
 import { UnsafeSheet, type UnsafeShareAction, type UnsafeTellAction } from "@/components/app/UnsafeSheet";
 import { HelpNearSheet } from "@/components/app/HelpNearSheet";
 import { HELP_CLASSES, dedupeHelpPoints, type HelpClass, type HelpPoint } from "@/domain/help-points";
-import { setCountry, type CountryContext } from "@/lib/locale-store";
+import { setCountry, useCountry, type CountryContext } from "@/lib/locale-store";
 import { InstallCard } from "@/components/pwa/InstallCard";
 import { useFlag } from "@/lib/flags";
 import { useOverlay } from "@/lib/use-overlay";
@@ -51,21 +52,23 @@ interface Note {
   lat: number;
   lon: number;
 }
-type Mode = "walk" | "ride" | "transit";
-const MODES: Array<[Mode, string]> = [
-  ["walk", "Walk"],
-  ["ride", "Auto / cab"],
-  ["transit", "Metro / bus"],
-];
-const ETA_CHOICES = [10, 20, 30, 45, 60, 90];
+type Mode = TravelMode;
+/** Her own "when do you expect to get there?" choices, when there's no provider time (or she prefers hers). */
+const ETA_CHOICES = [10, 20, 30, 45, 60, 90, 120, 180];
 interface RouteInfo extends RouteOption {
   notes: Note[];
   alternatives: RouteOption[];
 }
+/** Ride / transit (see /api/geo/route): the provider's route, or null = not known; Help Points where she arrives. */
+interface ModeInfo {
+  mode: Exclude<Mode, "walk">;
+  route: (RouteOption["route"] & { provider: string }) | null;
+  arrivalHelp: HelpPoint[];
+}
+type Routed = { data: RouteInfo | ModeInfo | null; code?: string };
 
 /** The greeting card + help row on top, the sheet below: frame the map in what is visible between. */
 const MAP_PADDING = { top: 170, bottom: 360, left: 40, right: 40 };
-const fmtM = (m: number) => (m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`);
 const clock = (d: Date) => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 const names = (list: string[]) => (list.length <= 2 ? list.join(" and ") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`);
 
@@ -114,7 +117,8 @@ export function HomeScreen({
   const [recenter, setRecenter] = useState(0);
   const [places, setPlaces] = useState(initialPlaces);
   const [dest, setDest] = useState<Destination | null>(initialDest);
-  const [routed, setRouted] = useState<{ key: string; data: RouteInfo | null; code?: string } | null>(null);
+  // Route answers per travel mode for the destination on screen (switching modes back is instant).
+  const [routed, setRouted] = useState<{ base: string; byMode: Partial<Record<Mode, Routed>> } | null>(null);
   const [option, setOption] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [pinMode, setPinMode] = useState(false);
@@ -125,6 +129,9 @@ export function HomeScreen({
   const [nearOpen, setNearOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("walk");
   const [etaMin, setEtaMin] = useState(30);
+  // With a provider ride/transit time, MIRA proposes the ETA; she can set her own instead.
+  const [ownTime, setOwnTime] = useState(false);
+  const units = distanceUnits(useCountry().iso);
   const exclude = useMemo(() => (user?.helpExclude ?? []) as HelpClass[], [user?.helpExclude]);
   const accepted = contacts.filter((c) => c.status === "accepted" && c.isDefault);
   const [shareWithCircle, setShareWithCircle] = useState(true);
@@ -177,26 +184,38 @@ export function HomeScreen({
     setDest(d);
     setOption(0);
     setMode("walk");
+    setOwnTime(false);
     setSnap("half");
   }, []);
 
-  // Route options for the chosen destination from where I am (derived; refetches if either changes).
-  const routeKey = dest && me ? `${dest.lat},${dest.lon}|${meKey}` : null;
+  // The way for the chosen destination from where I am, for the chosen mode (derived; refetches if either changes).
+  const routeBase = dest && me ? `${dest.lat},${dest.lon}|${meKey}` : null;
+  const byMode = useMemo(() => (routed && routed.base === routeBase ? routed.byMode : {}), [routed, routeBase]);
+  const haveMode = Boolean(byMode[mode]);
   useEffect(() => {
-    if (!routeKey || !dest || !me) return;
+    if (!routeBase || !dest || !me || haveMode) return;
     let stop = false;
-    void api<RouteInfo>("/api/geo/route", { body: { from: me, to: { lat: dest.lat, lon: dest.lon } } }).then((res) => {
+    const want = mode;
+    void api<RouteInfo | ModeInfo>("/api/geo/route", { body: { from: me, to: { lat: dest.lat, lon: dest.lon }, ...(want === "walk" ? {} : { mode: want }) } }).then((res) => {
       if (stop) return;
-      setRouted({ key: routeKey, data: res.ok ? res.data : null, code: res.ok ? undefined : res.code });
-      if (!res.ok && res.code === "too_far") setMode("ride"); // too far to walk: she's probably riding
+      const answer: Routed = { data: res.ok ? res.data : null, code: res.ok ? undefined : res.code };
+      setRouted((prev) => ({ base: routeBase, byMode: { ...(prev?.base === routeBase ? prev.byMode : {}), [want]: answer } }));
+      if (want === "walk" && !res.ok && res.code === "too_far") setMode("ride"); // too far to walk: she's probably riding
     });
     return () => {
       stop = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeKey]);
-  const info = routed && routed.key === routeKey ? routed.data : null;
-  const routeLoading = Boolean(routeKey) && routed?.key !== routeKey;
+  }, [routeBase, mode, haveMode]);
+  const info = (byMode.walk?.data as RouteInfo | null | undefined) ?? null;
+  const walkTooFar = byMode.walk?.code === "too_far";
+  const routeLoading = Boolean(routeBase) && !haveMode;
+  const modeRes = mode === "walk" ? undefined : byMode[mode];
+  const modeInfo = (modeRes?.data as ModeInfo | null | undefined) ?? null;
+  const rideRoute = modeInfo?.route ?? null;
+  const manualEta = mode !== "walk" && (!rideRoute || ownTime);
+  // Ride / transit ETA: the provider's time with a little slack, unless she set her own (clamped to what a journey accepts).
+  const tripEta = rideRoute && !manualEta ? expectedMinutes(rideRoute.minutes) : etaMin;
   // Her Help Point filters apply everywhere (e.g. no police), before any count or list.
   const options: RouteOption[] = useMemo(
     () =>
@@ -204,22 +223,23 @@ export function HomeScreen({
     [info, exclude],
   );
   const chosen = options[Math.min(option, options.length - 1)] ?? null;
+  const arrivalHelp = useMemo(() => (modeInfo?.arrivalHelp ?? []).filter((p) => !exclude.includes(p.cls)), [modeInfo, exclude]);
 
-  // Pins: what's around you, or the Help Points along the chosen way once a destination is picked.
+  // Pins: what's around you; once a destination is picked, the Help Points along the walk (or where she arrives).
   const mapPlaces = useMemo(
     () =>
       dest
-        ? (chosen?.helpPoints ?? []).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, emoji: HELP_CLASSES[p.cls].emoji }))
+        ? (mode === "walk" ? (chosen?.helpPoints ?? []) : arrivalHelp).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, emoji: HELP_CLASSES[p.cls].emoji }))
         : nearby.places.slice(0, 20).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, emoji: kindEmoji(p.kind) })),
-    [dest, chosen, nearby.places],
+    [dest, mode, chosen, arrivalHelp, nearby.places],
   );
   const onPlaceClick = useCallback(
     (p: { name: string; lat: number; lon: number; id: string }) => {
       const hit = nearby.places.find((x) => x.id === p.id);
-      const help = chosen?.helpPoints.find((x) => x.id === p.id);
+      const help = chosen?.helpPoints.find((x) => x.id === p.id) ?? arrivalHelp.find((x) => x.id === p.id);
       pick({ name: p.name, lat: p.lat, lon: p.lon, kind: hit?.kind ?? (help ? HELP_CLASSES[help.cls].label : undefined) });
     },
-    [nearby.places, chosen, pick],
+    [nearby.places, chosen, arrivalHelp, pick],
   );
 
   // Long-press on the map: offer to report or walk to that exact spot.
@@ -273,7 +293,7 @@ export function HomeScreen({
         from: me,
         to: { lat: target.lat, lon: target.lon, name: target.name.slice(0, 80) },
         share: sharesWithCircle,
-        ...(walking ? (picked ? { routeMinutes: picked.route.minutes } : {}) : { mode, etaMinutes: etaMin }),
+        ...(walking ? (picked ? { routeMinutes: picked.route.minutes } : {}) : { mode, etaMinutes: tripEta }),
       },
     });
     setStarting(false);
@@ -352,22 +372,23 @@ export function HomeScreen({
       : null;
   const unsafeHelp = useMemo(() => dedupeHelpPoints([...(chosen?.helpPoints ?? []), ...(nearHelp?.points ?? [])]), [chosen, nearHelp]);
 
+  // One sentence, and only what's true: who follows, and whether anyone is alerted.
   const circleLine = !user ? (
-    <>Send a live link to anyone when you start.</>
+    <>When you start, you can send a live link to anyone you choose.</>
   ) : !emailAlerts ? (
-    <>Send a live link to anyone when you start. Email alerts aren&apos;t switched on yet, so nobody is alerted automatically.</>
+    <>Send a live link when you start; email alerts aren&apos;t switched on yet, so nobody is alerted automatically.</>
   ) : accepted.length ? (
     <>
       <Icon name="check" className="mr-1 inline size-4 text-mint" />
       {names(accepted.map((c) => c.name))} get your live link by email when you share.
     </>
   ) : invited.length ? (
-    <>Waiting for {names(invited.map((c) => c.name))} to accept your email invite. Until then, send a live link yourself.</>
+    <>Waiting for {names(invited.map((c) => c.name))} to accept your invite; until then, send a live link yourself.</>
   ) : (
     <>
-      Send a live link to anyone when you start.{" "}
+      Send a live link when you start, or{" "}
       <Link href="/circle" className="font-bold text-accent">
-        Add someone
+        add someone
       </Link>{" "}
       to be emailed if you don&apos;t arrive.
     </>
@@ -384,7 +405,7 @@ export function HomeScreen({
   return (
     <div className="fixed inset-0 overflow-hidden">
       <h1 className="sr-only">MIRA — where are you going?</h1>
-      <WorldMap tiles={tiles} me={me} dest={dest} route={mode === "walk" ? (chosen?.route.geometry ?? null) : null} notes={[]} places={mapPlaces} recenter={recenter} lighting={chosen?.lighting?.segments ?? null} onPlaceClick={onPlaceClick} onLongPress={onLongPress} onMapClick={onMapClick} onArea={setArea} label="Map around your location" padding={MAP_PADDING} />
+      <WorldMap tiles={tiles} me={me} dest={dest} route={mode === "walk" ? (chosen?.route.geometry ?? null) : (rideRoute?.geometry ?? null)} notes={[]} places={mapPlaces} recenter={recenter} lighting={mode === "walk" ? (chosen?.lighting?.segments ?? null) : null} onPlaceClick={onPlaceClick} onLongPress={onLongPress} onMapClick={onMapClick} onArea={setArea} label="Map around your location" padding={MAP_PADDING} />
 
       {/* Top: greeting, and help that's always one tap away */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.9rem,env(safe-area-inset-top))]">
@@ -467,7 +488,7 @@ export function HomeScreen({
                   }}
                   className="min-h-12 rounded-2xl bg-accent-soft px-3 text-sm font-bold text-accent-strong"
                 >
-                  🧭 Walk here
+                  🧭 Go here
                 </button>
               </div>
             </div>
@@ -515,22 +536,31 @@ export function HomeScreen({
               <div className="min-w-0 flex-1">
                 <h2 className="text-xl font-extrabold text-mixed">{dest.name}</h2>
                 {mode !== "walk" ? (
-                  <p className="text-ink-muted">
-                    <strong className="text-ink">{MODES.find((m) => m[0] === mode)?.[1]}</strong> · expected in {etaMin < 60 ? `${etaMin} min` : etaMin === 90 ? "1 h 30" : `${etaMin / 60} h`}
-                  </p>
+                  routeLoading ? (
+                    <p className="text-ink-muted">Finding the time {TRAVEL_MODE_INFO[mode].by}…</p>
+                  ) : rideRoute && !manualEta ? (
+                    <p className="text-ink-muted">
+                      <strong className="text-ink">{formatMinutes(rideRoute.minutes)}</strong> {TRAVEL_MODE_INFO[mode].by} · {formatDistance(rideRoute.meters, units)}
+                      {now ? ` · arrive around ${clock(new Date(now.getTime() + rideRoute.minutes * 60_000))}` : ""}
+                    </p>
+                  ) : (
+                    <p className="text-ink-muted">
+                      <strong className="text-ink">{TRAVEL_MODE_INFO[mode].label}</strong> · expected in {formatMinutes(etaMin)}
+                    </p>
+                  )
                 ) : routeLoading ? (
                   <p className="text-ink-muted">Finding the way…</p>
-                ) : routed?.code === "too_far" ? (
+                ) : walkTooFar ? (
                   <p className="text-ink-muted">Too far to walk — choose how you&apos;re going.</p>
                 ) : chosen ? (
                   <p className="text-ink-muted">
-                    <strong className="text-ink">{chosen.route.minutes} min</strong> walk · {fmtM(chosen.route.meters)}
+                    <strong className="text-ink">{formatMinutes(chosen.route.minutes)}</strong> walk · {formatDistance(chosen.route.meters, units)}
                     {now ? ` · arrive around ${clock(new Date(now.getTime() + chosen.route.minutes * 60_000))}` : ""}
                     {chosen.route.approximate ? <span className="ml-2 rounded-full bg-sunken px-2 py-0.5 text-xs font-semibold">approx.</span> : null}
                   </p>
                 ) : !me ? (
-                  <p className="text-ink-muted">Turn on location to see the walk from here.</p>
-                ) : routed ? (
+                  <p className="text-ink-muted">Turn on location to see the way from here.</p>
+                ) : byMode.walk ? (
                   <p className="text-ink-muted">Couldn&apos;t get the walking time — you can still start with MIRA.</p>
                 ) : null}
               </div>
@@ -548,41 +578,80 @@ export function HomeScreen({
             </div>
 
             <div className="mt-3 grid grid-cols-3 gap-1.5 rounded-full bg-sunken p-1" role="radiogroup" aria-label="How are you going?">
-              {MODES.map(([m, label]) => (
+              {TRAVEL_MODES.map((m) => (
                 <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className={cx("min-h-10 rounded-full text-sm font-bold", mode === m ? "bg-surface text-ink shadow-[var(--shadow-card)]" : "text-ink-muted")}>
-                  {label}
+                  {TRAVEL_MODE_INFO[m].label}
                 </button>
               ))}
             </div>
 
-            {mode !== "walk" ? (
+            {/* What's known about getting there (short, facts only), then the way to start, then the details. */}
+            {mode === "walk" ? (
+              routeLoading ? (
+                <p className="mt-3 text-sm text-ink-muted">Checking lighting and Help Points along the way…</p>
+              ) : options.length > 1 ? (
+                <RouteOptions options={options} selected={option} onSelect={setOption} />
+              ) : chosen && !chosen.route.approximate ? (
+                <RouteContextLines option={chosen} />
+              ) : chosen ? (
+                <p className="mt-3 text-sm text-ink-muted">This walking time is an estimate from a straight line: there&apos;s no street map for this area yet, so lighting and Help Points along the way are not known.</p>
+              ) : null
+            ) : routeLoading ? null : (
               <div className="mt-3">
-                <p className="text-sm font-semibold">When do you expect to get there?</p>
-                <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Expected in">
-                  {ETA_CHOICES.map((m) => (
-                    <button key={m} type="button" role="radio" aria-checked={etaMin === m} onClick={() => setEtaMin(m)} className={cx("min-h-11 rounded-full border-2 px-4 text-sm font-bold", etaMin === m ? "border-accent bg-accent-soft text-accent-strong" : "border-line text-ink-muted")}>
-                      {m < 60 ? `${m} min` : m === 90 ? "1 h 30" : `${m / 60} h`}
+                {walkTooFar ? <p className="text-xs text-ink-subtle">Too far to walk from here, so MIRA switched to {TRAVEL_MODE_INFO.ride.label}.</p> : null}
+                {manualEta ? (
+                  <>
+                    {rideRoute ? null : (
+                      <p className="text-sm text-ink-muted">
+                        {!me
+                          ? "Turn on location to see the time from here."
+                          : modeRes?.code === "too_far"
+                          ? "That's further than a journey MIRA can follow (up to 4 hours)."
+                          : mode === "ride"
+                            ? "The driving time from here is not known."
+                            : "Transit times are not known for this journey."}
+                      </p>
+                    )}
+                    <p className="mt-2 text-sm font-semibold">When do you expect to get there?</p>
+                    <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Expected in">
+                      {ETA_CHOICES.map((m) => (
+                        <button key={m} type="button" role="radio" aria-checked={etaMin === m} onClick={() => setEtaMin(m)} className={cx("min-h-11 rounded-full border-2 px-4 text-sm font-bold", etaMin === m ? "border-accent bg-accent-soft text-accent-strong" : "border-line text-ink-muted")}>
+                          {formatMinutes(m)}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs text-ink-muted">
+                      MIRA uses the time you choose{now ? ` (around ${clock(new Date(now.getTime() + etaMin * 60_000))})` : ""}.{" "}
+                      {rideRoute ? (
+                        <button type="button" onClick={() => setOwnTime(false)} className="min-h-6 font-bold text-accent">
+                          Use the estimate instead
+                        </button>
+                      ) : null}
+                    </p>
+                  </>
+                ) : rideRoute ? (
+                  <p className="text-xs text-ink-muted">
+                    MIRA expects you by {now ? clock(new Date(now.getTime() + tripEta * 60_000)) : `${formatMinutes(tripEta)} from now`}, with a little extra time for {mode === "ride" ? "traffic" : "waiting and changes"}.{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEtaMin(ETA_CHOICES.find((c) => c >= tripEta) ?? ETA_CHOICES[ETA_CHOICES.length - 1]);
+                        setOwnTime(true);
+                      }}
+                      className="min-h-6 font-bold text-accent"
+                    >
+                      Set my own time
                     </button>
-                  ))}
-                </div>
-                <p className="mt-2 text-xs text-ink-muted">
-                  MIRA uses the time you choose{now ? ` (around ${clock(new Date(now.getTime() + etaMin * 60_000))})` : ""}. Lighting and Help Points on the way are for walking routes; Help Points near you are in &ldquo;I feel unsafe&rdquo;.
-                </p>
+                  </p>
+                ) : null}
+                {mode === "transit" && rideRoute?.provider === "google" ? <p className="mt-1 text-xs text-ink-subtle">Transit times from Google; check the operator for service changes.</p> : null}
+                {dest ? <ArrivalContextLines mode={mode} arrivalHelp={arrivalHelp} dest={dest} /> : null}
               </div>
-            ) : null}
-
-            {/* What's known about getting there (short), then the way to start, then the details. */}
-            {mode !== "walk" ? null : routeLoading ? (
-              <p className="mt-3 text-sm text-ink-muted">Checking lighting and Help Points along the way…</p>
-            ) : options.length > 1 ? (
-              <RouteOptions options={options} selected={option} onSelect={setOption} />
-            ) : chosen && !chosen.route.approximate ? (
-              <RouteContextLines option={chosen} />
-            ) : null}
+            )}
 
             <div className="mt-4">
-              <Button variant="hero" size="lg" onClick={() => void startTrip()} busy={starting} busyLabel="Starting…" disabled={!me}>
-                <Icon name="walk" /> Start with MIRA
+              <Button variant="hero" size="lg" onClick={() => void startTrip()} busy={starting} busyLabel="Starting…" disabled={!me || (mode !== "walk" && routeLoading)}>
+                <Icon name={mode === "walk" ? "walk" : "route"} /> Start with MIRA
               </Button>
               {user && emailAlerts && accepted.length ? (
                 <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Who follows this journey">
@@ -603,14 +672,15 @@ export function HomeScreen({
                   ))}
                 </div>
               ) : null}
+              {/* Who follows and whether anyone is alerted: stated before she starts, never implied. */}
               <p className="mt-2 text-center text-xs text-ink-muted">
                 {!user
-                  ? "Sign in with your first name. Then you can send a live link to anyone, and it ends itself when you arrive."
+                  ? "You'll sign in with just your first name. Then send a live link to anyone; it stops by itself when you arrive."
                   : sharesWithCircle
                     ? `${names(accepted.map((c) => c.name))} get your live link by email now, and an email if you don't arrive.`
                     : accepted.length && emailAlerts
                       ? "Nobody is alerted if you don't arrive. You can still send your live link on the next screen."
-                      : "Nobody is alerted automatically. On the next screen, send your live link on WhatsApp or SMS — it stops when you arrive."}
+                      : "Nobody is alerted automatically. On the next screen, send your live link by message — it stops when you arrive."}
               </p>
             </div>
 
@@ -620,7 +690,7 @@ export function HomeScreen({
                 <HelpPointList points={chosen.helpPoints} defaultOpen onPick={(p) => pick({ name: p.name, lat: p.lat, lon: p.lon, kind: HELP_CLASSES[p.cls].label })} />
               </>
             ) : null}
-            {info?.notes.length ? (
+            {mode === "walk" && info?.notes.length ? (
               <section className="mt-5">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">Community notes on this route</h3>
                 <ul className="mt-2 space-y-2">
@@ -629,44 +699,43 @@ export function HomeScreen({
                       <p>{n.text}</p>
                       <details className="mt-1 text-xs text-ink-muted">
                         <summary className="min-h-8 cursor-pointer font-semibold">{n.week ? `Week of ${new Date(n.week).toLocaleDateString([], { day: "numeric", month: "short" })} · ` : ""}Why am I seeing this?</summary>
-                        <p className="mt-1">At least five different people privately reported something similar in this ~1 km area at this time of day, and a person reviewed each report. It&apos;s shown in fixed words, without counts or exact places, and disappears after five weeks. It isn&apos;t a rating of the area.</p>
+                        <p className="mt-1">At least five different people privately reported something similar in this ~1 km area at this time of day. It&apos;s shown in fixed words, without counts or exact places, and disappears after five weeks. It isn&apos;t a rating of the area.</p>
                       </details>
                     </li>
                   ))}
                 </ul>
               </section>
             ) : null}
-            {user ? (
-              <section className="mt-5">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">Save this place</h3>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Chip disabled={saving !== null} onClick={() => savePlace("Home", "🏠")}>🏠 Home</Chip>
-                  <Chip disabled={saving !== null} onClick={() => savePlace("College", "🎓")}>🎓 College</Chip>
-                  <Chip disabled={saving !== null} onClick={() => savePlace("Work", "💼")}>💼 Work</Chip>
-                  <Chip disabled={saving !== null} onClick={() => savePlace(dest.name.slice(0, 40), "⭐")}>⭐ Favourite</Chip>
-                </div>
-              </section>
-            ) : null}
-            {chosen?.route.approximate ? (
-              <p className="mt-4 text-xs text-ink-subtle">Walking time is an estimate from a straight line: there&apos;s no street map for this area yet, so lighting and Help Points along the way aren&apos;t known.</p>
-            ) : null}
+            <section className="mt-5">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">Save this place</h3>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Chip disabled={saving !== null} onClick={() => savePlace("Home", "🏠")}>🏠 Home</Chip>
+                <Chip disabled={saving !== null} onClick={() => savePlace("College", "🎓")}>🎓 College</Chip>
+                <Chip disabled={saving !== null} onClick={() => savePlace("Work", "💼")}>💼 Work</Chip>
+                <Chip disabled={saving !== null} onClick={() => savePlace(dest.name.slice(0, 40), "⭐")}>⭐ Favourite</Chip>
+              </div>
+            </section>
           </div>
         ) : (
           <div>
             <h2 className="text-2xl font-extrabold tracking-tight">Where are you going?</h2>
-            <div className="-mx-5 mt-3 flex gap-2 overflow-x-auto px-5 pb-1">
-              {places.map((p) => (
-                <Chip key={p.id} onClick={() => pick({ name: p.label, lat: p.lat, lon: p.lon })}>
-                  {p.emoji} {p.label}
-                </Chip>
-              ))}
-              <Chip onClick={() => (user ? setSearchOpen(true) : setSignIn("Sign in to save places"))} ariaLabel="Add a place">
-                <Icon name="plus" className="size-4" /> {places.length ? "Add" : "Add a place"}
-              </Chip>
-            </div>
+            {/* What MIRA adds to a maps app, said by the product itself: once, quietly, until she has places of her own. */}
+            {places.length ? null : <p className="mt-1 text-sm text-ink-muted">Before you go: the way, its lighting and the Help Points on it. On the way: your people can follow until you arrive.</p>}
             <button type="button" onClick={() => setSearchOpen(true)} className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-full bg-surface px-5 text-left text-lg font-semibold text-ink-subtle shadow-[var(--shadow-card)]">
               <Icon name="know" className="size-5 text-accent" /> Search a place or address
             </button>
+            {places.length ? (
+              <div className="-mx-5 mt-3 flex gap-2 overflow-x-auto px-5 pb-1">
+                {places.map((p) => (
+                  <Chip key={p.id} onClick={() => pick({ name: p.label, lat: p.lat, lon: p.lon })}>
+                    {p.emoji} {p.label}
+                  </Chip>
+                ))}
+                <Chip onClick={() => setSearchOpen(true)} ariaLabel="Add a place">
+                  <Icon name="plus" className="size-4" /> Add
+                </Chip>
+              </div>
+            ) : null}
             <p className="mt-3 text-sm text-ink-muted">{circleLine}</p>
 
             {nudge ? (
@@ -716,7 +785,7 @@ export function HomeScreen({
                               {p.hours ? ` · Listed hours ${p.hours}` : ""}
                             </span>
                           </span>
-                          <span className="text-sm text-ink-subtle">{p.distanceM !== undefined ? fmtM(p.distanceM) : ""}</span>
+                          <span className="text-sm text-ink-subtle">{p.distanceM !== undefined ? formatDistance(p.distanceM, units) : ""}</span>
                         </button>
                       </li>
                     ))}

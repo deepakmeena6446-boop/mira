@@ -7,6 +7,8 @@ import { Icon } from "@/components/ui/Icon";
 import { api } from "@/lib/api-client";
 import type { SavedPlace } from "@/server/account/places";
 import { kindEmoji } from "./kinds";
+import { distanceUnits, formatDistance } from "@/domain/travel-mode";
+import { useCountry } from "@/lib/locale-store";
 
 export interface Destination {
   name: string;
@@ -24,10 +26,6 @@ interface Hit {
   distanceM?: number;
 }
 
-function fmtDistance(m?: number) {
-  if (m === undefined) return "";
-  return m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
-}
 
 /** Full-screen "Where to?" search: saved places first, then place results, or drop a pin. */
 export function SearchOverlay({
@@ -49,6 +47,7 @@ export function SearchOverlay({
   near: { lat: number; lon: number } | null;
 }) {
   const [q, setQ] = useState("");
+  const units = distanceUnits(useCountry().iso);
   const [hits, setHits] = useState<Hit[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -144,7 +143,7 @@ export function SearchOverlay({
                         <span className="block truncate font-bold text-mixed">{h.name}</span>
                         <span className="block text-sm text-ink-muted">{h.kind}</span>
                       </span>
-                      <span className="text-sm text-ink-subtle">{fmtDistance(h.distanceM)}</span>
+                      <span className="text-sm text-ink-subtle">{h.distanceM === undefined ? "" : formatDistance(h.distanceM, units)}</span>
                     </button>
                   </li>
                 ))}
