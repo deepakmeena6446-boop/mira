@@ -13,6 +13,8 @@ import { shareTargets } from "@/server/account/contacts";
 import { tooMany } from "@/server/http/errors";
 import { checkOnMeEmail, tripSharedEmail } from "@/server/mail/templates";
 import type { User } from "@/server/session/user";
+import { hourIn, isValidTimeZone } from "@/lib/time";
+import { onTripArrived } from "@/server/trips/on-arrival";
 
 export const ARRIVAL_RADIUS_M = 75;
 export const ARRIVAL_DWELL_MS = 45_000;
@@ -36,6 +38,19 @@ export const startTripSchema = z
     /** Auto/cab, metro/bus or other: MIRA can't estimate those, so she gives the ETA. */
     mode: z.enum(JOURNEY_MODES).default("walk"),
     etaMinutes: z.number().int().min(5).max(235).optional(),
+    /**
+     * Her phone's IANA time zone, so emails and the live link show times in her local time.
+     * An unknown zone never blocks a journey: it's dropped and times are shown in UTC, labelled.
+     */
+    tz: z
+      .string()
+      .max(64)
+      .optional()
+      .transform((v) => (isValidTimeZone(v) ? v : undefined)),
+    /** The destination is one of her saved places (must be hers). Enables habit learning on arrival. */
+    savedPlaceId: z.guid().optional(),
+    /** Local start hour on her phone (0–23), for habits. Derived from `tz` when omitted. */
+    startHour: z.number().int().min(0).max(23).optional(),
   })
   .strict()
   .refine((v) => (v.mode === "walk" && v.to) || v.etaMinutes !== undefined, { message: "Choose when you expect to arrive.", path: ["etaMinutes"] });
@@ -85,6 +100,9 @@ export interface TripView {
   lastLocation: { lat: number; lon: number; at: string } | null;
   closedAt: string | null;
   purgeAt: string | null;
+  /** Her phone's time zone at start (null: unknown, times shown in UTC). */
+  tz: string | null;
+  createdAt: string;
 }
 
 type Row = {
@@ -104,6 +122,8 @@ type Row = {
   mode: JourneyMode;
   auto_arrival: boolean;
   check_requested_at: Date | null;
+  tz: string | null;
+  created_at: Date;
 };
 
 async function toView(sql: postgres.Sql, r: Row, now: Date): Promise<TripView> {
@@ -130,10 +150,12 @@ async function toView(sql: postgres.Sql, r: Row, now: Date): Promise<TripView> {
     mode: r.mode,
     autoArrival: r.auto_arrival,
     checkRequestedAt: r.check_requested_at ? new Date(r.check_requested_at).toISOString() : null,
+    tz: r.tz,
+    createdAt: new Date(r.created_at).toISOString(),
   };
 }
 
-const COLS = "id, state, dest_lat, dest_lon, dest_name, eta_at, route_meters, extended, alert_state, alert_claimed_at, share_token_enc, closed_at, purge_at, mode, auto_arrival, check_requested_at";
+const COLS = "id, state, dest_lat, dest_lon, dest_name, eta_at, route_meters, extended, alert_state, alert_claimed_at, share_token_enc, closed_at, purge_at, mode, auto_arrival, check_requested_at, tz, created_at";
 
 export async function startTrip(sql: postgres.Sql, user: User, input: z.infer<typeof startTripSchema>, clock: Clock): Promise<TripView> {
   const now = clock.now();
@@ -153,6 +175,15 @@ export async function startTrip(sql: postgres.Sql, user: User, input: z.infer<ty
     const err = validateNewEta(now, eta);
     if (err) throw new ApiError(400, "invalid_eta", err);
   }
+  // A saved place must be hers. One that was deleted meanwhile (another tab) just isn't linked.
+  let savedPlaceId: string | null = null;
+  if (input.savedPlaceId) {
+    const [p] = await sql<{ user_id: string }[]>`SELECT user_id FROM saved_places WHERE id = ${input.savedPlaceId}`;
+    if (p && p.user_id !== user.id) throw new ApiError(400, "unknown_saved_place", "That isn't one of your saved places.", { fields: ["savedPlaceId"] });
+    if (p) savedPlaceId = input.savedPlaceId;
+  }
+  const tz = input.tz ?? null;
+  const startHour = input.startHour ?? (tz ? hourIn(now, tz) : null);
   const ownerToken = randomToken(24); // the traveller's own "Share link" (they choose who gets it)
   let created: { row: Row; links: Array<{ contactId: string; name: string; email: string; token: string }> };
   try {
@@ -160,10 +191,11 @@ export async function startTrip(sql: postgres.Sql, user: User, input: z.infer<ty
     created = await sql.begin(async (tx) => {
       const [row] = await tx<Row[]>`
         INSERT INTO journeys (owner_actor_hash, idempotency_key, user_id, destination_label_enc, dest_lat, dest_lon, dest_name, route_meters,
-                              eta_at, created_at, share_token_hash, share_token_enc, contact_state, last_location_at, mode, auto_arrival)
+                              eta_at, created_at, share_token_hash, share_token_enc, contact_state, last_location_at, mode, auto_arrival,
+                              tz, saved_place_id, start_hour)
         VALUES (${tripOwnerHash(user.id)}, ${randomToken(12)}, ${user.id}, ${encryptText(to.name, "journey_destination")}, ${to.lat}, ${to.lon},
                 ${to.name}, ${routeMeters}, ${eta}, ${now}, ${hashToken("invite", `trip:${ownerToken}`)}, ${encryptText(ownerToken, "share_token")}, 'none', ${now},
-                ${input.mode}, ${Boolean(input.to)})
+                ${input.mode}, ${Boolean(input.to)}, ${tz}, ${savedPlaceId}, ${startHour})
         RETURNING ${sql.unsafe(COLS)}`;
       await tx`INSERT INTO trip_locations (journey_id, lat, lon, at) VALUES (${row.id}, ${input.from.lat}, ${input.from.lon}, ${now})`;
       const targets = input.share ? await shareTargets(tx as unknown as postgres.Sql, user.id) : [];
@@ -185,7 +217,7 @@ export async function startTrip(sql: postgres.Sql, user: User, input: z.infer<ty
   const minutesToEta = Math.round((eta.getTime() - now.getTime()) / 60_000);
   await Promise.all(
     created.links.map(async (l) => {
-      const mail = tripSharedEmail({ contactName: l.name, ownerName: user.name.split(" ")[0], destination: input.to?.name ?? "where they are", minutesToEta, liveUrl: new URL(`/t/${l.token}`, getEnv().APP_BASE_URL).toString(), mode: input.to ? input.mode : "other" });
+      const mail = tripSharedEmail({ contactName: l.name, ownerName: user.name.split(" ")[0], destination: input.to?.name ?? "where they are", minutesToEta, etaAt: eta, tz, liveUrl: new URL(`/t/${l.token}`, getEnv().APP_BASE_URL).toString(), mode: input.to ? input.mode : "other" });
       const sent = await emailContact(l.email, mail.subject, mail.text).catch(() => ({ ok: false }));
       if (sent.ok) await sql`UPDATE trip_contacts SET notified_at = now() WHERE journey_id = ${created.row.id} AND contact_id = ${l.contactId}`;
     }),
@@ -259,7 +291,7 @@ export async function tripById(sql: postgres.Sql, userId: string, id: string, no
 /** Record a live point; auto-arrive after dwelling near the destination. */
 export async function addLocation(sql: postgres.Sql, userId: string, id: string, p: { lat: number; lon: number; accuracy?: number }, clock: Clock): Promise<{ arrived: boolean }> {
   const now = clock.now();
-  return sql.begin(async (tx) => {
+  const result = await sql.begin(async (tx) => {
     const [j] = await tx<{ state: JourneyState; dest_lat: number; dest_lon: number; near_dest_since: Date | null; auto_arrival: boolean }[]>`
       SELECT state, dest_lat, dest_lon, near_dest_since, auto_arrival FROM journeys WHERE id = ${id} AND user_id = ${userId} FOR UPDATE`;
     if (!j) throw notFound("Trip not found.");
@@ -282,6 +314,8 @@ export async function addLocation(sql: postgres.Sql, userId: string, id: string,
     await tx`UPDATE journeys SET last_location_at = ${now}, near_dest_since = ${near ? (j.near_dest_since ?? now) : null} WHERE id = ${id}`;
     return { arrived: false };
   });
+  if (result.arrived) await onTripArrived(sql, id, now); // after commit: best-effort, never undoes the arrival
+  return result;
 }
 
 /**
@@ -293,12 +327,12 @@ export async function addLocation(sql: postgres.Sql, userId: string, id: string,
 export async function sharedTrip(sql: postgres.Sql, token: string, now: Date) {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return null;
   const hash = hashToken("invite", `trip:${token}`);
-  type J = { id: string; state: JourneyState; dest_name: string; dest_lat: number; dest_lon: number; eta_at: Date; closed_at: Date | null; name: string; via_contact: boolean; mode: JourneyMode; auto_arrival: boolean; check_requested_at: Date | null };
+  type J = { id: string; state: JourneyState; dest_name: string; dest_lat: number; dest_lon: number; eta_at: Date; closed_at: Date | null; name: string; via_contact: boolean; mode: JourneyMode; auto_arrival: boolean; check_requested_at: Date | null; tz: string | null };
   const [j] = await sql<J[]>`
-    SELECT j.id, j.state, j.dest_name, j.dest_lat, j.dest_lon, j.eta_at, j.closed_at, u.name, false AS via_contact, j.mode, j.auto_arrival, j.check_requested_at
+    SELECT j.id, j.state, j.dest_name, j.dest_lat, j.dest_lon, j.eta_at, j.closed_at, u.name, false AS via_contact, j.mode, j.auto_arrival, j.check_requested_at, j.tz
     FROM journeys j JOIN users u ON u.id = j.user_id WHERE j.share_token_hash = ${hash}
     UNION ALL
-    SELECT j.id, j.state, j.dest_name, j.dest_lat, j.dest_lon, j.eta_at, j.closed_at, u.name, true AS via_contact, j.mode, j.auto_arrival, j.check_requested_at
+    SELECT j.id, j.state, j.dest_name, j.dest_lat, j.dest_lon, j.eta_at, j.closed_at, u.name, true AS via_contact, j.mode, j.auto_arrival, j.check_requested_at, j.tz
     FROM trip_contacts tc JOIN journeys j ON j.id = tc.journey_id JOIN users u ON u.id = j.user_id
     JOIN contacts c ON c.id = tc.contact_id AND c.accepted_at IS NOT NULL
     WHERE tc.share_token_hash = ${hash}
@@ -317,6 +351,8 @@ export async function sharedTrip(sql: postgres.Sql, token: string, now: Date) {
     destination: j.dest_name,
     dest: { lat: j.dest_lat, lon: j.dest_lon },
     etaAt: new Date(j.eta_at).toISOString(),
+    /** The traveller's time zone (IANA), so the ETA is shown in her local time with its label. Null: unknown (shown in UTC). */
+    tz: j.tz,
     /** Trusted contacts get the missed-arrival email; people the traveller shared the link with directly don't. */
     alertsViewer: j.via_contact,
     /** walk / ride / transit / other, or "here" when she's sharing where she is (no destination). */
@@ -324,5 +360,53 @@ export async function sharedTrip(sql: postgres.Sql, token: string, now: Date) {
     /** She tapped "Tell my people now" in the last 30 minutes. */
     checkRequested: Boolean(j.check_requested_at && now.getTime() - new Date(j.check_requested_at).getTime() < 30 * 60_000),
     location: loc ? { lat: loc.lat, lon: loc.lon, at: new Date(loc.at).toISOString(), ageSeconds: Math.round((now.getTime() - new Date(loc.at).getTime()) / 1000) } : null,
+  };
+}
+
+/** How long a finished journey can be listed in Trips: never longer than the journey itself exists (purged ≤ 24 h after closing). */
+export const RECENT_TRIPS_MS = 24 * 3600_000;
+
+export interface TripSummary {
+  id: string;
+  state: JourneyState;
+  destination: string;
+  mode: JourneyMode;
+  autoArrival: boolean;
+  createdAt: string;
+  closedAt: string;
+  tz: string | null;
+  /** First names of the people it was shared with (whose link was delivered). */
+  sharedWith: string[];
+}
+
+/**
+ * The TRIPS tab: the open journey (if any), then journeys that closed in the last day and
+ * haven't been purged yet. No coordinates, no route, no map: just what she needs to recall
+ * "did I tell them I arrived?". Nothing older exists — journeys are deleted after closing.
+ */
+export async function tripsOverview(sql: postgres.Sql, userId: string, now: Date): Promise<{ active: TripView | null; recent: TripSummary[] }> {
+  const [open] = await sql<Row[]>`
+    SELECT ${sql.unsafe(COLS)} FROM journeys WHERE user_id = ${userId} AND state IN ('active', 'missed') ORDER BY created_at DESC LIMIT 1`;
+  const recent = await sql<{ id: string; state: JourneyState; dest_name: string; mode: JourneyMode; auto_arrival: boolean; created_at: Date; closed_at: Date; tz: string | null; shared: string[] | null }[]>`
+    SELECT j.id, j.state, j.dest_name, j.mode, j.auto_arrival, j.created_at, j.closed_at, j.tz,
+           (SELECT array_agg(c.name ORDER BY c.name) FROM trip_contacts tc JOIN contacts c ON c.id = tc.contact_id
+             WHERE tc.journey_id = j.id AND tc.notified_at IS NOT NULL) AS shared
+    FROM journeys j
+    WHERE j.user_id = ${userId} AND j.state NOT IN ('active', 'missed')
+      AND j.closed_at > ${new Date(now.getTime() - RECENT_TRIPS_MS)} AND (j.purge_at IS NULL OR j.purge_at > ${now})
+    ORDER BY j.closed_at DESC LIMIT 20`;
+  return {
+    active: open ? await toView(sql, open, now) : null,
+    recent: recent.map((r) => ({
+      id: r.id,
+      state: r.state,
+      destination: r.dest_name,
+      mode: r.mode,
+      autoArrival: r.auto_arrival,
+      createdAt: new Date(r.created_at).toISOString(),
+      closedAt: new Date(r.closed_at).toISOString(),
+      tz: r.tz,
+      sharedWith: (r.shared ?? []).map((n) => n.split(" ")[0]),
+    })),
   };
 }

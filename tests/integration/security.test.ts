@@ -53,6 +53,8 @@ const PUBLIC_KEYS = new Set([
   "locale", "iso", "emergency", "number", "confirmed", "helplines", "timezone",
   // The live view: how they're travelling and whether they asked to be checked on (no location history).
   "mode", "checkRequested",
+  // The traveller's IANA time zone, so the viewer shows the ETA in her local time, labelled (no place, no person).
+  "tz",
 ]);
 
 describe("privacy red-line audit", () => {

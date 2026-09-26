@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { WorldMap } from "@/components/map/WorldMap";
 import { MiraOrb } from "@/components/app/MiraOrb";
 import { Avatar } from "@/components/app/Avatar";
-import { useClock } from "@/lib/location-store";
-import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
+import { cx } from "@/components/ui/cx";
+import { useClock } from "@/lib/location-store";
+import { formatPlaceTime } from "@/lib/time";
+import { modeWords } from "@/domain/travel-prefs";
 
 export interface SharedTrip {
   state: string;
@@ -14,6 +17,8 @@ export interface SharedTrip {
   destination?: string;
   dest?: { lat: number; lon: number };
   etaAt?: string;
+  /** The traveller's IANA time zone (null: unknown, times shown in UTC). */
+  tz?: string | null;
   /** True for trusted contacts (they get the missed-arrival email); false for a link shared directly. */
   alertsViewer?: boolean;
   location?: { lat: number; lon: number; at: string; ageSeconds: number } | null;
@@ -23,9 +28,13 @@ export interface SharedTrip {
   checkRequested?: boolean;
 }
 
-const VERB: Record<string, string> = { walk: "is walking to", ride: "is on the way by auto or cab to", transit: "is on the way by metro or bus to", other: "is on the way to" };
+/** "is walking to", "is on the way by public transport to" — never assumes walking. */
+function verb(mode: string | undefined): string {
+  if (mode === "walk") return "is walking to";
+  const phrase = modeWords(mode).phrase;
+  return phrase ? `is on the way ${phrase} to` : "is on the way to";
+}
 
-const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 function ago(s: number) {
   if (s < 60) return "just now";
   const m = Math.round(s / 60);
@@ -34,7 +43,11 @@ function ago(s: number) {
 
 const POLL_MS = 15_000;
 
-/** What someone holding the live link sees: live dot + ETA while the trip is open, then only "arrived/ended". */
+/**
+ * What someone holding the live link sees — no account, ever. While the trip is open: first
+ * name, how they're travelling, ETA in the TRAVELLER's local time (with its zone label), their
+ * latest point only and how fresh it is. After it closes: only "arrived/ended", then nothing.
+ */
 export function SharedTripView({ token, initial, tiles }: { token: string; initial: SharedTrip; tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null } }) {
   const [trip, setTrip] = useState(initial);
   const [pollFailedAt, setPollFailedAt] = useState<number | null>(null);
@@ -67,13 +80,15 @@ export function SharedTripView({ token, initial, tiles }: { token: string; initi
       <main className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 text-center">
         <MiraOrb size={72} />
         <h1 className="mt-5 text-2xl font-extrabold">{gone ? "This trip link has ended" : trip.state === "arrived" ? `${trip.name} arrived 🎉` : `${trip.name}'s trip has ended`}</h1>
-        <p className="mt-2 max-w-sm text-ink-muted">Live sharing is off. MIRA doesn&apos;t keep a record of the trip.</p>
-        {/* The viewer → user loop: one quiet line, no tracking parameters. */}
+        <p className="mt-2 max-w-sm text-ink-muted">
+Live sharing is off. MIRA doesn&apos;t keep a record of the trip.
+        </p>
+        {/* The viewer → user loop: one quiet card, no referral ids, no tracking parameters. */}
         <div className="mt-8 w-full max-w-sm rounded-3xl bg-surface p-5 text-left shadow-[var(--shadow-card)]">
           <p className="font-bold">Want MIRA with you on your journeys?</p>
-          <p className="mt-1 text-sm text-ink-muted">See what&apos;s known about the way before you go, share your walk in one tap, and it ends itself when you arrive.</p>
+          <p className="mt-1 text-sm text-ink-muted">See what&apos;s known about the way before you go, share your journey in one tap, and it ends by itself when you arrive. No account needed to follow someone.</p>
           <Link href="/" className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-accent-soft px-4 text-sm font-bold text-accent-strong">
-            Get MIRA <Icon name="arrow" className="size-4" />
+            Try MIRA <Icon name="arrow" className="size-4" />
           </Link>
         </div>
       </main>
@@ -83,17 +98,22 @@ export function SharedTripView({ token, initial, tiles }: { token: string; initi
   const me = trip.location ? { lat: trip.location.lat, lon: trip.location.lon } : null;
   const age = trip.location ? (now ? Math.max(0, Math.round((now.getTime() - new Date(trip.location.at).getTime()) / 1000)) : trip.location.ageSeconds) : null;
   const polledFailed = pollFailedAt !== null;
+  const checkOn = trip.state === "missed" || Boolean(trip.checkRequested);
+  const here = trip.mode === "here";
   return (
     <main className="fixed inset-0">
-      <WorldMap tiles={tiles} me={me} dest={trip.dest ?? null} follow label={`Live location of ${trip.name}`} padding={{ top: 80, bottom: 300, left: 40, right: 40 }} />
+      <WorldMap tiles={tiles} me={me} dest={trip.dest ?? null} follow label={`Live location of ${trip.name}`} padding={{ top: 80, bottom: 320, left: 40, right: 40 }} />
       <section className="glass absolute inset-x-0 bottom-0 z-20 mx-auto max-w-xl rounded-t-[2rem] border border-glass-edge p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)]">
-        <div className="flex items-center gap-3">
+        <p className={cx("inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-extrabold uppercase tracking-wider", checkOn ? "bg-warm-soft text-warm" : "bg-accent-soft text-accent-strong")}>
+          {checkOn ? "Check on them" : here ? "Sharing where they are" : "On the way"}
+        </p>
+        <div className="mt-3 flex items-center gap-3">
           <Avatar name={trip.name} size={48} />
           <div className="min-w-0">
-            <h1 className="text-xl font-extrabold">{trip.mode === "here" ? `${trip.name} is sharing where they are` : `${trip.name} ${VERB[trip.mode ?? "walk"] ?? VERB.walk} ${trip.destination}`}</h1>
-            {/* Times render after mount: the server doesn't know the viewer's time zone. */}
+            <h1 className="text-xl font-extrabold">{here ? `${trip.name} is sharing where they are` : `${trip.name} ${verb(trip.mode)} ${trip.destination}`}</h1>
+            {/* The ETA is in the traveller's own time zone, labelled, so it reads the same for every viewer. */}
             <p className="text-ink-muted">
-              {now && trip.etaAt ? `Expected by ${time(trip.etaAt)}` : ""}
+              {trip.etaAt ? `${here ? "Sharing until" : "Expected by"} ${formatPlaceTime(trip.etaAt, trip.tz ?? null)}` : ""}
               {age !== null ? ` · updated ${ago(age)}` : ""}
             </p>
           </div>
@@ -119,7 +139,7 @@ export function SharedTripView({ token, initial, tiles }: { token: string; initi
           </p>
         ) : null}
         <p className="mt-4 flex items-center gap-2 text-xs text-ink-subtle">
-          <MiraOrb size={18} calm /> Shared privately with you on MIRA. This link stops working shortly after the trip ends.
+          <MiraOrb size={18} calm /> Shared privately with you on MIRA. Only their latest spot is shown, and this link stops working shortly after the trip ends.
         </p>
       </section>
     </main>

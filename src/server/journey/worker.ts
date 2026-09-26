@@ -77,8 +77,8 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
   for (const { id } of due) {
     try {
       const pending = await sql.begin(async (tx) => {
-        const [j] = await tx<{ id: string; state: JourneyState; eta_at: Date; contact_state: string; place_id: string | null; dest_name: string | null; user_id: string | null }[]>`
-          SELECT id, state, eta_at, contact_state, place_id, dest_name, user_id FROM journeys WHERE id = ${id} FOR UPDATE SKIP LOCKED`;
+        const [j] = await tx<{ id: string; state: JourneyState; eta_at: Date; contact_state: string; place_id: string | null; dest_name: string | null; user_id: string | null; tz: string | null }[]>`
+          SELECT id, state, eta_at, contact_state, place_id, dest_name, user_id, tz FROM journeys WHERE id = ${id} FOR UPDATE SKIP LOCKED`;
         if (!j) return null; // taken by a user action right now, or gone
 
         if (j.state === "active" && dueTransition({ state: j.state, etaAt: new Date(j.eta_at) }, now) === "miss") {
@@ -125,8 +125,8 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
             sends: contacts.map((c) => ({
               email: decryptText(c.encrypted_email, "contact_email"),
               message: j.user_id
-                ? tripMissedEmail({ ownerName: owner, destination: j.dest_name ?? "their destination", minutesLate, liveUrl: liveUrl(c.share_token_enc) })
-                : missedAlertEmail({ etaAt: new Date(j.eta_at), placeName }),
+                ? tripMissedEmail({ ownerName: owner, destination: j.dest_name ?? "their destination", minutesLate, liveUrl: liveUrl(c.share_token_enc), etaAt: new Date(j.eta_at), tz: j.tz })
+                : missedAlertEmail({ etaAt: new Date(j.eta_at), placeName, tz: j.tz }),
             })),
           } satisfies PendingAlert;
         }

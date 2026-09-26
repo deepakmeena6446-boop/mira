@@ -69,7 +69,7 @@ test.describe("Journeys that aren't walks", () => {
     await expect(page.getByText(/expected in 45 min/)).toBeVisible();
     await page.getByRole("button", { name: /Start with MIRA/ }).click();
     await page.waitForURL("**/trip");
-    await expect(page.getByRole("heading", { name: /by auto or cab/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /by car or taxi/ })).toBeVisible();
     const [trip] = await db`SELECT mode, eta_at, created_at FROM journeys ORDER BY created_at DESC LIMIT 1`;
     expect(trip.mode).toBe("ride");
     expect(Math.round((new Date(trip.eta_at).getTime() - new Date(trip.created_at).getTime()) / 60_000)).toBe(45);

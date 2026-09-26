@@ -5,7 +5,7 @@ import { viewInvite } from "@/server/journey/invites";
 import { contactInviteView } from "@/server/account/contacts";
 import { Avatar } from "@/components/app/Avatar";
 import { inviteCookieName } from "@/server/journey/invite-cookie";
-import { formatIstDateTime } from "@/lib/time";
+import { formatPlaceDateTime } from "@/lib/time";
 import { AcceptButton } from "./AcceptButton";
 
 export const dynamic = "force-dynamic";
@@ -61,11 +61,11 @@ export default async function InvitePage() {
       <p className="text-ink-muted">Someone asked MIRA to email you if they don&apos;t check in after a planned trip.</p>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-[var(--radius-control)] bg-sunken p-4">
         <dt className="text-ink-muted">Planned arrival</dt>
-        <dd className="font-medium">{formatIstDateTime(invite.etaAt!)}</dd>
+        <dd className="font-medium">{formatPlaceDateTime(invite.etaAt!, invite.tz ?? null)}</dd>
         <dt className="text-ink-muted">Destination</dt>
         <dd className="font-medium">{invite.placeName ?? "Planned destination"}</dd>
         <dt className="text-ink-muted">Invitation ends</dt>
-        <dd className="font-medium">When the journey ends — at the latest {formatIstDateTime(invite.expiresAt!)}</dd>
+        <dd className="font-medium">When the journey ends — at the latest {formatPlaceDateTime(invite.expiresAt!, invite.tz ?? null)}</dd>
       </dl>
       <div>
         <h2 className="font-semibold">What accepting means</h2>
