@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { EMERGENCY_NUMBER, emergencyHref } from "@/domain/emergency";
 import { useRouter } from "next/navigation";
 import { MiraOrb } from "@/components/app/MiraOrb";
 import { Button } from "@/components/ui/Button";
@@ -92,8 +93,8 @@ export function ReportScreen({ preset }: { preset: Category | null }) {
         </p>
         <p className="mt-2 max-w-sm text-sm text-ink-muted">
           If you&apos;re in danger right now,{" "}
-          <a href="tel:112" className="font-bold text-ink underline">
-            call 112
+          <a href={emergencyHref()} className="font-bold text-ink underline">
+            call {EMERGENCY_NUMBER}
           </a>{" "}
           or your local emergency number.
         </p>

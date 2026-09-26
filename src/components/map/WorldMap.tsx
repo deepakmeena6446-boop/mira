@@ -337,6 +337,16 @@ export function WorldMap({
     };
   }, [me?.lat, me?.lon, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The panels over the map, as the map's own padding: centring and fitting then happen in the
+  // visible part. Set once here, never per camera call — MapLibre adds a call's padding on top
+  // of the map's, which made route fits fail silently on a phone-sized screen.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    map.setPadding(padding);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, padding.top, padding.bottom, padding.left, padding.right]);
+
   // Camera: fit the route or follow the user — but never fight someone exploring the map.
   const destKey = dest ? `${dest.lat},${dest.lon}` : "";
   const lastDestKey = useRef(destKey);
@@ -352,17 +362,17 @@ export function WorldMap({
     if (coords.length > 1) {
       const lons = coords.map((c) => c[0]);
       const lats = coords.map((c) => c[1]);
-      map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding, maxZoom: 17, duration: 700 });
+      map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { maxZoom: 17, duration: 700 });
     } else if (dest) {
-      map.easeTo({ center: [dest.lon, dest.lat], zoom: 16, duration: 700, padding });
+      map.easeTo({ center: [dest.lon, dest.lat], zoom: 16, duration: 700 });
     } else if (me && follow && places.length) {
       // Frame you + the closest pins, so "around you" is visible on the map, not just in the list.
       const pts = [me, ...places.slice(0, LABELLED_PINS)];
       const lons = pts.map((p) => p.lon);
       const lats = pts.map((p) => p.lat);
-      map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding, maxZoom: 16, duration: 700 });
+      map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { maxZoom: 16, duration: 700 });
     } else if (me && follow) {
-      map.easeTo({ center: [me.lon, me.lat], zoom: Math.max(map.getZoom(), 15), duration: 700, padding });
+      map.easeTo({ center: [me.lon, me.lat], zoom: Math.max(map.getZoom(), 15), duration: 700 });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.lat, me?.lon, destKey, route, ready, follow, placesKey]);
@@ -372,7 +382,7 @@ export function WorldMap({
     const map = mapRef.current;
     if (!recenter || !map || !ready || !me) return;
     userMovedRef.current = false;
-    map.easeTo({ center: [me.lon, me.lat], zoom: Math.max(map.getZoom(), 15), duration: 600, padding });
+    map.easeTo({ center: [me.lon, me.lat], zoom: Math.max(map.getZoom(), 15), duration: 600 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recenter]);
 

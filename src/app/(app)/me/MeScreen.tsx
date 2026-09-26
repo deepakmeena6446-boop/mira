@@ -46,11 +46,14 @@ export function MeScreen({
   places: initialPlaces,
   contacts: initialContacts,
   modes,
+  emailAlerts,
 }: {
   user: { id: string; name: string; avatarUrl: string | null } | null;
   places: SavedPlace[];
   contacts: Contact[];
   modes: ProviderModes;
+  /** Whether MIRA can email trusted contacts at all (production SMTP configured). */
+  emailAlerts: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -83,13 +86,6 @@ export function MeScreen({
       </div>
     );
   }
-
-  const demoItems = [
-    modes.auth === "demo" && "sign-in (Google coming)",
-    modes.maps === "placeholder" && "maps & search (Mapbox coming)",
-    modes.companion === "placeholder" && "Mira's brain (Claude coming)",
-    modes.push === "in_app" && "notifications (push coming)",
-  ].filter(Boolean);
 
   const addPlace = async () => {
     setBusy("place");
@@ -135,12 +131,6 @@ export function MeScreen({
           </div>
         </header>
 
-        {demoItems.length ? (
-          <details className="rounded-3xl bg-accent-soft px-5 py-3">
-            <summary className="min-h-11 cursor-pointer py-2 font-bold text-accent-strong">✨ Demo mode</summary>
-            <p className="pb-2 text-sm text-ink-muted">Everything works end to end. These parts use stand-ins until the real services are connected: {demoItems.join(", ")}.</p>
-          </details>
-        ) : null}
 
         <Section
           id="places"
@@ -232,6 +222,11 @@ export function MeScreen({
             )
           }
         >
+          {!emailAlerts ? (
+            <p role="status" className="border-b border-line bg-warm-soft px-5 py-3 text-sm text-ink">
+              Email alerts aren&apos;t switched on in this version yet, so contacts can&apos;t be emailed. Use &ldquo;Send my live link&rdquo; on a journey to share it yourself.
+            </p>
+          ) : null}
           {addingContact ? (
             <form onSubmit={addContact} className="border-b border-line p-5">
               <label className="block text-sm font-bold" htmlFor="c-name">
@@ -242,14 +237,14 @@ export function MeScreen({
                 Email
               </label>
               <input id="c-email" required type="email" inputMode="email" value={cEmail} onChange={(e) => setCEmail(e.target.value)} className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
-              <p className="mt-2 text-sm text-ink-muted">They&apos;ll get a one-time invite. Once they accept, they can follow the trips you choose to share — and nothing else.</p>
+              <p className="mt-2 text-sm text-ink-muted">They get a one-time invite by email. Once they accept, MIRA emails them your live link when you share a journey, and emails them if you don&apos;t arrive — nothing else.</p>
               <Button type="submit" className="mt-4" variant="primary" size="lg" busy={busy === "contact"} busyLabel="Sending invite…" disabled={!cName.trim() || !cEmail.trim()}>
                 Send invite
               </Button>
             </form>
           ) : null}
           {contacts.length === 0 && !addingContact ? (
-            <p className="p-5 text-ink-muted">Add someone you trust. When you share a trip, they can follow along live until you arrive.</p>
+            <p className="p-5 text-ink-muted">Add someone you trust. When you share a journey, they&apos;re emailed your live link, and emailed again if you don&apos;t arrive. Alerts go by email only for now.</p>
           ) : (
             <ul className="divide-y divide-line">
               {contacts.map((c) => (

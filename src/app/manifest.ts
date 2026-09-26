@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "MIRA — your walking companion",
+    name: "MIRA",
     short_name: "MIRA",
-    description: "Share your trip live with people you trust, see what's around, and chat with Mira.",
+    description: "Lighting and Help Points on your route, your journey shared live in one tap, and help close at hand.",
     start_url: "/",
     display: "standalone",
     orientation: "portrait",

@@ -5,6 +5,7 @@ import { getUser } from "@/server/session/user";
 import { listPlaces } from "@/server/account/places";
 import { listContacts } from "@/server/account/contacts";
 import { currentTrip } from "@/server/trips";
+import { smtpConfigured } from "@/server/config/env";
 import { HomeScreen } from "./HomeScreen";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export default async function Home() {
       contacts={contacts}
       trip={trip}
       tiles={await tileConfig()}
+      emailAlerts={smtpConfigured()}
     />
   );
 }

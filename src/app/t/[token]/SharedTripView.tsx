@@ -5,6 +5,8 @@ import { WorldMap } from "@/components/map/WorldMap";
 import { MiraOrb } from "@/components/app/MiraOrb";
 import { Avatar } from "@/components/app/Avatar";
 import { useClock } from "@/lib/location-store";
+import Link from "next/link";
+import { Icon } from "@/components/ui/Icon";
 
 export interface SharedTrip {
   state: string;
@@ -60,6 +62,14 @@ export function SharedTripView({ token, initial, tiles }: { token: string; initi
         <MiraOrb size={72} />
         <h1 className="mt-5 text-2xl font-extrabold">{gone ? "This trip link has ended" : trip.state === "arrived" ? `${trip.name} arrived 🎉` : `${trip.name}'s trip has ended`}</h1>
         <p className="mt-2 max-w-sm text-ink-muted">Live sharing is off. MIRA doesn&apos;t keep a record of the trip.</p>
+        {/* The viewer → user loop: one quiet line, no tracking parameters. */}
+        <div className="mt-8 w-full max-w-sm rounded-3xl bg-surface p-5 text-left shadow-[var(--shadow-card)]">
+          <p className="font-bold">Want MIRA with you on your journeys?</p>
+          <p className="mt-1 text-sm text-ink-muted">See what&apos;s known about the way before you go, share your walk in one tap, and it ends itself when you arrive.</p>
+          <Link href="/" className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-accent-soft px-4 text-sm font-bold text-accent-strong">
+            Get MIRA <Icon name="arrow" className="size-4" />
+          </Link>
+        </div>
       </main>
     );
   }

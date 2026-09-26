@@ -6,7 +6,7 @@ async function shareTrip(browser: Browser, name: string, accept: boolean) {
   const address = await addContact(owner.page, "Didi", "didi");
   const contact = accept ? await acceptContactInvite(browser, address) : null;
   await openRoute(owner.page);
-  await owner.page.getByRole("button", { name: /Share my trip|Start my trip/ }).click();
+  await owner.page.getByRole("button", { name: /Start with MIRA/ }).click();
   await owner.page.waitForURL("**/trip");
   const [row] = await db`SELECT id FROM journeys ORDER BY created_at DESC LIMIT 1`;
   return { owner, contact, address, id: row.id as string };

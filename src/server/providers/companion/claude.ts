@@ -24,6 +24,7 @@ const TOOL_GUIDE = `How you work in the MIRA app:
 - To help someone get somewhere, call propose_trip with a saved place label or a place_ref from find_nearby. Mention who would follow along live.
 - For "what's open / near me" questions, call find_nearby with fitting kinds. Opening hours from map data can be out of date — say so briefly.
 - If someone mentions being followed, threatened, attacked or in danger, call show_emergency_help first, then keep it short and practical.
+- If they feel uneasy, unsure or uncomfortable (not in immediate danger): don't ask a question first. Call find_nearby with kinds [police, health, metro, pharmacy] and, if they have a saved home, propose_trip to it. Then one short, warm line. The app also has an "I feel unsafe" button with the nearest Help Point and Emergency; you can mention it.
 - If someone describes something that happened, you can call offer_report so they can report it privately (reviewed by a person; only shared as combined, anonymous notes).
 - If they have no saved home and want to go home, call suggest_saving_home.
 - Never output coordinates, and don't guess addresses or facts the tools didn't give you.`;
@@ -40,7 +41,7 @@ const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "propose_trip",
-    description: "Propose sharing a walking trip to a destination. Shows a card with a 'Share my trip' button; nothing starts until they tap it. Give exactly one of saved_place (a label from their saved places) or place_ref (from find_nearby).",
+    description: "Propose sharing a walking trip to a destination. Shows a card with a 'Start with MIRA' button; nothing starts until they tap it. Give exactly one of saved_place (a label from their saved places) or place_ref (from find_nearby).",
     input_schema: { type: "object", properties: { saved_place: { type: "string" }, place_ref: { type: "string" } } },
     eager_input_streaming: true,
   },
@@ -175,7 +176,7 @@ export async function* claudeMira(opts: { apiKey: string; message: string; histo
             destination: dest.name,
             walk_minutes: t.minutes,
             contacts_who_would_follow: t.contacts,
-            ...(lighting ? { street_lighting_percent_of_route: lighting, lighting_note: "lit = walkers/OpenStreetMap say lit; poles = streetlights mapped, may not work; dark = reported dark. Mention briefly if useful; never call a route safe or unsafe." } : {}),
+            ...(lighting ? { street_lighting_percent_of_route: lighting, lighting_note: "lit = mapped as lit in OpenStreetMap (or confirmed by MIRA walkers); poles = streetlights mapped, may not work; dark = mapped as unlit or reported dark; unknown = not known. Say 'mapped as lit', mention the unknown share, and never call a route safe or unsafe." } : {}),
             note: "Shown as a card; nothing starts until they tap it.",
           },
           card: { type: "trip", ...t },

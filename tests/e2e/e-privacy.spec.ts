@@ -8,7 +8,7 @@ test.describe("Privacy — links die, strangers see nothing, deletion is real", 
     const address = await addContact(owner.page, "Bhai", "bhai");
     const contact = await acceptContactInvite(browser, address);
     await openRoute(owner.page);
-    await owner.page.getByRole("button", { name: /Share my trip/ }).click();
+    await owner.page.getByRole("button", { name: /Start with MIRA/ }).click();
     await owner.page.waitForURL("**/trip");
     const link = await shareLinkFor(address);
     const [trip] = await db`SELECT id FROM journeys ORDER BY created_at DESC LIMIT 1`;
@@ -23,7 +23,7 @@ test.describe("Privacy — links die, strangers see nothing, deletion is real", 
 
     await owner.page.getByRole("button", { name: "End trip without arriving" }).click();
     await owner.page.getByRole("button", { name: "End trip", exact: true }).click();
-    await expect(owner.page.getByText("Trip ended")).toBeVisible();
+    await expect(owner.page.getByText("Journey ended")).toBeVisible();
     await contact.page.goto(link);
     await expect(contact.page.getByRole("heading", { name: /trip has ended/ })).toBeVisible();
     const ended = await (await contact.page.request.get(`/api/t/${link.split("/t/")[1]}`)).json();

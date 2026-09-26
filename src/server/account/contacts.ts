@@ -67,6 +67,7 @@ export async function addContact(sql: postgres.Sql, userId: string, userName: st
     throw err;
   }
   const link = new URL(`/invite/${token}`, getEnv().APP_BASE_URL).toString();
+  const sender = /<([^>]+)>/.exec(getEnv().SMTP_FROM ?? "")?.[1] ?? getEnv().SMTP_FROM ?? null;
   const sent = await emailContact(
     email,
     // Fixed subject: user-chosen names stay in the body only.
@@ -75,12 +76,13 @@ export async function addContact(sql: postgres.Sql, userId: string, userName: st
       `Hi ${input.name},`,
       "",
       `${userName} would like you to be one of their trusted contacts on MIRA.`,
-      "When they share a trip, you'll get a link to follow along live until they arrive — and a heads-up if they don't check in.",
+      "When they share a journey, MIRA emails you a link to follow along live until they arrive — and emails you if they don't check in.",
       "",
       "Accept here:",
       link,
       "",
-      "You'll only ever see their location while they're actively sharing a trip with you. You can say no by ignoring this email.",
+      ...(sender ? [`So those emails never land in spam, add ${sender} to your contacts.`, ""] : []),
+      "You'll only ever see their location while they're actively sharing a journey with you. You can say no by ignoring this email.",
       "This link works once and expires in 7 days.",
     ].join("\n"),
   );

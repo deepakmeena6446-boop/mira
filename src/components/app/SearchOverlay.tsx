@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useOverlay } from "@/lib/use-overlay";
 import { Icon } from "@/components/ui/Icon";
 import { api } from "@/lib/api-client";
@@ -88,7 +89,8 @@ export function SearchOverlay({
   const savedHits = saved.filter((s) => !term || s.label.toLowerCase().includes(term));
   const showHits = term.length >= 2;
 
-  return (
+  // Portal: above the tab bar (screens are position:fixed, their own stacking context).
+  return createPortal(
     <div role="dialog" aria-modal="true" aria-label="Where to?" className="bg-companion fixed inset-0 z-50 flex flex-col animate-fade">
       <div className="flex items-center gap-2 px-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <button type="button" onClick={onClose} aria-label="Close search" className="grid size-12 shrink-0 place-items-center rounded-full bg-surface shadow-[var(--shadow-card)]">
@@ -172,6 +174,7 @@ export function SearchOverlay({
           </button>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

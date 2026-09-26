@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useOverlay } from "@/lib/use-overlay";
 import { useRouter } from "next/navigation";
 import { MiraOrb } from "./MiraOrb";
@@ -18,7 +19,8 @@ export function SignInSheet({ open, onClose, reason }: { open: boolean; onClose:
   const [error, setError] = useState<string | null>(null);
   useOverlay(open, onClose);
   if (!open) return null;
-  return (
+  // Portal: screens are position:fixed (their own stacking context), and this must sit above the tab bar.
+  return createPortal(
     <div role="dialog" aria-modal="true" aria-labelledby="signin-h" className="fixed inset-0 z-50 flex items-end justify-center bg-[rgb(10_6_24/0.45)] animate-fade sm:items-center" onClick={onClose}>
       <form
         onClick={(e) => e.stopPropagation()}
@@ -58,8 +60,9 @@ export function SignInSheet({ open, onClose, reason }: { open: boolean; onClose:
         <Button type="submit" variant="hero" size="lg" className="mt-5" busy={busy} busyLabel="Setting up…" disabled={!name.trim()}>
           Continue
         </Button>
-        <p className="mt-3 text-center text-xs text-ink-subtle">Google sign-in is coming soon. For now, your name is all I need.</p>
+        <p className="mt-3 text-center text-xs text-ink-subtle">No email or password: your account lives in this browser.</p>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }

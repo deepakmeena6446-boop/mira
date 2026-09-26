@@ -4,6 +4,7 @@ import { getUser } from "@/server/session/user";
 import { listPlaces } from "@/server/account/places";
 import { listContacts } from "@/server/account/contacts";
 import { providerModes } from "@/server/providers/modes";
+import { smtpConfigured } from "@/server/config/env";
 import { MeScreen } from "./MeScreen";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export default async function MePage() {
       places={places}
       contacts={contacts}
       modes={providerModes()}
+      emailAlerts={smtpConfigured()}
     />
   );
 }

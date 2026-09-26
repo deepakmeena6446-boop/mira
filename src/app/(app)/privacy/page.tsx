@@ -3,6 +3,7 @@ import Link from "next/link";
 import { providerModes } from "@/server/providers/modes";
 import { MiraOrb } from "@/components/app/MiraOrb";
 import { Icon } from "@/components/ui/Icon";
+import { EMERGENCY_NUMBER } from "@/domain/emergency";
 
 export const metadata: Metadata = { title: "Privacy" };
 
@@ -55,7 +56,22 @@ export default function PrivacyPage() {
               that, the link shows only that you arrived (for 30 minutes), then nothing. Remove a contact and their link stops working at once.
             </p>
             <p>&ldquo;Share link&rdquo; on the trip screen lets you send a live link to anyone you choose yourself — they can follow until you arrive.</p>
-            <p>If you don&apos;t check in, MIRA emails your contacts once, and again when you arrive. It&apos;s not an emergency service: in danger, call 112 or your local emergency number.</p>
+            <p>
+              If you don&apos;t check in, MIRA emails your trusted contacts once, and again when you arrive. People you sent the link to yourself aren&apos;t emailed. On a
+              journey with no trusted contacts, nobody is alerted. Emails are delivered by MIRA&apos;s email provider.
+            </p>
+            <p>
+              The planned route of a journey stays on your phone (for Help Points ahead and the lighting question), not on MIRA&apos;s server, and is cleared when
+              you&apos;re done.
+            </p>
+          </Item>
+          <Item emoji="📞" title="If you feel unsafe">
+            <p>
+              &ldquo;I feel unsafe&rdquo; and Emergency work on your phone alone: nothing is sent to MIRA or anyone else until you tap an action. Emergency opens your
+              phone&apos;s dialler with {EMERGENCY_NUMBER}; MIRA doesn&apos;t call, dispatch or alert anyone for you. &ldquo;Call someone&rdquo; uses your phone&apos;s
+              contacts or a number you type, and MIRA never sees or keeps it.
+            </p>
+            <p>Help Points are staffed kinds of places (hospitals, police, stations, pharmacies, fuel, hotels) from map data. MIRA can&apos;t confirm they&apos;re open or who&apos;s there.</p>
           </Item>
           <Item emoji="👤" title="Your account">
             <p>
@@ -65,8 +81,9 @@ export default function PrivacyPage() {
           </Item>
           <Item emoji="✨" title="Chatting with Mira">
             <p>
-              Your chat is saved to your account for 30 days so Mira can follow the conversation — without anything about where you were (area names, distances and
-              nearby places are shown to you but not saved). Clear it any time in Me.
+              Your chat is saved to your account for 30 days so Mira can follow the conversation. Mira&apos;s replies are saved without area names, walking times or
+              nearby places. <strong className="text-ink">Your own messages are saved exactly as you typed them</strong>, so don&apos;t type addresses you&apos;d rather not
+              keep. Clear it any time in Me.
             </p>
             <p>
               {providerModes().companion === "claude"
@@ -86,7 +103,7 @@ export default function PrivacyPage() {
             <p>A stretch shows as lit or dark only once at least three different people agree. Answers older than 90 days stop counting and are deleted after 120.</p>
           </Item>
           <Item emoji="🚫" title="What MIRA never does">
-            <p>No ads, no selling data, no public profiles, no &ldquo;safe/unsafe&rdquo; scores or crime maps, and no tracking you didn&apos;t start.</p>
+            <p>No ads, no selling data, no analytics trackers, no public profiles, no &ldquo;safe/unsafe&rdquo; scores or crime maps, and no tracking you didn&apos;t start.</p>
           </Item>
         </ul>
         <p className="mt-6 text-sm text-ink-subtle">

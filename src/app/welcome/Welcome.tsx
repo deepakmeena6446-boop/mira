@@ -19,7 +19,7 @@ function markWelcomed() {
   }
 }
 
-/** Three-step onboarding: meet Mira → location → name. */
+/** Three-step onboarding: the promise → location → name. */
 export function Welcome({ signedIn }: { signedIn: boolean }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -55,18 +55,24 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
   };
 
   const steps = [
-    <div key="mira" className="flex flex-col items-center text-center">
-      <MiraOrb size={120} />
-      <h1 className="mt-8 text-4xl font-extrabold tracking-tight">Hi, I&apos;m Mira</h1>
-      <p className="mt-3 max-w-xs text-lg text-ink-muted">Your walking companion. I help you get where you&apos;re going — and let the people you trust walk with you, live.</p>
+    <div key="promise" className="flex flex-col items-center text-center">
+      <MiraOrb size={72} />
+      <h1 className="mt-7 text-4xl font-extrabold tracking-tight">Walk home. Your people will know.</h1>
+      <p className="mt-3 max-w-xs text-lg text-ink-muted">Know more about the way before you go, share your journey in one tap, and have help close at hand.</p>
       <ul className="mt-8 w-full max-w-xs space-y-3 text-left">
         {[
-          ["🗺️", "See what's around you and along your walk"],
-          ["💜", "Share your trip live in one tap"],
-          ["🤝", "Look out for each other, anonymously"],
-        ].map(([e, t]) => (
-          <li key={t} className="flex items-center gap-3 rounded-2xl bg-surface/80 px-4 py-3 font-semibold shadow-[var(--shadow-card)]">
-            <span className="text-2xl">{e}</span> {t}
+          ["🧭", "Before you go", "How much of the way is mapped as lit, and the Help Points along it"],
+          ["📍", "On the way", "The people you choose see you live until you arrive — then it switches off"],
+          ["📞", "If something feels wrong", "The nearest Help Point, your people, and Emergency 112 — one tap each"],
+        ].map(([e, t, d]) => (
+          <li key={t} className="flex items-start gap-3 rounded-2xl bg-surface/80 px-4 py-3 shadow-[var(--shadow-card)]">
+            <span aria-hidden className="text-2xl">
+              {e}
+            </span>
+            <span>
+              <span className="block font-bold">{t}</span>
+              <span className="block text-sm text-ink-muted">{d}</span>
+            </span>
           </li>
         ))}
       </ul>
@@ -76,13 +82,13 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
         <Icon name="locate" className="size-14" />
       </div>
       <h1 className="mt-8 text-3xl font-extrabold">Where are you?</h1>
-      <p className="mt-3 max-w-xs text-lg text-ink-muted">I use your location to show what&apos;s around and to share trips — only the ones you choose. I never keep a history of where you&apos;ve been.</p>
+      <p className="mt-3 max-w-xs text-lg text-ink-muted">MIRA uses your location to show the way from here, the Help Points near you, and to share the journeys you choose. It never keeps a history of where you&apos;ve been.</p>
       {locMsg ? <p className="mt-4 rounded-2xl bg-surface px-4 py-2 text-sm font-semibold text-ink-muted">{locMsg}</p> : null}
     </div>,
     <div key="name" className="flex w-full flex-col items-center text-center">
       <MiraOrb size={84} />
-      <h1 className="mt-7 text-3xl font-extrabold">What should I call you?</h1>
-      <p className="mt-2 max-w-xs text-ink-muted">So I can remember your places and the people you trust.</p>
+      <h1 className="mt-7 text-3xl font-extrabold">What&apos;s your first name?</h1>
+      <p className="mt-2 max-w-xs text-ink-muted">Your people see this name when you share a journey. No email or password needed.</p>
       <label htmlFor="w-name" className="sr-only">
         Your first name
       </label>
@@ -100,7 +106,6 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
         className="mt-6 w-full max-w-xs min-h-14 rounded-2xl border border-line bg-surface px-5 text-center text-xl font-semibold outline-none focus:border-accent"
       />
       {error ? <p className="mt-2 text-sm font-semibold text-error">{error}</p> : null}
-      <p className="mt-3 text-xs text-ink-subtle">Google sign-in is coming soon.</p>
     </div>,
   ];
 

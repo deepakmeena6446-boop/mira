@@ -9,8 +9,8 @@ import { DaypartSync } from "@/lib/daypart-store";
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "MIRA — your walking companion", template: "%s · MIRA" },
-  description: "Mira helps you get where you're going: see what's around, share your trip live with people you trust, and look out for each other.",
+  title: { default: "MIRA — walk home, your people will know", template: "%s · MIRA" },
+  description: "Know more about the way before you go: lighting and Help Points on your route. Share your journey live in one tap, and have help close at hand.",
   applicationName: "MIRA",
   appleWebApp: { capable: true, title: "MIRA", statusBarStyle: "default" },
   formatDetection: { telephone: false, address: false, email: false },

@@ -5,14 +5,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { WorldMap } from "@/components/map/WorldMap";
 import { BottomSheet, type Snap } from "@/components/app/BottomSheet";
-import { MiraOrb } from "@/components/app/MiraOrb";
 import { Avatar } from "@/components/app/Avatar";
 import { Chip } from "@/components/app/Chip";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { SearchOverlay, type Destination } from "@/components/app/SearchOverlay";
 import { kindEmoji } from "@/components/app/kinds";
 import { LightingSummary } from "@/components/app/LightingSummary";
-import type { RouteLighting } from "@/domain/lighting";
+import { HelpPointList, RouteContextLines } from "@/components/app/HelpPointList";
+import { RouteOptions, type RouteOption } from "@/components/app/RouteOptions";
+import { EmergencyPill } from "@/components/app/EmergencyPill";
+import { UnsafeSheet, type UnsafeShareAction } from "@/components/app/UnsafeSheet";
+import { HELP_CLASSES, dedupeHelpPoints, type HelpPoint } from "@/domain/help-points";
 import { InstallCard } from "@/components/pwa/InstallCard";
 import { useFlag } from "@/lib/flags";
 import { useOverlay } from "@/lib/use-overlay";
@@ -21,6 +24,8 @@ import { cx } from "@/components/ui/cx";
 import { Icon } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api-client";
+import { shareLiveLink } from "@/lib/share";
+import { keepTripRoute } from "@/lib/trip-route";
 import { greetingFor, setArea, setPendingReportSpot, takePendingDestination, useClock, useLocation, watchWhileVisible, type PickedSpot } from "@/lib/location-store";
 import type { SavedPlace } from "@/server/account/places";
 import type { Contact } from "@/server/account/contacts";
@@ -43,14 +48,16 @@ interface Note {
   lat: number;
   lon: number;
 }
-interface RouteInfo {
-  route: { meters: number; minutes: number; geometry: Array<[number, number]>; approximate: boolean };
-  along: Place[];
+interface RouteInfo extends RouteOption {
   notes: Note[];
-  lighting: RouteLighting | null;
+  alternatives: RouteOption[];
 }
 
+/** The greeting card + help row on top, the sheet below: frame the map in what is visible between. */
+const MAP_PADDING = { top: 170, bottom: 360, left: 40, right: 40 };
 const fmtM = (m: number) => (m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`);
+const clock = (d: Date) => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+const names = (list: string[]) => (list.length <= 2 ? list.join(" and ") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`);
 
 export function HomeScreen({
   user,
@@ -58,12 +65,15 @@ export function HomeScreen({
   contacts,
   trip,
   tiles,
+  emailAlerts,
 }: {
   user: { id: string; name: string; avatarUrl: string | null } | null;
   places: SavedPlace[];
   contacts: Contact[];
   trip: TripView | null;
   tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null };
+  /** Whether MIRA can email trusted contacts at all (production SMTP configured). */
+  emailAlerts: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -89,16 +99,21 @@ export function HomeScreen({
   }, [user]);
   const [nearby, setNearby] = useState<{ places: Place[]; notes: Note[] }>({ places: [], notes: [] });
   const [nearbyFailed, setNearbyFailed] = useState(false);
+  const [nearHelp, setNearHelp] = useState<{ key: string; points: HelpPoint[]; failed: boolean } | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [recenter, setRecenter] = useState(0);
   const [places, setPlaces] = useState(initialPlaces);
   const [dest, setDest] = useState<Destination | null>(initialDest);
   const [routed, setRouted] = useState<{ key: string; data: RouteInfo | null } | null>(null);
+  const [option, setOption] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [pinMode, setPinMode] = useState(false);
   const [snap, setSnap] = useState<Snap>(initialDest ? "half" : "peek");
   const [signIn, setSignIn] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [unsafe, setUnsafe] = useState(false);
+  const accepted = contacts.filter((c) => c.status === "accepted" && c.isDefault);
+  const [shareWithCircle, setShareWithCircle] = useState(true);
 
   // First visit: show the short onboarding once (per-device convenience flag only).
   useEffect(() => {
@@ -116,20 +131,22 @@ export function HomeScreen({
   // Locality from the map tiles ("Kamla Nagar"), else the nearest named place we know.
   const area = loc.area ?? poiArea;
 
-  // Where am I + what's around, whenever the position settles.
+  // Where am I, what's around, and the Help Points near me (fetched ahead, so "I feel unsafe" is instant).
   const meKey = me ? `${me.lat.toFixed(3)},${me.lon.toFixed(3)}` : "";
   useEffect(() => {
     if (!me) return;
     let stop = false;
     (async () => {
-      const [r, n] = await Promise.all([
+      const [r, n, h] = await Promise.all([
         api<{ label: string | null }>("/api/geo/reverse", { body: me }),
         api<{ places: Place[]; notes: Note[] }>("/api/geo/nearby", { body: me }),
+        api<{ helpPoints: HelpPoint[] }>("/api/geo/help", { body: me }),
       ]);
       if (stop) return;
       if (r.ok) setPoiArea(r.data.label);
       if (n.ok) setNearby(n.data);
       setNearbyFailed(!n.ok);
+      setNearHelp({ key: meKey, points: h.ok ? h.data.helpPoints : [], failed: !h.ok });
     })();
     return () => {
       stop = true;
@@ -141,10 +158,11 @@ export function HomeScreen({
     setSearchOpen(false);
     setPinMode(false);
     setDest(d);
+    setOption(0);
     setSnap("half");
   }, []);
 
-  // Route for the chosen destination from where I am (derived; refetches if either changes).
+  // Route options for the chosen destination from where I am (derived; refetches if either changes).
   const routeKey = dest && me ? `${dest.lat},${dest.lon}|${meKey}` : null;
   useEffect(() => {
     if (!routeKey || !dest || !me) return;
@@ -159,25 +177,44 @@ export function HomeScreen({
   }, [routeKey]);
   const info = routed && routed.key === routeKey ? routed.data : null;
   const routeLoading = Boolean(routeKey) && routed?.key !== routeKey;
+  const options: RouteOption[] = useMemo(() => (info ? [{ route: info.route, lighting: info.lighting, helpPoints: info.helpPoints ?? [] }, ...(info.alternatives ?? [])] : []), [info]);
+  const chosen = options[Math.min(option, options.length - 1)] ?? null;
 
-  // Pins: what's around you, or what's along the way once a destination is chosen.
+  // Pins: what's around you, or the Help Points along the chosen way once a destination is picked.
   const mapPlaces = useMemo(
-    () => (dest ? (info?.along ?? []) : nearby.places).slice(0, 20).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, emoji: kindEmoji(p.kind) })),
-    [dest, info, nearby.places],
+    () =>
+      dest
+        ? (chosen?.helpPoints ?? []).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, emoji: HELP_CLASSES[p.cls].emoji }))
+        : nearby.places.slice(0, 20).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, emoji: kindEmoji(p.kind) })),
+    [dest, chosen, nearby.places],
   );
   const onPlaceClick = useCallback(
     (p: { name: string; lat: number; lon: number; id: string }) => {
-      const hit = [...nearby.places, ...(info?.along ?? [])].find((x) => x.id === p.id);
-      pick({ name: p.name, lat: p.lat, lon: p.lon, kind: hit?.kind });
+      const hit = nearby.places.find((x) => x.id === p.id);
+      const help = chosen?.helpPoints.find((x) => x.id === p.id);
+      pick({ name: p.name, lat: p.lat, lon: p.lon, kind: hit?.kind ?? (help ? HELP_CLASSES[help.cls].label : undefined) });
     },
-    [nearby.places, info, pick],
+    [nearby.places, chosen, pick],
   );
 
   // Long-press on the map: offer to report or walk to that exact spot.
   const onLongPress = useCallback(async (p: { lat: number; lon: number }) => {
     setPressed({ ...p, name: null });
     setPressArmed(false);
-    setTimeout(() => setPressArmed(true), 450);
+    // Arm the card only once the finger has lifted (plus the browser's delayed synthetic click),
+    // so lifting it can't "ghost tap" whatever button opened under it. Fallback for mouse/right-click.
+    let armed = false;
+    const arm = (delay: number) => {
+      if (armed) return;
+      armed = true;
+      window.removeEventListener("touchend", onLift);
+      window.removeEventListener("pointerup", onLift);
+      setTimeout(() => setPressArmed(true), delay);
+    };
+    const onLift = () => arm(450);
+    window.addEventListener("touchend", onLift, { once: true });
+    window.addEventListener("pointerup", onLift, { once: true });
+    setTimeout(() => arm(0), 1500);
     const r = await api<{ label: string | null }>("/api/geo/reverse", { body: p });
     setPressed((cur) => (cur && cur.lat === p.lat && cur.lon === p.lon ? { ...cur, name: r.ok ? r.data.label : null } : cur));
   }, []);
@@ -191,32 +228,31 @@ export function HomeScreen({
     [pinMode, pick],
   );
 
-  const accepted = contacts.filter((c) => c.status === "accepted" && c.isDefault);
   const home = places.find((p) => /home|hostel|pg/i.test(p.label));
   const g = now ? greetingFor(now) : null;
   const firstName = user?.name.split(" ")[0];
+  const activeTrip = trip && (trip.state === "active" || trip.state === "missed") ? trip : null;
+  const invited = contacts.filter((c) => c.status === "invited");
+  const sharesWithCircle = Boolean(emailAlerts && accepted.length && shareWithCircle);
 
-  const nudge = useMemo(() => {
-    if (trip && (trip.state === "active" || trip.state === "missed")) return null;
-    if (!user) return { text: "Hi, I'm Mira. Tell me where you're headed and I'll help you share the trip with people you trust.", cta: "Get started", action: () => setSignIn("Hi! I'm Mira") };
-    if (g?.late && home && me) return { text: `It's getting late, ${firstName}. Want me to share your walk to ${home.label}?`, cta: `Take me ${home.label === "Home" ? "home" : "to " + home.label}`, action: () => pick({ name: home.label, lat: home.lat, lon: home.lon }) };
-    if (!home) return { text: "Save your home and I can share your walk back in one tap.", cta: "Save a place", action: () => router.push("/me#places") };
-    if (!accepted.length) return { text: "Add someone you trust — they'll be able to follow your trips live when you share.", cta: "Add a contact", action: () => router.push("/me#contacts") };
-    return { text: "Heading somewhere? I'll keep your people in the loop.", cta: "Where to?", action: () => setSearchOpen(true) };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, g?.late, home, me, accepted.length, trip]);
-
-  const startTrip = async () => {
-    if (!user) return setSignIn("Sign in to share your trip");
-    if (!dest || !me || starting) return;
+  /** Start a journey (her tap, always). `to` defaults to the destination on screen. */
+  const startTrip = async (to?: { name: string; lat: number; lon: number }) => {
+    if (!user) return setSignIn("Sign in to start with MIRA");
+    const target = to ?? dest;
+    if (!target || !me || starting) return;
+    const picked = !to && option > 0 ? chosen : null;
     setStarting(true);
-    const res = await api<{ trip: TripView }>("/api/trips", { body: { from: me, to: { lat: dest.lat, lon: dest.lon, name: dest.name.slice(0, 80) }, share: true } });
+    const res = await api<{ trip: TripView }>("/api/trips", {
+      body: { from: me, to: { lat: target.lat, lon: target.lon, name: target.name.slice(0, 80) }, share: sharesWithCircle, ...(picked ? { routeMinutes: picked.route.minutes } : {}) },
+    });
     setStarting(false);
     if (res.ok) {
+      const line = (to ? null : chosen?.route.geometry) ?? null;
+      if (line && line.length > 2) keepTripRoute(res.data.trip.id, line);
       router.push("/trip");
       router.refresh();
     } else if (res.code === "trip_active") {
-      toast(trip ? `You already have a trip to ${trip.destination.name} running — here it is.` : "You already have a trip running — here it is.");
+      toast(trip ? `You already have a journey to ${trip.destination.name} running — here it is.` : "You already have a journey running — here it is.");
       router.push("/trip");
     } else {
       toast(res.message, "error");
@@ -236,23 +272,75 @@ export function HomeScreen({
     } else toast(res.message, "error");
   };
 
-  const activeTrip = trip && (trip.state === "active" || trip.state === "missed") ? trip : null;
+  // "I feel unsafe": the share action depends on what's already known — never asks for anything MIRA has.
+  const unsafeShare: UnsafeShareAction = activeTrip?.shareUrl
+    ? {
+        label: "Send my live link",
+        detail: `Anyone you send it to sees you until you arrive at ${activeTrip.destination.name}.`,
+        onShare: async () => {
+          const r = await shareLiveLink(activeTrip.shareUrl!, activeTrip.destination.name);
+          if (r === "copied") toast("Live link copied — paste it in WhatsApp or a message.");
+          if (r === "failed") toast("Couldn't share the link on this device.", "error");
+        },
+      }
+    : !user
+      ? { label: "Share my journey live", detail: "Sign in with just your first name, then send a live link to anyone.", onShare: () => (setUnsafe(false), setSignIn("Sign in to start with MIRA")) }
+      : dest || home
+        ? {
+            label: `Share my walk to ${dest ? dest.name : home!.label}`,
+            detail: "Starts a live journey now. Then send the link to anyone you choose.",
+            onShare: () => {
+              setUnsafe(false);
+              void startTrip(dest ? undefined : { name: home!.label, lat: home!.lat, lon: home!.lon });
+            },
+          }
+        : { label: "Share my journey live", detail: "Choose where you're going, then send a live link to anyone.", onShare: () => (setUnsafe(false), setSearchOpen(true)) };
+  const unsafeHelp = useMemo(() => dedupeHelpPoints([...(chosen?.helpPoints ?? []), ...(nearHelp?.points ?? [])]), [chosen, nearHelp]);
+
+  const circleLine = !user ? (
+    <>Send a live link to anyone when you start.</>
+  ) : !emailAlerts ? (
+    <>Send a live link to anyone when you start. Email alerts aren&apos;t switched on yet, so nobody is alerted automatically.</>
+  ) : accepted.length ? (
+    <>
+      <Icon name="check" className="mr-1 inline size-4 text-mint" />
+      {names(accepted.map((c) => c.name))} get your live link by email when you share.
+    </>
+  ) : invited.length ? (
+    <>Waiting for {names(invited.map((c) => c.name))} to accept your email invite. Until then, send a live link yourself.</>
+  ) : (
+    <>
+      Send a live link to anyone when you start.{" "}
+      <Link href="/me#contacts" className="font-bold text-accent">
+        Add someone
+      </Link>{" "}
+      to be emailed if you don&apos;t arrive.
+    </>
+  );
+
+  const nudge = useMemo(() => {
+    if (activeTrip || !user) return null;
+    if (g?.late && home && me) return { text: `Heading home, ${firstName}?`, cta: `Take me ${home.label === "Home" ? "home" : "to " + home.label}`, action: () => pick({ name: home.label, lat: home.lat, lon: home.lon }) };
+    if (!home) return { text: "Save Home once, and the walk back is one tap.", cta: "Find it", action: () => setSearchOpen(true) };
+    return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, g?.late, home, me, activeTrip]);
 
   return (
     <div className="fixed inset-0 overflow-hidden">
-      <h1 className="sr-only">MIRA — map and places around you</h1>
-      <WorldMap tiles={tiles} me={me} dest={dest} route={info?.route.geometry ?? null} notes={nearby.notes} places={mapPlaces} recenter={recenter} lighting={info?.lighting?.segments ?? null} onPlaceClick={onPlaceClick} onLongPress={onLongPress} onMapClick={onMapClick} onArea={setArea} label="Map around your location" />
+      <h1 className="sr-only">MIRA — where are you going?</h1>
+      <WorldMap tiles={tiles} me={me} dest={dest} route={chosen?.route.geometry ?? null} notes={nearby.notes} places={mapPlaces} recenter={recenter} lighting={chosen?.lighting?.segments ?? null} onPlaceClick={onPlaceClick} onLongPress={onLongPress} onMapClick={onMapClick} onArea={setArea} label="Map around your location" padding={MAP_PADDING} />
 
-      {/* Top: greeting + search */}
+      {/* Top: greeting, and help that's always one tap away */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.9rem,env(safe-area-inset-top))]">
         <div className="pointer-events-auto mx-auto max-w-xl">
           <div className="glass flex items-center gap-3 rounded-[1.6rem] border border-glass-edge px-4 py-3 shadow-[var(--shadow-card)] animate-rise">
             <div className="min-w-0 flex-1">
               <p className="line-clamp-2 text-[clamp(1rem,4.6vw,1.125rem)] font-extrabold leading-tight">
-                {g ? `${g.hello}${firstName ? `, ${firstName}` : ""} ${g.emoji}` : " "}
+                {g ? `${g.hello}${firstName ? `, ${firstName}` : ""} ${g.emoji}` : " "}
               </p>
               <p className="truncate text-sm text-ink-muted">
-                {now ? now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}
+                {now ? clock(now) : ""}
                 {area ? ` · ${area}` : loc.status === "asking" ? " · Finding you…" : loc.status === "denied" ? " · Location off" : ""}
               </p>
             </div>
@@ -267,22 +355,21 @@ export function HomeScreen({
                 </Link>
               </>
             ) : (
-              <button type="button" onClick={() => setSignIn("Hi! I'm Mira")} className="min-h-11 rounded-full bg-accent px-4 text-sm font-bold text-accent-ink">
+              <button type="button" onClick={() => setSignIn("Let's get you set up")} className="min-h-11 rounded-full bg-accent px-4 text-sm font-bold text-accent-ink">
                 Sign in
               </button>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => setSearchOpen(true)}
-            className="mt-2.5 flex min-h-14 w-full items-center gap-3 rounded-full bg-surface px-5 text-left text-lg font-semibold text-ink-subtle shadow-[var(--shadow-float)] animate-rise"
-          >
-            <Icon name="know" className="size-5 text-accent" /> Where to?
-          </button>
+          <div className="mt-2 flex justify-end gap-2 animate-rise">
+            <button type="button" onClick={() => setUnsafe(true)} className="min-h-11 rounded-full bg-surface px-4 text-sm font-extrabold text-accent-strong shadow-[var(--shadow-card)]">
+              I feel unsafe
+            </button>
+            <EmergencyPill />
+          </div>
           {loc.status === "denied" || loc.status === "unavailable" ? (
             <button type="button" onClick={() => loc.request()} className="mt-2 w-full rounded-2xl bg-warm-soft px-4 py-2.5 text-left text-sm font-semibold text-warm">
               {loc.status === "denied"
-                ? "Location is blocked for MIRA. Allow it in your browser's site settings (the icon next to the address), then tap here."
+                ? "Location is off for MIRA, so it can't show the way from here or Help Points near you. Allow it in your browser's site settings (the icon next to the address), then tap here. Search still works."
                 : "Can't find you right now → Tap to try again"}
             </button>
           ) : null}
@@ -348,7 +435,7 @@ export function HomeScreen({
         </button>
       ) : null}
 
-      <BottomSheet snap={snap} onSnap={setSnap} label={dest ? `Route to ${dest.name}` : "Around you"}>
+      <BottomSheet snap={snap} onSnap={setSnap} label={dest ? `Route to ${dest.name}` : "Where are you going?"}>
         {activeTrip ? (
           <Link href="/trip" className="mb-4 flex items-center gap-3 rounded-3xl bg-mira p-4 text-white shadow-[var(--shadow-float)]">
             <span className="relative flex size-3">
@@ -356,10 +443,10 @@ export function HomeScreen({
               <span className="relative inline-flex size-3 rounded-full bg-white" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block font-extrabold">{activeTrip.state === "missed" ? "Are you okay?" : `Sharing your trip to ${activeTrip.destination.name}`}</span>
+              <span className="block font-extrabold">{activeTrip.state === "missed" ? "Are you okay?" : `On your way to ${activeTrip.destination.name}`}</span>
               <span className="block text-sm text-white/85">
-                {now ? `ETA ${new Date(activeTrip.etaAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · ` : ""}
-                {activeTrip.sharedWith.some((c) => c.notified) ? `${activeTrip.sharedWith.filter((c) => c.notified).map((c) => c.name).join(", ")} following` : "Private trip"}
+                {now ? `ETA ${clock(new Date(activeTrip.etaAt))} · ` : ""}
+                {activeTrip.sharedWith.some((c) => c.notified) ? `${activeTrip.sharedWith.filter((c) => c.notified).map((c) => c.name).join(", ")} following` : "Only people you send the link to can follow"}
               </span>
             </span>
             <Icon name="chevron" />
@@ -374,52 +461,79 @@ export function HomeScreen({
                 <h2 className="text-xl font-extrabold text-mixed">{dest.name}</h2>
                 {routeLoading ? (
                   <p className="text-ink-muted">Finding the way…</p>
-                ) : info ? (
+                ) : chosen ? (
                   <p className="text-ink-muted">
-                    <strong className="text-ink">{info.route.minutes} min</strong> walk · {fmtM(info.route.meters)}
-                    {info.route.approximate ? <span className="ml-2 rounded-full bg-sunken px-2 py-0.5 text-xs font-semibold">approx.</span> : null}
+                    <strong className="text-ink">{chosen.route.minutes} min</strong> walk · {fmtM(chosen.route.meters)}
+                    {now ? ` · arrive around ${clock(new Date(now.getTime() + chosen.route.minutes * 60_000))}` : ""}
+                    {chosen.route.approximate ? <span className="ml-2 rounded-full bg-sunken px-2 py-0.5 text-xs font-semibold">approx.</span> : null}
                   </p>
                 ) : !me ? (
                   <p className="text-ink-muted">Turn on location to see the walk from here.</p>
                 ) : routed ? (
-                  <p className="text-ink-muted">Couldn&apos;t get the walking time — you can still start the trip.</p>
+                  <p className="text-ink-muted">Couldn&apos;t get the walking time — you can still start with MIRA.</p>
                 ) : null}
               </div>
-              <button type="button" aria-label="Close" onClick={() => { setDest(null); setSnap("peek"); }} className="grid size-11 place-items-center rounded-full bg-sunken">
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => {
+                  setDest(null);
+                  setSnap("peek");
+                }}
+                className="grid size-11 place-items-center rounded-full bg-sunken"
+              >
                 <Icon name="close" className="size-4" />
               </button>
             </div>
 
+            {/* What's known about getting there (short), then the way to start, then the details. */}
+            {routeLoading ? (
+              <p className="mt-3 text-sm text-ink-muted">Checking lighting and Help Points along the way…</p>
+            ) : options.length > 1 ? (
+              <RouteOptions options={options} selected={option} onSelect={setOption} />
+            ) : chosen && !chosen.route.approximate ? (
+              <RouteContextLines option={chosen} />
+            ) : null}
+
             <div className="mt-4">
-              <Button variant="hero" size="lg" onClick={startTrip} busy={starting} busyLabel="Starting…" disabled={!me || routeLoading}>
-                <Icon name="share" /> {accepted.length || !user ? "Share my trip" : "Start my trip"}
+              <Button variant="hero" size="lg" onClick={() => void startTrip()} busy={starting} busyLabel="Starting…" disabled={!me}>
+                <Icon name="walk" /> Start with MIRA
               </Button>
-              <p className="mt-2 text-center text-sm text-ink-muted">
+              {user && emailAlerts && accepted.length ? (
+                <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Who follows this journey">
+                  {[
+                    [true, `Share with ${names(accepted.map((c) => c.name))}`],
+                    [false, "Just me"],
+                  ].map(([v, label]) => (
+                    <button
+                      key={String(v)}
+                      type="button"
+                      role="radio"
+                      aria-checked={shareWithCircle === v}
+                      onClick={() => setShareWithCircle(v as boolean)}
+                      className={cx("min-h-11 truncate rounded-full border-2 px-3 text-sm font-bold", shareWithCircle === v ? "border-accent bg-accent-soft text-accent-strong" : "border-line text-ink-muted")}
+                    >
+                      {label as string}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <p className="mt-2 text-center text-xs text-ink-muted">
                 {!user
-                  ? "Your people follow along live until you arrive."
-                  : accepted.length
-                    ? `${accepted.map((c) => c.name).join(", ")} will see you live until you arrive.`
-                    : "No trusted contacts yet — I'll still check you arrive. "}
-                {user && !accepted.length ? (
-                  <Link href="/me#contacts" className="inline-flex min-h-11 items-center px-1 font-bold text-accent">
-                    Add one
-                  </Link>
-                ) : null}
+                  ? "Sign in with your first name. Then you can send a live link to anyone, and it ends itself when you arrive."
+                  : sharesWithCircle
+                    ? `${names(accepted.map((c) => c.name))} get your live link by email now, and an email if you don't arrive.`
+                    : accepted.length && emailAlerts
+                      ? "Nobody is alerted if you don't arrive. You can still send your live link on the next screen."
+                      : "Nobody is alerted automatically. On the next screen, send your live link on WhatsApp or SMS — it stops when you arrive."}
               </p>
             </div>
 
-            {info?.lighting ? <LightingSummary lighting={info.lighting} /> : null}
-            {info?.along.length ? (
-              <section className="mt-5">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">Along the way</h3>
-                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-                  {info.along.slice(0, 8).map((p) => (
-                    <span key={p.id} className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-surface px-3 py-2 text-sm font-semibold shadow-[var(--shadow-card)]">
-                      {kindEmoji(p.kind)} <span className="max-w-40 truncate">{p.name}</span>
-                    </span>
-                  ))}
-                </div>
-              </section>
+            {chosen && !chosen.route.approximate ? (
+              <>
+                {chosen.lighting ? <LightingSummary lighting={chosen.lighting} /> : null}
+                <HelpPointList points={chosen.helpPoints} defaultOpen onPick={(p) => pick({ name: p.name, lat: p.lat, lon: p.lon, kind: HELP_CLASSES[p.cls].label })} />
+              </>
             ) : null}
             {info?.notes.length ? (
               <section className="mt-5">
@@ -442,13 +556,14 @@ export function HomeScreen({
                 </div>
               </section>
             ) : null}
-            {info && !info.route.approximate ? null : info ? (
-              <p className="mt-4 text-xs text-ink-subtle">Walking time is an estimate. Detailed walking directions arrive when full maps are connected.</p>
+            {chosen?.route.approximate ? (
+              <p className="mt-4 text-xs text-ink-subtle">Walking time is an estimate from a straight line: there&apos;s no street map for this area yet, so lighting and Help Points along the way aren&apos;t known.</p>
             ) : null}
           </div>
         ) : (
           <div>
-            <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
+            <h2 className="text-2xl font-extrabold tracking-tight">Where are you going?</h2>
+            <div className="-mx-5 mt-3 flex gap-2 overflow-x-auto px-5 pb-1">
               {places.map((p) => (
                 <Chip key={p.id} onClick={() => pick({ name: p.label, lat: p.lat, lon: p.lon })}>
                   {p.emoji} {p.label}
@@ -458,23 +573,28 @@ export function HomeScreen({
                 <Icon name="plus" className="size-4" /> {places.length ? "Add" : "Add a place"}
               </Chip>
             </div>
+            <button type="button" onClick={() => setSearchOpen(true)} className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-full bg-surface px-5 text-left text-lg font-semibold text-ink-subtle shadow-[var(--shadow-card)]">
+              <Icon name="know" className="size-5 text-accent" /> Search a place or address
+            </button>
+            <p className="mt-3 text-sm text-ink-muted">{circleLine}</p>
 
             {nudge ? (
-              <div className="mt-4 flex gap-3 rounded-3xl bg-gradient-to-br from-accent-soft to-peach-soft p-4 animate-rise">
-                <MiraOrb size={40} />
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold leading-snug">{nudge.text}</p>
-                  <div className="mt-2.5 flex flex-wrap gap-2">
-                    <button type="button" onClick={nudge.action} className="min-h-11 rounded-full bg-accent px-4 text-sm font-bold text-accent-ink">
-                      {nudge.cta}
-                    </button>
-                    <Link href="/mira" className="inline-flex min-h-11 items-center rounded-full bg-surface px-4 text-sm font-bold text-accent">
-                      Talk to Mira
-                    </Link>
-                  </div>
-                </div>
+              <div className="mt-4 flex items-center gap-3 rounded-2xl bg-surface px-4 py-3 shadow-[var(--shadow-card)] animate-rise">
+                <p className="min-w-0 flex-1 text-sm font-semibold">{nudge.text}</p>
+                <button type="button" onClick={nudge.action} className="min-h-11 shrink-0 rounded-full bg-accent-soft px-4 text-sm font-bold text-accent-strong">
+                  {nudge.cta}
+                </button>
               </div>
             ) : null}
+
+            <div className="mt-4 flex flex-wrap gap-x-4 text-sm">
+              <Link href="/mira" className="inline-flex min-h-11 items-center gap-1.5 font-bold text-accent">
+                <Icon name="sparkle" className="size-4" /> Ask Mira
+              </Link>
+              <Link href="/report" className="inline-flex min-h-11 items-center gap-1.5 font-bold text-ink-muted">
+                <Icon name="flag" className="size-4" /> Report something
+              </Link>
+            </div>
 
             {user && !installDismissed.value ? <InstallCard variant="card" onDismiss={installDismissed.set} /> : null}
 
@@ -485,7 +605,7 @@ export function HomeScreen({
               ) : nearbyFailed ? (
                 <p className="mt-2 text-ink-muted">Couldn&apos;t load what&apos;s around you — check your connection.</p>
               ) : nearby.places.length === 0 && nearby.notes.length === 0 ? (
-                <p className="mt-2 text-ink-muted">I don&apos;t have detailed places for this area yet. Search or drop a pin to plan a walk.</p>
+                <p className="mt-2 text-ink-muted">No detailed places for this area yet. Search or drop a pin to plan a walk.</p>
               ) : (
                 <>
                   {nearby.notes.length ? (
@@ -498,7 +618,7 @@ export function HomeScreen({
                     </ul>
                   ) : null}
                   <ul className="mt-2 divide-y divide-line overflow-hidden rounded-3xl bg-surface shadow-[var(--shadow-card)]">
-                    {nearby.places.slice(0, 6).map((p) => (
+                    {nearby.places.slice(0, 5).map((p) => (
                       <li key={p.id}>
                         <button type="button" onClick={() => pick({ name: p.name, lat: p.lat, lon: p.lon, kind: p.kind })} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-sunken">
                           <span className="text-xl" aria-hidden>
@@ -534,6 +654,22 @@ export function HomeScreen({
         }}
         saved={places}
         near={me}
+        placeholder="Search a place or address"
+      />
+      <UnsafeSheet
+        open={unsafe}
+        onClose={() => setUnsafe(false)}
+        me={me}
+        area={area}
+        helpPoints={unsafeHelp}
+        helpLoading={Boolean(me) && nearHelp?.key !== meKey}
+        helpFailed={Boolean(nearHelp?.failed) && !chosen?.helpPoints.length}
+        onGoHelpPoint={(p) => {
+          setUnsafe(false);
+          pick({ name: p.name, lat: p.lat, lon: p.lon, kind: HELP_CLASSES[p.cls].label });
+        }}
+        goLabel="Walk there"
+        share={unsafeShare}
       />
       <SignInSheet open={signIn !== null} reason={signIn ?? undefined} onClose={() => setSignIn(null)} />
     </div>
