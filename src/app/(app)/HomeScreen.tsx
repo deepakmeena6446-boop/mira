@@ -14,8 +14,10 @@ import { LightingSummary } from "@/components/app/LightingSummary";
 import { HelpPointList, RouteContextLines } from "@/components/app/HelpPointList";
 import { RouteOptions, type RouteOption } from "@/components/app/RouteOptions";
 import { EmergencyPill } from "@/components/app/EmergencyPill";
-import { UnsafeSheet, type UnsafeShareAction } from "@/components/app/UnsafeSheet";
-import { HELP_CLASSES, dedupeHelpPoints, type HelpPoint } from "@/domain/help-points";
+import { UnsafeSheet, type UnsafeShareAction, type UnsafeTellAction } from "@/components/app/UnsafeSheet";
+import { HelpNearSheet } from "@/components/app/HelpNearSheet";
+import { HELP_CLASSES, dedupeHelpPoints, type HelpClass, type HelpPoint } from "@/domain/help-points";
+import { setLocale, type ClientLocale } from "@/lib/locale-store";
 import { InstallCard } from "@/components/pwa/InstallCard";
 import { useFlag } from "@/lib/flags";
 import { useOverlay } from "@/lib/use-overlay";
@@ -45,9 +47,17 @@ interface Note {
   text: string;
   polarity: string;
   timeBand: string;
+  week?: string;
   lat: number;
   lon: number;
 }
+type Mode = "walk" | "ride" | "transit";
+const MODES: Array<[Mode, string]> = [
+  ["walk", "Walk"],
+  ["ride", "Auto / cab"],
+  ["transit", "Metro / bus"],
+];
+const ETA_CHOICES = [10, 20, 30, 45, 60, 90];
 interface RouteInfo extends RouteOption {
   notes: Note[];
   alternatives: RouteOption[];
@@ -67,7 +77,7 @@ export function HomeScreen({
   tiles,
   emailAlerts,
 }: {
-  user: { id: string; name: string; avatarUrl: string | null } | null;
+  user: { id: string; name: string; avatarUrl: string | null; helpExclude?: string[] } | null;
   places: SavedPlace[];
   contacts: Contact[];
   trip: TripView | null;
@@ -104,7 +114,7 @@ export function HomeScreen({
   const [recenter, setRecenter] = useState(0);
   const [places, setPlaces] = useState(initialPlaces);
   const [dest, setDest] = useState<Destination | null>(initialDest);
-  const [routed, setRouted] = useState<{ key: string; data: RouteInfo | null } | null>(null);
+  const [routed, setRouted] = useState<{ key: string; data: RouteInfo | null; code?: string } | null>(null);
   const [option, setOption] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [pinMode, setPinMode] = useState(false);
@@ -112,6 +122,10 @@ export function HomeScreen({
   const [signIn, setSignIn] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [unsafe, setUnsafe] = useState(false);
+  const [nearOpen, setNearOpen] = useState(false);
+  const [mode, setMode] = useState<Mode>("walk");
+  const [etaMin, setEtaMin] = useState(30);
+  const exclude = useMemo(() => (user?.helpExclude ?? []) as HelpClass[], [user?.helpExclude]);
   const accepted = contacts.filter((c) => c.status === "accepted" && c.isDefault);
   const [shareWithCircle, setShareWithCircle] = useState(true);
 
@@ -138,12 +152,15 @@ export function HomeScreen({
     let stop = false;
     (async () => {
       const [r, n, h] = await Promise.all([
-        api<{ label: string | null }>("/api/geo/reverse", { body: me }),
+        api<{ label: string | null; locale?: ClientLocale }>("/api/geo/reverse", { body: me }),
         api<{ places: Place[]; notes: Note[] }>("/api/geo/nearby", { body: me }),
         api<{ helpPoints: HelpPoint[] }>("/api/geo/help", { body: me }),
       ]);
       if (stop) return;
-      if (r.ok) setPoiArea(r.data.label);
+      if (r.ok) {
+        setPoiArea(r.data.label);
+        setLocale(r.data.locale); // emergency number + helplines for where she is
+      }
       if (n.ok) setNearby(n.data);
       setNearbyFailed(!n.ok);
       setNearHelp({ key: meKey, points: h.ok ? h.data.helpPoints : [], failed: !h.ok });
@@ -159,6 +176,7 @@ export function HomeScreen({
     setPinMode(false);
     setDest(d);
     setOption(0);
+    setMode("walk");
     setSnap("half");
   }, []);
 
@@ -168,7 +186,9 @@ export function HomeScreen({
     if (!routeKey || !dest || !me) return;
     let stop = false;
     void api<RouteInfo>("/api/geo/route", { body: { from: me, to: { lat: dest.lat, lon: dest.lon } } }).then((res) => {
-      if (!stop) setRouted({ key: routeKey, data: res.ok ? res.data : null });
+      if (stop) return;
+      setRouted({ key: routeKey, data: res.ok ? res.data : null, code: res.ok ? undefined : res.code });
+      if (!res.ok && res.code === "too_far") setMode("ride"); // too far to walk: she's probably riding
     });
     return () => {
       stop = true;
@@ -177,7 +197,12 @@ export function HomeScreen({
   }, [routeKey]);
   const info = routed && routed.key === routeKey ? routed.data : null;
   const routeLoading = Boolean(routeKey) && routed?.key !== routeKey;
-  const options: RouteOption[] = useMemo(() => (info ? [{ route: info.route, lighting: info.lighting, helpPoints: info.helpPoints ?? [] }, ...(info.alternatives ?? [])] : []), [info]);
+  // Her Help Point filters apply everywhere (e.g. no police), before any count or list.
+  const options: RouteOption[] = useMemo(
+    () =>
+      (info ? [{ route: info.route, lighting: info.lighting, helpPoints: info.helpPoints ?? [] }, ...(info.alternatives ?? [])] : []).map((o) => ({ ...o, helpPoints: o.helpPoints.filter((p) => !exclude.includes(p.cls)) })),
+    [info, exclude],
+  );
   const chosen = options[Math.min(option, options.length - 1)] ?? null;
 
   // Pins: what's around you, or the Help Points along the chosen way once a destination is picked.
@@ -242,12 +267,18 @@ export function HomeScreen({
     if (!target || !me || starting) return;
     const picked = !to && option > 0 ? chosen : null;
     setStarting(true);
+    const walking = to || mode === "walk";
     const res = await api<{ trip: TripView }>("/api/trips", {
-      body: { from: me, to: { lat: target.lat, lon: target.lon, name: target.name.slice(0, 80) }, share: sharesWithCircle, ...(picked ? { routeMinutes: picked.route.minutes } : {}) },
+      body: {
+        from: me,
+        to: { lat: target.lat, lon: target.lon, name: target.name.slice(0, 80) },
+        share: sharesWithCircle,
+        ...(walking ? (picked ? { routeMinutes: picked.route.minutes } : {}) : { mode, etaMinutes: etaMin }),
+      },
     });
     setStarting(false);
     if (res.ok) {
-      const line = (to ? null : chosen?.route.geometry) ?? null;
+      const line = (to || !walking ? null : chosen?.route.geometry) ?? null;
       if (line && line.length > 2) keepTripRoute(res.data.trip.id, line);
       router.push("/trip");
       router.refresh();
@@ -295,6 +326,30 @@ export function HomeScreen({
             },
           }
         : { label: "Share my journey live", detail: "Choose where you're going, then send a live link to anyone.", onShare: () => (setUnsafe(false), setSearchOpen(true)) };
+  // "Tell my people now": emails her accepted contacts at once. With no journey running, it first
+  // starts one that just shares where she is (no destination), so they have a live link to open.
+  const tellAction: UnsafeTellAction | null =
+    user && emailAlerts && accepted.length && me
+      ? {
+          names: accepted.map((c) => c.name),
+          onTell: async () => {
+            let tripId = activeTrip?.id ?? null;
+            if (!tripId) {
+              const r = await api<{ trip: TripView }>("/api/trips", { body: { from: me, share: true, etaMinutes: 30 } });
+              if (!r.ok && r.code !== "trip_active") return { error: r.message };
+              tripId = r.ok ? r.data.trip.id : null;
+              if (!tripId) {
+                const cur = await api<{ trip: TripView | null }>("/api/trips/current");
+                tripId = cur.ok ? (cur.data.trip?.id ?? null) : null;
+              }
+            }
+            if (!tripId) return { error: "Couldn't start sharing right now. Send your live link or call them." };
+            const t = await api<{ told: string[]; failed: string[] }>(`/api/trips/${tripId}/checkon`, { body: {} });
+            router.refresh();
+            return t.ok ? t.data : { error: t.message };
+          },
+        }
+      : null;
   const unsafeHelp = useMemo(() => dedupeHelpPoints([...(chosen?.helpPoints ?? []), ...(nearHelp?.points ?? [])]), [chosen, nearHelp]);
 
   const circleLine = !user ? (
@@ -311,7 +366,7 @@ export function HomeScreen({
   ) : (
     <>
       Send a live link to anyone when you start.{" "}
-      <Link href="/me#contacts" className="font-bold text-accent">
+      <Link href="/circle" className="font-bold text-accent">
         Add someone
       </Link>{" "}
       to be emailed if you don&apos;t arrive.
@@ -329,7 +384,7 @@ export function HomeScreen({
   return (
     <div className="fixed inset-0 overflow-hidden">
       <h1 className="sr-only">MIRA — where are you going?</h1>
-      <WorldMap tiles={tiles} me={me} dest={dest} route={chosen?.route.geometry ?? null} notes={nearby.notes} places={mapPlaces} recenter={recenter} lighting={chosen?.lighting?.segments ?? null} onPlaceClick={onPlaceClick} onLongPress={onLongPress} onMapClick={onMapClick} onArea={setArea} label="Map around your location" padding={MAP_PADDING} />
+      <WorldMap tiles={tiles} me={me} dest={dest} route={mode === "walk" ? (chosen?.route.geometry ?? null) : null} notes={[]} places={mapPlaces} recenter={recenter} lighting={chosen?.lighting?.segments ?? null} onPlaceClick={onPlaceClick} onLongPress={onLongPress} onMapClick={onMapClick} onArea={setArea} label="Map around your location" padding={MAP_PADDING} />
 
       {/* Top: greeting, and help that's always one tap away */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.9rem,env(safe-area-inset-top))]">
@@ -459,8 +514,14 @@ export function HomeScreen({
               <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-accent-soft text-2xl">{kindEmoji(dest.kind ?? "")}</span>
               <div className="min-w-0 flex-1">
                 <h2 className="text-xl font-extrabold text-mixed">{dest.name}</h2>
-                {routeLoading ? (
+                {mode !== "walk" ? (
+                  <p className="text-ink-muted">
+                    <strong className="text-ink">{MODES.find((m) => m[0] === mode)?.[1]}</strong> · expected in {etaMin < 60 ? `${etaMin} min` : etaMin === 90 ? "1 h 30" : `${etaMin / 60} h`}
+                  </p>
+                ) : routeLoading ? (
                   <p className="text-ink-muted">Finding the way…</p>
+                ) : routed?.code === "too_far" ? (
+                  <p className="text-ink-muted">Too far to walk — choose how you&apos;re going.</p>
                 ) : chosen ? (
                   <p className="text-ink-muted">
                     <strong className="text-ink">{chosen.route.minutes} min</strong> walk · {fmtM(chosen.route.meters)}
@@ -486,8 +547,32 @@ export function HomeScreen({
               </button>
             </div>
 
+            <div className="mt-3 grid grid-cols-3 gap-1.5 rounded-full bg-sunken p-1" role="radiogroup" aria-label="How are you going?">
+              {MODES.map(([m, label]) => (
+                <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className={cx("min-h-10 rounded-full text-sm font-bold", mode === m ? "bg-surface text-ink shadow-[var(--shadow-card)]" : "text-ink-muted")}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {mode !== "walk" ? (
+              <div className="mt-3">
+                <p className="text-sm font-semibold">When do you expect to get there?</p>
+                <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Expected in">
+                  {ETA_CHOICES.map((m) => (
+                    <button key={m} type="button" role="radio" aria-checked={etaMin === m} onClick={() => setEtaMin(m)} className={cx("min-h-11 rounded-full border-2 px-4 text-sm font-bold", etaMin === m ? "border-accent bg-accent-soft text-accent-strong" : "border-line text-ink-muted")}>
+                      {m < 60 ? `${m} min` : m === 90 ? "1 h 30" : `${m / 60} h`}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-ink-muted">
+                  MIRA uses the time you choose{now ? ` (around ${clock(new Date(now.getTime() + etaMin * 60_000))})` : ""}. Lighting and Help Points on the way are for walking routes; Help Points near you are in &ldquo;I feel unsafe&rdquo;.
+                </p>
+              </div>
+            ) : null}
+
             {/* What's known about getting there (short), then the way to start, then the details. */}
-            {routeLoading ? (
+            {mode !== "walk" ? null : routeLoading ? (
               <p className="mt-3 text-sm text-ink-muted">Checking lighting and Help Points along the way…</p>
             ) : options.length > 1 ? (
               <RouteOptions options={options} selected={option} onSelect={setOption} />
@@ -529,7 +614,7 @@ export function HomeScreen({
               </p>
             </div>
 
-            {chosen && !chosen.route.approximate ? (
+            {mode === "walk" && chosen && !chosen.route.approximate ? (
               <>
                 {chosen.lighting ? <LightingSummary lighting={chosen.lighting} /> : null}
                 <HelpPointList points={chosen.helpPoints} defaultOpen onPick={(p) => pick({ name: p.name, lat: p.lat, lon: p.lon, kind: HELP_CLASSES[p.cls].label })} />
@@ -540,7 +625,13 @@ export function HomeScreen({
                 <h3 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">Community notes on this route</h3>
                 <ul className="mt-2 space-y-2">
                   {info.notes.map((n) => (
-                    <li key={n.id} className="rounded-2xl bg-peach-soft px-4 py-3 text-sm">{n.text}</li>
+                    <li key={n.id} className="rounded-2xl bg-sunken px-4 py-3 text-sm">
+                      <p>{n.text}</p>
+                      <details className="mt-1 text-xs text-ink-muted">
+                        <summary className="min-h-8 cursor-pointer font-semibold">{n.week ? `Week of ${new Date(n.week).toLocaleDateString([], { day: "numeric", month: "short" })} · ` : ""}Why am I seeing this?</summary>
+                        <p className="mt-1">At least five different people privately reported something similar in this ~1 km area at this time of day, and a person reviewed each report. It&apos;s shown in fixed words, without counts or exact places, and disappears after five weeks. It isn&apos;t a rating of the area.</p>
+                      </details>
+                    </li>
                   ))}
                 </ul>
               </section>
@@ -588,6 +679,9 @@ export function HomeScreen({
             ) : null}
 
             <div className="mt-4 flex flex-wrap gap-x-4 text-sm">
+              <button type="button" onClick={() => setNearOpen(true)} className="inline-flex min-h-11 items-center gap-1.5 font-bold text-accent">
+                <Icon name="pin" className="size-4" /> Help Points near me
+              </button>
               <Link href="/mira" className="inline-flex min-h-11 items-center gap-1.5 font-bold text-accent">
                 <Icon name="sparkle" className="size-4" /> Ask Mira
               </Link>
@@ -604,19 +698,10 @@ export function HomeScreen({
                 <p className="mt-2 text-ink-muted">{loc.status === "asking" ? "Finding where you are…" : "Turn on location to see what's nearby."}</p>
               ) : nearbyFailed ? (
                 <p className="mt-2 text-ink-muted">Couldn&apos;t load what&apos;s around you — check your connection.</p>
-              ) : nearby.places.length === 0 && nearby.notes.length === 0 ? (
+              ) : nearby.places.length === 0 ? (
                 <p className="mt-2 text-ink-muted">No detailed places for this area yet. Search or drop a pin to plan a walk.</p>
               ) : (
                 <>
-                  {nearby.notes.length ? (
-                    <ul className="mt-2 space-y-2">
-                      {nearby.notes.slice(0, 2).map((n) => (
-                        <li key={n.id} className="flex gap-2 rounded-2xl bg-peach-soft px-4 py-3 text-sm">
-                          <span aria-hidden>💬</span> {n.text}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
                   <ul className="mt-2 divide-y divide-line overflow-hidden rounded-3xl bg-surface shadow-[var(--shadow-card)]">
                     {nearby.places.slice(0, 5).map((p) => (
                       <li key={p.id}>
@@ -670,6 +755,21 @@ export function HomeScreen({
         }}
         goLabel="Walk there"
         share={unsafeShare}
+        tell={tellAction}
+        landmark={nearby.places[0]?.name ?? null}
+        exclude={exclude}
+      />
+      <HelpNearSheet
+        open={nearOpen}
+        onClose={() => setNearOpen(false)}
+        me={me}
+        points={nearHelp?.points ?? []}
+        loading={Boolean(me) && nearHelp?.key !== meKey}
+        exclude={exclude}
+        onPick={(p) => {
+          setNearOpen(false);
+          pick({ name: p.name, lat: p.lat, lon: p.lon, kind: HELP_CLASSES[p.cls].label });
+        }}
       />
       <SignInSheet open={signIn !== null} reason={signIn ?? undefined} onClose={() => setSignIn(null)} />
     </div>

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { DEST, acceptContactInvite, addContact, db, newUser, openRoute, shareLinkFor } from "./helpers";
+import { DEST, acceptContactInvite, addContact, db, mailsTo, newUser, openRoute, shareLinkFor, waitFor } from "./helpers";
 
 test.describe("Core loop — onboard, save Home, share a trip live, arrive", () => {
   test("a trusted contact follows the trip live and the link goes dark on arrival", async ({ browser }) => {
@@ -16,6 +16,8 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     const mum = await acceptContactInvite(browser, address);
     await owner.page.reload();
     await expect(owner.page.getByText("Trusted", { exact: true })).toBeVisible();
+    // Navigation is Home · Circle · Me (Mira is a button, not a tab).
+    await expect(owner.page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Home", "Circle", "Me"]);
 
     // Home → "Where are you going?" → one tap on the saved place → context → Start with MIRA.
     await owner.page.goto("/");
@@ -32,16 +34,24 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     await expect(owner.page.getByRole("link", { name: /Emergency call, 112/ })).toHaveAttribute("href", "tel:112");
     await expect(owner.page.getByRole("button", { name: /Send my live link/ })).toBeEnabled();
 
+    // "Tell my people now" from the unsafe sheet reaches Mum's inbox, and her live view says so.
+    await owner.page.getByRole("button", { name: "I feel unsafe" }).click();
+    await owner.page.getByRole("dialog", { name: "Right now" }).getByRole("button", { name: /Tell my people now/ }).click();
+    await expect(owner.page.getByText(/Emailed Mum/)).toBeVisible();
+    await waitFor(async () => (await mailsTo(address)).find((m) => m.Subject.includes("asked you to check on them")));
+    await owner.page.getByRole("button", { name: "I'm okay now" }).click();
+
     // The contact's live view: first name, destination label, ETA — no account needed.
     const link = await shareLinkFor(address);
     await mum.page.goto(link);
     await expect(mum.page.getByText(/Priya/).first()).toBeVisible();
     await expect(mum.page.getByText(/Expected by/)).toBeVisible();
+    await expect(mum.page.getByText(/Priya asked you to check on them/)).toBeVisible();
     await expect(mum.page.locator("body")).not.toContainText(DEST); // label is the saved name, not the address
     const live = await (await mum.page.request.get(`/api/t/${link.split("/t/")[1]}`)).json();
     expect(live).toMatchObject({ state: "active", name: "Priya", destination: "Home" });
     // Only the latest point — no trail, no email, no user id.
-    expect(Object.keys(live).sort()).toEqual(["alertsViewer", "dest", "destination", "etaAt", "location", "name", "state"]);
+    expect(Object.keys(live).sort()).toEqual(["alertsViewer", "checkRequested", "dest", "destination", "etaAt", "location", "mode", "name", "state"]);
     expect(live.alertsViewer).toBe(true); // she's a trusted contact: she'll get the missed-arrival email
     expect(Object.keys(live.location ?? {}).sort()).toEqual(["ageSeconds", "at", "lat", "lon"]);
 

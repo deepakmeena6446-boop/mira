@@ -45,9 +45,19 @@ export function uniqueAddress(tag: string): string {
   return `${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 }
 
+/**
+ * Each test person gets their own client address (the app reads the proxy-appended
+ * X-Forwarded-For), like real people on different phones. Otherwise every sign-up in the suite
+ * comes from one address and trips the per-IP sign-up limit (20/hour) partway through a run.
+ */
+export function testClientIp(): string {
+  const b = () => 1 + Math.floor(Math.random() * 250);
+  return `10.${b()}.${b()}.${b()}`;
+}
+
 /** A fresh person: own browser context with location granted, onboarded and signed in (demo auth). */
 export async function newUser(browser: Browser, name: string): Promise<{ ctx: BrowserContext; page: Page }> {
-  const ctx = await browser.newContext({ geolocation: GEO, permissions: ["geolocation"] });
+  const ctx = await browser.newContext({ geolocation: GEO, permissions: ["geolocation"], extraHTTPHeaders: { "x-forwarded-for": testClientIp() } });
   const page = await ctx.newPage();
   await page.goto("/");
   await page.waitForURL("**/welcome");
@@ -64,8 +74,8 @@ export async function newUser(browser: Browser, name: string): Promise<{ ctx: Br
 /** Adds a trusted contact from the Me screen and returns their address. */
 export async function addContact(page: Page, name: string, tag: string): Promise<string> {
   const address = uniqueAddress(tag);
-  await page.goto("/me");
-  await page.getByRole("button", { name: "+ Add" }).nth(1).click();
+  await page.goto("/circle");
+  await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Name").last().fill(name);
   await page.getByLabel("Email").fill(address);
   await page.getByRole("button", { name: "Send invite" }).click();

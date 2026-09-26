@@ -15,6 +15,7 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "MIRA", statusBarStyle: "default" },
   formatDetection: { telephone: false, address: false, email: false },
   icons: { icon: "/icon.svg", apple: "/apple-icon.png" },
+  openGraph: { title: "MIRA — walk home, your people will know", description: "Lighting and Help Points on your route, your journey shared live in one tap, and help close at hand.", siteName: "MIRA", type: "website" },
 };
 
 export const viewport: Viewport = {

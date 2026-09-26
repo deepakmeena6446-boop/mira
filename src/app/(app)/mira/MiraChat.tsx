@@ -124,7 +124,7 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
           </a>
           <p className="mt-1 text-center text-xs text-ink-subtle">{EMERGENCY_NUMBER} works from most mobile phones; your local emergency number works too. MIRA doesn&apos;t call anyone for you.</p>
           <p className="mt-2 text-center text-sm text-ink-muted">
-            {card.contacts.length ? `Or share your trip below so ${card.contacts.join(", ")} can see where you are.` : "Add trusted contacts in Me so I can alert them next time."}
+            {card.contacts.length ? `Or share your trip below so ${card.contacts.join(", ")} can see where you are.` : "Add trusted contacts in Circle so I can alert them next time."}
           </p>
         </div>
       );

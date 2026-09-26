@@ -17,7 +17,13 @@ export interface SharedTrip {
   /** True for trusted contacts (they get the missed-arrival email); false for a link shared directly. */
   alertsViewer?: boolean;
   location?: { lat: number; lon: number; at: string; ageSeconds: number } | null;
+  /** walk / ride / transit / other, or "here" when they're sharing where they are. */
+  mode?: string;
+  /** They tapped "Tell my people now" in the last 30 minutes. */
+  checkRequested?: boolean;
 }
+
+const VERB: Record<string, string> = { walk: "is walking to", ride: "is on the way by auto or cab to", transit: "is on the way by metro or bus to", other: "is on the way to" };
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 function ago(s: number) {
@@ -84,9 +90,7 @@ export function SharedTripView({ token, initial, tiles }: { token: string; initi
         <div className="flex items-center gap-3">
           <Avatar name={trip.name} size={48} />
           <div className="min-w-0">
-            <h1 className="text-xl font-extrabold">
-              {trip.name} is walking to {trip.destination}
-            </h1>
+            <h1 className="text-xl font-extrabold">{trip.mode === "here" ? `${trip.name} is sharing where they are` : `${trip.name} ${VERB[trip.mode ?? "walk"] ?? VERB.walk} ${trip.destination}`}</h1>
             {/* Times render after mount: the server doesn't know the viewer's time zone. */}
             <p className="text-ink-muted">
               {now && trip.etaAt ? `Expected by ${time(trip.etaAt)}` : ""}
@@ -97,6 +101,11 @@ export function SharedTripView({ token, initial, tiles }: { token: string; initi
         {polledFailed ? (
           <p role="status" className="mt-4 rounded-2xl bg-sunken px-4 py-3 text-sm text-ink-muted">
             <span className="font-bold text-ink">Can&apos;t refresh right now.</span> Check your connection — this shows the last update I received.
+          </p>
+        ) : null}
+        {trip.checkRequested ? (
+          <p role="alert" className="mt-4 rounded-2xl bg-warm-soft px-4 py-3 font-semibold text-warm">
+            {trip.name} asked you to check on them. The best next step is usually to call or message them. MIRA isn&apos;t an emergency service; if you think they&apos;re in danger, call your local emergency number.
           </p>
         ) : null}
         {trip.state === "missed" ? (

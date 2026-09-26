@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { GEO, SAME_ORIGIN, adminPage, apiReport, db, newUser, nextIstMonday, runAggregation } from "./helpers";
+import { GEO, SAME_ORIGIN, adminPage, apiReport, db, newUser, nextIstMonday, openRoute, runAggregation } from "./helpers";
 
 const HERE = { lat: GEO.latitude, lon: GEO.longitude };
 
@@ -67,8 +67,13 @@ test.describe("Reports — private until reviewed, public only as thresholded no
     expect(json.notes).toHaveLength(1);
     expect(json.notes[0].text).toBe("Multiple reviewed observations mention poor lighting in this area during late hours.");
     expect(JSON.stringify(json)).not.toMatch(/Dark stretch|SECRET|harassment|actor|report_id/i);
+    // Notes are not a map layer or a Home feed: they appear only on a route through the area, dated, with why.
     await me.page.goto("/");
+    await expect(me.page.getByRole("heading", { name: "Where are you going?", exact: true })).toBeVisible();
+    await expect(me.page.getByText(/poor lighting in this area/)).toHaveCount(0);
+    await openRoute(me.page);
     await expect(me.page.getByText(/poor lighting in this area/)).toBeVisible();
+    await expect(me.page.getByText(/Why am I seeing this\?/)).toBeVisible();
     await admin.context().close();
     await me.ctx.close();
   });

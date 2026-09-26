@@ -5,10 +5,13 @@ import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 
+/**
+ * Home · Circle · Me (blueprint §9). Mira is a way in, not a place: "Ask Mira" on Home and in
+ * "I feel unsafe". Report is reached by long-pressing the map, from Home, after a journey, and in Me.
+ */
 const TABS = [
   { href: "/", label: "Home", icon: "home" },
-  { href: "/mira", label: "Mira", icon: "sparkle" },
-  { href: "/report", label: "Report", icon: "flag" },
+  { href: "/circle", label: "Circle", icon: "heart" },
   { href: "/me", label: "Me", icon: "user" },
 ] as const;
 
@@ -21,7 +24,7 @@ export function TabBar() {
   const path = usePathname() ?? "/";
   return (
     <nav aria-label="Main" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-      <ul className="glass pointer-events-auto grid w-full max-w-sm grid-cols-4 rounded-full border border-glass-edge p-1.5 shadow-[var(--shadow-float)]">
+      <ul className="glass pointer-events-auto grid w-full max-w-xs grid-cols-3 rounded-full border border-glass-edge p-1.5 shadow-[var(--shadow-float)]">
         {TABS.map((t) => {
           const on = active(path, t.href);
           return (

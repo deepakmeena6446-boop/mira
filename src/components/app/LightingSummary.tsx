@@ -32,8 +32,12 @@ export function lightingLine(lighting: RouteLighting | null): string {
   return [`${lit}% ${litLabel}`, lighting.summary.poles ? `${lighting.summary.poles}% streetlights mapped` : null, `${lighting.summary.unknown}% not known`].filter(Boolean).join(" · ");
 }
 
-function sourceList(l: RouteLighting): string {
-  return [l.sources.walkers && "MIRA walkers", l.sources.osm && "OpenStreetMap", l.sources.poles && "street imagery (Mapillary)"].filter(Boolean).join(", ");
+/** Sources with their age: "OpenStreetMap (streets last edited 2016–2024)". Old is not current. */
+export function sourceList(l: RouteLighting): string {
+  const f = l.freshness;
+  const osm = f?.osmFrom ? `OpenStreetMap (streets last edited ${f.osmFrom === f.osmTo ? f.osmFrom : `${f.osmFrom}–${f.osmTo}`})` : "OpenStreetMap";
+  const poles = f?.polesTo ? `street imagery (Mapillary, last seen ${f.polesTo})` : "street imagery (Mapillary)";
+  return [l.sources.walkers && "MIRA walkers (last 90 days)", l.sources.osm && osm, l.sources.poles && poles].filter(Boolean).join(", ");
 }
 
 /**
@@ -65,7 +69,7 @@ export function LightingSummary({ lighting, compact = false }: { lighting: Route
           </ul>
           {compact ? null : (
             <p className="mt-1.5 text-xs text-ink-subtle">
-              From {sourceList(lighting)}. Map data can be old and lights can be out — this is about lighting, not a safety rating.
+              From {sourceList(lighting)}.{lighting.freshness?.osmFrom && new Date().getFullYear() - lighting.freshness.osmFrom >= 5 ? " Some of this map data is over five years old." : ""} Lights can be out or new ones missing — this is about lighting, not a safety rating.
             </p>
           )}
         </>

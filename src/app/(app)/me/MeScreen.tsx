@@ -15,8 +15,11 @@ import { cx } from "@/components/ui/cx";
 import { api } from "@/lib/api-client";
 import { freshLocation } from "@/lib/location-store";
 import type { SavedPlace } from "@/server/account/places";
-import { MAX_CONTACTS, MAX_SAVED_PLACES } from "@/domain/limits";
+import { MAX_SAVED_PLACES } from "@/domain/limits";
 import type { Contact } from "@/server/account/contacts";
+import { HELP_CLASSES, type HelpClass } from "@/domain/help-points";
+import { Section } from "@/components/app/Section";
+import { AccountSection, PushSection } from "./MeSections";
 import type { ProviderModes } from "@/server/providers/modes";
 
 const EMOJIS = [
@@ -27,19 +30,6 @@ const EMOJIS = [
   ["⭐", "Favourite"],
 ] as const;
 
-function Section({ id, title, children, action }: { id: string; title: string; children: React.ReactNode; action?: React.ReactNode }) {
-  return (
-    <section id={id} aria-labelledby={`${id}-h`} className="scroll-mt-6">
-      <div className="mb-2 flex items-center justify-between px-1">
-        <h2 id={`${id}-h`} className="text-sm font-bold uppercase tracking-wider text-ink-subtle">
-          {title}
-        </h2>
-        {action}
-      </div>
-      <div className="overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]">{children}</div>
-    </section>
-  );
-}
 
 export function MeScreen({
   user,
@@ -47,30 +37,30 @@ export function MeScreen({
   contacts: initialContacts,
   modes,
   emailAlerts,
+  saved = false,
 }: {
-  user: { id: string; name: string; avatarUrl: string | null } | null;
+  user: { id: string; name: string; avatarUrl: string | null; durable: boolean; emailHint: string | null; helpExclude: string[] } | null;
   places: SavedPlace[];
   contacts: Contact[];
   modes: ProviderModes;
-  /** Whether MIRA can email trusted contacts at all (production SMTP configured). */
+  /** Whether MIRA can send email at all (production SMTP configured). */
   emailAlerts: boolean;
+  /** Just came back from adding an email to this account. */
+  saved?: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
   const [places, setPlaces] = useState(initialPlaces);
-  const [contacts, setContacts] = useState(initialContacts);
+  const contacts = initialContacts;
+  const [exclude, setExclude] = useState<HelpClass[]>((user?.helpExclude ?? []) as HelpClass[]);
   const [addingPlace, setAddingPlace] = useState(false);
   const [placeLabel, setPlaceLabel] = useState("Home");
   const [placeEmoji, setPlaceEmoji] = useState("🏠");
-  const [addingContact, setAddingContact] = useState(false);
-  const [cName, setCName] = useState("");
-  const [cEmail, setCEmail] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState<string | null>(null); // contact id awaiting "Remove?"
   const [removing, setRemoving] = useState<string | null>(null);
-  const isDemo = modes.auth === "demo";
+  const isDemo = !user?.durable; // no email login: there's no way back in after signing out
   const [signIn, setSignIn] = useState(false);
 
   if (!user) {
@@ -103,20 +93,6 @@ export function MeScreen({
     } else toast(r.message, "error");
   };
 
-  const addContact = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy("contact");
-    const r = await api<{ contact: Contact }>("/api/me/contacts", { body: { name: cName.trim(), email: cEmail.trim() } });
-    setBusy(null);
-    if (r.ok) {
-      setContacts((c) => [...c, r.data.contact]);
-      setCName("");
-      setCEmail("");
-      setAddingContact(false);
-      toast(r.data.contact.status === "invited" ? `Invite sent to ${r.data.contact.name}` : "Saved — but the invite email couldn't be sent", r.data.contact.status === "invited" ? "info" : "error");
-    } else toast(r.message, "error");
-  };
-
   return (
     <div className="bg-companion min-h-dvh px-4 pb-32 pt-[max(1.25rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex max-w-xl flex-col gap-6">
@@ -125,8 +101,10 @@ export function MeScreen({
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-2xl font-extrabold">{user.name}</h1>
             <p className="text-ink-muted">
-              {places.length} place{places.length === 1 ? "" : "s"} · {contacts.filter((c) => c.status === "accepted").length} trusted contact
-              {contacts.filter((c) => c.status === "accepted").length === 1 ? "" : "s"}
+              {places.length} place{places.length === 1 ? "" : "s"} ·{" "}
+              <Link href="/circle" className="font-semibold text-accent">
+                {contacts.filter((c) => c.status === "accepted").length} in your circle
+              </Link>
             </p>
           </div>
         </header>
@@ -207,99 +185,41 @@ export function MeScreen({
           )}
         </Section>
 
-        <Section
-          id="contacts"
-          title="Trusted contacts"
-          action={
-            contacts.length >= MAX_CONTACTS && !addingContact ? (
-              <span className="text-sm font-semibold text-ink-subtle">
-                {MAX_CONTACTS} of {MAX_CONTACTS}
-              </span>
-            ) : (
-              <button type="button" onClick={() => setAddingContact((v) => !v)} className="min-h-11 rounded-full px-3 text-sm font-bold text-accent">
-                {addingContact ? "Cancel" : "+ Add"}
-              </button>
-            )
-          }
-        >
-          {!emailAlerts ? (
-            <p role="status" className="border-b border-line bg-warm-soft px-5 py-3 text-sm text-ink">
-              Email alerts aren&apos;t switched on in this version yet, so contacts can&apos;t be emailed. Use &ldquo;Send my live link&rdquo; on a journey to share it yourself.
-            </p>
-          ) : null}
-          {addingContact ? (
-            <form onSubmit={addContact} className="border-b border-line p-5">
-              <label className="block text-sm font-bold" htmlFor="c-name">
-                Name
-              </label>
-              <input id="c-name" required value={cName} maxLength={60} onChange={(e) => setCName(e.target.value)} placeholder="e.g. Mum" className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
-              <label className="mt-3 block text-sm font-bold" htmlFor="c-email">
-                Email
-              </label>
-              <input id="c-email" required type="email" inputMode="email" value={cEmail} onChange={(e) => setCEmail(e.target.value)} className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
-              <p className="mt-2 text-sm text-ink-muted">They get a one-time invite by email. Once they accept, MIRA emails them your live link when you share a journey, and emails them if you don&apos;t arrive — nothing else.</p>
-              <Button type="submit" className="mt-4" variant="primary" size="lg" busy={busy === "contact"} busyLabel="Sending invite…" disabled={!cName.trim() || !cEmail.trim()}>
-                Send invite
-              </Button>
-            </form>
-          ) : null}
-          {contacts.length === 0 && !addingContact ? (
-            <p className="p-5 text-ink-muted">Add someone you trust. When you share a journey, they&apos;re emailed your live link, and emailed again if you don&apos;t arrive. Alerts go by email only for now.</p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {contacts.map((c) => (
-                <li key={c.id} className="flex items-center gap-3 px-5 py-3">
-                  <Avatar name={c.name} size={44} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-bold">{c.name}</span>
-                    <span className="block truncate text-sm text-ink-muted">{c.emailHint}</span>
-                  </span>
-                  <span
-                    className={cx(
-                      "rounded-full px-3 py-1 text-xs font-bold",
-                      c.status === "accepted" ? "bg-mint-soft text-mint" : c.status === "invited" ? "bg-sunken text-ink-muted" : "bg-error-soft text-error",
-                    )}
-                  >
-                    {c.status === "accepted" ? "Trusted" : c.status === "invited" ? "Invited" : "Invite failed"}
-                  </span>
-                  {confirmRemove === c.id ? (
-                    <span className="flex shrink-0 gap-1">
-                      <button
-                        type="button"
-                        disabled={removing === c.id}
-                        onClick={async () => {
-                          setRemoving(c.id);
-                          const r = await api(`/api/me/contacts/${c.id}`, { method: "DELETE" });
-                          setRemoving(null);
-                          setConfirmRemove(null);
-                          if (r.ok) {
-                            setContacts((xs) => xs.filter((x) => x.id !== c.id));
-                            toast(`${c.name} removed — any live link they had stops working now.`);
-                          } else toast(r.message, "error");
-                        }}
-                        className="min-h-11 rounded-full bg-ink px-3 text-sm font-bold text-canvas disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
-                      <button type="button" onClick={() => setConfirmRemove(null)} className="min-h-11 rounded-full px-2 text-sm font-bold text-ink-muted">
-                        Keep
-                      </button>
-                    </span>
-                  ) : (
+        <AccountSection durable={user.durable} emailHint={user.emailHint} emailAvailable={emailAlerts} saved={saved} />
+
+        <Section id="help" title="Help Points">
+          <div className="p-5">
+            <p className="text-sm text-ink-muted">Kinds of places MIRA suggests when you feel unsafe and along your routes. Turn off any you&apos;d rather not be pointed to.</p>
+            <ul className="mt-3 grid grid-cols-2 gap-2">
+              {(Object.keys(HELP_CLASSES) as HelpClass[]).map((c) => {
+                const on = !exclude.includes(c);
+                return (
+                  <li key={c}>
                     <button
                       type="button"
-                      aria-label={`Remove ${c.name}`}
-                      onClick={() => setConfirmRemove(c.id)}
-                      className="grid size-11 place-items-center rounded-full text-ink-subtle hover:bg-sunken"
+                      role="switch"
+                      aria-checked={on}
+                      onClick={async () => {
+                        const next = on ? [...exclude, c] : exclude.filter((x) => x !== c);
+                        setExclude(next);
+                        const r = await api("/api/me", { method: "PATCH", body: { helpExclude: next } });
+                        if (!r.ok) {
+                          setExclude(exclude);
+                          toast(r.message, "error");
+                        }
+                      }}
+                      className={cx("flex min-h-12 w-full items-center gap-2 rounded-2xl border-2 px-3 text-left text-sm font-bold", on ? "border-accent bg-accent-soft text-accent-strong" : "border-line text-ink-muted line-through")}
                     >
-                      <Icon name="trash" className="size-5" />
+                      <span aria-hidden>{HELP_CLASSES[c].emoji}</span> {HELP_CLASSES[c].label}
                     </button>
-                  )}
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
-          )}
+          </div>
         </Section>
+
+        <PushSection available={modes.push === "web_push"} />
 
         <Section id="app" title="App">
           <div className="divide-y divide-line">
@@ -310,6 +230,11 @@ export function MeScreen({
 
         <Section id="privacy" title="Privacy">
           <ul className="divide-y divide-line">
+            <li>
+              <Link href="/report" className="flex min-h-14 items-center gap-3 px-5 hover:bg-sunken">
+                <Icon name="flag" className="text-accent" /> <span className="flex-1 font-semibold">Report something, privately</span> <Icon name="chevron" className="size-4 text-ink-subtle" />
+              </Link>
+            </li>
             <li>
               <Link href="/privacy" className="flex min-h-14 items-center gap-3 px-5 hover:bg-sunken">
                 <Icon name="shield" className="text-accent" /> <span className="flex-1 font-semibold">How MIRA handles your data</span> <Icon name="chevron" className="size-4 text-ink-subtle" />
@@ -332,7 +257,7 @@ export function MeScreen({
                 <div className="px-5 py-4">
                   <p className="font-semibold">
                     {isDemo
-                      ? "This is a demo account, so there's no way back in after signing out — signing out deletes it (places, contacts, trips, chat)."
+                      ? "This account has no email, so there's no way back in after signing out — signing out deletes it (places, contacts, trips, chat). Add your email above to keep it."
                       : "Sign out on this device?"}
                   </p>
                   <div className="mt-3 flex gap-2">

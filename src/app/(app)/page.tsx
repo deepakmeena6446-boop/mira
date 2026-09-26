@@ -18,7 +18,7 @@ export default async function Home() {
     : [[], [], null];
   return (
     <HomeScreen
-      user={user ? { id: user.id, name: user.name, avatarUrl: user.avatarUrl } : null}
+      user={user ? { id: user.id, name: user.name, avatarUrl: user.avatarUrl, helpExclude: user.helpExclude } : null}
       places={places}
       contacts={contacts}
       trip={trip}

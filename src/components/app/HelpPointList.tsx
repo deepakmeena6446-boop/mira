@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { HELP_CLASSES, SOURCE_NAME, hoursLine, minutesIn, type HelpPoint } from "@/domain/help-points";
+import { localTime, openState } from "@/domain/opening-hours";
 import { Icon } from "@/components/ui/Icon";
 import type { RouteOption } from "./RouteOptions";
 import { lightingLine } from "./LightingSummary";
@@ -51,7 +52,7 @@ export function HelpPointList({ points, onPick, defaultOpen = false }: { points:
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold">{p.name}</span>
                       <span className="block truncate text-xs text-ink-muted">
-                        {HELP_CLASSES[p.cls].label} · {minutesIn(p.alongM ?? 0)} · {hoursLine(p)}
+                        {HELP_CLASSES[p.cls].label} · {minutesIn(p.alongM ?? 0)} · {hoursLine({ ...p, open: openState(p.schedule, localTime(new Date()), Math.round((p.alongM ?? 0) / 75)) })}
                       </span>
                     </span>
                   </button>

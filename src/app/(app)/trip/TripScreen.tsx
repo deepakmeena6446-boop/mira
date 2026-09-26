@@ -16,8 +16,9 @@ import { api } from "@/lib/api-client";
 import { setLocation, useClock } from "@/lib/location-store";
 import { shareLiveLink } from "@/lib/share";
 import { clearTripRoutes, keepTripRoute, tripRoute } from "@/lib/trip-route";
-import { EMERGENCY_NUMBER, emergencyHref } from "@/domain/emergency";
-import { HELP_CLASSES, hoursLine, isNight, rankHelpPoints, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
+import { HELP_CLASSES, hoursLine, isNight, rankHelpPoints, type HelpClass, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
+import { localTime } from "@/domain/opening-hours";
+import { setLocale, useLocale, type ClientLocale } from "@/lib/locale-store";
 import { MISS_GRACE_MS } from "@/domain/journey";
 import type { TripView } from "@/server/trips";
 import type { SafetyNet } from "@/server/health/safety-net";
@@ -34,7 +35,22 @@ function haversine(a: { lat: number; lon: number }, b: { lat: number; lon: numbe
 /** Help Points around her are looked up again only after she has moved this far. */
 const HELP_REFETCH_M = 600;
 
-export function TripScreen({ initial, initialNet, tiles }: { initial: TripView; initialNet: SafetyNet; tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null } }) {
+const MODE_LINE: Record<string, string> = { ride: "by auto or cab", transit: "by metro or bus", other: "" };
+
+export function TripScreen({
+  initial,
+  initialNet,
+  tiles,
+  helpExclude = [],
+  canTell = false,
+}: {
+  initial: TripView;
+  initialNet: SafetyNet;
+  tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null };
+  helpExclude?: string[];
+  /** She has accepted trusted contacts and email is on: "Tell my people now" can reach someone. */
+  canTell?: boolean;
+}) {
   const router = useRouter();
   const toast = useToast();
   const [trip, setTrip] = useState(initial);
@@ -46,6 +62,10 @@ export function TripScreen({ initial, initialNet, tiles }: { initial: TripView; 
   const helpInFlight = useRef(false);
   const [focus, setFocus] = useState<RankedHelpPoint | null>(null);
   const [unsafe, setUnsafe] = useState(false);
+  const [area, setAreaName] = useState<string | null>(null);
+  const locale = useLocale();
+  const exclude = helpExclude as HelpClass[];
+  const walking = initial.mode === "walk" && initial.autoArrival;
   const clock = useClock(); // null during server render: times appear after hydration (the server doesn't know your zone)
   const now = clock?.getTime() ?? new Date(initial.etaAt).getTime();
   const [snap, setSnap] = useState<Snap>("half");
@@ -89,7 +109,7 @@ export function TripScreen({ initial, initialNet, tiles }: { initial: TripView; 
 
   // Route from where I am to the destination, when this device doesn't already have it.
   useEffect(() => {
-    if (!me || route) return;
+    if (!me || route || !walking) return;
     void api<{ route: { geometry: Array<[number, number]>; approximate: boolean } }>("/api/geo/route", { body: { from: me, to: { lat: trip.destination.lat, lon: trip.destination.lon } } }).then((r) => {
       if (!r.ok) return;
       setRoute(r.data.route.geometry);
@@ -97,6 +117,18 @@ export function TripScreen({ initial, initialNet, tiles }: { initial: TripView; 
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me !== null]);
+
+  // Where she is in words, and the emergency number for this country (once per journey screen).
+  const hasFix = me !== null;
+  useEffect(() => {
+    if (!hasFix || !me) return;
+    void api<{ label: string | null; locale?: ClientLocale }>("/api/geo/reverse", { body: me }).then((r) => {
+      if (!r.ok) return;
+      setAreaName(r.data.label);
+      setLocale(r.data.locale);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasFix]);
 
   // Help Points around her, fetched ahead (and again once she has moved on), so "I feel unsafe" is instant.
   useEffect(() => {
@@ -110,7 +142,11 @@ export function TripScreen({ initial, initialNet, tiles }: { initial: TripView; 
     });
   }, [open, me, help]);
   const night = isNight((clock ?? new Date()).getHours());
-  const ranked = useMemo(() => (me && help ? rankHelpPoints(help.points, me, { night, route }) : []), [me, help, night, route]);
+  const minuteKey = clock ? Math.floor(clock.getTime() / 60_000) : 0;
+  const ranked = useMemo(
+    () => (me && help ? rankHelpPoints(help.points, me, { night, route, now: minuteKey ? localTime(new Date(minuteKey * 60_000)) : undefined, exclude }) : []),
+    [me, help, night, route, minuteKey, exclude],
+  );
   const nextHelp = ranked[0] ?? null;
 
   // Live location while the screen is open: throttled to 20 s or 50 m.
@@ -200,23 +236,28 @@ export function TripScreen({ initial, initialNet, tiles }: { initial: TripView; 
   if (!open) {
     // After a walk in the dark (arrived or ended), one tap tells the next person whether the way was lit.
     const hour = clock?.getHours() ?? 12;
-    const askLit = (trip.state === "arrived" || trip.state === "ended") && route !== null && route.length > 2 && isNight(hour);
+    const askLit = walking && (trip.state === "arrived" || trip.state === "ended") && route !== null && route.length > 2 && isNight(hour);
     return (
       <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-32 text-center">
         <div className="animate-rise">
           <MiraOrb size={84} />
         </div>
         <h1 className="mt-6 text-3xl font-extrabold animate-rise">
-          {trip.state === "arrived" ? "You made it 🎉" : trip.state === "ended" ? "Journey ended" : "Journey closed"}
+          {!trip.autoArrival && trip.state !== "expired" ? "Sharing stopped" : trip.state === "arrived" ? "You made it 🎉" : trip.state === "ended" ? "Journey ended" : "Journey closed"}
         </h1>
         <p className="mt-2 max-w-sm text-ink-muted animate-rise">
-          {trip.state === "arrived"
+          {!trip.autoArrival
+            ? "Nobody can follow your live location any more."
+            : trip.state === "arrived"
             ? `Glad you're at ${trip.destination.name}. ${sharedOk.length ? `${names(sharedOk.map((c) => c.name))} can see you arrived.` : "Your live link now just says you arrived."}`
             : "Live sharing is off."}{" "}
           Journey details are deleted
           {trip.purgeAt && clock ? ` by ${time(trip.purgeAt)}` : " soon"}. MIRA doesn&apos;t keep a history of where you&apos;ve been.
         </p>
         {askLit ? <LitQuestion route={route!} onDone={() => clearTripRoutes()} /> : null}
+        <Link href="/report" className="mt-5 inline-flex min-h-11 items-center gap-1.5 text-sm font-bold text-ink-muted">
+          <Icon name="flag" className="size-4" /> Something happened on the way? Report it privately
+        </Link>
         <Button
           className="mt-8 max-w-xs"
           variant="hero"
@@ -254,7 +295,7 @@ export function TripScreen({ initial, initialNet, tiles }: { initial: TripView; 
               </span>
               {sharedOk.length ? "Sharing live" : "Journey in progress"}
             </p>
-            <h1 className="truncate font-extrabold">To {trip.destination.name}</h1>
+            <h1 className="truncate font-extrabold">{trip.autoArrival ? `To ${trip.destination.name}${MODE_LINE[trip.mode] ? ` · ${MODE_LINE[trip.mode]}` : ""}` : "Sharing where you are"}</h1>
           </div>
         </div>
         <div className="pointer-events-auto mx-auto mt-2 flex max-w-xl justify-end">
@@ -299,8 +340,8 @@ export function TripScreen({ initial, initialNet, tiles }: { initial: TripView; 
                     ? "I tried to reach your contacts but couldn't confirm the message went out."
                     : "Nobody was notified — either no contact on this trip has accepted your invite, or email isn't available right now."}{" "}
               If you&apos;re in danger,{" "}
-              <a href={emergencyHref()} className="font-bold text-ink underline">
-                call {EMERGENCY_NUMBER}
+              <a href={`tel:${locale.emergency.number}`} className="font-bold text-ink underline">
+                call {locale.emergency.number}
               </a>{" "}
               or your local emergency number.
             </p>
@@ -313,7 +354,7 @@ export function TripScreen({ initial, initialNet, tiles }: { initial: TripView; 
             <p className="text-4xl font-extrabold tabular-nums">{!clock ? "…" : left > 0 ? span : mins < 1 ? "now" : `${span} ago`}</p>
             <p className="text-ink-muted">
               {clock ? `ETA ${time(trip.etaAt)}` : "ETA"}
-              {distance !== null ? ` · ${distance < 1000 ? `${Math.round(distance / 10) * 10} m` : `${(distance / 1000).toFixed(1)} km`} to go` : ""}
+              {distance !== null && trip.autoArrival ? ` · ${distance < 1000 ? `${Math.round(distance / 10) * 10} m` : `${(distance / 1000).toFixed(1)} km`} to go` : ""}
             </p>
           </div>
           {sharedOk.length ? (
@@ -326,9 +367,15 @@ export function TripScreen({ initial, initialNet, tiles }: { initial: TripView; 
         </div>
 
         <div className="mt-4 grid gap-3">
-          <Button variant="hero" size="lg" onClick={() => act("arrive")} busy={busy === "arrive"} busyLabel="Saving…">
-            <Icon name="check" /> I&apos;m here
-          </Button>
+          {trip.autoArrival ? (
+            <Button variant="hero" size="lg" onClick={() => act("arrive")} busy={busy === "arrive"} busyLabel="Saving…">
+              <Icon name="check" /> I&apos;m here
+            </Button>
+          ) : (
+            <Button variant="hero" size="lg" onClick={() => act("arrive")} busy={busy === "arrive"} busyLabel="Stopping…">
+              <Icon name="check" /> I&apos;m okay — stop sharing
+            </Button>
+          )}
           <Button variant={sharedOk.length ? "secondary" : "primary"} onClick={share} disabled={!trip.shareUrl}>
             <Icon name="share" className="size-4" /> Send my live link
           </Button>
@@ -344,8 +391,14 @@ export function TripScreen({ initial, initialNet, tiles }: { initial: TripView; 
         <p className="mt-4 text-sm text-ink-muted">
           {sharedOk.length
             ? `${names(sharedOk.map((c) => c.name))} can see where you are until you arrive${netDown ? "." : `, and are emailed if you haven't arrived ${Math.round(MISS_GRACE_MS / 60_000)} min after your ETA.`}`
-            : "Only people you send your live link to can follow. Nobody is alerted if you don't arrive — add someone in Me for that."}
+            : "Only people you send your live link to can follow. Nobody is alerted if you don't arrive — add someone in Circle for that."}
         </p>
+        {trip.checkRequestedAt && clock && clock.getTime() - new Date(trip.checkRequestedAt).getTime() < 30 * 60_000 ? (
+          <p role="status" className="mt-3 rounded-2xl bg-mint-soft px-4 py-3 text-sm">
+            You asked {sharedOk.length ? names(sharedOk.map((c) => c.name)) : "your people"} to check on you at {time(trip.checkRequestedAt)}. MIRA didn&apos;t contact anyone else.
+          </p>
+        ) : null}
+
         {/* The nearest Help Point, ranked for right now */}
         {focus ? (
           <div className="mt-3 rounded-3xl bg-accent-soft p-4">
@@ -411,7 +464,6 @@ export function TripScreen({ initial, initialNet, tiles }: { initial: TripView; 
         open={unsafe}
         onClose={() => setUnsafe(false)}
         me={me}
-        area={null}
         helpPoints={help?.points ?? []}
         helpLoading={!help}
         helpFailed={Boolean(help?.failed)}
@@ -423,6 +475,22 @@ export function TripScreen({ initial, initialNet, tiles }: { initial: TripView; 
         }}
         goLabel="Show"
         share={trip.shareUrl ? { label: "Send my live link", detail: "Anyone you send it to sees where you are until you arrive.", onShare: share } : null}
+        tell={
+          canTell
+            ? {
+                names: sharedOk.length ? sharedOk.map((c) => c.name) : ["your trusted contacts"],
+                onTell: async () => {
+                  const r = await api<{ told: string[]; failed: string[]; trip: TripView }>(`/api/trips/${trip.id}/checkon`, { body: {} });
+                  if (!r.ok) return { error: r.message };
+                  setTrip(r.data.trip);
+                  return { told: r.data.told, failed: r.data.failed };
+                },
+              }
+            : null
+        }
+        area={area}
+        landmark={nextHelp?.name ?? null}
+        exclude={exclude}
         onTrip
       />
     </div>

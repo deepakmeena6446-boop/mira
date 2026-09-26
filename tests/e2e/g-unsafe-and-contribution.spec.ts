@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { db, newUser, openRoute } from "./helpers";
+import { db, newUser, openRoute, testClientIp } from "./helpers";
 
 test.describe("When something feels wrong — instant, deterministic help", () => {
   test("Home: 'I feel unsafe' shows every action at once, with no Mira call, and walks to a Help Point", async ({ browser }) => {
@@ -60,6 +60,25 @@ test.describe("When something feels wrong — instant, deterministic help", () =
   });
 });
 
+test.describe("Journeys that aren't walks", () => {
+  test("by auto or cab: she picks the ETA, and the journey screen says how she's travelling", async ({ browser }) => {
+    const { ctx, page } = await newUser(browser, "Meher");
+    await openRoute(page);
+    await page.getByRole("radio", { name: "Auto / cab" }).click();
+    await page.getByRole("radio", { name: "45 min" }).click();
+    await expect(page.getByText(/expected in 45 min/)).toBeVisible();
+    await page.getByRole("button", { name: /Start with MIRA/ }).click();
+    await page.waitForURL("**/trip");
+    await expect(page.getByRole("heading", { name: /by auto or cab/ })).toBeVisible();
+    const [trip] = await db`SELECT mode, eta_at, created_at FROM journeys ORDER BY created_at DESC LIMIT 1`;
+    expect(trip.mode).toBe("ride");
+    expect(Math.round((new Date(trip.eta_at).getTime() - new Date(trip.created_at).getTime()) / 60_000)).toBe(45);
+    await page.getByRole("button", { name: "End trip without arriving" }).click();
+    await page.getByRole("button", { name: "End trip", exact: true }).click();
+    await ctx.close();
+  });
+});
+
 test.describe("After — one tiny factual contribution", () => {
   test("after a journey at night, even one ended early, she's asked 'Was the way lit?' once", async ({ browser }) => {
     const { ctx, page } = await newUser(browser, "Noor");
@@ -84,7 +103,7 @@ test.describe("After — one tiny factual contribution", () => {
 
 test.describe("Degraded states are honest", () => {
   test("with location denied, Home explains it, search still works, and Emergency is still one tap", async ({ browser }) => {
-    const ctx = await browser.newContext({ permissions: [] });
+    const ctx = await browser.newContext({ permissions: [], extraHTTPHeaders: { "x-forwarded-for": testClientIp() } });
     const page = await ctx.newPage();
     await page.goto("/");
     await page.waitForURL("**/welcome");

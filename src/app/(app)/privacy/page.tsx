@@ -65,18 +65,26 @@ export default function PrivacyPage() {
               you&apos;re done.
             </p>
           </Item>
+          <Item emoji="🔔" title="Notifications">
+            <p>
+              If you turn them on in Me, your phone&apos;s push service (Google, Apple or Mozilla) delivers MIRA&apos;s notifications to you: a missed check-in, someone
+              accepting your invite, or your live location pausing. Notifications never contain your location. Turn them off in Me at any time.
+            </p>
+          </Item>
           <Item emoji="📞" title="If you feel unsafe">
             <p>
               &ldquo;I feel unsafe&rdquo; and Emergency work on your phone alone: nothing is sent to MIRA or anyone else until you tap an action. Emergency opens your
               phone&apos;s dialler with {EMERGENCY_NUMBER}; MIRA doesn&apos;t call, dispatch or alert anyone for you. &ldquo;Call someone&rdquo; uses your phone&apos;s
-              contacts or a number you type, and MIRA never sees or keeps it.
+              contacts or a number you type, and MIRA never sees or keeps it. &ldquo;Tell my people now&rdquo; emails your accepted trusted contacts your live link
+              and asks them to check on you — only when you tap it. &ldquo;Your location in words&rdquo; is shown on your screen only.
             </p>
             <p>Help Points are staffed kinds of places (hospitals, police, stations, pharmacies, fuel, hotels) from map data. MIRA can&apos;t confirm they&apos;re open or who&apos;s there.</p>
           </Item>
           <Item emoji="👤" title="Your account">
             <p>
-              Your name, saved places and trusted contacts (their emails are encrypted). Delete your account in Me and all of it is erased; any reports you sent stay
-              anonymous and can no longer be linked to you.
+              Your name, saved places (encrypted) and trusted contacts (their emails are encrypted). If you add your email to keep your account, it&apos;s stored
+              encrypted and only used for sign-in links. Delete your account in Me and all of it is erased; any reports you sent stay anonymous and can no longer be linked
+              to you. An account with an email that isn&apos;t used for over a year is deleted; one without an email goes when you sign out or its session ends.
             </p>
           </Item>
           <Item emoji="✨" title="Chatting with Mira">
@@ -93,7 +101,9 @@ export default function PrivacyPage() {
           </Item>
           <Item emoji="📝" title="Reports">
             <p>Only a rough area (about 1 km), roughly when, and the kind of thing are kept — never your exact spot. Notes are encrypted and read only by a moderator.</p>
-            <p>Nothing is shown on its own. A soft note appears on the map only when at least five different people have reported something similar nearby, and disappears after five weeks. Reports are deleted within 30 days.</p>
+            <p>
+              Nothing is shown on its own. A fixed-wording note appears on a route that passes through the area only when at least five different people have reported something similar nearby, and disappears after five weeks. Reports are deleted within 30 days. How reports are reviewed is in MIRA&apos;s moderation policy (MODERATION_POLICY.md in the project).
+            </p>
           </Item>
           <Item emoji="💡" title="Street lighting">
             <p>

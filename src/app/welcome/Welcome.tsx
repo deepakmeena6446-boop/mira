@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 import { api } from "@/lib/api-client";
 import { requestLocation } from "@/lib/location-store";
+import { EmailSignIn } from "@/components/app/EmailSignIn";
 
 export const WELCOMED_KEY = "mira.welcomed";
 
@@ -106,6 +107,7 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
         className="mt-6 w-full max-w-xs min-h-14 rounded-2xl border border-line bg-surface px-5 text-center text-xl font-semibold outline-none focus:border-accent"
       />
       {error ? <p className="mt-2 text-sm font-semibold text-error">{error}</p> : null}
+      <EmailSignIn />
     </div>,
   ];
 

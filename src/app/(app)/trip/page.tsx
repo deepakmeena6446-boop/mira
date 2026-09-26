@@ -6,6 +6,8 @@ import { getUser } from "@/server/session/user";
 import { currentTrip } from "@/server/trips";
 import { safetyNet } from "@/server/health/safety-net";
 import { tileConfig } from "@/server/providers/geo/tiles";
+import { listContacts } from "@/server/account/contacts";
+import { smtpConfigured } from "@/server/config/env";
 import { TripScreen } from "./TripScreen";
 
 export const dynamic = "force-dynamic";
@@ -17,5 +19,7 @@ export default async function TripPage() {
   if (!user) redirect("/");
   const trip = await currentTrip(sql, user.id, systemClock.now());
   if (!trip) redirect("/");
-  return <TripScreen initial={trip} initialNet={await safetyNet(sql, systemClock)} tiles={await tileConfig()} />;
+  const contacts = await listContacts(sql, user.id);
+  const canTell = smtpConfigured() && contacts.some((c) => c.status === "accepted" && c.isDefault);
+  return <TripScreen initial={trip} initialNet={await safetyNet(sql, systemClock)} tiles={await tileConfig()} helpExclude={user.helpExclude} canTell={canTell} />;
 }

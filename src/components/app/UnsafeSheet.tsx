@@ -5,14 +5,21 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useOverlay } from "@/lib/use-overlay";
 import { useClock } from "@/lib/location-store";
-import { EMERGENCY_NUMBER, emergencyHref } from "@/domain/emergency";
-import { HELP_CLASSES, SOURCE_NAME, hoursLine, isNight, rankHelpPoints, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
+import { HELP_CLASSES, SOURCE_NAME, hoursLine, isNight, rankHelpPoints, type HelpClass, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
+import { localTime } from "@/domain/opening-hours";
+import { useLocale } from "@/lib/locale-store";
 import { Icon } from "@/components/ui/Icon";
 
 export interface UnsafeShareAction {
   label: string;
   detail: string;
   onShare: () => void | Promise<void>;
+}
+
+/** "Tell my people now": emails her accepted trusted contacts, with their live link. */
+export interface UnsafeTellAction {
+  names: string[];
+  onTell: () => Promise<{ told: string[]; failed: string[] } | { error: string }>;
 }
 
 /**
@@ -34,6 +41,9 @@ export function UnsafeSheet({
   onGoHelpPoint,
   goLabel,
   share,
+  tell,
+  landmark,
+  exclude,
   onTrip,
 }: {
   open: boolean;
@@ -48,14 +58,25 @@ export function UnsafeSheet({
   onGoHelpPoint: (p: RankedHelpPoint) => void;
   goLabel: string;
   share: UnsafeShareAction | null;
+  tell?: UnsafeTellAction | null;
+  /** The nearest named place she's by (for "your location in words"). */
+  landmark?: string | null;
+  /** Help Point classes she chose not to see. */
+  exclude?: readonly HelpClass[];
   onTrip?: boolean;
 }) {
   useOverlay(open, onClose);
   const now = useClock();
+  const locale = useLocale();
   const night = isNight((now ?? new Date()).getHours());
-  const ranked = useMemo(() => (me ? rankHelpPoints(helpPoints, me, { night, route }) : []), [helpPoints, me, night, route]);
+  const minuteKey = now ? Math.floor(now.getTime() / 60_000) : 0;
+  const ranked = useMemo(
+    () => (me ? rankHelpPoints(helpPoints, me, { night, route, now: minuteKey ? localTime(new Date(minuteKey * 60_000)) : undefined, exclude }) : []),
+    [helpPoints, me, night, route, minuteKey, exclude],
+  );
   const [first, ...more] = ranked;
   if (!open) return null;
+  const number = locale.emergency.number;
 
   const sources = [...new Set(ranked.slice(0, 3).map((p) => SOURCE_NAME[p.source]))];
   // Portal: screens are position:fixed (their own stacking context), and this must sit above the tab bar.
@@ -129,6 +150,7 @@ export function UnsafeSheet({
         </div>
 
         {/* 2. Tell people */}
+        {tell ? <TellMyPeople tell={tell} /> : null}
         {share ? (
           <button type="button" onClick={() => void share.onShare()} className="mt-3 flex w-full items-center gap-3 rounded-3xl border border-line p-4 text-left">
             <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-2xl bg-sunken text-accent">
@@ -144,10 +166,29 @@ export function UnsafeSheet({
         {/* 3. Call */}
         <div className="mt-3 grid grid-cols-2 gap-3">
           <CallSomeone />
-          <a href={emergencyHref()} aria-label={`Emergency call, ${EMERGENCY_NUMBER}`} className="flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-ink px-3 text-[0.95rem] font-extrabold text-canvas">
-            <Icon name="phone" className="size-5" /> Emergency {EMERGENCY_NUMBER}
+          <a href={`tel:${number}`} aria-label={`Emergency call, ${number}`} className="flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-ink px-3 text-[0.95rem] font-extrabold text-canvas">
+            <Icon name="phone" className="size-5" /> Emergency {number}
           </a>
         </div>
+        {locale.helplines.length ? (
+          <ul className="mt-2 space-y-1">
+            {locale.helplines.map((h) => (
+              <li key={h.number}>
+                <a href={`tel:${h.number}`} className="flex min-h-11 items-center justify-between rounded-2xl bg-sunken px-4 text-sm">
+                  <span className="font-semibold">{h.name}</span>
+                  <span className="font-extrabold">
+                    {h.number}
+                    {h.hours ? <span className="font-normal text-ink-muted"> · {h.hours}</span> : null}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {!locale.confirmed ? <p className="mt-2 text-xs text-ink-muted">Emergency number for this country not confirmed in MIRA yet. {number} works on most mobile networks.</p> : null}
+
+        {/* Where she is, in words she can read to a call-taker (shown to her only; never sent). */}
+        {me ? <LocationInWords me={me} area={area} landmark={landmark ?? first?.name ?? null} /> : null}
 
         {/* 4. Quiet options */}
         <div className="mt-4 flex items-center justify-between gap-2 text-sm">
@@ -230,5 +271,71 @@ function CallSomeone() {
         Call
       </button>
     </form>
+  );
+}
+
+function TellMyPeople({ tell }: { tell: UnsafeTellAction }) {
+  const [state, setState] = useState<{ kind: "idle" | "busy" } | { kind: "done"; told: string[]; failed: string[] } | { kind: "error"; message: string }>({ kind: "idle" });
+  const who = tell.names.length <= 2 ? tell.names.join(" and ") : `${tell.names.slice(0, -1).join(", ")} and ${tell.names[tell.names.length - 1]}`;
+  if (state.kind === "done") {
+    return (
+      <p role="status" className="mt-3 rounded-3xl bg-mint-soft p-4 text-sm">
+        {state.told.length ? <strong>Emailed {state.told.join(" and ")}. </strong> : null}
+        {state.told.length ? "They can see where you are and were asked to check on you. " : ""}
+        {state.failed.length ? `Couldn't reach ${state.failed.join(", ")} — call them, or send your live link. ` : ""}
+        MIRA didn&apos;t contact anyone else.
+      </p>
+    );
+  }
+  return (
+    <button
+      type="button"
+      disabled={state.kind === "busy"}
+      onClick={async () => {
+        setState({ kind: "busy" });
+        const r = await tell.onTell();
+        setState("error" in r ? { kind: "error", message: r.error } : { kind: "done", ...r });
+      }}
+      className="mt-3 flex w-full items-center gap-3 rounded-3xl border-2 border-accent/40 p-4 text-left disabled:opacity-60"
+    >
+      <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-2xl bg-accent-soft text-accent-strong">
+        <Icon name="send" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-extrabold">{state.kind === "busy" ? "Telling them…" : "Tell my people now"}</span>
+        <span className="block text-sm text-ink-muted">
+          {state.kind === "error" ? state.message : `Emails ${who} your live location and asks them to check on you.`}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function LocationInWords({ me, area, landmark }: { me: { lat: number; lon: number }; area: string | null; landmark: string | null }) {
+  const [copied, setCopied] = useState(false);
+  const place = [landmark ? `near ${landmark}` : null, area?.replace(/^Near /, "") ?? null].filter(Boolean).join(", ");
+  const coords = `${me.lat.toFixed(5)}, ${me.lon.toFixed(5)}`;
+  const text = `I'm ${place || "here"}. Coordinates: ${coords}.`;
+  return (
+    <div className="mt-3 rounded-2xl bg-sunken px-4 py-3 text-sm">
+      <p className="text-xs font-bold uppercase tracking-wider text-ink-subtle">Your location in words</p>
+      <p className="mt-1">
+        {place ? <span className="font-semibold">I&apos;m {place}.</span> : null} <span className="text-ink-muted">Coordinates {coords}</span>
+      </p>
+      <button
+        type="button"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+          } catch {
+            setCopied(false);
+          }
+        }}
+        className="mt-1 min-h-11 font-bold text-accent"
+      >
+        {copied ? "Copied" : "Copy to read out or send"}
+      </button>
+    </div>
   );
 }

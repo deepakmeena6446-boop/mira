@@ -102,7 +102,7 @@ export function WorldMap({
   className,
   label,
 }: {
-  tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null };
+  tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null; provider?: string };
   me: LngLat | null;
   dest?: LngLat | null;
   route?: Array<[number, number]> | null;
@@ -390,6 +390,12 @@ export function WorldMap({
     <div className={className ?? "absolute inset-0"}>
       {/* A labelled region (not role="img"), so the place pins inside stay reachable by screen readers. */}
       <div ref={ref} role="region" aria-label={label} className="h-full w-full bg-sunken" />
+      {/* Google Map Tiles terms: the Google mark must be visible on the map (the sheet covers the bottom). */}
+      {tiles.provider === "google" ? (
+        <span aria-hidden className="pointer-events-none absolute left-3 z-10 select-none rounded bg-white/80 px-1.5 text-[13px] font-semibold tracking-tight text-[#5f6368]" style={{ top: padding.top + 6 }}>
+          Google
+        </span>
+      ) : null}
     </div>
   );
 }

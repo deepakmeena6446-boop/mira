@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { MiraOrb } from "./MiraOrb";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api-client";
+import { EmailSignIn } from "./EmailSignIn";
 
 /**
  * Sign-in sheet. Placeholder mode: "Continue" creates a real local account from a
@@ -22,8 +23,8 @@ export function SignInSheet({ open, onClose, reason }: { open: boolean; onClose:
   // Portal: screens are position:fixed (their own stacking context), and this must sit above the tab bar.
   return createPortal(
     <div role="dialog" aria-modal="true" aria-labelledby="signin-h" className="fixed inset-0 z-50 flex items-end justify-center bg-[rgb(10_6_24/0.45)] animate-fade sm:items-center" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md animate-rise rounded-t-[2rem] bg-surface p-7 pb-[max(1.75rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[2rem]">
       <form
-        onClick={(e) => e.stopPropagation()}
         onSubmit={async (e) => {
           e.preventDefault();
           if (!name.trim() || busy) return;
@@ -36,7 +37,6 @@ export function SignInSheet({ open, onClose, reason }: { open: boolean; onClose:
             router.refresh();
           } else setError(res.message);
         }}
-        className="w-full max-w-md animate-rise rounded-t-[2rem] bg-surface p-7 pb-[max(1.75rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[2rem]"
       >
         <MiraOrb size={52} />
         <h2 id="signin-h" className="mt-4 text-2xl font-extrabold">
@@ -60,8 +60,12 @@ export function SignInSheet({ open, onClose, reason }: { open: boolean; onClose:
         <Button type="submit" variant="hero" size="lg" className="mt-5" busy={busy} busyLabel="Setting up…" disabled={!name.trim()}>
           Continue
         </Button>
-        <p className="mt-3 text-center text-xs text-ink-subtle">No email or password: your account lives in this browser.</p>
+        <p className="mt-3 text-center text-xs text-ink-subtle">No password. You can add your email later in Me to keep your account.</p>
       </form>
+      <div className="text-center">
+        <EmailSignIn />
+      </div>
+      </div>
     </div>,
     document.body,
   );

@@ -83,8 +83,8 @@ test.describe("Mobile extras — long-press report, inbox, time of day, installa
     const { installabilityErrors } = await cdp.send("Page.getInstallabilityErrors");
     expect(installabilityErrors).toEqual([]);
     // The offline cache holds no personal pages — only the offline page and static files.
-    await page.waitForFunction(async () => (await caches.keys()).includes("mira-shell-v2"));
-    const cached = await page.evaluate(async () => (await (await caches.open("mira-shell-v2")).keys()).map((r) => new URL(r.url).pathname).sort());
+    await page.waitForFunction(async () => (await caches.keys()).includes("mira-shell-v3"));
+    const cached = await page.evaluate(async () => (await (await caches.open("mira-shell-v3")).keys()).map((r) => new URL(r.url).pathname).sort());
     expect(cached).toEqual(["/daypart.js", "/icon.svg", "/manifest.webmanifest", "/offline.html"]);
     // Offline, a navigation gets the offline page (never someone's cached home screen).
     await page.context().setOffline(true);
