@@ -30,12 +30,12 @@ test.describe("Mira — the companion (placeholder engine)", () => {
     await ctx.close();
   });
 
-  test("points to 112 when someone says they're in danger, and never claims to be help itself", async ({ browser }) => {
+  test("points to Emergency when someone says they're in danger, and never claims to be help itself", async ({ browser }) => {
     const { ctx, page } = await newUser(browser, "Sana");
     await openMira(page);
     await page.getByPlaceholder("Message Mira…").fill("someone is following me, I'm scared");
     await page.getByRole("button", { name: "Send" }).click();
-    await expect(page.getByRole("log").getByText(/please call 112/)).toBeVisible();
+    await expect(page.getByRole("log").getByText(/If you're in danger right now/)).toBeVisible();
     await expect(page.getByRole("link", { name: /Call 112/ })).toHaveAttribute("href", "tel:112");
     await page.getByPlaceholder("Message Mira…").fill("who are you");
     await page.getByRole("button", { name: "Send" }).click();

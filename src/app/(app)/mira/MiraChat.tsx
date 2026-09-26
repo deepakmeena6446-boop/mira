@@ -27,20 +27,28 @@ interface Msg {
   failed?: boolean;
 }
 
-// Quick replies follow the time of day: errands by day, the walk home after dark.
-const QUICK: Record<Daypart, string[]> = {
-  dawn: ["What's open near me", "Take me home", "Report something", "I feel uneasy"],
-  day: ["Pharmacy near me", "Take me home", "Report something", "I feel uneasy"],
-  evening: ["Take me home", "What's open near me", "I feel uneasy", "Report something"],
-  night: ["Walk me home", "I feel uneasy", "What's open now", "What time is it?"],
-};
+/** What Mira is good at, as tappable examples (signed out, they open sign-in). */
+const EXAMPLES = ["Take me home", "What's open nearby?", "I'm landing in London at 11 PM", "Find somewhere staffed nearby", "I feel uneasy"];
+/** After dark, the journey home and Help Points come first. */
+const NIGHT_EXAMPLES = ["Take me home", "I feel uneasy", "Find somewhere staffed nearby", "What's open nearby?", "I'm landing in London at 11 PM"];
+
 const INTRO: Record<Daypart, (name: string) => string> = {
-  dawn: (n) => `Morning${n}! ☀️ Early start? I can share your trip live with people you trust, find what's open, or help you report something privately.`,
-  day: (n) => `Hi${n}! I'm Mira 👋 I can share your trip live with people you trust, find what's open nearby, or help you report something privately. What do you need?`,
-  evening: (n) => `Good evening${n} 🌆 Heading somewhere? I can share your walk live with people you trust, or find what's open nearby.`,
-  night: (n) => `Hey${n} 🌙 It's late. Want me to share your walk home with someone you trust? I can also find what's still open near you.`,
+  dawn: (n) => `Morning${n}! Early start? I can share your journey with people you trust, find Help Points and what's open, and tell you what MIRA knows about where you are.`,
+  day: (n) => `Hi${n}, I'm Mira. I can share your journey with people you trust, find Help Points and what's open nearby, and tell you what MIRA knows — and doesn't — about where you are.`,
+  evening: (n) => `Good evening${n}. Heading somewhere? I can share your journey with people you trust, or find Help Points and what's open nearby.`,
+  night: (n) => `Hey${n}, it's late. Want me to share your journey home with someone you trust? I can also find Help Points and what's still open near you.`,
 };
+const MODE_LABEL = { walk: "Walk", ride: "Ride (taxi / app cab)", transit: "Public transport" } as const;
 const fmtM = (m?: number) => (m === undefined ? "" : m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`);
+
+/** The phone's IANA time zone (e.g. "Europe/London"), so Mira knows her local day and time. */
+function deviceTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
 
 type StartTrip = (d: { name: string; lat: number; lon: number }) => Promise<void>;
 
@@ -66,19 +74,32 @@ function TripCardButton({ label, onStart }: { label: string; onStart: () => Prom
 
 function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
   const router = useRouter();
+  const goTo = (d: { name: string; lat: number; lon: number; kind?: string }) => {
+    setPendingDestination(d);
+    router.push("/");
+  };
   switch (card.type) {
-    case "trip":
+    case "trip": {
+      const mode = card.mode ?? "walk";
       return (
         <div className="mt-2 rounded-3xl bg-surface p-4 shadow-[var(--shadow-card)]">
-          <p className="text-xs font-bold uppercase tracking-wider text-ink-subtle">Share trip</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-ink-subtle">Share journey</p>
           <p className="mt-1 text-lg font-extrabold">To {card.destination.name}</p>
           <p className="text-sm text-ink-muted">
-            {card.minutes ? `About ${card.minutes} min walk · ` : ""}
+            {mode === "walk" ? (card.minutes ? `About ${card.minutes} min walk · ` : "") : `${MODE_LABEL[mode]} · `}
             {card.contacts.length ? `${card.contacts.join(", ")} can follow live` : "Private — I'll check you arrive"}
           </p>
-          <TripCardButton label="Start with MIRA" onStart={() => onTrip(card.destination)} />
+          {mode === "walk" ? (
+            <TripCardButton label="Start with MIRA" onStart={() => onTrip(card.destination)} />
+          ) : (
+            // Home plans rides and public transport, and asks her for the ETA.
+            <Button className="mt-3" variant="hero" onClick={() => goTo(card.destination)}>
+              <Icon name="share" className="size-4" /> Plan it on Home
+            </Button>
+          )}
         </div>
       );
+    }
     case "places":
       return (
         <div className="mt-2 overflow-hidden rounded-3xl bg-surface shadow-[var(--shadow-card)]">
@@ -86,14 +107,7 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
           <ul className="divide-y divide-line">
             {card.places.map((p) => (
               <li key={`${p.name}-${p.lat}`}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPendingDestination({ name: p.name, lat: p.lat, lon: p.lon, kind: p.kind });
-                    router.push("/");
-                  }}
-                  className="flex min-h-13 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-sunken"
-                >
+                <button type="button" onClick={() => goTo({ name: p.name, lat: p.lat, lon: p.lon, kind: p.kind })} className="flex min-h-13 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-sunken">
                   <span className="text-xl" aria-hidden>
                     {kindEmoji(p.kind)}
                   </span>
@@ -106,6 +120,34 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
               </li>
             ))}
           </ul>
+        </div>
+      );
+    case "help_points":
+      return (
+        <div className="mt-2 overflow-hidden rounded-3xl bg-surface shadow-[var(--shadow-card)]">
+          <p className="px-4 pt-3 text-xs font-bold uppercase tracking-wider text-ink-subtle">{card.title}</p>
+          <ul className="divide-y divide-line">
+            {card.points.map((p) => (
+              <li key={`${p.name}-${p.lat}`}>
+                <button type="button" onClick={() => goTo({ name: p.name, lat: p.lat, lon: p.lon, kind: p.label })} className="flex min-h-13 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-sunken">
+                  <span className="text-xl" aria-hidden>
+                    {p.emoji}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold text-mixed">{p.name}</span>
+                    <span className="block text-xs text-ink-muted">
+                      {p.label} · {p.hours}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-right text-sm text-ink-subtle">
+                    ~{p.minutes} min
+                    <span className="block text-[0.7rem]">{p.source}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="px-4 pb-3 pt-1 text-xs text-ink-subtle">Places where help is usually available. Walking times are estimates.</p>
         </div>
       );
     case "report":
@@ -122,18 +164,18 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
           <EmergencyPill variant="block" className="w-full" />
           <p className="mt-1 text-center text-xs text-ink-subtle">Opens your phone&apos;s dialler. MIRA doesn&apos;t call anyone for you.</p>
           <p className="mt-2 text-center text-sm text-ink-muted">
-            {card.contacts.length ? `Or share your trip below so ${card.contacts.join(", ")} can see where you are.` : "Add trusted contacts in Circle so I can alert them next time."}
+            {card.contacts.length ? `You can also share your journey so ${card.contacts.join(", ")} can see where you are.` : "Add people you trust in Circle (under Me) so they can follow your journeys."}
           </p>
         </div>
       );
     case "trip_status":
       return (
-        <Link href="/trip" className="mt-2 flex items-center gap-3 rounded-3xl bg-mira p-4 text-white shadow-[var(--shadow-float)]">
+        <Link href="/trip" className="mt-2 flex items-center gap-3 rounded-3xl bg-surface p-4 shadow-[var(--shadow-card)]">
           <span className="flex-1">
             <span className="block font-extrabold">On the way to {card.destination}</span>
-            <span className="block text-sm text-white/85">ETA {new Date(card.etaAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+            <span className="block text-sm text-ink-muted">ETA {new Date(card.etaAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
           </span>
-          <Icon name="chevron" />
+          <Icon name="chevron" className="text-ink-subtle" />
         </Link>
       );
     case "save_place":
@@ -143,6 +185,33 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
         </Link>
       );
   }
+}
+
+/** Signed out: what Mira does, why she needs an account, and what to ask. */
+function SignedOutIntro({ onSignIn }: { onSignIn: () => void }) {
+  return (
+    <div className="animate-rise rounded-3xl bg-surface p-5 shadow-[var(--shadow-card)]">
+      <p className="text-lg font-extrabold">Mira is your travel companion</p>
+      <p className="mt-2 text-ink-muted">
+        She shares your journey with people you trust, finds Help Points and what&apos;s open near you, and tells you what MIRA knows — and what it doesn&apos;t — about where you are. She never guesses whether a place is safe.
+      </p>
+      <p className="mt-2 text-sm text-ink-muted">Mira needs an account because your conversation is saved (you can clear it any time).</p>
+      <p className="mt-4 text-xs font-bold uppercase tracking-wider text-ink-subtle">You could ask</p>
+      <ul className="mt-2 flex flex-wrap gap-2">
+        {EXAMPLES.map((q) => (
+          <li key={q}>
+            <button type="button" onClick={onSignIn} className="min-h-11 rounded-full border border-line bg-canvas px-4 text-sm font-semibold hover:border-accent/40">
+              {q}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <Button className="mt-4 w-full" variant="hero" onClick={onSignIn}>
+        Sign in to talk to Mira
+      </Button>
+      <p className="mt-3 text-center text-xs text-ink-subtle">Emergency and &ldquo;I feel unsafe&rdquo; are on Home and never wait for Mira.</p>
+    </div>
+  );
 }
 
 export function MiraChat({ user }: { user: { name: string; avatarUrl: string | null } | null }) {
@@ -183,7 +252,7 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
       const res = await fetch("/api/mira", {
         method: "POST",
         headers: { "content-type": "application/json", "x-mira-request": "1" },
-        body: JSON.stringify({ message, context: { localTime: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), location: loc.point ? { lat: loc.point.lat, lon: loc.point.lon } : null, area: loc.area } }),
+        body: JSON.stringify({ message, context: { localTime: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), tz: deviceTimeZone(), location: loc.point ? { lat: loc.point.lat, lon: loc.point.lon } : null, area: loc.area } }),
       });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => null);
@@ -235,16 +304,15 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
 
   const firstName = user?.name.split(" ")[0];
   const part = useDaypart() ?? "day";
+  const chips = part === "night" ? NIGHT_EXAMPLES : EXAMPLES;
 
   return (
-    <div className="bg-companion flex h-dvh flex-col">
-      <header className="glass z-10 flex items-center gap-3 border-b border-glass-edge px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
-        <MiraOrb size={44} />
+    <div className="flex h-dvh flex-col bg-canvas">
+      <header className="z-10 flex items-center gap-3 border-b border-line bg-canvas px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
+        <MiraOrb size={36} calm />
         <div>
           <h1 className="text-xl font-extrabold leading-tight">Mira</h1>
-          <p className="flex items-center gap-1.5 text-sm text-ink-muted">
-            <span className="size-2 rounded-full bg-mint" /> Your walking companion
-          </p>
+          <p className="text-sm text-ink-muted">Your travel companion · facts from maps and MIRA&apos;s country data</p>
         </div>
       </header>
 
@@ -252,9 +320,10 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
       <p className="sr-only" aria-live="polite">
         {announce}
       </p>
-      <div role="log" aria-live="off" aria-label="Conversation with Mira" className="flex-1 overflow-y-auto px-4 pb-44 pt-4">
+      <div role="log" aria-live="off" aria-label="Conversation with Mira" className={cx("flex-1 overflow-y-auto px-4 pt-4", user ? "pb-44" : "pb-28")}>
         <div className="mx-auto flex max-w-xl flex-col gap-3">
-          {(!user || (loaded && msgs.length === 0)) && (
+          {!user && <SignedOutIntro onSignIn={() => setSignIn(true)} />}
+          {user && loaded && msgs.length === 0 && (
             <div className="animate-rise">
               <div className="flex items-end gap-2">
                 <MiraOrb size={30} calm />
@@ -267,7 +336,7 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
           {msgs.map((m) =>
             m.role === "user" ? (
               <div key={m.id} className="flex justify-end animate-rise">
-                <p className="max-w-[80%] rounded-3xl rounded-br-md bg-accent px-4 py-2.5 text-accent-ink text-mixed">{m.text}</p>
+                <p className="max-w-[80%] rounded-3xl rounded-br-md bg-accent-soft px-4 py-2.5 text-ink text-mixed">{m.text}</p>
               </div>
             ) : (
               <div key={m.id} className="flex items-end gap-2 animate-rise">
@@ -287,33 +356,35 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-[calc(5.4rem+env(safe-area-inset-bottom))] z-30 px-4">
-        <div className="mx-auto max-w-xl">
-          <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
-            {QUICK[part].map((q) => (
-              <button key={q} type="button" onClick={() => send(q)} className="min-h-11 shrink-0 rounded-full border border-line bg-surface px-4 text-sm font-semibold shadow-[var(--shadow-card)] hover:border-accent/40">
-                {q}
+      {user && (
+        <div className="fixed inset-x-0 bottom-[calc(5.4rem+env(safe-area-inset-bottom))] z-30 px-4">
+          <div className="mx-auto max-w-xl">
+            <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
+              {chips.map((q) => (
+                <button key={q} type="button" onClick={() => send(q)} disabled={sending} className="min-h-11 shrink-0 rounded-full border border-line bg-surface px-4 text-sm font-semibold shadow-[var(--shadow-card)] hover:border-accent/40">
+                  {q}
+                </button>
+              ))}
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void send(input);
+              }}
+              className="flex items-center gap-2 rounded-full border border-line bg-surface p-1.5 pl-5 shadow-[var(--shadow-float)]"
+            >
+              <label htmlFor="mira-input" className="sr-only">
+                Message Mira
+              </label>
+              <input id="mira-input" value={input} onChange={(e) => setInput(e.target.value)} maxLength={1000} placeholder="Message Mira…" autoComplete="off" className="min-h-11 flex-1 bg-transparent text-base outline-none" />
+              <button type="submit" disabled={!input.trim() || sending} aria-label="Send" className={cx("grid size-11 place-items-center rounded-full transition-colors", input.trim() ? "bg-accent text-accent-ink" : "bg-sunken text-ink-subtle")}>
+                <Icon name="send" className="size-5" />
               </button>
-            ))}
+            </form>
           </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void send(input);
-            }}
-            className="glass flex items-center gap-2 rounded-full border border-glass-edge p-1.5 pl-5 shadow-[var(--shadow-float)]"
-          >
-            <label htmlFor="mira-input" className="sr-only">
-              Message Mira
-            </label>
-            <input id="mira-input" value={input} onChange={(e) => setInput(e.target.value)} maxLength={1000} placeholder="Message Mira…" autoComplete="off" className="min-h-11 flex-1 bg-transparent text-base outline-none" />
-            <button type="submit" disabled={!input.trim() || sending} aria-label="Send" className={cx("grid size-11 place-items-center rounded-full text-white transition-all", input.trim() ? "bg-mira" : "bg-line-strong")}>
-              <Icon name="send" className="size-5" />
-            </button>
-          </form>
         </div>
-      </div>
-      <SignInSheet open={signIn} onClose={() => setSignIn(false)} reason="Sign in to chat with Mira" />
+      )}
+      <SignInSheet open={signIn} onClose={() => setSignIn(false)} reason="Sign in to talk to Mira" />
     </div>
   );
 }
