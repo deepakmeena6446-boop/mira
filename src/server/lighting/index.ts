@@ -160,7 +160,8 @@ export async function lightingForRoutes(sql: postgres.Sql, geometries: Array<Arr
 }
 
 const VALUE: Record<LitVote, number> = { lit: 1, partly: 0, dark: -1 };
-const isoWeek = (d: Date) => {
+/** ISO week label ("2026-39"): the rotation period of lighting voter hashes. */
+export const isoWeek = (d: Date) => {
   const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
   t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
   const start = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));

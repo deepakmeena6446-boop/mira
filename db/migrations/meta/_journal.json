@@ -92,6 +92,13 @@
       "when": 1790431849733,
       "tag": "0012_global_day0",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790432819380,
+      "tag": "0013_contributions",
+      "breakpoints": true
     }
   ]
 }

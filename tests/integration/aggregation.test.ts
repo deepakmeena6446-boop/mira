@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { getSql } from "@/server/db/client";
 import { runWeeklyAggregation, recheckReleasesForReport, suppressRelease } from "@/server/aggregate/run";
@@ -7,6 +7,8 @@ import { POST as nearbyPOST } from "@/app/api/geo/nearby/route";
 import { encodeGeohash } from "@/domain/geohash";
 import { loadFixturePilot, fixturePlaceId } from "../helpers/pilot";
 import { jsonRequest, allKeys, PRIVATE_FIELD_NAMES } from "../helpers/http";
+import { applyTestEnv } from "../setup/test-env";
+import { resetEnvCache } from "@/server/config/env";
 
 /**
  * TEST-ONLY synthetic observations inserted straight into the test database. They
@@ -55,12 +57,19 @@ async function know(time: "now" | "evening" | "late" = "late") {
 
 describe("community release end to end (synthetic test fixtures)", () => {
   beforeAll(async () => {
+    // Public notes are off by default (no moderation operations yet); these tests exercise the release path.
+    applyTestEnv({ PUBLIC_AGGREGATE_RELEASES: "on" });
+    resetEnvCache();
     const sql = getSql();
     await loadFixturePilot(sql);
     placeId = await fixturePlaceId(sql, "Fixture Pharmacy");
     const [p] = await sql<{ lat: number; lon: number }[]>`SELECT ST_Y(point) AS lat, ST_X(point) AS lon FROM places WHERE id = ${placeId}`;
     point = { lat: p.lat, lon: p.lon };
     cell = encodeGeohash(p.lat, p.lon);
+  });
+  afterAll(() => {
+    applyTestEnv();
+    resetEnvCache();
   });
   beforeEach(async () => {
     const sql = getSql();

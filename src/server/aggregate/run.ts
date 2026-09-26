@@ -4,6 +4,7 @@ import { ELIGIBLE_SUBMISSION_DAYS } from "@/domain/aggregation";
 import { isIstMonday, istWeekMonday } from "@/domain/time-bands";
 import type { Category } from "@/domain/report/taxonomy";
 import type { Clock } from "@/server/clock";
+import { getEnv } from "@/server/config/env";
 
 export interface RunSummary {
   ran: boolean;
@@ -11,15 +12,32 @@ export interface RunSummary {
   keysEvaluated: number;
   releasesCreated: number;
   heldForBurst: number;
+  /** True when public releases are switched off (PUBLIC_AGGREGATE_RELEASES), so nothing was computed or published. */
+  disabled?: boolean;
+}
+
+/**
+ * Public community notes are OFF unless PUBLIC_AGGREGATE_RELEASES=on. Until moderation operations
+ * exist (someone actually on review duty), reports stay private and the weekly job publishes nothing.
+ * Fail safe: unset, "off" or anything unreadable means off.
+ */
+export function publicReleasesEnabled(): boolean {
+  try {
+    return getEnv().PUBLIC_AGGREGATE_RELEASES === "on";
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Weekly release (Mondays, IST). Idempotent per week and serialised with an advisory
- * lock, so several workers or a manual run can't double-release.
+ * lock, so several workers or a manual run can't double-release. Does nothing at all unless
+ * public releases are switched on (publicReleasesEnabled).
  */
 export async function runWeeklyAggregation(sql: postgres.Sql, clock: Clock): Promise<RunSummary> {
   const now = clock.now();
   const week = istWeekMonday(now);
+  if (!publicReleasesEnabled()) return { ran: false, releaseWeek: week, keysEvaluated: 0, releasesCreated: 0, heldForBurst: 0, disabled: true };
   if (!isIstMonday(now)) return { ran: false, releaseWeek: week, keysEvaluated: 0, releasesCreated: 0, heldForBurst: 0 };
   return sql.begin(async (tx) => {
     await tx`SELECT pg_advisory_xact_lock(hashtext('mira-weekly-aggregation'))`;

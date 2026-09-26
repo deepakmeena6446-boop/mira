@@ -23,6 +23,7 @@ import type { Clock } from "@/server/clock";
 import type { Mailer } from "@/server/mail";
 import { inviteEmail } from "@/server/mail/templates";
 import { displayName } from "@/domain/know-copy";
+import { captureCheckEvidence } from "@/server/contributions";
 
 export const LABEL_MAX = 60;
 
@@ -208,6 +209,7 @@ export async function userAction(sql: postgres.Sql, actorHash: string, id: strin
     const [updated] = await tx<JourneyRow[]>`
       UPDATE journeys SET state = ${t.next}, closed_at = ${closed}, purge_at = ${purge} WHERE id = ${id} RETURNING *`;
     await tx`UPDATE contact_invites SET expires_at = LEAST(expires_at, ${now}) WHERE journey_id = ${id}`;
+    if (t.next === "arrived") await captureCheckEvidence(tx, id, now); // Contribute (MIRA Checks): evidence before the points are deleted; never fails the action
     await tx`DELETE FROM trip_locations WHERE journey_id = ${id}`; // live points never outlive the trip
     return updated;
   });

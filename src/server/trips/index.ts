@@ -13,6 +13,7 @@ import { shareTargets } from "@/server/account/contacts";
 import { tooMany } from "@/server/http/errors";
 import { checkOnMeEmail, tripSharedEmail } from "@/server/mail/templates";
 import type { User } from "@/server/session/user";
+import { captureCheckEvidence } from "@/server/contributions";
 
 export const ARRIVAL_RADIUS_M = 75;
 export const ARRIVAL_DWELL_MS = 45_000;
@@ -276,6 +277,7 @@ export async function addLocation(sql: postgres.Sql, userId: string, id: string,
     const near = haversineMeters(p, { lat: j.dest_lat, lon: j.dest_lon }) <= ARRIVAL_RADIUS_M;
     if (near && j.near_dest_since && now.getTime() - new Date(j.near_dest_since).getTime() >= ARRIVAL_DWELL_MS) {
       await tx`UPDATE journeys SET state = 'arrived', closed_at = ${now}, purge_at = ${purgeAt(now)}, last_location_at = ${now} WHERE id = ${id}`;
+      await captureCheckEvidence(tx, id, now); // Contribute (MIRA Checks): evidence captured before the points are deleted; never fails the arrival
       await tx`DELETE FROM trip_locations WHERE journey_id = ${id}`;
       return { arrived: true };
     }

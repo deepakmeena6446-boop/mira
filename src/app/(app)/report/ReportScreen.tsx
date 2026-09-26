@@ -89,7 +89,7 @@ export function ReportScreen({ preset }: { preset: Category | null }) {
         <MiraOrb size={84} />
         <h1 className="mt-6 text-3xl font-extrabold animate-rise">Thank you 💜</h1>
         <p className="mt-2 max-w-sm text-ink-muted animate-rise">
-          Your report is private. A person reviews it, and it only ever shows up as a combined, anonymous note once enough people have seen the same thing.
+          Submitted privately. Reports may be reviewed before they can contribute to MIRA&apos;s information. Nothing you send is ever shown on its own.
         </p>
         <p className="mt-2 max-w-sm text-sm text-ink-muted">
           If you&apos;re in danger right now, <EmergencyPill variant="link" />.
@@ -113,7 +113,7 @@ export function ReportScreen({ preset }: { preset: Category | null }) {
           <div className="animate-rise">
             <h1 className="text-3xl font-extrabold">What happened?</h1>
             <p className="mt-1 text-ink-muted">
-              {spot ? `Reporting ${spot.name ? spot.name.replace(/^Near /, "near ") : "the spot you picked on the map"}. ` : ""}Private and anonymous. It helps others know what&apos;s been noticed around here.
+              {spot ? `Reporting ${spot.name ? spot.name.replace(/^Near /, "near ") : "the spot you picked on the map"}. ` : ""}Private and anonymous.
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3">
               {TILES.map((t) => (
@@ -204,7 +204,7 @@ export function ReportScreen({ preset }: { preset: Category | null }) {
             <Button className="mt-5" variant="hero" size="lg" onClick={send} busy={busy} busyLabel="Sending privately…" disabled={!point && loc.status !== "asking"}>
               Send privately
             </Button>
-            <p className="mt-3 text-center text-xs text-ink-subtle">Reviewed by a person. Never shown on its own.</p>
+            <p className="mt-3 text-center text-xs text-ink-subtle">Submitted privately. Reports may be reviewed before they can contribute to MIRA&apos;s information. Never shown on its own.</p>
             <SearchOverlay
               open={choosing}
               onClose={() => setChoosing(false)}

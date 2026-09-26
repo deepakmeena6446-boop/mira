@@ -5,6 +5,8 @@ import { runWeeklyAggregation } from "@/server/aggregate/run";
 import { processJourneys } from "@/server/journey/worker";
 import { getMailer } from "@/server/mail";
 import { drainPushOutbox, pushConfigured, webPushSender } from "@/server/providers/notify/push";
+import { runContributionsJob } from "@/server/contributions";
+import { getGeo } from "@/server/providers/geo";
 
 /** All periodic jobs. Each is idempotent and safe to run concurrently with the web app. */
 export const JOBS: WorkerJob[] = [
@@ -46,6 +48,15 @@ export const JOBS: WorkerJob[] = [
     run: async ({ sql, clock, log }) => {
       const r = await runWeeklyAggregation(sql, clock);
       if (r.ran) log("aggregation.released", { week: r.releaseWeek, keys: r.keysEvaluated, releases: r.releasesCreated, burstHeld: r.heldForBurst });
+    },
+  },
+  {
+    // MIRA Checks from finished walks (one Help Point lookup each), then decide pending contribution receipts.
+    name: "contributions",
+    intervalMs: 2 * 60_000,
+    run: async ({ sql, clock, log }) => {
+      const r = await runContributionsJob(sql, getGeo(), clock.now());
+      if (r.checksReady || r.verified || r.contradicted) log("contributions.decided", r);
     },
   },
 ];

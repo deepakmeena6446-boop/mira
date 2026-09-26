@@ -5,6 +5,7 @@ import { assertSameOrigin } from "@/server/http/csrf";
 import { clientIp, dailyKey, enforce } from "@/server/ratelimit";
 import { requireUser } from "@/server/session/user";
 import { recordLitVote } from "@/server/lighting";
+import { recordLightingReceipt } from "@/server/contributions";
 
 export const dynamic = "force-dynamic";
 
@@ -21,5 +22,10 @@ export const POST = handle(async (req: Request) => {
   await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "lit:vote:ip:h", max: 200, windowMs: 3600_000 }], now);
   const { route, vote } = await readJson(req, body, 64 * 1024);
   const cells = await recordLitVote(sql, user.id, route, vote, now);
-  return json({ ok: true, cells });
+  // Her private receipt (pending until others agree by the same walker rule); the vote itself stays unlinkable.
+  const receipt = await recordLightingReceipt(sql, user.id, route, vote, now).catch((err) => {
+    console.warn(JSON.stringify({ t: now.toISOString(), src: "web", event: "contributions.receipt_failed", error: err instanceof Error ? err.name : "unknown" }));
+    return null; // the answer itself is saved; only her private receipt is missing
+  });
+  return json({ ok: true, cells, receipt });
 });
