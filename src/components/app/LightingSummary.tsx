@@ -29,7 +29,11 @@ export function lightingLine(lighting: RouteLighting | null): string {
   if (known === 0) return "Lighting not known";
   const lit = lighting.summary.lit;
   const litLabel = lighting.confirmed?.lit && lighting.confirmed.lit === lit ? "lit (walkers)" : "mapped as lit";
-  return [`${lit}% ${litLabel}`, lighting.summary.poles ? `${lighting.summary.poles}% streetlights mapped` : null, `${lighting.summary.unknown}% not known`].filter(Boolean).join(" · ");
+  // Only shares that exist (no "0% mapped as lit" noise); the unknown share is shown whenever there is one.
+  const s = lighting.summary;
+  return [s.lit ? `${lit}% ${litLabel}` : null, s.poles ? `${s.poles}% streetlights mapped` : null, s.dark ? `${s.dark}% mapped as unlit` : null, s.unknown ? `${s.unknown}% not known` : null]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /**

@@ -1,7 +1,7 @@
 import "server-only";
 import { placeStatusFor } from "@/server/contributions";
 import type postgres from "postgres";
-import { classWeight, dedupeHelpPoints, helpPointsAlongRoute, helpWeightsFor, rankHelpPoints, samplePointsForRoutes, type HelpPoint } from "@/domain/help-points";
+import { HELP_CLASSES, classWeight, dedupeHelpPoints, helpPointsAlongRoute, helpWeightsFor, rankHelpPoints, samplePointsForRoutes, type HelpPoint } from "@/domain/help-points";
 import { haversineMeters } from "@/domain/pilot";
 import type { GeoPoint, GeoProvider } from "@/server/providers/geo";
 import type { HelpHours } from "@/server/providers/geo/types";
@@ -77,8 +77,10 @@ export async function helpPointsForRoutes(geo: GeoProvider, geometries: Array<Ar
   const candidates = await quiet(geo.helpPlaces(samplePointsForRoutes(real), SAMPLE_RADIUS_M));
   const along = geometries.map((g) => (g.length > 2 ? helpPointsAlongRoute(candidates, g) : []));
   if (opts.hours === false) return along;
-  const order: HelpPoint[] = [];
-  for (let i = 0; order.length < HOURS_SHORTLIST * 3 && along.some((a) => a[i]); i++) for (const a of along) if (a[i]) order.push(a[i]);
+  const passing: HelpPoint[] = [];
+  for (let i = 0; passing.length < HOURS_SHORTLIST * 3 && along.some((a) => a[i]); i++) for (const a of along) if (a[i]) passing.push(a[i]);
+  // Spend the few hours lookups where hours change the answer (pharmacies, stations, fuel), then the rest.
+  const order = [...passing.filter((p) => HELP_CLASSES[p.cls].hoursMatter), ...passing.filter((p) => !HELP_CLASSES[p.cls].hoursMatter)];
   const enriched = new Map((await enrichHours(geo, order)).map((p) => [p.id, p]));
   return along.map((a) => a.map((p) => (enriched.has(p.id) ? { ...enriched.get(p.id)!, alongM: p.alongM } : p)));
 }
@@ -101,10 +103,10 @@ export async function helpPointsNear(geo: GeoProvider, p: GeoPoint, opts: { coun
     })
     .slice(0, NEAR_MAX);
   const keep = new Map(found.map((h) => [h.id, h]));
-  return enrichHours(
-    geo,
-    shortlist.map((h) => keep.get(h.id)!),
-  );
+  const ranked = shortlist.map((h) => keep.get(h.id)!);
+  // Hours lookups go first to classes where hours decide whether it's worth walking there; order stays ranked.
+  const enriched = new Map((await enrichHours(geo, [...ranked.filter((h) => HELP_CLASSES[h.cls].hoursMatter), ...ranked.filter((h) => !HELP_CLASSES[h.cls].hoursMatter)])).map((h) => [h.id, h]));
+  return ranked.map((h) => enriched.get(h.id) ?? h);
 }
 
 /**

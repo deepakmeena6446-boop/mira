@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { countryContext, profiledCountries } from "@/server/locale";
-import { emergencyDial, emergencyLine, UNKNOWN_COUNTRY } from "@/domain/country-context";
+import { emergencyDial, emergencyLine, otherEmergencyNumbers, UNKNOWN_COUNTRY } from "@/domain/country-context";
 
 /**
  * Every cited profile in data/locales must load (a malformed file is a safety bug), and the
@@ -43,6 +43,11 @@ describe("Country Context", () => {
     expect(gb.emergency.also.map((a) => a.number)).not.toContain("999");
     const ae = countryContext("AE");
     expect(ae.emergency.services.map((s) => s.number)).toEqual(expect.arrayContaining(["998", "997"]));
+  });
+
+  it("merges other numbers per number, without the primary (Japan: 119 ambulance / fire)", () => {
+    expect(otherEmergencyNumbers(countryContext("JP"))).toEqual([{ number: "119", label: "Ambulance / Fire" }]);
+    expect(otherEmergencyNumbers(countryContext("AQ"))).toEqual([]);
   });
 
   it("rejects malformed codes", () => {

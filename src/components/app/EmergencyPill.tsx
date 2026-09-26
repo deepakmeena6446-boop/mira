@@ -44,9 +44,19 @@ export function EmergencyPill({ className, variant = "pill" }: { className?: str
         {icon}
         <span>{variant === "link" ? "call emergency services" : "Emergency"}</span>
       </button>
-      {explain ? <UnknownNumberSheet onClose={() => setExplain(false)} countryName={country.countryName} /> : null}
+      {explain ? <UnknownNumberSheet onClose={() => setExplain(false)} countryName={country.countryName ?? regionName(country.iso)} /> : null}
     </>
   );
+}
+
+/** "Peru" for "PE", from the browser's own region names (no data file needed); null when unknown. */
+function regionName(iso: string | null): string | null {
+  if (!iso) return null;
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(iso) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function UnknownNumberSheet({ onClose, countryName }: { onClose: () => void; countryName: string | null }) {

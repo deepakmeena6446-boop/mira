@@ -76,6 +76,21 @@ export function emergencyDial(ctx: CountryContext): { number: string; known: boo
 export function emergencyLine(ctx: CountryContext): string {
   const p = ctx.emergency.primary;
   if (!p) return `Local emergency number: not known to MIRA for ${ctx.iso ?? "this location"} (112 is connected by most mobile networks).`;
-  const also = ctx.emergency.also.map((a) => a.number);
-  return `Local emergency number: ${p.number} (${p.label})${also.length ? `; ${also.join(", ")} also works` : ""}.`;
+  const other = otherEmergencyNumbers(ctx).map((n) => `${n.number} (${n.label})`);
+  return `Local emergency number: ${p.number} (${p.label})${other.length ? `; also ${other.join(", ")}` : ""}.`;
+}
+
+/**
+ * The country's other official numbers, besides the primary: numbers that also work and
+ * single-service numbers, one row per number with the services merged ("Ambulance / Fire" for
+ * Japan's 119). For the "I feel unsafe" sheet and Mira.
+ */
+export function otherEmergencyNumbers(ctx: CountryContext): EmergencyNumber[] {
+  const out = new Map<string, EmergencyNumber>();
+  for (const n of [...ctx.emergency.also, ...ctx.emergency.services]) {
+    if (n.number === ctx.emergency.primary?.number) continue;
+    const seen = out.get(n.number);
+    out.set(n.number, seen ? { ...seen, label: seen.label.includes(n.label) ? seen.label : `${seen.label} / ${n.label}` } : { number: n.number, label: n.label });
+  }
+  return [...out.values()];
 }

@@ -145,11 +145,15 @@ export function helpClassFromGoogle(primaryType: string | undefined): HelpClass 
  */
 const NOT_A_HOSPITAL =
   /\b(lab|labs|laborator\w*|diagnostic\w*|dental|dentist|clinic\w*|dispensary|council|pathology|scan|imaging|ayurved\w*|homeopath\w*|pharmaceutical\w*|braces|orthodont\w*|aesthetic\w*|cosmetic\w*|diet|physiotherap\w*|ivf|fertility|medical (?:equipment|supplies|devices))\b/i;
+/** A named doctor or a GP practice isn't a hospital ("Dr Khan", "Dr. Mehta's", "… Surgery", "… Medical Centre"). */
+const DOCTORS_PRACTICE = /^\s*dr\.?\s|\b(surgery|medical cent(?:re|er)|health cent(?:re|er)|gp|polyclinic)\b/i;
+const NOT_A_PHARMACY = /\b(homeopath\w*|ayurved\w*|herbal\w*|wholesale\w*|distributor\w*|pharmaceutical\w*)\b/i;
 const HOTEL_NAME = /\b(hotel|hotels|inn|resort)\b/i;
 const NOT_A_HOTEL = /\b(pg|paying guest|hostel|co-?living|oyo life)\b/i;
 
 export function plausibleHelpPoint(cls: HelpClass, name: string): boolean {
-  if (cls === "hospital") return !NOT_A_HOSPITAL.test(name);
+  if (cls === "hospital") return !NOT_A_HOSPITAL.test(name) && !DOCTORS_PRACTICE.test(name);
+  if (cls === "pharmacy") return !NOT_A_PHARMACY.test(name);
   if (cls === "hotel") return HOTEL_NAME.test(name) && !NOT_A_HOTEL.test(name);
   return true;
 }

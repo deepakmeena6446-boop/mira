@@ -165,8 +165,9 @@ export function WorldMap({
             sources: { base: { type: "raster", tiles: [rasterUrl], tileSize: 256, maxzoom: 22, attribution: tiles.attribution } },
             layers: [{ id: "base", type: "raster", source: "base" }],
           },
-          center: me ? [me.lon, me.lat] : [77.209, 28.6139],
-          zoom: me ? 15 : 11,
+          // Until she's located: the whole world, not any one country's capital (flies to her once known).
+          center: me ? [me.lon, me.lat] : [10, 20],
+          zoom: me ? 15 : 1.3,
           attributionControl: { compact: true },
           dragRotate: false,
           pitchWithRotate: false,

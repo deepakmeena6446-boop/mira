@@ -29,7 +29,7 @@ describe("journey context card", () => {
   it("states lighting with its unknown share, and the first Help Point on the way", () => {
     render(<RouteContextLines option={option(lighting(71, 22))} />);
     const card = screen.getByLabelText("What's known about this way");
-    expect(card).toHaveTextContent("71% mapped as lit · 22% not known");
+    expect(card).toHaveTextContent("71% mapped as lit · 7% mapped as unlit · 22% not known"); // every known share, never a 0%
     expect(card).toHaveTextContent("1 Help Point along the way · first: Corner Pharmacy, 6 min in");
     expect(card.textContent).not.toMatch(VERDICTS);
   });
