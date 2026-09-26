@@ -1,14 +1,21 @@
 import nodemailer from "nodemailer";
-import { getEnv, smtpConfigured } from "@/server/config/env";
+import { emailProvider, emailSender, getEnv, type ServerEnv } from "@/server/config/env";
+import { createResendMailer } from "./resend";
 
 export interface OutgoingMail {
   to: string;
   subject: string;
   text: string;
+  /**
+   * Optional stable key for this logical message (Resend honours it for 24 h). Leave it unset
+   * unless the same message could be sent twice by a retry: two different messages must never
+   * share a key, or the second is silently dropped.
+   */
+  idempotencyKey?: string;
 }
 
 /**
- * `definite: true` means the SMTP server refused the message (shown as failed);
+ * `definite: true` means the provider refused the message (shown as failed);
  * `definite: false` means we can't know whether it was accepted (shown as unconfirmed).
  */
 export type SendResult = { ok: true } | { ok: false; definite: boolean };
@@ -19,10 +26,22 @@ export interface Mailer {
 
 let cached: Mailer | null = null;
 
+/**
+ * The mailer every email in MIRA goes through (contact invites, trip links, missed-arrival
+ * alerts, sign-in links): Resend's HTTPS API in production, SMTP (Mailpit) for local dev and
+ * E2E. Null when neither is configured: callers must then say email is off.
+ */
 export function getMailer(): Mailer | null {
-  if (!smtpConfigured()) return null;
-  if (cached) return cached;
   const env = getEnv();
+  const provider = emailProvider(env);
+  if (provider === "none") return null;
+  if (cached) return cached;
+  cached = provider === "resend" ? createResendMailer({ apiKey: env.RESEND_API_KEY!, from: env.EMAIL_FROM! }) : createSmtpMailer(env);
+  return cached;
+}
+
+function createSmtpMailer(env: ServerEnv): Mailer {
+  const from = emailSender(env);
   const transport = nodemailer.createTransport({
     host: env.SMTP_HOST,
     // Explicit EHLO name: the OS hostname can trigger slow mDNS lookups (e.g. *.local).
@@ -36,17 +55,16 @@ export function getMailer(): Mailer | null {
     disableFileAccess: true,
     disableUrlAccess: true,
   });
-  cached = {
+  return {
     async send(mail) {
       try {
-        await transport.sendMail({ from: env.SMTP_FROM, to: mail.to, subject: mail.subject, text: mail.text });
+        await transport.sendMail({ from, to: mail.to, subject: mail.subject, text: mail.text });
         return { ok: true };
       } catch (err) {
         return { ok: false, definite: isDefiniteFailure(err) };
       }
     },
   };
-  return cached;
 }
 
 /** Test hook: forget the cached transport after env changes. */

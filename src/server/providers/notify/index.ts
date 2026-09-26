@@ -3,8 +3,9 @@ import type postgres from "postgres";
 import { getMailer } from "@/server/mail";
 
 /**
- * Contact delivery + in-app inbox. Placeholder today: email through the configured
- * SMTP (Mailpit locally) and an in-app notification list instead of push.
+ * Contact delivery + in-app inbox. Email goes through the configured provider (Resend's
+ * HTTPS API in production, SMTP/Mailpit locally; see `getMailer`). With no provider this
+ * reports a definite failure and nothing is sent.
  */
 export async function emailContact(to: string, subject: string, text: string): Promise<{ ok: boolean; definite?: boolean }> {
   const mailer = getMailer();
