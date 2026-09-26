@@ -31,6 +31,10 @@ export function applyTestEnv(overrides: Record<string, string | undefined> = {})
     GOOGLE_MAPS_SERVER_KEY: undefined,
     GOOGLE_MAPS_BROWSER_KEY: undefined,
     MAPILLARY_TOKEN: undefined,
+    // Tests run without Google: first-name sign-in stays on unless a test configures Google.
+    AUTH_GOOGLE_ID: undefined,
+    AUTH_GOOGLE_SECRET: undefined,
+    ALLOW_DEMO_SIGNIN: undefined,
     ...overrides,
   };
   for (const [k, v] of Object.entries(base)) {

@@ -55,7 +55,10 @@ export function testClientIp(): string {
   return `10.${b()}.${b()}.${b()}`;
 }
 
-/** A fresh person: own browser context with location granted, onboarded and signed in (demo auth). */
+/**
+ * A fresh person: own browser context with location granted, onboarded (no account needed), then
+ * signed in from the sign-in sheet with a first name (demo auth: E2E runs without Google).
+ */
 export async function newUser(browser: Browser, name: string): Promise<{ ctx: BrowserContext; page: Page }> {
   const ctx = await browser.newContext({ geolocation: GEO, permissions: ["geolocation"], extraHTTPHeaders: { "x-forwarded-for": testClientIp() } });
   const page = await ctx.newPage();
@@ -64,9 +67,13 @@ export async function newUser(browser: Browser, name: string): Promise<{ ctx: Br
   await expect(page.getByRole("heading", { name: "Walk home. Your people will know." })).toBeVisible();
   await page.getByRole("button", { name: "Let's go" }).click();
   await page.getByRole("button", { name: "Use my location" }).click();
+  await page.waitForURL((u) => u.pathname === "/"); // Home, signed out
+  await page.goto("/me");
+  await page.getByRole("button", { name: "Get started" }).click();
   await page.getByPlaceholder("Your first name").fill(name);
-  await page.getByRole("button", { name: "Start using MIRA" }).click();
-  await page.waitForURL((u) => u.pathname === "/");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await page.goto("/");
   await expect(page.getByText(new RegExp(name)).first()).toBeVisible();
   return { ctx, page };
 }

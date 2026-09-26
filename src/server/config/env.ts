@@ -94,8 +94,11 @@ const envSchema = z.object({
   // "on" = ask Google for Help Point opening hours (Places Enterprise SKU: higher cost). Default off.
   GOOGLE_PLACES_HOURS: optionalNonEmpty.refine((v) => v === undefined || v === "on" || v === "off", 'must be "on" or "off"'),
   MIRA_GLOBAL_DAILY_MAX: optionalNonEmpty.refine((v) => v === undefined || /^\d{1,7}$/.test(v), "must be a whole number"),
+  // Sign in with Google (OIDC). Both set = Google is the sign-in; first-name sign-in becomes a fallback.
   AUTH_GOOGLE_ID: optionalNonEmpty,
   AUTH_GOOGLE_SECRET: optionalNonEmpty,
+  // "on" = keep first-name (demo) sign-in available even when Google is configured. Default off.
+  ALLOW_DEMO_SIGNIN: optionalNonEmpty.refine((v) => v === undefined || v === "on" || v === "off", 'must be "on" or "off"'),
   VAPID_PUBLIC_KEY: optionalNonEmpty,
   VAPID_PRIVATE_KEY: optionalNonEmpty,
   // Contact for push services (mailto: or https:); defaults to APP_BASE_URL.
@@ -145,6 +148,19 @@ export function resetEnvCache(): void {
 
 export function smtpConfigured(env: ServerEnv = getEnv()): boolean {
   return Boolean(env.SMTP_HOST && env.SMTP_FROM);
+}
+
+/** Google sign-in works only with both halves of the OAuth client. */
+export function googleSignInConfigured(env: ServerEnv = getEnv()): boolean {
+  return Boolean(env.AUTH_GOOGLE_ID && env.AUTH_GOOGLE_SECRET);
+}
+
+/**
+ * First-name sign-in keeps no way back in (no email), so once Google exists it's a fallback only:
+ * on when Google isn't configured (local dev, tests) or when the owner explicitly allows it.
+ */
+export function demoSignInAllowed(env: ServerEnv = getEnv()): boolean {
+  return !googleSignInConfigured(env) || env.ALLOW_DEMO_SIGNIN === "on";
 }
 
 export function isProduction(env: ServerEnv = getEnv()): boolean {

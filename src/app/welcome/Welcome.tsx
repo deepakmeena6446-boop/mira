@@ -6,9 +6,8 @@ import { MiraOrb } from "@/components/app/MiraOrb";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
-import { api } from "@/lib/api-client";
 import { requestLocation } from "@/lib/location-store";
-import { EmailSignIn } from "@/components/app/EmailSignIn";
+import { SignInSheet } from "@/components/app/SignInSheet";
 
 export const WELCOMED_KEY = "mira.welcomed";
 
@@ -20,14 +19,16 @@ function markWelcomed() {
   }
 }
 
-/** Three-step onboarding: the promise → location → name. */
+/**
+ * Two steps, no account: the promise → location, then Home, signed out. She can search a place and
+ * see what's known about the way first; MIRA asks her to sign in only when she reaches something
+ * that needs an account (starting a journey, her circle, saved places, contributing, Mira).
+ */
 export function Welcome({ signedIn }: { signedIn: boolean }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [locMsg, setLocMsg] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [signIn, setSignIn] = useState(false);
 
   const finish = () => {
     markWelcomed();
@@ -37,29 +38,18 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
 
   const next = async () => {
     if (step === 0) return setStep(1);
-    if (step === 1) {
-      setBusy(true);
-      const s = await requestLocation();
-      setBusy(false);
-      if (s.status === "ok" || s.status === "denied" || s.status === "unavailable") {
-        if (s.status !== "ok") setLocMsg("No problem — you can turn it on later. You can always search for places instead.");
-        return signedIn ? finish() : setStep(2);
-      }
-      return;
-    }
-    if (!name.trim()) return;
     setBusy(true);
-    const r = await api("/api/auth/demo", { body: { name: name.trim() } });
+    const s = await requestLocation();
     setBusy(false);
-    if (r.ok) finish();
-    else setError(r.message);
+    // Allowed, refused or unavailable: Home explains the state, and search works either way.
+    if (s.status === "ok" || s.status === "denied" || s.status === "unavailable") finish();
   };
 
   const steps = [
     <div key="promise" className="flex flex-col items-center text-center">
       <MiraOrb size={72} />
       <h1 className="mt-7 text-4xl font-extrabold tracking-tight">Walk home. Your people will know.</h1>
-      <p className="mt-3 max-w-xs text-lg text-ink-muted">Know more about the way before you go, share your journey in one tap, and have help close at hand.</p>
+      <p className="mt-3 max-w-xs text-lg text-ink-muted">Google Maps tells you how to get somewhere. MIRA tells you what to know before you go, stays with you on the way, and helps if something feels wrong — anywhere.</p>
       <ul className="mt-8 w-full max-w-xs space-y-3 text-left">
         {[
           ["🧭", "Before you go", "How much of the way is mapped as lit, and the Help Points along it"],
@@ -84,35 +74,11 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
       </div>
       <h1 className="mt-8 text-3xl font-extrabold">Where are you?</h1>
       <p className="mt-3 max-w-xs text-lg text-ink-muted">MIRA uses your location to show the way from here, the Help Points near you, and to share the journeys you choose. It never keeps a history of where you&apos;ve been.</p>
-      {locMsg ? <p className="mt-4 rounded-2xl bg-surface px-4 py-2 text-sm font-semibold text-ink-muted">{locMsg}</p> : null}
-    </div>,
-    <div key="name" className="flex w-full flex-col items-center text-center">
-      <MiraOrb size={84} />
-      <h1 className="mt-7 text-3xl font-extrabold">What&apos;s your first name?</h1>
-      <p className="mt-2 max-w-xs text-ink-muted">Your people see this name when you share a journey. No email or password needed.</p>
-      <label htmlFor="w-name" className="sr-only">
-        Your first name
-      </label>
-      <input
-        id="w-name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        maxLength={40}
-        autoComplete="given-name"
-        enterKeyHint="go"
-        onKeyDown={(e) => {
-          if (e.key === "Enter") void next();
-        }}
-        placeholder="Your first name"
-        className="mt-6 w-full max-w-xs min-h-14 rounded-2xl border border-line bg-surface px-5 text-center text-xl font-semibold outline-none focus:border-accent"
-      />
-      {error ? <p className="mt-2 text-sm font-semibold text-error">{error}</p> : null}
-      <EmailSignIn />
+      <p className="mt-3 max-w-xs text-sm text-ink-subtle">No account needed to look around. You can always search for places instead.</p>
     </div>,
   ];
 
-
-  const total = signedIn ? 2 : 3;
+  const total = steps.length;
   return (
     <main id="main" className="bg-companion flex min-h-dvh flex-col px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
       <div className="flex items-center justify-between">
@@ -130,9 +96,15 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
           {steps[step]}
         </div>
       </div>
-      <Button variant="hero" size="lg" onClick={next} busy={busy} busyLabel={step === 1 ? "Asking…" : "Setting up…"} disabled={step === 2 && !name.trim()} className="mx-auto max-w-sm">
-        {step === 0 ? "Let's go" : step === 1 ? "Use my location" : "Start using MIRA"}
+      <Button variant="hero" size="lg" onClick={next} busy={busy} busyLabel="Asking…" className="mx-auto max-w-sm">
+        {step === 0 ? "Let's go" : "Use my location"}
       </Button>
+      {step === 0 && !signedIn ? (
+        <button type="button" onClick={() => setSignIn(true)} className="mx-auto mt-2 min-h-11 px-3 text-sm font-bold text-ink-muted">
+          Already use MIRA? Sign in
+        </button>
+      ) : null}
+      <SignInSheet open={signIn} reason="Welcome back" onClose={() => setSignIn(false)} />
     </main>
   );
 }
