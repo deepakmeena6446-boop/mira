@@ -73,7 +73,7 @@ Browser verification at 375×812 on the production build with live Google Maps: 
 
 ## KNOWN RISKS
 
-- **Help Point hours:** Google hours need the pricier Places SKU (owner decision, P1), so Google Help Points say "hours not known". At night, pharmacies, stations and fuel stations are demoted and labelled "may be closed".
+- **Help Point hours:** Google hours use the pricier Places Enterprise SKU; the owner approved it (2026-09-26, `GOOGLE_PLACES_HOURS=on`). Places Google lists without hours still say "hours not known". At night, pharmacies, stations and fuel stations are demoted and labelled "may be closed".
 - **Place-type quality varies** by city. The conservative rules drop obvious non-Help Points, but a "hospital" may still be a small nursing home. Everything is labelled with its source.
 - **Google spend:** up to 5 Nearby calls per route and 2 per near-me lookup. This is bounded per process (default 600/min, then OSM fallback), but not globally. Google Cloud quotas are the hard backstop (ops).
 - **Browser limits:** no background location, so the journey needs the screen on (honest copy, wake lock). Call someone's contact picker is Android Chrome only; elsewhere it's a typed number.
@@ -97,8 +97,7 @@ Browser verification at 375×812 on the production build with live Google Maps: 
 
 The P1 list was implemented in a second round (see `MIRA_EXECUTION_STATUS.md` → P1 EXECUTION). What's left of Horizon 1 needs you or a partner, not code:
 - **Google sign-in:** needs OAuth credentials. Email sign-in works now.
-- **Google Help Point hours:** a pricier SKU, behind `GOOGLE_PLACES_HOURS=on`.
-- **The official Google logo asset** on the map.
+- **Google Help Point hours:** approved and on (`GOOGLE_PLACES_HOURS=on`, Enterprise SKU). Watch the Places line in Google Cloud billing.
 - **Reviewer sign-off** on `data/locales/IN.json`.
 
 ## P2 / P3 NOT TOUCHED

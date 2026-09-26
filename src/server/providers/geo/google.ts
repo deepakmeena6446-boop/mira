@@ -155,8 +155,8 @@ type GHelpPlace = GPlace & {
 
 /**
  * Help Point candidates around one (already rounded) point. Same Pro-SKU fields as the
- * nearby list plus the machine place types; opening hours aren't requested (a pricier SKU),
- * so every Google Help Point honestly says "hours not known".
+ * nearby list plus the machine place types. With GOOGLE_PLACES_HOURS=on the listed opening
+ * hours come too (Enterprise SKU); off, every Google Help Point honestly says "hours not known".
  */
 async function helpNearby(key: string, c: GeoPoint, radiusM: number, types: readonly string[]): Promise<HelpPoint[]> {
   const ck = `${c.lat},${c.lon}|${Math.round(radiusM)}|${types.join(",")}`;

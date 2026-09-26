@@ -97,7 +97,7 @@ COMPLETED:
 TESTS: 13 unit tests (classes, plausibility, projection, corridor, sampling, ranking, determinism, copy without verdicts). Integration: route order, hours as listed, a chemist *shop* excluded, near-me, approximate routes claim nothing.
 
 KNOWN RISKS:
-- Opening hours: Google hours need a pricier SKU (P1 decision), so Google Help Points say "hours not known".
+- Opening hours: Google hours need a pricier SKU (P1 decision; approved and on since 2026-09-26).
 - Place-type quality varies (a "hospital" can be a small nursing home).
 - Google cost: up to 5 Nearby calls per route and 2 per near-me lookup, bounded by the new per-process budget (Phase 7).
 
@@ -225,7 +225,7 @@ Owner decisions taken up front (AskUserQuestion): license **AGPL-3.0**; durable 
 
 | Gap-analysis P1 item | Status | Where |
 |---|---|---|
-| 1. Help Point hours + deterministic ranking + filters; "Help Points near me" | Done. The OSM `opening_hours` strict parser runs open/closing/closed on the device clock, and places known closed (or closing before she'd arrive) are left out. Google hours sit behind `GOOGLE_PLACES_HOURS=on` (pricier SKU, owner's call; default off). Class filters are stored with the account. There's a "Help Points near me" sheet on Home | `domain/opening-hours.ts`, `domain/help-points.ts`, `HelpNearSheet.tsx`, Me → Help Points |
+| 1. Help Point hours + deterministic ranking + filters; "Help Points near me" | Done. The OSM `opening_hours` strict parser runs open/closing/closed on the device clock, and places known closed (or closing before she'd arrive) are left out. Google hours sit behind `GOOGLE_PLACES_HOURS=on` (pricier SKU; owner approved "on", 2026-09-26). Class filters are stored with the account. There's a "Help Points near me" sheet on Home | `domain/opening-hours.ts`, `domain/help-points.ts`, `HelpNearSheet.tsx`, Me → Help Points |
 | 2. Tell my people now + location in words | Done. It emails accepted contacts their live link with care wording, rate-limited to one per 5 minutes. On a private journey it adds her contacts (her tap is the consent); with no journey running it starts a "share where I am" one. The viewer page shows "asked you to check on them". Location in words (landmark, area, coordinates) is shown only on her screen, with a copy button | `trips/index.ts tellMyPeopleNow`, `UnsafeSheet.tsx`, `SharedTripView.tsx` |
 | 3. Route alternatives | Done in P0 | — |
 | 4. Next Help Point ahead on the trip | Done in P0, now hours-aware and filtered | `TripScreen.tsx` |
@@ -234,7 +234,7 @@ Owner decisions taken up front (AskUserQuestion): license **AGPL-3.0**; durable 
 | 7. Non-walking journeys with manual ETA | Done. Walk, Auto/cab or Metro/bus; she chooses the ETA; the 25 km walk limit doesn't apply; copy is mode-aware (trip screen, emails, viewer) | `trips/index.ts`, `HomeScreen.tsx` |
 | 8. Emergency number + time zone via Location Context (India profile) | Done. `data/locales/IN.json` has every value verified on official pages (MHA ERSS 112, WCD 181 with "not in West Bengal" honoured, PIB IST). Reverse geocoding returns country/state, and the pill, sheet, missed banner and Mira SOS card use it. Without a profile it shows "not confirmed… 112 works on most mobile networks". Times use the place's zone label, not hardcoded "IST" | `server/locale`, `lib/locale-store.ts`, `lib/time.ts` |
 | 9. ContextItem read-model; lighting freshness | Done. `domain/context.ts` (claim, source, observedAt, confidence tier, unknowns, verdict-free templates) feeds Mira's trip proposals: Mira gets evidence and picks relevance. Lighting shows "streets last edited 2016–2024" (OSM `out meta`) and "last seen" (Mapillary) | `domain/context.ts`, `server/lighting`, `LightingSummary.tsx` |
-| 10. Notes display, encrypt saved places, tabs, OG image, attribution, Mira model | Done. Notes: off the map and out of "Around you"; a dated route-card line with "Why am I seeing this?". Places: AES-GCM at rest, with a worker backfill for old rows. Tabs: Home · Circle · Me. OG image. Google mark on Google tiles. Mira: measured (below), kept `claude-opus-5`, switchable via `MIRA_MODEL` | various |
+| 10. Notes display, encrypt saved places, tabs, OG image, attribution, Mira model | Done. Notes: off the map and out of "Around you"; a dated route-card line with "Why am I seeing this?". Places: AES-GCM at rest, with a worker backfill for old rows. Tabs: Home · Circle · Me. OG image. The official Google Maps logo (outlined, day/night variants from Google's attribution pack) on Google tiles. Mira: measured (below), kept `claude-opus-5`, switchable via `MIRA_MODEL` | various |
 | 11. Public moderation policy; open-source readiness | Done. MODERATION_POLICY.md (describes what the code actually does); LICENSE (AGPL-3.0, verbatim from gnu.org), CONTRIBUTING, SECURITY, CODE_OF_CONDUCT (Contributor Covenant 2.1), PRINCIPLES, CODEOWNERS, CI workflow; V0 docs moved to `docs/archive/v0/` | repo root, `.github/` |
 | (from P0 risks) Inactivity retention before durable accounts | Done. Email accounts unused for 400 days are deleted; activity is recorded to the day only | `retention.ts`, `session/user.ts` |
 
@@ -248,7 +248,7 @@ All three chose the right tools: "uneasy" → options first (confirming the P0 f
 KNOWN RISKS (P1):
 - Opening-hours parsing ignores public-holiday rules. Hours are always labelled "listed".
 - Google hours stay "not known" until the owner switches on the SKU.
-- The "Google" mark is text, not the official logo asset. Replace it with Google's logo file before launch per their attribution guidelines.
+- ~~The "Google" mark is text~~ — replaced 2026-09-26 with the official Google Maps logo (`public/attribution/`, from Google's attribution assets zip).
 - Web Push needs an installed PWA on iOS (16.4+). Delivery depends on the platform push services.
 - The locale profile has no reviewers yet (the file requires 2 approvals). SMS to 112 is marked true per MHA's channel list, but support varies by state.
 - Durable sign-in is email-only. Google OAuth is still not built (needs your OAuth credentials).

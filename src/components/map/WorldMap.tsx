@@ -390,11 +390,20 @@ export function WorldMap({
     <div className={className ?? "absolute inset-0"}>
       {/* A labelled region (not role="img"), so the place pins inside stay reachable by screen readers. */}
       <div ref={ref} role="region" aria-label={label} className="h-full w-full bg-sunken" />
-      {/* Google Map Tiles terms: the Google mark must be visible on the map (the sheet covers the bottom). */}
+      {/* Google Map Tiles terms: the official Google Maps logo, unmodified, 16–19 px tall with ≥ 10 px
+          clear space, visible on the map (the sheet covers the bottom). Outlined variants are the ones
+          for busy backgrounds: light outline on the day map, dark outline on the night map. */}
       {tiles.provider === "google" ? (
-        <span aria-hidden className="pointer-events-none absolute left-3 z-10 select-none rounded bg-white/80 px-1.5 text-[13px] font-semibold tracking-tight text-[#5f6368]" style={{ top: padding.top + 6 }}>
-          Google
-        </span>
+        // eslint-disable-next-line @next/next/no-img-element -- a fixed-size vendor mark; next/image adds nothing here
+        <img
+          src={night ? "/attribution/google-maps-dark-outline.svg" : "/attribution/google-maps-light-outline.svg"}
+          alt="Google Maps"
+          width={86}
+          height={18}
+          draggable={false}
+          className="pointer-events-none absolute left-3 z-10 h-[18px] w-auto select-none"
+          style={{ top: padding.top + 10 }}
+        />
       ) : null}
     </div>
   );
