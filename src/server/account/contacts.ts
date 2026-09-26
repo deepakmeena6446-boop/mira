@@ -4,7 +4,7 @@ import { z } from "zod";
 import { decryptText, encryptText, hashToken, hmacHex, randomToken } from "@/server/crypto";
 import { ApiError } from "@/server/http/errors";
 import { personName } from "@/server/http/person-name";
-import { getEnv } from "@/server/config/env";
+import { emailSenderAddress, getEnv } from "@/server/config/env";
 import { emailContact, notifyInApp } from "@/server/providers/notify";
 
 export { MAX_CONTACTS } from "@/domain/limits";
@@ -67,7 +67,7 @@ export async function addContact(sql: postgres.Sql, userId: string, userName: st
     throw err;
   }
   const link = new URL(`/invite/${token}`, getEnv().APP_BASE_URL).toString();
-  const sender = /<([^>]+)>/.exec(getEnv().SMTP_FROM ?? "")?.[1] ?? getEnv().SMTP_FROM ?? null;
+  const sender = emailSenderAddress();
   const sent = await emailContact(
     email,
     // Fixed subject: user-chosen names stay in the body only.

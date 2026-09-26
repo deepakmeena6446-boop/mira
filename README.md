@@ -39,7 +39,7 @@ Every external service sits behind an interface in `src/server/providers/`. The 
 | Basemap | OpenFreeMap vector style ("dark" style at night) | Mapbox day + night styles | `MAP_STYLE_URL`, `MAP_STYLE_URL_NIGHT` (optional) |
 | Sign-in | "Continue" with a first name creates a local account; **adding an email (one-time link, no password) makes it durable** across phones | Google OAuth (adapter not built) | `SMTP_*` for email links; `AUTH_GOOGLE_*` later |
 | Mira | Scripted persona engine over the real tools, streamed as NDJSON (English + Hinglish) — used when no key is set, and as the automatic fallback if Claude fails before replying | **Connected:** Claude (`claude-opus-5`, low effort, streaming tool loop, cached persona; never sees coordinates; location details scrubbed from saved history) — `src/server/providers/companion/claude.ts` | `ANTHROPIC_API_KEY` |
-| Contact delivery | SMTP (Mailpit locally) + in-app notifications | Production SMTP / WhatsApp / SMS | `SMTP_*` |
+| Contact delivery | SMTP (Mailpit locally) + in-app notifications | **Connected:** Resend HTTPS API (`src/server/mail/resend.ts`); WhatsApp / SMS later | `RESEND_API_KEY` + `EMAIL_FROM` (production), `SMTP_*` (local) |
 | Push | In-app inbox | **Connected:** Web Push to the traveller (worker outbox; payloads never carry location) | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` |
 
 Wiring a real adapter takes three steps: implement it next to `placeholder.ts`, flip its flag in `REAL_ADAPTERS` (`src/server/providers/modes.ts`), and set the env vars. A capability reports "real" only when **both** the adapter exists and its key is present, so setting a key alone never pretends a feature works.
@@ -69,12 +69,12 @@ Production mode locally: `npm run build && npm run start` and `npm run worker:st
 
 | Script | Purpose |
 |---|---|
-| `dev` / `start` | Next.js web (port 3100) |
+| `dev` / `start` | Next.js web (port 3100); `start:prod` honours `$PORT` (Railway) |
 | `worker:dev` / `worker:start` | Background worker (bundled to `dist/worker.mjs` by `build`) |
 | `env:local` | Generate `.env.local` with random secrets and an Argon2id moderator hash |
 | `admin:hash` | Hash a moderator password for a secret store (prints the dotenv-safe `b64:` form) |
-| `db:migrate`, `db:new-migration -- <name>` | Apply or create reviewed, forward-only SQL migrations |
-| `pilot:fetch`, `pilot:import` | Fetch the sourced OSM extract; validate checksums and import (placeholder map data) |
+| `db:migrate`, `db:new-migration -- <name>` | Apply or create reviewed, forward-only SQL migrations (`db:migrate:prod` runs the bundled `dist/migrate.mjs`, no `tsx`) |
+| `pilot:fetch`, `pilot:import` | Fetch the sourced OSM extract; validate checksums and import (placeholder map data; `pilot:import:prod` in production) |
 | `aggregate:run -- --at <ISO Monday>` | Operator tool: run the weekly community-notes release (idempotent) |
 | `lint`, `typecheck`, `test` | ESLint; route typegen + `tsc`; Vitest unit + integration (uses DB `mira_test`) |
 | `test:e2e` | Production build + Playwright: share-a-trip loop, missed alerts, Mira, reports and moderation, privacy; mobile and desktop (uses DB `mira_e2e` and Mailpit) |
@@ -119,11 +119,15 @@ Production mode locally: `npm run build && npm run start` and `npm run worker:st
 
 There's no location history, no public profile, no safety score and no heatmap. Emails never contain coordinates. Deleting your account (Me → Delete) removes places, contacts, trips, chat and sessions. Public responses are covered by an allowlist test, and client bundles by a secret scan.
 
+## Deploy
+
+MIRA's production target is **Railway**: a `postgis` service (`postgis/postgis:17-3.5` + volume), a `web` service (`npm run build`, `next start` on `$PORT`, pre-deploy `node dist/migrate.mjs`, deploy healthcheck `/api/health/live`) and a `worker` service (`node dist/worker.mjs`, restart always). Email goes through Resend's HTTPS API. The step-by-step guide, with the exact CLI commands, variables table, Resend/Google setup, monitoring and rollback, is **[docs/DEPLOY.md](docs/DEPLOY.md)**. The same setup is declared as Railway Infrastructure as Code in [`.railway/railway.ts`](.railway/railway.ts).
+
 ## Production prerequisites
 
 - **HTTPS** (`APP_BASE_URL=https://…`, enforced at startup). Cookies become `__Host-` + `Secure`, and HSTS is sent.
-- **Two services from the same build**: `npm run start` (web) and `npm run worker:start` (worker), against one PostGIS database. Serverless-only or static hosting is not supported.
-- **Reverse proxy** that *appends* the client address to `X-Forwarded-For`; set `TRUSTED_PROXY_HOPS` to match (default 1). It must not log full request URLs for `/invite/*` or `/t/*`, which carry bearer tokens.
+- **Two services from the same build**: `npm run start:prod` (web, on `$PORT`) and `npm run worker:start` (worker), against one PostGIS database. Serverless-only or static hosting is not supported.
+- **Reverse proxy**: rate limits key on `CLIENT_IP_HEADER` when the edge overwrites one header with the client address (Railway: `x-real-ip`), otherwise on the `X-Forwarded-For` entry `TRUSTED_PROXY_HOPS` from the right (default 1). It must not log full request URLs for `/invite/*` or `/t/*`, which carry bearer tokens.
 - **Secrets from a secret store**, never from files in the repo. Required: `DATABASE_URL`, `APP_BASE_URL`, `SESSION_SECRET`, `DATA_ENCRYPTION_KEY`, `ADMIN_PASSWORD_HASH`, `PILOT_MANIFEST_PATH`, `MAP_TILE_URL`. Optional provider keys are listed in the table above. See `.env.example`, which documents each variable and the dotenv-safe `b64:` hash form.
 - **Backups**: expire in 30 days or less. After any restore, run the worker (or `purgeExpired`) **before** serving traffic, so expired reports and journeys are removed again. Use database disk encryption.
 - **Monitoring**: poll `/api/health/ready`. It returns 503 when the worker's journeys job hasn't completed a pass in 3 minutes (a running-but-failing worker counts as down). Publicly it returns only `{status}`; a signed-in moderator also sees the checks, including `contactAlertProblems24h` (a count only). Warnings are logged as `health.worker_stale` and `health.contact_alert_delivery_problems`; per-trip failures as `journey.failed`.
@@ -136,9 +140,9 @@ There's no location history, no public profile, no safety score and no heatmap. 
 | Google sign-in | First-name account, made durable with an email link | Add a Google OAuth adapter, flip `REAL_ADAPTERS.google`, set `AUTH_GOOGLE_*` |
 | Maps for production | **Google connected** (demo key) | Split into a browser key (website-restricted, Map Tiles only) and a server key (API-restricted); set budgets/quotas; show the Google logo on the map per Google's attribution rules |
 | Claude for Mira | **Done** — live whenever `ANTHROPIC_API_KEY` is set (tests and E2E force the placeholder) | Rotate the demo key before production |
-| Production SMTP / push | Mailpit + in-app | Set `SMTP_*` / `VAPID_*` |
+| Production email / push | Resend adapter built; Mailpit locally | Verify the sending domain in Resend, set `RESEND_API_KEY` + `EMAIL_FROM` / `VAPID_*` |
 | Background location on iOS | Browsers can't track in the background. Contacts see the last spot and time, and the missed-arrival alert still fires | Native app shell |
-| Hosting, HTTPS, backups | Not provisioned | See Production prerequisites |
+| Hosting, HTTPS, backups | Railway config ready ([docs/DEPLOY.md](docs/DEPLOY.md)), not yet provisioned | Follow docs/DEPLOY.md |
 
 ## Implementation decisions (where the documents left room)
 

@@ -2,15 +2,16 @@ import { getSql } from "@/server/db/client";
 import { systemClock } from "@/server/clock";
 import { workerStatus } from "@/server/health/worker";
 import { pilotStatus } from "@/server/pilot/status";
-import { smtpConfigured } from "@/server/config/env";
+import { emailConfigured, emailProvider } from "@/server/config/env";
 import { getAdmin } from "@/server/admin/auth";
+import { providerModes } from "@/server/providers/modes";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Readiness for monitoring: database reachable and the worker's journeys job fresh (< 3 min).
  * The status code and `status` are public (load balancers, uptime checks). The detailed
- * checks (heartbeat age, email setup, alert-delivery problems) are shown only to a signed-in
+ * checks (heartbeat age, email provider, Mira provider, alert-delivery problems) are shown only to a signed-in
  * moderator — they're operational signals, not something the internet needs to see.
  */
 export async function GET() {
@@ -48,8 +49,11 @@ export async function GET() {
         worker: worker.healthy ? "ok" : "stale",
         workerHeartbeatAgeSeconds: worker.lastBeatAgeSeconds,
         pilotMapData: pilot ? "ok" : "unavailable",
-        contactEmail: smtpConfigured() ? (alertProblems > 0 ? "degraded" : "ok") : "not_configured",
+        contactEmail: emailConfigured() ? (alertProblems > 0 ? "degraded" : "ok") : "not_configured",
+        // Which transport would send it (never the key or the sender address).
+        contactEmailProvider: emailProvider(),
         contactAlertProblems24h: alertProblems,
+        mira: providerModes().companion,
       },
     },
     { status: ready ? 200 : 503, headers: { "cache-control": "no-store" } },

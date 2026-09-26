@@ -1,6 +1,6 @@
 import "server-only";
 import type postgres from "postgres";
-import { smtpConfigured } from "@/server/config/env";
+import { emailConfigured } from "@/server/config/env";
 import type { Clock } from "@/server/clock";
 import { workerStatus } from "./worker";
 
@@ -16,5 +16,5 @@ export interface SafetyNet {
 
 export async function safetyNet(sql: postgres.Sql, clock: Clock): Promise<SafetyNet> {
   const worker = await workerStatus(sql, clock).catch(() => ({ healthy: false }));
-  return { worker: worker.healthy, email: smtpConfigured() };
+  return { worker: worker.healthy, email: emailConfigured() };
 }

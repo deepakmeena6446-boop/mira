@@ -43,8 +43,16 @@ export async function enforce(sql: postgres.Sql, keys: string[], limits: Limit[]
  * forge the left of X-Forwarded-For, so we take the address appended by our own
  * proxy chain: the entry TRUSTED_PROXY_HOPS positions from the right (default 1).
  * Production must sit behind a proxy that appends the real client address.
+ *
+ * CLIENT_IP_HEADER (e.g. "x-real-ip" on Railway, whose edge overwrites it with the
+ * connecting address) takes precedence when the platform documents a single trusted header.
  */
 export function clientIp(req: Request): string {
+  const trustedHeader = process.env.CLIENT_IP_HEADER?.trim();
+  if (trustedHeader) {
+    const v = req.headers.get(trustedHeader)?.split(",")[0]?.trim();
+    if (v) return ipBucket(v.slice(0, 64));
+  }
   const hops = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS ?? "1") || 1);
   const xff = req.headers.get("x-forwarded-for");
   if (xff) {
