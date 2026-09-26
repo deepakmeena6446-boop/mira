@@ -14,9 +14,9 @@ Brief: the owner's "Global Day-0 Beta — 12-hour autonomous execution sprint". 
 | 5 — Mira intelligence | PASS |
 | 6 — Contribute + reputation | PASS WITH KNOWN RISK (no human moderator; public notes off) |
 | 7 — Personalisation foundation | PASS |
-| 8 — Global QA | pending |
-| 9 — Production beta | pending |
-| 10 — Final audit | pending |
+| 8 — Global QA | PASS WITH KNOWN RISK (real devices pending) |
+| 9 — Production beta | FAIL — external blocker: Railway trial expired (owner must choose a plan) |
+| 10 — Final audit | PASS (`MIRA_OVERNIGHT_IMPLEMENTATION_AUDIT.md`) |
 
 ### Sprint architecture contract (binding for every track)
 
@@ -276,6 +276,72 @@ KNOWN RISKS: `shareByDefault` exists in the schema, but no UI sets it yet.
 FILES: `src/domain/{habits,travel-prefs}.ts`, `src/server/account/habits.ts`, `src/app/api/me/{prefs,habits}/**`, `src/app/(app)/me/PersonalSections.tsx`.
 
 **Integration (lead):** the seven tracks were built in parallel worktrees with strict file ownership, then merged and conflicts resolved. Full suite after integration: lint clean, typecheck clean, **48 files / 453 tests pass** (baseline 30 / 210).
+
+
+### PHASE 8 — GLOBAL QA
+
+PHASE: 8
+STATUS: PASS WITH KNOWN RISK
+
+COMPLETED — live checks on the production build, with live Google Maps Platform and live Claude, in the in-app browser at 375×812. Locations were simulated by stubbing `navigator.geolocation`.
+- **London:** "Westminster · Emergency 999".
+  - Search Covent Garden → 2 walking options, 0.5 mi (miles), lighting shares, 12 Help Points.
+  - *I feel unsafe* is instant: Help Points, share, call, Emergency 999, location in words.
+- **Dubai:** "Downtown Dubai · Emergency 999". The map recentres on Burj Khalifa.
+- **New York:** "Theater District · tel:911".
+- **Nairobi:** tel:999.
+- **Tokyo:** "Jinnan · tel:110". *I feel unsafe* lists "Ambulance / Fire 119".
+- **Lima** (no profile): "Emergency" explains first, naming Peru, then Call 112.
+- **Delhi, the full loop:**
+  - sign in (first name; Google not configured yet), search Kamla Nagar Market, Start with MIRA;
+  - the trip screen shows honest copy ("Nobody is alerted automatically…");
+  - the live link opened with no cookie (API and page 200; first name, ETA with tz, location 20 s old);
+  - I'm here → "You made it" → "Was the way lit?" → Partly → thanks;
+  - the viewer then shows arrived and "Want MIRA with you on your journeys? · Try MIRA";
+  - Trips shows "Earlier today"; Contribute shows 1 pending, nothing verified, and Steward needs;
+  - Me shows every section;
+  - Mira (live Claude): the neighbourhood-safety question → "I don't have enough verified information to make that judgement"; "Find somewhere staffed nearby" → ranked Help Points with "Open 24 hours (listed) · Google" / "Open now, listed until 10 PM · Google".
+- **Fixed from QA:**
+  - the map started on New Delhi for everyone (now the world until she's located);
+  - Japan's 119 was missing from the unsafe sheet;
+  - the unknown-number sheet said "doesn't know which country" when it did know;
+  - the hours shortlist was spent on clinics without hours;
+  - private doctors and homeopaths were counted as Help Points;
+  - "0% mapped as lit" noise;
+  - Help Points were fetched before the country was known (convenience stores never turned on);
+  - Contribute copy named only email sign-in.
+- **Degraded states** (E2E + integration): location denied, weak network (failed lookups say so), worker down (readiness 503, start refused, "checks paused"), AI unavailable (scripted Mira), email not configured (`not_attempted`, honest copy).
+
+TESTS (final run on the last commit):
+- `npx eslint .` clean; `tsc --noEmit` clean.
+- `npx vitest run`: **48 files, 454/454 pass** (baseline 30 / 210).
+- `npm run test:e2e` (production build + Playwright, mobile + desktop): **42 passed, 2 skipped, 0 failed** (10.1 min; baseline 40 passed).
+
+REGRESSIONS: none found. E2E specs updated for intended behaviour changes: five tabs, explain-first emergency when the country is unknown, `tz` on the viewer.
+
+KNOWN RISKS: real iPhone/Android not tested (needs the public URL); Help Point data quality varies by city.
+
+FILES: `src/components/map/WorldMap.tsx`, `src/components/app/{EmergencyPill,UnsafeSheet,LightingSummary}.tsx`, `src/domain/{country-context,help-points,reputation}.ts`, `src/server/help-points/index.ts`, `src/app/(app)/{HomeScreen,trip/TripScreen,contribute/ContributeScreen}.tsx`, `tests/e2e/*`.
+
+### PHASE 9 — PRODUCTION BETA
+
+PHASE: 9
+STATUS: FAIL (external blocker)
+
+COMPLETED:
+- The deployment is fully prepared: `docs/DEPLOY.md` Path A has the exact Railway CLI sequence (PostGIS `postgis/postgis:17-3.5` with a volume, web with pre-deploy migrations and a `/api/health/live` health check, worker with ALWAYS restart, the variable table, domain).
+- Resend is wired; production env validation is in place.
+
+BLOCKER: `railway init --name mira-beta` → "Your trial has expired. Please select a plan to continue using Railway." Choosing a plan is billing, so it's the owner's action. The Railway CLI is logged in as the owner.
+
+NEXT (after the plan): run DEPLOY.md Path A → set the secrets → deploy web + worker → `curl /api/health/ready` → Google OAuth redirect → Resend test send → real-device pass.
+
+### PHASE 10 — FINAL AUDIT
+
+PHASE: 10
+STATUS: PASS
+
+COMPLETED: re-read the blueprint (§1, §5, §7–§9, §16) and the brief's definition of done, and compared them with the implementation. See `MIRA_OVERNIGHT_IMPLEMENTATION_AUDIT.md` (definition-of-done table with evidence, drift check, known risks, external blockers, P1 list, what to audit).
 
 ---
 
