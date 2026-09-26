@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     "public/maplibre/**",
     "playwright-report/**",
     "test-results/**",
+    // Agent worktrees and local tooling (each is its own copy of the repo).
+    ".claude/**",
   ]),
 ]);
 

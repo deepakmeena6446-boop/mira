@@ -88,8 +88,10 @@ describe("which sign-in is on", () => {
     expect(googleSignInConfigured(env)).toBe(false);
     expect(demoSignInAllowed(env)).toBe(true);
   });
-  it("half a Google client isn't configured", () => {
-    expect(googleSignInConfigured(parseEnv({ ...base, AUTH_GOOGLE_ID: "id" }))).toBe(false);
+  it("half a Google client is a configuration error, not a silent 'off'", () => {
+    expect(() => parseEnv({ ...base, AUTH_GOOGLE_ID: "id" })).toThrow(/AUTH_GOOGLE/);
+    expect(() => parseEnv({ ...base, AUTH_GOOGLE_SECRET: "secret" })).toThrow(/AUTH_GOOGLE/);
+    expect(googleSignInConfigured(parseEnv(base))).toBe(false);
   });
   it("Google: first name off unless ALLOW_DEMO_SIGNIN=on", () => {
     const g = { ...base, AUTH_GOOGLE_ID: "id", AUTH_GOOGLE_SECRET: "secret" };
