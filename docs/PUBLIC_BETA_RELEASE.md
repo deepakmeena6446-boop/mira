@@ -22,7 +22,7 @@
 | Worldwide | Test coordinates and route/share flows in India, Japan, Nigeria, France and Brazil, plus an unknown-profile country. Show local number only where reviewed; show truthful provider gaps; use a manual ETA where a route is unavailable | Pending live test |
 | Phones | Real iPhone Safari and installed PWA, Android Chrome and installed PWA, and a separate contact phone; permission denial, background/resume, push where supported, dialer, 375 px route/evidence/help/arrival screens | Pending real devices |
 | Security and policy | Review privacy, terms, third-party transfers, retention and age rule for the intended jurisdictions; publish the operator's support/security contact; verify link-token exposure and admin access | Pending owner review |
-| Operations | Named primary and backup responder, staffed report queue, external monitor on `/api/health/ready` with phone alert, tested staging outage/restore/rollback, daily database backups with retention ≤ 30 days | Pending owner setup |
+| Operations | Named primary and backup responder, staffed report queue, external monitor on `/api/health/ready` with phone alert, tested staging outage/restore/rollback using [the incident response guide](INCIDENT_RESPONSE.md), daily database backups with retention ≤ 30 days | Pending owner setup |
 | Production | Promote the tested SHA, confirm same settings and a healthy worker, repeat the real inbox/core trip smoke test, watch logs and monitor during a controlled public opening | Pending all earlier gates |
 
 For the migration rehearsal, query the same database immediately before and after applying 0016. The first query should be read-only; the migration must be applied by the normal migrator, not by an ad hoc update:

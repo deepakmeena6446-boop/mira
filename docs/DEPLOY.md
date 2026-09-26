@@ -220,7 +220,7 @@ How MIRA uses it (`src/server/mail/resend.ts`): `POST https://api.resend.com/ema
 
 ## 8. Monitoring
 
-- **Uptime monitor** (UptimeRobot, Better Stack, …) on `https://<your domain>/api/health/ready` every 1–5 min, alerting your phone on any non-200. It's 503 when the database is unreachable or the worker's journeys pass is over 3 minutes old. Test it: `railway down --service worker` (removes the running worker deployment) → alert within ~5 min, and new trips are refused → `railway up --service worker --detach` → monitor green again.
+- **Uptime monitor** (UptimeRobot, Better Stack, …) on `https://<your domain>/api/health/ready` every 1–5 min, alerting your phone on any non-200. It's 503 when the database is unreachable or the worker's journeys pass is over 3 minutes old. Rehearse on staging: stop the worker deployment, confirm the page and trip-start refusal, then restart the worker and confirm the monitor turns green. Follow [the incident response guide](INCIDENT_RESPONSE.md).
 - Railway's deploy healthcheck only runs during a deploy ([docs](https://docs.railway.com/guides/healthchecks)); it is not monitoring.
 - Logs are structured JSON: `railway logs --service worker`. Watch for `worker.watchdog_exit`, `journey.failed`, `mail.send_failed`, `health.worker_stale`, `health.contact_alert_delivery_problems`, `config.warning`.
 - Rate limits live in Postgres (`abuse_counters`), so they hold across restarts.
