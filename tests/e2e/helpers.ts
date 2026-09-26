@@ -71,6 +71,7 @@ export async function newUser(browser: Browser, name: string): Promise<{ ctx: Br
   await page.goto("/me");
   await page.getByRole("button", { name: "Get started" }).click();
   await page.getByPlaceholder("Your first name").fill(name);
+  await page.getByRole("dialog").getByRole("checkbox", { name: /I confirm I.m 18 or older/ }).check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
   await page.goto("/");

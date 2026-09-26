@@ -8,11 +8,9 @@
  * Secrets are never in this file: they are `preserve()`d and set once with
  * `railway variable set KEY --stdin --service web` (the worker references the web service's values).
  *
- *   npm install --no-save railway@3.11.0   # SDK the CLI evaluates this file with
- *   railway config plan                     # review the diff (values masked)
- *   railway config apply                    # create/update services
- *
- * Requires a Railway CLI with the `config` command (`railway upgrade --yes`). Config as Code
+ * This file records the desired topology. CLI 4.57.3 does not expose `railway config`;
+ * provision with the verified commands in docs/DEPLOY.md and compare settings here.
+ * Config as Code
  * (railway.json / railway.toml) is deprecated and new services can't opt into it, so there is
  * deliberately no railway.json in this repo.
  */
@@ -50,6 +48,8 @@ export default defineRailway(() => {
     deploy: { restartPolicyType: "ON_FAILURE", restartPolicyMaxRetries: 10 },
     env: {
       NODE_ENV: "production",
+      PUBLIC_BETA_STRICT: "on",
+      PUBLIC_AGGREGATE_RELEASES: "off",
       PORT: "3000",
       RAILPACK_NODE_VERSION: "24",
       DATABASE_URL,
@@ -64,10 +64,10 @@ export default defineRailway(() => {
       // networking/public-networking/specs-and-limits). Rate limits key on it.
       CLIENT_IP_HEADER: "x-real-ip",
       TRUSTED_PROXY_HOPS: "1",
-      // Email: Resend over HTTPS. Unset = share-link-only beta (the UI says email is off).
+      // Email: required by PUBLIC_BETA_STRICT for the public launch.
       RESEND_API_KEY: preserve(),
       EMAIL_FROM: preserve(), // "MIRA <alerts@your-domain>"
-      // Providers (unset = OpenStreetMap / scripted placeholders).
+      // Live providers required by PUBLIC_BETA_STRICT for the public launch.
       GOOGLE_MAPS_SERVER_KEY: preserve(),
       GOOGLE_MAPS_BROWSER_KEY: preserve(),
       GOOGLE_PLACES_HOURS: "on",
@@ -87,7 +87,7 @@ export default defineRailway(() => {
   // Only what the worker reads: database, secrets, email, push. No map or AI keys.
   const fromWeb = [
     "DATABASE_URL", "APP_BASE_URL", "SESSION_SECRET", "DATA_ENCRYPTION_KEY", "ADMIN_PASSWORD_HASH", "PILOT_MANIFEST_PATH",
-    "MAP_TILE_URL", "RESEND_API_KEY", "EMAIL_FROM", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT",
+    "MAP_TILE_URL", "RESEND_API_KEY", "EMAIL_FROM", "PUBLIC_AGGREGATE_RELEASES", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT",
   ] as const;
 
   const worker = service("worker", {

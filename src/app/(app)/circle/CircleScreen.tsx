@@ -34,7 +34,7 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
       <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-32 text-center">
         <MiraOrb size={80} />
         <h1 className="mt-6 text-3xl font-extrabold">Your circle</h1>
-        <p className="mt-2 max-w-sm text-ink-muted">The people you trust follow your journeys live until you arrive, and are told if you don&apos;t.</p>
+        <p className="mt-2 max-w-sm text-ink-muted">You can share a journey link with people you trust. Contact email depends on availability and their acceptance.</p>
         <Button className="mt-7 max-w-xs" variant="hero" size="lg" onClick={() => setSignIn(true)}>
           Get started
         </Button>
@@ -65,8 +65,8 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
           <h1 className="text-2xl font-extrabold">Your circle</h1>
           <p className="mt-1 text-ink-muted">
             {accepted.length && emailAlerts
-              ? `${accepted.map((c) => c.name).join(", ")} ${accepted.length === 1 ? "gets" : "get"} your live link by email when you share a journey, and an email if you don't arrive.`
-              : "When you start a journey you can always send a live link to anyone yourself. People here are also emailed automatically."}
+              ? `${accepted.map((c) => c.name).join(", ")} ${accepted.length === 1 ? "is" : "are"} eligible for a live-link email when you share a journey and a missed-check-in email. MIRA shows sending results on the journey screen.`
+              : emailAlerts ? "You can send a live link yourself. Automatic email needs an accepted trusted contact on the journey." : "You can send a live link yourself. Contact email is unavailable right now."}
           </p>
         </header>
 
@@ -100,14 +100,14 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
                 Email
               </label>
               <input id="c-email" required type="email" inputMode="email" value={cEmail} onChange={(e) => setCEmail(e.target.value)} className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
-              <p className="mt-2 text-sm text-ink-muted">They get a one-time invite by email. Once they accept, MIRA emails them your live link when you share a journey, and emails them if you don&apos;t arrive — nothing else.</p>
+              <p className="mt-2 text-sm text-ink-muted">MIRA attempts an email invite when email is available. After they accept, journey and missed-check-in emails can be attempted; sending can fail.</p>
               <Button type="submit" className="mt-4" variant="primary" size="lg" busy={busy === "contact"} busyLabel="Sending invite…" disabled={!cName.trim() || !cEmail.trim()}>
                 Send invite
               </Button>
             </form>
           ) : null}
           {contacts.length === 0 && !addingContact ? (
-            <p className="p-5 text-ink-muted">Add someone you trust. When you share a journey, they&apos;re emailed your live link, and emailed again if you don&apos;t arrive. Alerts go by email only for now.</p>
+            <p className="p-5 text-ink-muted">Add someone you trust. Accepted contacts on a journey can receive live-link and missed-check-in emails when email is available.</p>
           ) : (
             <ul className="divide-y divide-line">
               {contacts.map((c) => (
@@ -165,7 +165,7 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
         </Section>
 
         <p className="px-1 text-sm text-ink-muted">
-          On a journey, <strong>Tell my people now</strong> (in &ldquo;I feel unsafe&rdquo;) emails everyone here who has accepted, with your live location. MIRA never contacts anyone else.{" "}
+          On a journey, <strong>Tell my people now</strong> (in &ldquo;I feel unsafe&rdquo;) {emailAlerts ? "attempts to email accepted contacts who are available for that journey with a live link. The screen shows which attempts the provider accepted or rejected." : "cannot email contacts while contact email is unavailable. You can send your live link yourself."} MIRA never contacts anyone else.{" "}
           <Link href="/privacy" className="font-bold text-accent">
             Privacy
           </Link>

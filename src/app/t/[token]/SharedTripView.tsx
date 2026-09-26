@@ -135,7 +135,7 @@ Live sharing is off. MIRA doesn&apos;t keep a record of the trip.
         ) : age !== null && age > 180 ? (
           <p className="mt-4 rounded-2xl bg-sunken px-4 py-3 text-sm text-ink-muted">
             <span className="font-bold text-ink">Location paused.</span> This is their last shared spot, from {ago(age)} — often it just means the phone screen is off.
-            {trip.alertsViewer ? ` MIRA will still email you if ${trip.name} doesn't check in.` : ""}
+            {trip.alertsViewer ? ` MIRA may attempt an email if ${trip.name} misses check-in; sending can fail.` : ""}
           </p>
         ) : null}
         <p className="mt-4 flex items-center gap-2 text-xs text-ink-subtle">

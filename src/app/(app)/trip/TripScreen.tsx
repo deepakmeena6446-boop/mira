@@ -326,7 +326,7 @@ export function TripScreen({
             <p className="mt-1 text-sm text-ink-muted">
               {sharedOk.length ? "Your contacts are seeing your last spot. " : ""}
               {gps === "denied" ? "Turn location back on for this site in your browser settings." : gps === "lost" ? "It usually comes back once you're outdoors or have signal." : "Check your connection — MIRA keeps trying."}
-              {alertsOn ? " If you don't arrive, they're still emailed after your ETA." : ""}
+              {alertsOn ? " If you miss check-in, MIRA still attempts an email after your ETA; sending can fail." : ""}
             </p>
           </div>
         ) : null}

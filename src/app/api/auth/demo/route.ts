@@ -1,3 +1,4 @@
+import { assertAdultEligibility } from "@/server/account/adult-eligibility";
 import { z } from "zod";
 import { getSql } from "@/server/db/client";
 import { handle, json, readJson } from "@/server/http/handler";
@@ -20,6 +21,7 @@ export const dynamic = "force-dynamic";
  */
 export const POST = handle(async (req: Request) => {
   assertSameOrigin(req);
+  await assertAdultEligibility();
   if (!demoSignInAllowed()) throw forbidden("Sign in with Google instead.");
   const sql = getSql();
   const now = new Date();

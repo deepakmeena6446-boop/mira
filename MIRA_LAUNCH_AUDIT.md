@@ -1,5 +1,7 @@
 # MIRA — Product Truth, Wedge & Public Launch Audit
 
+> Historical audit of an earlier build. Several “today” and “not yet built” statements below are stale after the beta-hardening sprint. For current launch gates and verdict, use [docs/PUBLIC_BETA_RELEASE.md](docs/PUBLIC_BETA_RELEASE.md); for current behavior, use [README.md](README.md).
+
 *Audit date: 2026-09-26 · commit `ba671c3` (main). One document combining the product-truth audit, wedge analysis, user-need audit, privacy reality, open-source model and the six-hour release plan.*
 
 ## Contents

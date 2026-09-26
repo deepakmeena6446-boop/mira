@@ -6,6 +6,7 @@ import { GOOGLE_KEEPS, GoogleButton } from "@/components/app/SignInSheet";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { api } from "@/lib/api-client";
+import { AdultAttestation, confirmAdultEligibility } from "@/components/app/AdultAttestation";
 
 /**
  * Keep your account so she can sign in on another phone or after clearing the browser: Continue
@@ -29,6 +30,7 @@ export function AccountSection({
   saved: boolean;
 }) {
   const [email, setEmail] = useState("");
+  const [adult, setAdult] = useState(false);
   const [state, setState] = useState<"idle" | "busy" | "sent" | "error">("idle");
   const [message, setMessage] = useState("");
   const [useEmail, setUseEmail] = useState(!googleAvailable);
@@ -41,7 +43,10 @@ export function AccountSection({
       <form
         onSubmit={async (e) => {
           e.preventDefault();
+          if (!adult) return;
           setState("busy");
+          const eligibility = await confirmAdultEligibility();
+          if (!eligibility.ok) { setMessage(eligibility.message); setState("error"); return; }
           const r = await api("/api/auth/email", { body: { email: email.trim() } });
           if (r.ok) setState("sent");
           else {
@@ -55,8 +60,9 @@ export function AccountSection({
           Email
         </label>
         <input id="acct-email" type="email" inputMode="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
+        <AdultAttestation checked={adult} onChange={setAdult} />
         {state === "error" ? <p className="mt-2 text-sm font-semibold text-error">{message}</p> : null}
-        <Button type="submit" className="mt-3" variant={googleAvailable ? "secondary" : "primary"} size="lg" busy={state === "busy"} busyLabel="Sending…" disabled={!email.trim()}>
+        <Button type="submit" className="mt-3" variant={googleAvailable ? "secondary" : "primary"} size="lg" busy={state === "busy"} busyLabel="Sending…" disabled={!email.trim() || !adult}>
           Email me a link
         </Button>
       </form>

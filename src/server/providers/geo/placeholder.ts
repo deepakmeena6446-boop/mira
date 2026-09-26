@@ -9,8 +9,10 @@ import type postgres from "postgres";
 import { haversineMeters, inBounds } from "@/domain/pilot";
 import { pathCoords, planRoutes, WALKING_SPEED_KMH } from "@/domain/routing";
 import { displayName } from "@/domain/know-copy";
+import { evidenceState, type EvidenceState, type SourceState } from "@/domain/evidence-state";
+import { getEnv } from "@/server/config/env";
 import { loadGraph } from "@/server/know/graph";
-import type { GeoPoint, GeoProvider, ModeRoute, PlaceHit, WalkRoute } from "./types";
+import type { GeoPoint, GeoProvider, HelpLookupOptions, ModeRoute, PlaceHit, WalkRoute } from "./types";
 
 /**
  * Placeholder maps provider. Uses MIRA's own OpenStreetMap snapshot (real places and a
@@ -46,6 +48,39 @@ export function placeholderGeo(sql: postgres.Sql): GeoProvider {
     // Straight line with a typical street-network detour factor.
     const meters = Math.round(haversineMeters(a, b) * 1.3);
     return [{ meters, minutes: Math.max(1, Math.ceil(meters / ((WALKING_SPEED_KMH * 1000) / 60))), geometry: [[a.lon, a.lat], [b.lon, b.lat]], approximate: true }];
+  };
+
+
+  const lookupHelp = async (points: GeoPoint[], radiusM: number, opts?: HelpLookupOptions): Promise<EvidenceState<HelpPoint[]>> => {
+
+      if (!points.length) return { state: "empty", data: [], sources: [{ source: "local map", state: "ready" }] } as EvidenceState<HelpPoint[]>;
+      type HelpRow = { id: string; name: string | null; kind: string | null; place_type: string; tags: Record<string, string>; lat: number; lon: number };
+      let rows: HelpRow[] = [];
+      let localState: SourceState = { source: "local map", state: "ready" };
+      try { rows = await sql<HelpRow[]>`
+        SELECT id, name, tags->>'mira:kind' AS kind, place_type, tags, ST_Y(point) AS lat, ST_X(point) AS lon
+        FROM places
+        WHERE place_type = ANY(${["health", "police", "metro", "rail", "pharmacy", "accommodation"]})
+          AND ST_DWithin(point::geography,
+                (SELECT ST_Collect(ST_SetSRID(ST_MakePoint(x, y), 4326)) FROM unnest(${points.map((p) => p.lon)}::float8[], ${points.map((p) => p.lat)}::float8[]) AS t(x, y))::geography,
+                ${radiusM})
+        LIMIT 80`; } catch { localState = { source: "local map", state: "failed", retryable: true }; }
+      const local: HelpPoint[] = [];
+      for (const r of rows) {
+        const cls = helpClassFromOsm(r.tags);
+        if (!cls) continue;
+        const hours = r.tags.opening_hours ?? null;
+        local.push({ id: r.id, name: displayName(r.name, r.kind ?? HELP_CLASSES[cls].label), cls, lat: r.lat, lon: r.lon, open24h: isOpen24h(hours), hours: isOpen24h(hours) ? null : hours, schedule: parseOpeningHours(hours), source: "osm" });
+      }
+      // The local snapshot covers one small area; elsewhere ask live OpenStreetMap once for the whole corridor.
+      let live: HelpPoint[] = [];
+      let liveState: SourceState = { source: "OpenStreetMap live", state: "unavailable" };
+      if (local.length < 3 && getEnv().OVERPASS_URL) {
+        try { live = await overpassHelp(points, radiusM, opts); liveState = { source: "OpenStreetMap live", state: "ready" }; }
+        catch { liveState = { source: "OpenStreetMap live", state: "failed", retryable: true }; }
+      }
+      const data = dedupeHelpPoints([...local, ...live]);
+      return evidenceState(data, data.length > 0, [localState, liveState]);
   };
 
   return {
@@ -100,27 +135,10 @@ export function placeholderGeo(sql: postgres.Sql): GeoProvider {
     },
 
     async helpPlaces(points, radiusM, opts) {
-      if (!points.length) return [];
-      type HelpRow = { id: string; name: string | null; kind: string | null; place_type: string; tags: Record<string, string>; lat: number; lon: number };
-      const rows = await sql<HelpRow[]>`
-        SELECT id, name, tags->>'mira:kind' AS kind, place_type, tags, ST_Y(point) AS lat, ST_X(point) AS lon
-        FROM places
-        WHERE place_type = ANY(${["health", "police", "metro", "rail", "pharmacy", "accommodation"]})
-          AND ST_DWithin(point::geography,
-                (SELECT ST_Collect(ST_SetSRID(ST_MakePoint(x, y), 4326)) FROM unnest(${points.map((p) => p.lon)}::float8[], ${points.map((p) => p.lat)}::float8[]) AS t(x, y))::geography,
-                ${radiusM})
-        LIMIT 80`;
-      const local: HelpPoint[] = [];
-      for (const r of rows) {
-        const cls = helpClassFromOsm(r.tags);
-        if (!cls) continue;
-        const hours = r.tags.opening_hours ?? null;
-        local.push({ id: r.id, name: displayName(r.name, r.kind ?? HELP_CLASSES[cls].label), cls, lat: r.lat, lon: r.lon, open24h: isOpen24h(hours), hours: isOpen24h(hours) ? null : hours, schedule: parseOpeningHours(hours), source: "osm" });
-      }
-      // The local snapshot covers one small area; elsewhere ask live OpenStreetMap once for the whole corridor.
-      const live = local.length >= 3 ? [] : await overpassHelp(points, radiusM, opts);
-      return dedupeHelpPoints([...local, ...live]);
+      const result = await lookupHelp(points, radiusM, opts);
+      return "data" in result ? result.data : [];
     },
+    helpPlacesEvidence: lookupHelp,
 
     async nearby(p, radiusM, kinds) {
       const allowed = kinds?.length ? kinds : ["pharmacy", "health", "police", "metro", "bus", "food", "shop", "toilets", "finance"];

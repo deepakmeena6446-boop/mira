@@ -5,8 +5,8 @@ import { clientIp, dailyKey, enforce } from "@/server/ratelimit";
 import { point } from "@/server/http/geo-input";
 import { getGeo, type GeoPoint, type GeoProvider } from "@/server/providers/geo";
 import { cellsAlongRoute, notesForCells } from "@/server/notes";
-import { lightingForRoutes } from "@/server/lighting";
-import { helpPointsForRoutes, withoutCorroboratedGone } from "@/server/help-points";
+import { lightingEvidenceForRoutes } from "@/server/lighting";
+import { helpPointsEvidenceForRoutes, withoutCorroboratedGone } from "@/server/help-points";
 import { dedupeHelpPoints, type HelpPoint } from "@/domain/help-points";
 import { TRAVEL_MODES } from "@/domain/travel-mode";
 import { haversineMeters } from "@/domain/pilot";
@@ -73,12 +73,19 @@ export const POST = handle(async (req: Request) => {
   const routes = all.filter((r, i) => i === 0 || (!r.approximate && r.minutes <= all[0].minutes * ALT_MAX_STRETCH)).slice(0, 3);
   // Only real street routes get lighting and Help Points: a straight-line estimate doesn't follow any street.
   const streets = routes.map((r) => (r.approximate ? [] : r.geometry));
-  const [notes, lighting, helpPoints] = await Promise.all([notesForCells(sql, cellsAlongRoute(routes[0].geometry)), lightingForRoutes(sql, streets), helpPointsForRoutes(geo, streets).then((all) => Promise.all(all.map((pts) => withoutCorroboratedGone(sql, pts))))]);
+  const [notes, lighting, helpPoints] = await Promise.all([notesForCells(sql, cellsAlongRoute(routes[0].geometry)), lightingEvidenceForRoutes(sql, streets), helpPointsEvidenceForRoutes(geo, streets)]);
+  const filteredHelp = await Promise.all(helpPoints.map(async (e) => {
+    if (!("data" in e)) return e;
+    const data = await withoutCorroboratedGone(sql, e.data);
+    return { ...e, data, state: e.state === "ready" && !data.length ? "empty" as const : e.state };
+  }));
   return json({
     route: routes[0],
-    lighting: lighting[0],
-    helpPoints: helpPoints[0],
+    lighting: "data" in lighting[0] ? lighting[0].data : null,
+    lightingEvidence: lighting[0],
+    helpPoints: "data" in filteredHelp[0] ? filteredHelp[0].data : [],
+    helpEvidence: filteredHelp[0],
     notes,
-    alternatives: routes.slice(1).map((route, i) => ({ route, lighting: lighting[i + 1], helpPoints: helpPoints[i + 1] })),
+    alternatives: routes.slice(1).map((route, i) => { const evidence = lighting[i + 1]; const help = filteredHelp[i + 1]; return { route, lighting: "data" in evidence ? evidence.data : null, lightingEvidence: evidence, helpPoints: "data" in help ? help.data : [], helpEvidence: help }; }),
   });
 });

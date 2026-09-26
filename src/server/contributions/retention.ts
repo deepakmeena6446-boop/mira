@@ -24,6 +24,9 @@ export async function purgeContributions(sql: postgres.Sql, now: Date): Promise<
       (kind = 'lighting' AND created_at < ${ago(PENDING_MAX_DAYS.lighting)}) OR
       (kind = 'place_status' AND created_at < ${ago(PENDING_MAX_DAYS.place_status)}) OR
       (kind = 'correction' AND created_at < ${ago(PENDING_MAX_DAYS.correction)}))`;
+  // A decided place receipt's encrypted answer is retained only through the maximum claim window.
+  await sql`UPDATE contribution_receipts SET decision_enc = NULL, claim_key = NULL
+    WHERE decision_enc IS NOT NULL AND created_at < ${ago(31)}`;
   await sql`UPDATE contribution_receipts SET subject_hash = NULL WHERE subject_hash IS NOT NULL AND decided_at < ${ago(30)}`;
   const receipts = await sql`
     DELETE FROM contribution_receipts WHERE (status = 'expired' AND decided_at < ${ago(30)}) OR decided_at < ${ago(RECEIPT_KEEP_DAYS)}`;

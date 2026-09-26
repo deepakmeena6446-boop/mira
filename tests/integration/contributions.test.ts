@@ -14,7 +14,9 @@ import { parseOpeningHours } from "@/domain/opening-hours";
 import { encodeGeohash } from "@/domain/geohash";
 import type { HelpPoint } from "@/domain/help-points";
 import { decidePending, placeStatusFor, prepareChecks, recordPlaceSignal } from "@/server/contributions";
-import { recordLitVote } from "@/server/lighting";
+import { recordLitVote, lightingForRoute } from "@/server/lighting";
+import { cellsForRoute } from "@/domain/lighting";
+import { hmacHex } from "@/server/crypto";
 import { recordLightingReceipt } from "@/server/contributions";
 import { runWeeklyAggregation } from "@/server/aggregate/run";
 import { purgeExpired } from "@/server/retention";
@@ -111,6 +113,22 @@ describe("Contribute: MIRA Checks, receipts, corroboration, privacy", () => {
     resetEnvCache();
   });
 
+  it("keeps historical credit visible but excludes it from current impact and Steward", async () => {
+    const sql = getSql();
+    const person = await signIn("Legacy");
+    const now = new Date();
+    const day = now.toISOString().slice(0, 10);
+    await sql`INSERT INTO contribution_receipts (user_id, kind, status, verified_by, day, counted, decided_at, legacy_unverifiable)
+      VALUES (${person.id}, 'place_status', 'verified', 'corroboration', ${day}, true, ${now}, true),
+             (${person.id}, 'lighting', 'verified', 'corroboration', ${day}, true, ${now}, false)`;
+    person.use();
+    const view = (await contribute()).impact;
+    expect(view.summary).toMatchObject({ verified: 1, archived: 1, byKind: { place_status: 0, lighting: 1, correction: 0 } });
+    expect(view.line).toBe("You helped verify 1 piece of local information.");
+    expect(view.steward.steward).toBe(false);
+    expect((await sql`SELECT count(*)::int AS n FROM contribution_receipts WHERE user_id = ${person.id}`)[0].n).toBe(2);
+  });
+
   it("offers at most one check per walk, only with journey evidence, only for places she passed", async () => {
     const sql = getSql();
     const geo = stubGeo();
@@ -172,8 +190,8 @@ describe("Contribute: MIRA Checks, receipts, corroboration, privacy", () => {
     expect((await (await answer(cb.id, "open")).json()).outcome).toBe("verified");
     expect((await contribute()).impact).toMatchObject({ summary: { verified: 1, pending: 0 }, line: "You helped verify 1 piece of local information." });
 
-    // The first person's receipt is decided by the worker job.
-    expect((await decidePending(sql, new Date())).verified).toBe(1);
+    // The first person is recomputed immediately; a worker retry is idempotent.
+    expect((await decidePending(sql, new Date())).verified).toBe(0);
     a.use();
     mine = await contribute();
     expect(mine.impact.summary).toMatchObject({ verified: 1, pending: 0, byKind: { place_status: 1 } });
@@ -218,6 +236,27 @@ describe("Contribute: MIRA Checks, receipts, corroboration, privacy", () => {
     d.use();
     expect((await contribute()).impact.summary).toMatchObject({ verified: 0, differed: 1 });
     expect((await placeStatusFor(sql, [gateId], { weekday: 4, band: "late" })).get(gateId)).toMatchObject({ reportsDiffer: true, openAtThisTime: false, closedAtThisTime: false });
+  });
+
+  it("revokes credited impact when a later independent person contradicts, without double counting on retry", async () => {
+    const sql = getSql();
+    const a = await signIn("First");
+    const b = await signIn("Second");
+    const c = await signIn("Third");
+    const now = new Date();
+    const base = { kind: "place_status" as const, placeKey: gateId, weekday: 3, band: "day" as const, providerAgrees: null, area5: "ttnfv", country: "IN", now };
+    expect(await recordPlaceSignal(sql, { ...base, userId: a.id, claim: "open" })).toBe("pending");
+    expect(await recordPlaceSignal(sql, { ...base, userId: b.id, claim: "open" })).toBe("verified");
+    expect((await sql`SELECT count(*)::int AS n FROM contribution_receipts WHERE counted`)[0].n).toBe(2);
+    expect(await recordPlaceSignal(sql, { ...base, userId: c.id, claim: "closed" })).toBe("contradicted");
+    expect(await recordPlaceSignal(sql, { ...base, userId: c.id, claim: "closed" })).toBe("duplicate");
+    const rows = await sql`SELECT status, counted FROM contribution_receipts`;
+    expect(rows).toHaveLength(3);
+    expect(rows.every((r) => r.status === "contradicted" && !r.counted)).toBe(true);
+    a.use();
+    expect((await contribute()).impact.summary).toMatchObject({ verified: 0, differed: 1 });
+    await decidePending(sql, now);
+    expect((await sql`SELECT count(*)::int AS n FROM contribution_receipts WHERE counted`)[0].n).toBe(0);
   });
 
   it("one person + agreeing listed hours verifies (provider confirmation); diminishing returns count a subject once", async () => {
@@ -307,7 +346,30 @@ describe("Contribute: MIRA Checks, receipts, corroboration, privacy", () => {
     expect(rows.every((r) => r.status === "verified" && r.subject_enc === null && /^[0-9a-f]{64}$/.test(r.area_key))).toBe(true);
     // lit_votes still carries nothing about who (unchanged design).
     const cols = (await sql`SELECT column_name FROM information_schema.columns WHERE table_name = 'lit_votes'`).map((c) => c.column_name).sort();
-    expect(cols).toEqual(["cell", "day", "id", "value", "voter_hash"]);
+    expect(cols).toEqual(["cell", "day", "id", "identity_version", "value", "voter_hash"]);
+  });
+
+  it("does not count three legacy weekly lighting hashes as three independent walkers", async () => {
+    const sql = getSql();
+    await sql`DELETE FROM lit_votes`;
+    const route: Array<[number, number]> = [[77.2, 28.69], [77.2002, 28.69], [77.2004, 28.69]];
+    const cell = cellsForRoute(route)[0];
+    const now = new Date();
+    const one = await signIn("LegacyWalker");
+    for (let week = 0; week < 3; week++) {
+      const hash = hmacHex("lit-vote", `${one.id}:${cell}:legacy-${week}`);
+      await sql`INSERT INTO lit_votes (cell, value, voter_hash, day, identity_version)
+        VALUES (${cell}, 1, ${hash}, ${new Date(now.getTime() - week * 7 * 86_400_000)}, 1)`;
+    }
+    expect((await lightingForRoute(sql, route, now))?.confirmed.lit).toBe(0);
+    await recordLitVote(sql, one.id, route, "lit", now);
+    expect((await lightingForRoute(sql, route, now))?.confirmed.lit).toBe(0);
+    for (const name of ["Independent1", "Independent2"]) {
+      const u = await signIn(name);
+      await recordLitVote(sql, u.id, route, "lit", now);
+    }
+    expect((await lightingForRoute(sql, route, now))?.confirmed.lit).toBeGreaterThan(0);
+    expect((await sql`SELECT count(*)::int AS n FROM lit_votes WHERE cell = ${cell} AND identity_version = 1`)[0].n).toBe(3);
   });
 
   it("deleting the account deletes receipts and checks; signals stay and are unlinkable", async () => {

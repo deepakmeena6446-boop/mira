@@ -10,7 +10,7 @@ import { Chip } from "@/components/app/Chip";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { SearchOverlay, type Destination } from "@/components/app/SearchOverlay";
 import { kindEmoji } from "@/components/app/kinds";
-import { LightingSummary } from "@/components/app/LightingSummary";
+import { LightingSummary, lightingEvidenceLine, sourceList } from "@/components/app/LightingSummary";
 import { HelpPointList, RouteContextLines } from "@/components/app/HelpPointList";
 import { ArrivalContextLines, RouteOptions, type RouteOption } from "@/components/app/RouteOptions";
 import { TRAVEL_MODES, TRAVEL_MODE_INFO, distanceUnits, expectedMinutes, formatDistance, formatMinutes, type TravelMode } from "@/domain/travel-mode";
@@ -18,6 +18,7 @@ import { EmergencyPill } from "@/components/app/EmergencyPill";
 import { UnsafeSheet, type UnsafeShareAction, type UnsafeTellAction } from "@/components/app/UnsafeSheet";
 import { HelpNearSheet } from "@/components/app/HelpNearSheet";
 import { HELP_CLASSES, dedupeHelpPoints, type HelpClass, type HelpPoint } from "@/domain/help-points";
+import type { EvidenceState } from "@/domain/evidence-state";
 import { setCountry, useCountry, type CountryContext } from "@/lib/locale-store";
 import { InstallCard } from "@/components/pwa/InstallCard";
 import { useFlag } from "@/lib/flags";
@@ -114,7 +115,8 @@ export function HomeScreen({
   }, [user]);
   const [nearby, setNearby] = useState<{ places: Place[]; notes: Note[] }>({ places: [], notes: [] });
   const [nearbyFailed, setNearbyFailed] = useState(false);
-  const [nearHelp, setNearHelp] = useState<{ key: string; points: HelpPoint[]; failed: boolean } | null>(null);
+  const [nearHelp, setNearHelp] = useState<{ key: string; points: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> | null; failed: boolean } | null>(null);
+  const [helpRetry, setHelpRetry] = useState(0);
   const [saving, setSaving] = useState<string | null>(null);
   const [recenter, setRecenter] = useState(0);
   const [places, setPlaces] = useState(initialPlaces);
@@ -165,7 +167,7 @@ export function HomeScreen({
       const r = await api<{ label: string | null; country?: CountryContext }>("/api/geo/reverse", { body: me });
       // Help Points after the country is known: it turns on locale-weighted classes (24-hour convenience stores in Japan).
       const iso = (r.ok ? r.data.country?.iso : null) ?? countryIso;
-      const [n, h] = await Promise.all([nearbyReq, api<{ helpPoints: HelpPoint[] }>("/api/geo/help", { body: { ...me, ...(iso ? { country: iso } : {}) } })]);
+      const [n, h] = await Promise.all([nearbyReq, api<{ helpPoints: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> }>("/api/geo/help", { body: { ...me, ...(iso ? { country: iso } : {}) } })]);
       if (stop) return;
       if (r.ok) {
         setPoiArea(r.data.label);
@@ -173,13 +175,13 @@ export function HomeScreen({
       }
       if (n.ok) setNearby(n.data);
       setNearbyFailed(!n.ok);
-      setNearHelp({ key: meKey, points: h.ok ? h.data.helpPoints : [], failed: !h.ok });
+      setNearHelp({ key: meKey, points: h.ok ? h.data.helpPoints : [], evidence: h.ok ? h.data.evidence : null, failed: !h.ok || h.data.evidence.state === "failed" });
     })();
     return () => {
       stop = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meKey]);
+  }, [meKey, helpRetry]);
 
   const pick = useCallback((d: Destination) => {
     setSearchOpen(false);
@@ -222,7 +224,7 @@ export function HomeScreen({
   // Her Help Point filters apply everywhere (e.g. no police), before any count or list.
   const options: RouteOption[] = useMemo(
     () =>
-      (info ? [{ route: info.route, lighting: info.lighting, helpPoints: info.helpPoints ?? [] }, ...(info.alternatives ?? [])] : []).map((o) => ({ ...o, helpPoints: o.helpPoints.filter((p) => !exclude.includes(p.cls)) })),
+      (info ? [{ route: info.route, lighting: info.lighting, lightingEvidence: info.lightingEvidence, helpPoints: info.helpPoints ?? [], helpEvidence: info.helpEvidence }, ...(info.alternatives ?? [])] : []).map((o) => ({ ...o, helpPoints: o.helpPoints.filter((p) => !exclude.includes(p.cls)) })),
     [info, exclude],
   );
   const chosen = options[Math.min(option, options.length - 1)] ?? null;
@@ -386,7 +388,7 @@ export function HomeScreen({
   ) : accepted.length ? (
     <>
       <Icon name="check" className="mr-1 inline size-4 text-mint" />
-      {names(accepted.map((c) => c.name))} get your live link by email when you share.
+      MIRA attempts to email {names(accepted.map((c) => c.name))} a live link when you share. Sending can fail.
     </>
   ) : invited.length ? (
     <>Waiting for {names(invited.map((c) => c.name))} to accept your invite; until then, send a live link yourself.</>
@@ -396,7 +398,7 @@ export function HomeScreen({
       <Link href="/circle" className="font-bold text-accent">
         add someone
       </Link>{" "}
-      to be emailed if you don&apos;t arrive.
+      so MIRA can attempt an email if you don&apos;t arrive.
     </>
   );
 
@@ -669,6 +671,16 @@ export function HomeScreen({
               </div>
             )}
 
+            {mode === "walk" && chosen && !chosen.route.approximate ? (
+              <section className="mt-4 rounded-2xl border border-line-strong bg-surface px-4 py-3" aria-label="Lighting evidence before starting">
+                <h3 className="text-sm font-extrabold">Lighting evidence on this walk</h3>
+                <p className="mt-1 text-sm text-ink-muted">{lightingEvidenceLine(chosen.lightingEvidence, chosen.lighting)}</p>
+                <details className="mt-1 text-xs text-ink-muted">
+                  <summary className="min-h-8 cursor-pointer font-bold text-accent">Sources and freshness</summary>
+                  <p>{chosen.lighting ? sourceList(chosen.lighting) || "No mapped source returned evidence." : "MIRA could not confirm source coverage."} Lighting evidence does not establish whether a route is safe.</p>
+                </details>
+              </section>
+            ) : mode !== "walk" ? <p className="mt-3 text-xs text-ink-muted">Lighting evidence is available for mapped walking routes.</p> : null}
             <div className="mt-4">
               <Button variant="hero" size="lg" onClick={() => void startTrip()} busy={starting} busyLabel="Starting…" disabled={!me || (mode !== "walk" && routeLoading)}>
                 <Icon name={mode === "walk" ? "walk" : "route"} /> Start with MIRA
@@ -697,7 +709,7 @@ export function HomeScreen({
                 {!user
                   ? "You'll sign in first. Then send a live link to anyone; it stops by itself when you arrive."
                   : sharesWithCircle
-                    ? `${names(accepted.map((c) => c.name))} get your live link by email now, and an email if you don't arrive.`
+                    ? `MIRA attempts to email ${names(accepted.map((c) => c.name))} a live link when this journey starts and an alert if you miss your check-in. Sending can fail.`
                     : accepted.length && emailAlerts
                       ? "Nobody is alerted if you don't arrive. You can still send your live link on the next screen."
                       : "Nobody is alerted automatically. On the next screen, send your live link by message — it stops when you arrive."}
@@ -707,7 +719,7 @@ export function HomeScreen({
             {mode === "walk" && chosen && !chosen.route.approximate ? (
               <>
                 {chosen.lighting ? <LightingSummary lighting={chosen.lighting} /> : null}
-                <HelpPointList points={chosen.helpPoints} defaultOpen onPick={(p) => pick({ name: p.name, lat: p.lat, lon: p.lon, kind: HELP_CLASSES[p.cls].label })} />
+                <HelpPointList points={chosen.helpPoints} evidence={chosen.helpEvidence} defaultOpen onPick={(p) => pick({ name: p.name, lat: p.lat, lon: p.lon, kind: HELP_CLASSES[p.cls].label })} />
               </>
             ) : null}
             {mode === "walk" && info?.notes.length ? (
@@ -838,6 +850,7 @@ export function HomeScreen({
         helpPoints={unsafeHelp}
         helpLoading={Boolean(me) && nearHelp?.key !== meKey}
         helpFailed={Boolean(nearHelp?.failed) && !chosen?.helpPoints.length}
+        helpPartial={nearHelp?.evidence?.state === "partial" || chosen?.helpEvidence?.state === "partial"}
         onGoHelpPoint={(p) => {
           setUnsafe(false);
           pick({ name: p.name, lat: p.lat, lon: p.lon, kind: HELP_CLASSES[p.cls].label });
@@ -853,6 +866,9 @@ export function HomeScreen({
         onClose={() => setNearOpen(false)}
         me={me}
         points={nearHelp?.points ?? []}
+        evidence={nearHelp?.evidence ?? null}
+        failed={Boolean(nearHelp?.failed)}
+        onRetry={() => { setNearHelp(null); setHelpRetry((n) => n + 1); }}
         loading={Boolean(me) && nearHelp?.key !== meKey}
         exclude={exclude}
         onPick={(p) => {

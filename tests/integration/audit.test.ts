@@ -250,7 +250,7 @@ describe("street lighting answers", () => {
     expect((await lightingForRoute(sql, [ROUTE[0], [77.2015, 28.69], ROUTE[1]]))!.summary.lit).toBe(100);
 
     const cols = (await sql`SELECT column_name FROM information_schema.columns WHERE table_name = 'lit_votes'`).map((c) => c.column_name).sort();
-    expect(cols).toEqual(["cell", "day", "id", "value", "voter_hash"]); // no user, no trip, no time of day
+    expect(cols).toEqual(["cell", "day", "id", "identity_version", "value", "voter_hash"]); // no user, no trip, no time of day
     const perCell = await sql`SELECT cell, count(*)::int AS n, count(DISTINCT voter_hash)::int AS voters FROM lit_votes GROUP BY cell`;
     expect(perCell.every((r) => r.n === 3 && r.voters === 3)).toBe(true);
     // One person's rows in different cells share no identifier.

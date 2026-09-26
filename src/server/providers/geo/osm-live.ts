@@ -4,6 +4,7 @@ import { classifyPlace, type PlaceType } from "@/domain/osm";
 import { helpClassFromOsm, isOpen24h, type HelpPoint } from "@/domain/help-points";
 import { haversineMeters } from "@/domain/pilot";
 import { getEnv } from "@/server/config/env";
+import { coordinateBearingGeoUrl } from "./coordinate-url";
 import type { GeoPoint, PlaceHit } from "./types";
 
 /**
@@ -110,7 +111,7 @@ export async function overpassHelp(points: GeoPoint[], radiusM: number, opts?: {
   const key = `${pts.map((c) => `${c.lat},${c.lon}`).join(";")}|${r}|${opts?.convenience ? "c" : ""}`;
   const hit = helpCache.get(key);
   if (hit) return hit;
-  if (Date.now() - lastOverpass < 1000) return [];
+  if (Date.now() - lastOverpass < 1000) throw new Error("overpass_retry_later");
   lastOverpass = Date.now();
   const around = `(around:${r},${pts.map((c) => `${c.lat},${c.lon}`).join(",")})`;
   const query = `[out:json][timeout:8];(
@@ -127,7 +128,7 @@ export async function overpassHelp(points: GeoPoint[], radiusM: number, opts?: {
       body: new URLSearchParams({ data: query }),
       signal: AbortSignal.timeout(9000),
     });
-    if (!res.ok) return [];
+    if (!res.ok) throw new Error("overpass_help_http");
     type El = { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
     const out: HelpPoint[] = [];
     for (const e of ((await res.json()) as { elements: El[] }).elements ?? []) {
@@ -140,8 +141,8 @@ export async function overpassHelp(points: GeoPoint[], radiusM: number, opts?: {
     }
     helpCache.set(key, out);
     return out;
-  } catch {
-    return [];
+  } catch (err) {
+    throw err;
   }
 }
 
@@ -168,8 +169,7 @@ export async function photonSearch(q: string, near?: GeoPoint): Promise<PlaceHit
   }
   recentSearches.push(Date.now());
   try {
-    const url = new URL("/api/", base);
-    url.search = new URLSearchParams({ q, limit: "12", lang: "en", ...(c ? { lat: String(c.lat), lon: String(c.lon), location_bias_scale: "0.4" } : {}) }).toString();
+    const url = coordinateBearingGeoUrl(base, "/api/", { q, limit: "12", lang: "en", ...(c ? { lat: String(c.lat), lon: String(c.lon), location_bias_scale: "0.4" } : {}) });
     const res = await fetch(url, { headers: { "user-agent": UA() }, signal: AbortSignal.timeout(4000) });
     if (!res.ok) return [];
     type F = { geometry: { coordinates: [number, number] }; properties: Record<string, string | undefined> };

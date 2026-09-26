@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { RouteContextLines } from "@/components/app/HelpPointList";
+import { RouteContextLines, helpPointsLine } from "@/components/app/HelpPointList";
+import { HelpNearSheet } from "@/components/app/HelpNearSheet";
 import { ArrivalContextLines, RouteOptions, type RouteOption } from "@/components/app/RouteOptions";
-import { lightingWhy } from "@/components/app/LightingSummary";
+import { lightingEvidenceLine, lightingWhy } from "@/components/app/LightingSummary";
 import { setCountry } from "@/lib/locale-store";
 import { UNKNOWN_COUNTRY } from "@/domain/country-context";
 import type { RouteLighting } from "@/domain/lighting";
@@ -30,20 +31,38 @@ describe("journey context card", () => {
     render(<RouteContextLines option={option(lighting(71, 22))} />);
     const card = screen.getByLabelText("What's known about this way");
     expect(card).toHaveTextContent("71% mapped as lit · 7% mapped as unlit · 22% not known"); // every known share, never a 0%
-    expect(card).toHaveTextContent("1 Help Point along the way · first: Corner Pharmacy, 6 min in");
+    expect(card).toHaveTextContent("1 mapped Help Point along the way · first: Corner Pharmacy, 6 min in");
     expect(card.textContent).not.toMatch(VERDICTS);
   });
 
   it("says 'not known' and why in one tap, with the community hint", () => {
     render(<RouteContextLines option={option(null, [])} />);
     expect(screen.getByText("Lighting not known")).toBeInTheDocument();
-    expect(screen.getByText("No Help Points found along the way")).toBeInTheDocument();
+    expect(screen.getByText("No mapped Help Points from sources checked")).toBeInTheDocument();
     expect(screen.getAllByText(/Community can improve this/)).toHaveLength(2);
     const [lightWhy] = screen.getAllByRole("button", { name: "Why not known?" });
     expect(lightWhy).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(lightWhy);
     expect(screen.getByText(/has mapped the street lights here yet/)).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(VERDICTS);
+  });
+
+  it("shows failed and partial source states without discarding available evidence", () => {
+    const failed = [{ source: "OpenStreetMap", state: "failed" as const, retryable: true }];
+    const partial = [{ source: "MIRA walkers", state: "ready" as const }, ...failed];
+    expect(lightingEvidenceLine({ state: "failed", sources: failed, retryable: true }, null)).toBe("MIRA couldn't check lighting sources right now.");
+    expect(lightingEvidenceLine({ state: "partial", sources: partial, data: lighting(71, 22) }, null)).toMatch(/71% mapped as lit.*Couldn't check OpenStreetMap/);
+    expect(helpPointsLine([], { state: "failed", sources: failed, retryable: true })).toBe("MIRA couldn't check Help Points right now.");
+    expect(helpPointsLine([pharmacy], { state: "partial", sources: partial, data: [pharmacy] })).toMatch(/1 mapped Help Point.*Some sources couldn't be checked/);
+  });
+
+  it("offers Retry instead of an empty Help Point claim when lookup failed", () => {
+    const retry = vi.fn();
+    render(<HelpNearSheet open onClose={() => {}} me={{ lat: 51.5, lon: -0.12 }} points={[]} evidence={{ state: "failed", sources: [{ source: "Google Places", state: "failed", retryable: true }], retryable: true }} loading={false} onRetry={retry} onPick={() => {}} />);
+    expect(screen.getByText("MIRA couldn't check Help Points right now.")).toBeInTheDocument();
+    expect(screen.queryByText(/No mapped Help Points/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 
   it("has nothing to explain when every stretch is known", () => {
@@ -78,8 +97,8 @@ describe("journey context card", () => {
 
   it("for transit with nothing found: says so, and why in one tap", () => {
     render(<ArrivalContextLines mode="transit" arrivalHelp={[]} dest={{ lat: 0, lon: 0 }} />);
-    expect(screen.getByText("No Help Points found near where you arrive")).toBeInTheDocument();
+    expect(screen.getByText("No mapped Help Points from sources checked near where you arrive")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Why not known?" }));
-    expect(screen.getByText(/may only mean the map has no data yet/)).toBeInTheDocument();
+    expect(screen.getByText(/No results from checked sources does not mean no places exist/)).toBeInTheDocument();
   });
 });

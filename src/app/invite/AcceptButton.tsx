@@ -11,7 +11,7 @@ export function AcceptButton() {
   if (state === "done") {
     return (
       <Notice tone="info" role="status" title="You've accepted">
-        Thank you. MIRA will email you a live link whenever they share a trip, and let you know if they don&apos;t check in. You can close this page.
+        Thank you. When email is available, MIRA attempts to send you a live link if they share a trip, and a missed-check-in email if needed. Sending can fail. You can close this page.
       </Notice>
     );
   }

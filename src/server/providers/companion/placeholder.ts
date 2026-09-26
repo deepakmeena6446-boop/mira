@@ -2,7 +2,7 @@ import "server-only";
 import type { MiraCard, MiraEvent, MiraTurn } from "./types";
 import type { MiraTools } from "./tools";
 import { daypartFor } from "@/domain/daypart";
-import { GSM_EMERGENCY, type CountryContext } from "@/domain/country-context";
+import { emergencyLine, type CountryContext } from "@/domain/country-context";
 import { clock12 } from "./clock";
 import { DANGER, JUDGEMENT } from "./signals";
 
@@ -60,17 +60,17 @@ function joinNames(xs: string[]): string {
 /** What to say about emergency help here, from the Country Context only (never a hardcoded number). */
 export function emergencySentence(c: CountryContext): string {
   const p = c.emergency.primary;
-  if (p) return `call ${p.number} now`;
+  if (p?.scope === "all") return `call ${p.number} now`;
+  if (p) return "open Emergency options and choose the service you need";
   return "use the Emergency button now — MIRA doesn't know the local number here, and it explains what to dial";
 }
 
 function emergencyFacts(c: CountryContext): string {
   const p = c.emergency.primary;
   const where = c.countryName ?? "this country";
-  if (!p) return `${GSM_EMERGENCY.explain}`;
-  const also = c.emergency.also.map((a) => a.number);
+  if (!p) return "MIRA could not verify a local emergency number here. Use the Emergency options button for that explanation.";
   const help = c.helplines.map((h) => `${h.number} (${h.name})`);
-  return `In ${where}, the emergency number is ${p.number}${also.length ? `; ${also.join(", ")} also works` : ""}.${help.length ? ` Helplines: ${help.join(", ")}.` : ""}`;
+  return `In ${where}, ${emergencyLine(c)}${help.length ? ` Helplines: ${help.join(", ")}.` : ""}`;
 }
 
 // Marks location-derived fragments inside a reply: streamed, never stored (see MiraEvent).
@@ -139,7 +139,7 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
           : `I'm right here, ${firstName}. ${help.length ? "These are the nearest Help Points — places where help is usually available." : ""} Want me to share your journey so someone you trust can follow along?`
         : help.length
           ? "Here are the nearest Help Points. Hours are as the source lists them."
-          : "I couldn't find Help Points in the map data I have for this area.";
+          : "I don't have Help Point results to show right now. That doesn't mean there are none nearby.";
     if (help.length) cards.push({ type: "help_points", title: uneasy ? "Nearest Help Points" : "Help Points near you", points: help });
     if (uneasy && home) cards.push(tripCard(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })));
   } else if (named || RX.home.test(m)) {
@@ -195,10 +195,9 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
   } else if (RX.thanks.test(m)) {
     reply = hinglish ? "Koi baat nahi! Main yahin hoon." : part === "night" ? "Anytime 🌙 I'm around if you head out again." : "Anytime. I'm here whenever you're heading out.";
   } else if (RX.who.test(m)) {
-    const p = ctx0.country.emergency.primary;
-    reply = `I'm Mira, your travel companion. I can share your journey live with people you trust, find Help Points and what's open around you, and help you report something privately. I'm not an emergency service — ${p ? `for that, call ${p.number}` : "for that, use the Emergency button"}.`;
+    reply = `I'm Mira, your travel companion. I can share your journey live with people you trust, find Help Points and what's open around you, and help you report something privately. I'm not an emergency service — for that, ${emergencySentence(ctx0.country)}.`;
   } else {
-    reply = `I can't answer that one yet. Right now I'm best at sharing your journey, finding Help Points and what's open nearby, and private reports — try "take me home" or "find somewhere staffed nearby".`;
+    reply = `I can't answer that one yet. Right now I'm best at sharing your journey, finding Help Points and what's open nearby, and private reports — try "take me home" or "find Help Points nearby".`;
     if (part === "night" && home) {
       reply += ` It's late, so here's your walk to ${home.label} if you want it.`;
       cards.push(tripCard(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })));

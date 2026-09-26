@@ -69,6 +69,11 @@ describe("production validation", () => {
     expect(productionWarnings(parseEnv(prod)).join(" ")).toMatch(/No email provider/);
     expect(productionWarnings(parseEnv({ ...prod, ...RESEND }))).toEqual([]);
     expect(productionWarnings(parseEnv(valid))).toEqual([]); // dev/test: quiet
+    const missing = { ...prod, PUBLIC_BETA_STRICT: "on" };
+    expect(() => parseEnv(missing)).toThrow(/RESEND_API_KEY/);
+    const live = { ...missing, ...RESEND, GOOGLE_MAPS_SERVER_KEY: "server", GOOGLE_MAPS_BROWSER_KEY: "browser", AUTH_GOOGLE_ID: "id", AUTH_GOOGLE_SECRET: "secret", ANTHROPIC_API_KEY: "claude", MAPILLARY_TOKEN: "mapillary", VAPID_PUBLIC_KEY: "public", VAPID_PRIVATE_KEY: "private", VAPID_SUBJECT: "mailto:alerts@mira.test", GOOGLE_PLACES_HOURS: "on", PUBLIC_AGGREGATE_RELEASES: "off" };
+    expect(() => parseEnv(live)).not.toThrow();
+    expect(() => parseEnv({ ...live, PUBLIC_AGGREGATE_RELEASES: "on" })).toThrow(/PUBLIC_AGGREGATE_RELEASES/);
   });
   it("logs the warning once, as structured JSON, when the env is first read", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});

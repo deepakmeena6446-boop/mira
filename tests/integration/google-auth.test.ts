@@ -235,6 +235,30 @@ describe("Sign in with Google (OIDC code + PKCE, offline)", () => {
     expect(await getSql()`SELECT 1 FROM users WHERE id = ${kaiId}`).toHaveLength(1);
   });
 
+  it("keeps a first-name account with places and contacts when Google belongs to another account", async () => {
+    const sub = `g-${uniq()}`;
+    const email = `existing-${uniq()}@example.test`;
+    const existing = newJar();
+    await signInGoogle(existing, sub, email);
+    const existingId = (await me(existing))!.id;
+
+    withGoogle({ ALLOW_DEMO_SIGNIN: "on" });
+    const jar = await demo("Ria");
+    const demoId = (await me(jar))!.id;
+    switchJar(jar);
+    expect((await placesPOST(jsonRequest("/api/me/places", { label: "Home", emoji: "🏠", ...HOME }))).status).toBe(201);
+    await getSql()`INSERT INTO contacts (user_id, name, encrypted_email, email_hash, accepted_at)
+      VALUES (${demoId}, 'Mum', ${encryptText(`mum-${uniq()}@example.test`, "contact_email")}, ${emailHash(`unique-${uniq()}@example.test`)}, now())`;
+    const session = jar.get("mira_session");
+    const res = await signInGoogle(jar, sub, email);
+    expect(res.headers.get("location")).toBe(`${BASE}/me?switch=preserved`);
+    expect(jar.get("mira_session")).toBe(session);
+    expect((await me(jar))!.id).toBe(demoId);
+    expect(await getSql()`SELECT 1 FROM saved_places WHERE user_id = ${demoId}`).toHaveLength(1);
+    expect(await getSql()`SELECT 1 FROM contacts WHERE user_id = ${demoId}`).toHaveLength(1);
+    expect(await getSql()`SELECT 1 FROM users WHERE id = ${existingId}`).toHaveLength(1);
+  });
+
   describe("every failure lands on Home with ?signin=failed and no session", () => {
     const cases: Array<[string, (jar: Jar) => Promise<Response>, string]> = [
       ["bad state", (jar) => roundTrip(jar, (nonce) => idToken(claimsFor({ sub: `g-${uniq()}`, email: `${uniq()}@example.test`, nonce })), { state: () => randomToken(24) }), "state_mismatch"],

@@ -63,7 +63,15 @@ export function countryContext(country: string | null | undefined, region?: stri
   const p = iso ? allProfiles()[iso] : undefined;
   if (!p) return { ...UNKNOWN_COUNTRY, iso, region: region ?? null };
   const e = p.emergency;
-  const primary: EmergencyNumber = { number: e.general.number, label: e.general.label };
+  const matchingService = (e.services ?? []).find((s) => s.number === e.general.number);
+  const allServicesExplicit = /(?:police.*(?:fire|ambulance).*(?:fire|ambulance)|(?:fire|ambulance).*police.*(?:fire|ambulance))/i.test(e.general.label);
+  const scope: EmergencyNumber["scope"] = matchingService ? "service" : allServicesExplicit ? "all" : "unspecified";
+  const primary: EmergencyNumber = {
+    number: e.general.number,
+    label: matchingService ? matchingService.label : e.general.label,
+    scope: p.iso === "NG" ? "unspecified" : scope,
+    ...(p.iso === "NG" ? { qualification: "112 is a national number, but operational coverage in every area is not verified by MIRA" } : {}),
+  };
   return {
     iso: p.iso,
     countryName: p.name,

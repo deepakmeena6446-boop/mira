@@ -18,7 +18,7 @@ const GB: CountryContext = {
   countryName: "United Kingdom",
   region: null,
   timezone: "Europe/London",
-  emergency: { primary: { number: "999", label: "Emergency (police, fire, ambulance)" }, also: [{ number: "112", label: "Emergency" }], services: [], source: { title: "gov.uk", url: "https://www.gov.uk" } },
+  emergency: { primary: { number: "999", label: "Emergency (police, fire, ambulance)", scope: "all" }, also: [{ number: "112", label: "Emergency" }], services: [], source: { title: "gov.uk", url: "https://www.gov.uk" } },
   helplines: [],
 };
 const KE: CountryContext = { ...UNKNOWN_COUNTRY, iso: "KE" };
@@ -74,10 +74,10 @@ describe("Mira (scripted engine)", () => {
     expect(r.text).toMatch(/MIRA doesn't know the local number here/);
     expect(r.text).not.toMatch(/\b\d{3}\b/);
     const info = await run("what's the emergency number here?", tools({ getContext: async () => now({ country: KE }) }));
-    expect(info.text).toMatch(/doesn't know the emergency number for this country/);
+    expect(info.text).toMatch(/could not verify a local emergency number/);
     expect(info.cards[0].type).toBe("sos");
     const uk = await run("what's the emergency number here?");
-    expect(uk.text).toMatch(/United Kingdom, the emergency number is 999; 112 also works/);
+    expect(uk.text).toMatch(/United Kingdom, Reviewed call options: 999/);
   });
   it("answers safety judgements with 'not enough verified information', then facts", async () => {
     const r = await run("Is this neighbourhood safe at night?");
@@ -198,7 +198,7 @@ describe("Mira's context block", () => {
     const block = contextBlock(facts(now({ area: "28.6927, 77.2131" })));
     expect(block).toMatch(/Friday, 10:05 pm \(night\), time zone Europe\/London/);
     expect(block).toMatch(/country: United Kingdom \(GB\)/);
-    expect(block).toMatch(/Local emergency number: 999/);
+    expect(block).toMatch(/Reviewed call options: 999/);
     expect(block).toMatch(/no crime, incident or neighbourhood-safety data/);
     expect(block).not.toMatch(/\d+\.\d{3,}/); // no coordinates, even when the device sent them as an "area"
     expect(safeArea("Near Gate 3")).toBe("Near Gate 3");
@@ -244,7 +244,7 @@ describe("Mira on Claude (mocked client)", () => {
     expect(calls[0]).toMatchObject({ model: "claude-sonnet-5", output_config: { effort: "low" } });
     const system = JSON.stringify(calls[0].system);
     expect(system).toMatch(/United Kingdom \(GB\)/);
-    expect(system).toMatch(/Local emergency number: 999/);
+    expect(system).toMatch(/Reviewed call options: 999/);
     expect(system).not.toMatch(/28\.69|77\.21|51\.49|-0\.11/);
     expect(r.events.find((e) => e.type === "usage")).toEqual({ type: "usage", inputTokens: 1000, outputTokens: 40 });
   });
@@ -277,7 +277,7 @@ describe("Mira on Claude (mocked client)", () => {
     expect(uk.result).toMatch(/999 — Emergency/);
     const ke = await ask(KE);
     expect(ke.result).toMatch(/\\"known\\":false/);
-    expect(ke.result).toMatch(/doesn't know the emergency number for this country/);
+    expect(ke.result).toMatch(/could not verify a local emergency number/);
   });
 
   it("danger words show the Emergency card before the model says anything, once", async () => {
@@ -287,14 +287,16 @@ describe("Mira on Claude (mocked client)", () => {
     expect(r.cards.filter((c) => c.type === "sos")).toHaveLength(1);
   });
 
-  it("logs (without content) when a reply contains a verdict word", async () => {
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+  it("rejects a model safety verdict before any unsafe text reaches the user", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { client } = mockClient([{ text: "That area is safe." }]);
-    await collect(claudeMira({ client, message: "is Soho safe?", history: [], tools: tools(), firstName: "A" }));
-    const line = info.mock.calls.map((c) => String(c[0])).find((l) => l.includes("mira.verdict_word"));
-    expect(JSON.parse(line!)).toMatchObject({ event: "mira.verdict_word", words: ["safe"] });
+    const r = await collect(claudeMira({ client, message: "is Soho safe?", history: [], tools: tools(), firstName: "A" }));
+    expect(r.text).not.toContain("That area is safe");
+    expect(r.text).toContain("I can't verify");
+    const line = warn.mock.calls.map((c) => String(c[0])).find((l) => l.includes("mira.output_rejected"));
+    expect(JSON.parse(line!)).toMatchObject({ event: "mira.output_rejected", reason: "safety_verdict" });
     expect(line).not.toMatch(/That area|Soho/);
-    info.mockRestore();
+    warn.mockRestore();
   });
 });
 

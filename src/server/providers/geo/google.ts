@@ -3,10 +3,12 @@ import { haversineMeters } from "@/domain/pilot";
 import { FAR_M } from "@/domain/search-rank";
 import { GoogleBudgetExceeded, takeGoogleCall } from "./budget";
 import { getEnv } from "@/server/config/env";
+import { evidenceState, type EvidenceState, type SourceState } from "@/domain/evidence-state";
+import { coordinateBearingGeoUrl } from "./coordinate-url";
 import { scheduleFromGoogle } from "@/domain/opening-hours";
 import { GOOGLE_HELP_TYPES, helpClassFromGoogle, type HelpClass, type HelpPoint } from "@/domain/help-points";
 import type { TravelMode } from "@/domain/travel-mode";
-import type { GeoPoint, GeoProvider, HelpHours, ModeRoute, PlaceHit, WalkRoute } from "./types";
+import type { GeoPoint, GeoProvider, HelpHours, HelpLookupOptions, ModeRoute, PlaceHit, WalkRoute } from "./types";
 
 /**
  * Google Maps Platform provider (Places API (New), Routes API, Geocoding API). Called only
@@ -240,9 +242,32 @@ export function resetGoogleHelpCaches() {
 }
 
 const warn = (op: string, err: unknown) =>
-  console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "geo.google_failed", op, error: err instanceof Error ? err.message.slice(0, 40) : "unknown" }));
+  console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "geo.google_failed", op, error: err instanceof Error ? err.name : "unknown" }));
 
 export function googleGeo(key: string, fallback: GeoProvider): GeoProvider {
+  const lookupHelp = async (points: GeoPoint[], radiusM: number, opts?: HelpLookupOptions): Promise<EvidenceState<HelpPoint[]>> => {
+
+      if (!points.length) return evidenceState([], false, [{ source: "Google Places", state: "ready" }]);
+      const r = Math.min(Math.max(radiusM, 300), 5000);
+      // One point ("near me"): separate lookups so pharmacies (or convenience stores) can't crowd
+      // out a hospital, station or police station. Along a route: one lookup per sample point.
+      const groups =
+        points.length === 1
+          ? [HELP_TYPE_GROUPS.main, HELP_TYPE_GROUPS.late, ...(opts?.convenience ? [HELP_TYPE_GROUPS.convenience] : [])]
+          : [[...HELP_TYPE_GROUPS.main, ...HELP_TYPE_GROUPS.late]];
+      try {
+        const found = await Promise.all(points.flatMap((p) => groups.map((types) => helpNearby(key, round(p, 3), r, types))));
+        const data = found.flat();
+        return evidenceState(data, data.length > 0, [{ source: "Google Places", state: "ready" }]);
+      } catch (err) {
+        warn("help_places", err);
+        const backup: EvidenceState<HelpPoint[]> = fallback.helpPlacesEvidence
+          ? await fallback.helpPlacesEvidence(points, radiusM, opts)
+          : await fallback.helpPlaces(points, radiusM, opts).then((data) => evidenceState(data, data.length > 0, [{ source: "OpenStreetMap", state: "ready" }])).catch(() => ({ state: "failed", sources: [{ source: "OpenStreetMap", state: "failed", retryable: true }], retryable: true }));
+        const sources: SourceState[] = [{ source: "Google Places", state: "failed", retryable: true }, ...backup.sources];
+        return evidenceState("data" in backup ? backup.data : [], "data" in backup && backup.data.length > 0, sources);
+      }
+  };
   return {
     async search(q, near, opts) {
       const text = q.trim().slice(0, 80);
@@ -277,8 +302,7 @@ export function googleGeo(key: string, fallback: GeoProvider): GeoProvider {
       if (cached !== undefined) return { ...cached, precise: false };
       try {
         if (!takeGoogleCall()) throw new GoogleBudgetExceeded();
-        const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
-        url.search = new URLSearchParams({ latlng: `${r.lat},${r.lon}`, language: "en", key }).toString();
+        const url = coordinateBearingGeoUrl("https://maps.googleapis.com/maps/api/geocode/json", null, { latlng: `${r.lat},${r.lon}`, language: "en", key });
         const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
         const data = (await res.json()) as { status: string; results: Array<{ address_components: Array<{ long_name: string; short_name?: string; types: string[] }> }> };
         if (data.status !== "OK" && data.status !== "ZERO_RESULTS") throw new Error(`geocode_${data.status}`);
@@ -328,22 +352,10 @@ export function googleGeo(key: string, fallback: GeoProvider): GeoProvider {
     },
 
     async helpPlaces(points, radiusM, opts) {
-      if (!points.length) return [];
-      const r = Math.min(Math.max(radiusM, 300), 5000);
-      // One point ("near me"): separate lookups so pharmacies (or convenience stores) can't crowd
-      // out a hospital, station or police station. Along a route: one lookup per sample point.
-      const groups =
-        points.length === 1
-          ? [HELP_TYPE_GROUPS.main, HELP_TYPE_GROUPS.late, ...(opts?.convenience ? [HELP_TYPE_GROUPS.convenience] : [])]
-          : [[...HELP_TYPE_GROUPS.main, ...HELP_TYPE_GROUPS.late]];
-      try {
-        const found = await Promise.all(points.flatMap((p) => groups.map((types) => helpNearby(key, round(p, 3), r, types))));
-        return found.flat();
-      } catch (err) {
-        warn("help_places", err);
-        return fallback.helpPlaces(points, radiusM, opts);
-      }
+      const result = await lookupHelp(points, radiusM, opts);
+      return "data" in result ? result.data : [];
     },
+    helpPlacesEvidence: lookupHelp,
 
     /**
      * Listed hours (and Google's own "open now", which counts special hours) for at most

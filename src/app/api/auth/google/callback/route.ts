@@ -1,3 +1,4 @@
+import { assertAdultEligibility } from "@/server/account/adult-eligibility";
 import { cookies } from "next/headers";
 import { getSql } from "@/server/db/client";
 import { getEnv, googleSignInConfigured } from "@/server/config/env";
@@ -31,6 +32,7 @@ export async function GET(req: Request) {
   const sealed = store.get(cookieName("google"))?.value;
   store.delete(cookieName("google")); // single use, whatever happens next
   try {
+    await assertAdultEligibility();
     if (!googleSignInConfigured()) throw new GoogleAuthError("not_configured");
     const sql = getSql();
     const now = new Date();
@@ -66,6 +68,7 @@ export async function GET(req: Request) {
   } catch (err) {
     const reason = err instanceof GoogleAuthError ? err.reason : (err as { code?: unknown })?.code === "rate_limited" ? "rate_limited" : err instanceof Error ? err.name : "unknown";
     log("auth.google_failed", { reason });
+    if (reason === "demo_data_preserved") return redirect(new URL("/me?switch=preserved", base).toString());
     return failed();
   }
 }

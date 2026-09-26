@@ -1,5 +1,8 @@
 # Deploying MIRA on Railway
 
+> **Public beta profile:** Use `PUBLIC_BETA_STRICT=on` on web for the 18+ worldwide beta. It fails startup/build if Resend, Google Maps, Google sign-in, Claude, Mapillary, Web Push or Google Places hours are unconfigured; keep `PUBLIC_AGGREGATE_RELEASES=off`. The older share-link-only option below is for local previews or a different, explicitly approved release. Complete [the public beta release gates](PUBLIC_BETA_RELEASE.md) before production traffic.
+
+
 MIRA runs as **three Railway services** in one project, built from this repository:
 
 | Service | What it runs | Restart | Health |
@@ -10,19 +13,19 @@ MIRA runs as **three Railway services** in one project, built from this reposito
 
 The worker is not optional: it sends missed-arrival alerts, purges journeys and runs retention. Trips refuse to start while it's unhealthy, and `/api/health/ready` returns 503.
 
-The declarative version of all this is [`.railway/railway.ts`](../.railway/railway.ts) (Railway Infrastructure as Code). Railway's older Config as Code (`railway.json` / `railway.toml`) is deprecated, **new services can't opt into it**, and it stops being read on 2026‑12‑01, so this repo has no `railway.json` ([docs](https://docs.railway.com/config-as-code)).
+The desired declarative topology is recorded in [`.railway/railway.ts`](../.railway/railway.ts). The installed Railway CLI 4.57.3 does not expose `railway config`, so use the verified CLI path below and compare it with this topology. Railway's older Config as Code (`railway.json` / `railway.toml`) is deprecated, **new services can't opt into it**, and it stops being read on 2026‑12‑01, so this repo has no `railway.json` ([docs](https://docs.railway.com/config-as-code)).
 
-> **Email is optional for the beta.** Without `RESEND_API_KEY` + `EMAIL_FROM`, MIRA boots, logs a `config.warning`, and says in the app that automatic email is off. The traveller's share link still works. Missed arrivals are then recorded `not_attempted`, never `sent`.
+> **Email is required for this public beta.** A non-strict local or private preview can still boot without it and honestly offer share links only. With `PUBLIC_BETA_STRICT=on`, missing Resend configuration blocks startup.
 
 ---
 
 ## 0. Before you start (owner-held accounts)
 
 - Railway account (Hobby or Pro). Railway CLI: `brew install railway` (or `npm i -g @railway/cli`), then `railway login`.
-- A domain you control (or start on the free `*.up.railway.app` domain and add yours later).
+- A domain you control for the final production URL; staging uses a separate domain or subdomain.
 - Resend account with that domain verified (step 6). Start DNS verification first: it can take a while.
-- Google Cloud project: a **server** Maps key, a **browser** Maps key, and (optionally) an OAuth client.
-- Anthropic API key with a monthly spend limit (optional: Mira falls back to the scripted placeholder).
+- Google Cloud project: a **server** Maps key, a **browser** Maps key, and an OAuth client.
+- Anthropic API key with a monthly spend limit, plus a Mapillary token.
 
 Generate the secrets locally (never commit them, never paste them into chat):
 
@@ -31,10 +34,10 @@ openssl rand -hex 32      # POSTGRES_PASSWORD (hex: safe inside a URL)
 openssl rand -base64 32   # SESSION_SECRET
 openssl rand -base64 32   # DATA_ENCRYPTION_KEY
 npm run admin:hash        # ADMIN_PASSWORD_HASH: use the printed "b64:…" form
-npx web-push generate-vapid-keys   # VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY (optional)
+npx web-push generate-vapid-keys   # VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY (required for this beta)
 ```
 
-## 1. Create the project and services (path A: CLI commands)
+## 1. Create the project and services
 
 Run from the repository root. Every command below exists in Railway CLI 4.57 (`railway <cmd> --help`). Values are read from stdin so they never land in shell history.
 
@@ -74,17 +77,9 @@ railway environment config --json   # verify every field above landed as intende
 
 If a field didn't take (the CLI doesn't document how `--service-config` parses arrays and numbers), set it in the dashboard: *service → Settings → Build / Deploy*. Pre-deploy command: `node dist/migrate.mjs`.
 
-### Path B: Infrastructure as Code (declarative, with a reviewed diff)
+### Staging environment
 
-Needs a CLI that has `railway config` (`railway upgrade --yes`) and the SDK at the repo root:
-
-```bash
-npm install --no-save railway@3.11.0
-railway config plan        # shows the diff; variable values are masked
-railway config apply       # creates/updates postgis, its volume, web and worker
-```
-
-Secrets stay `preserve()`d in the file: set them with the `railway variable set … --stdin` commands in step 3 either way.
+Create a separate `staging` Railway environment with its **own** PostGIS volume, secrets, sending address, OAuth redirect URI and staging domain. `railway environment new staging --json` is available in CLI 4.57.3. Verify the environment and service settings with `railway status --json` and `railway environment config --environment staging --json` before uploading code. Never point staging at the production database or reuse production share-link secrets. Run the same migrations and release checks there first; production uses the same tested Git revision.
 
 ## 2. Domain and HTTPS
 
@@ -104,7 +99,7 @@ Set on **web**; the worker gets the subset it needs by reference (`${{web.NAME}}
 
 ```bash
 S="--service web --skip-deploys"
-railway variable set NODE_ENV=production PORT=3000 RAILPACK_NODE_VERSION=24 $S
+railway variable set NODE_ENV=production PUBLIC_BETA_STRICT=on PUBLIC_AGGREGATE_RELEASES=off PORT=3000 RAILPACK_NODE_VERSION=24 $S
 railway variable set 'DATABASE_URL=postgresql://mira:${{postgis.POSTGRES_PASSWORD}}@${{postgis.RAILWAY_PRIVATE_DOMAIN}}:5432/mira' $S
 printf 'https://<your domain>' | railway variable set APP_BASE_URL --stdin $S
 openssl rand -base64 32 | railway variable set SESSION_SECRET --stdin $S
@@ -114,21 +109,26 @@ railway variable set PILOT_MANIFEST_PATH=data/pilot/manifest.json $S
 railway variable set 'MAP_TILE_URL=https://tile.openstreetmap.org/{z}/{x}/{y}.png' $S
 railway variable set MAP_STYLE_URL=https://tiles.openfreemap.org/styles/positron $S
 railway variable set CLIENT_IP_HEADER=x-real-ip TRUSTED_PROXY_HOPS=1 $S
-# Email (Resend; see step 6). Skip both for a share-link-only beta.
+# Email (Resend; required for this public beta; see step 6).
 railway variable set RESEND_API_KEY --stdin $S
 railway variable set 'EMAIL_FROM=MIRA <alerts@your-domain>' $S
-# Providers (optional)
+# Live providers required for this public beta
 railway variable set GOOGLE_MAPS_SERVER_KEY --stdin $S
 railway variable set GOOGLE_MAPS_BROWSER_KEY --stdin $S
 railway variable set GOOGLE_PLACES_HOURS=on $S
+railway variable set MAPILLARY_TOKEN --stdin $S
+railway variable set AUTH_GOOGLE_ID --stdin $S
+railway variable set AUTH_GOOGLE_SECRET --stdin $S
+railway variable set VAPID_PUBLIC_KEY --stdin $S
+railway variable set VAPID_PRIVATE_KEY --stdin $S
+railway variable set VAPID_SUBJECT --stdin $S
 railway variable set ANTHROPIC_API_KEY --stdin $S
 
 W="--service worker --skip-deploys"
 railway variable set NODE_ENV=production RAILPACK_NODE_VERSION=24 $W
-for k in DATABASE_URL APP_BASE_URL SESSION_SECRET DATA_ENCRYPTION_KEY ADMIN_PASSWORD_HASH PILOT_MANIFEST_PATH MAP_TILE_URL RESEND_API_KEY EMAIL_FROM; do
+for k in DATABASE_URL APP_BASE_URL SESSION_SECRET DATA_ENCRYPTION_KEY ADMIN_PASSWORD_HASH PILOT_MANIFEST_PATH MAP_TILE_URL RESEND_API_KEY EMAIL_FROM PUBLIC_AGGREGATE_RELEASES VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT; do
   railway variable set "$k=\${{web.$k}}" $W
 done
-# If you use Web Push, reference VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT the same way.
 ```
 
 | Variable | Service | Required | Notes |
@@ -141,18 +141,20 @@ done
 | `PILOT_MANIFEST_PATH` | web, worker | yes | `data/pilot/manifest.json` (committed). |
 | `MAP_TILE_URL` | web, worker | yes | Raster fallback template. |
 | `NODE_ENV` | web, worker | yes | `production` (Railpack also sets it at runtime). |
+| `PUBLIC_BETA_STRICT` | web | public beta | `on`: require every advertised live provider at startup. |
+| `PUBLIC_AGGREGATE_RELEASES` | web, worker | public beta | `off` until a staffed moderation release is approved. |
 | `PORT` | web | yes | `3000`, matching the domain's target port. |
 | `RAILPACK_NODE_VERSION` | web, worker | recommended | `24` (LTS). Without it Railpack resolves `engines.node` (`>=22.11.0`), which can pick a non-LTS major. |
 | `CLIENT_IP_HEADER` | web | recommended | `x-real-ip`: Railway's edge overwrites it with the connecting address. Rate limits key on it. |
 | `TRUSTED_PROXY_HOPS` | web | fallback | `1`. Used only when the header above is absent. |
-| `RESEND_API_KEY`, `EMAIL_FROM` | web, worker | for email | Both or neither. `EMAIL_FROM` = `MIRA <alerts@your-verified-domain>`. |
+| `RESEND_API_KEY`, `EMAIL_FROM` | web, worker | public beta | Both or neither. `EMAIL_FROM` = `MIRA <alerts@your-verified-domain>`. |
 | `MAP_STYLE_URL`, `MAP_STYLE_URL_NIGHT` | web | optional | Vector basemap (OpenFreeMap placeholder by default). |
-| `GOOGLE_MAPS_SERVER_KEY`, `GOOGLE_MAPS_BROWSER_KEY`, `GOOGLE_PLACES_HOURS` | web | optional | See step 7. |
-| `ANTHROPIC_API_KEY`, `MIRA_MODEL` | web | optional | Mira on Claude; unset = scripted placeholder. |
-| `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | web | optional | **Both or neither** (startup fails otherwise). |
-| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | web, worker | optional | Web Push to the traveller. |
+| `GOOGLE_MAPS_SERVER_KEY`, `GOOGLE_MAPS_BROWSER_KEY`, `GOOGLE_PLACES_HOURS` | web | public beta | See step 7. |
+| `ANTHROPIC_API_KEY`, `MIRA_MODEL` | web | public beta | Mira on Claude; unset = scripted placeholder. |
+| `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | web | public beta | **Both or neither** (startup fails otherwise). |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | web, worker | public beta | Web Push to the traveller. |
 | `GOOGLE_MAX_CALLS_PER_MIN`, `MIRA_GLOBAL_DAILY_MAX` | web | optional | Spend ceilings (defaults 600/min per process, 5000/day). |
-| `MAPILLARY_TOKEN` | web | optional | Street-lighting layer. |
+| `MAPILLARY_TOKEN` | web | public beta | Street-lighting layer. |
 | `REVERSE_GEOCODER_URL`, `OVERPASS_URL`, `PLACE_SEARCH_URL` | web | optional | Public OSM services; set only if you accept their usage policies. |
 
 Set all of these **before the first deploy** (`--skip-deploys` above), because `next build` and the pre-deploy step both run with the service's variables.

@@ -52,7 +52,7 @@ async function googleSession(key: string, kind: "day" | "night"): Promise<string
     sessions.set(kind, { token: data.session, expiresAt: Number(data.expiry) * 1000 });
     return data.session;
   } catch (err) {
-    console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "geo.google_tiles_failed", kind, error: err instanceof Error ? err.message.slice(0, 40) : "unknown" }));
+    console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "geo.google_tiles_failed", kind, error: err instanceof Error ? err.name : "unknown" }));
     return cached?.token ?? null;
   }
 }

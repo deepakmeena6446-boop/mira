@@ -28,7 +28,7 @@ interface Msg {
 }
 
 /** What Mira is good at, as tappable examples (signed out, they open sign-in). */
-const EXAMPLES = ["Take me home", "What's open nearby?", "I'm landing in London at 11 PM", "Find somewhere staffed nearby", "I feel uneasy"];
+const EXAMPLES = ["Take me home", "What's open nearby?", "I'm landing in London at 11 PM", "Find Help Points nearby", "I feel uneasy"];
 /** After dark, the journey home and Help Points come first. */
 const NIGHT_EXAMPLES = ["Take me home", "I feel uneasy", "Find somewhere staffed nearby", "What's open nearby?", "I'm landing in London at 11 PM"];
 

@@ -1,48 +1,48 @@
 # MIRA — walk home, your people will know
 
-An installable, mobile-first web app (PWA). It helps a woman understand the way before she goes, keeps the people she chooses with her until she arrives, and puts help one tap away. It never says a route, place or person is safe; it shows what's known, where it's from, and what isn't known.
+An installable, mobile-first web app (PWA) for adults 18 or older. It helps a woman understand the way before she goes, keeps the people she chooses with her until she arrives, and puts help one tap away. It never says a route, place or person is safe; it shows what's known, where it's from, and what isn't known.
 
 1. **Where are you going?** Search, or tap a saved place like 🏠 Home. You get the walking route (and up to two alternatives when the maps provider has them), the time, how much of the way is **mapped as lit**, and the **Help Points** along it (hospitals, police, stations, pharmacies, fuel, hotel receptions), each with hours exactly as the source lists them or "hours not known".
 2. **Start with MIRA.** Share with your trusted contacts (by email), or keep it to yourself and send your **live link** with the phone's share sheet (WhatsApp, SMS…). The journey screen has *I'm here*, *+10 min*, the nearest Help Point, *I feel unsafe* and Emergency.
-3. **Arrive.** Arrival is auto-detected. The link goes dark and the live points are deleted. If you don't check in, each accepted contact gets **one** email. After a journey at night, one tap: "Was the way lit?"
+3. **Arrive.** Arrival is auto-detected. The link goes dark and the live points are deleted. If you miss a check-in, MIRA attempts **one** email per accepted contact when email is configured; the app shows failed or unconfirmed delivery honestly. After a journey at night, one tap: "Was the way lit?"
 
 **Walking, by auto/cab, or by metro/bus.** Walks get routes and context; for rides she picks the ETA (and they can be longer than a walk). "Tell my people now" can also start a journey that just shares where she is.
 
 **Navigation is Home · Circle · Me.** Circle holds trusted contacts; Me holds places, Help Point filters (e.g. no police), notifications on this phone, and adding an email to keep the account. Mira is a button (Home, "I feel unsafe"), and Report is reached from long-press, Home, after a journey, and Me.
 
-**I feel unsafe** (Home and journey screen) opens instantly, with no AI and no network wait: the nearest Help Point ranked for right now (listed as closed now → left out), **Tell my people now** (emails her accepted contacts her live link and asks them to check on her), send your live link, call someone (the phone's own contacts or a typed number, never stored), **Emergency** with the number from the country's cited profile (`data/locales/`; 112 until known, plus helplines such as Women Helpline 181 where they operate), her location in words to read out, and Mira last. **Emergency 112** is also a pill on Home and the journey screen.
+**I feel unsafe** (Home and journey screen) opens instantly, with no AI and no network wait: the nearest Help Point ranked for right now (listed as closed now → left out), **Tell my people now** (attempts to email accepted contacts her live link and shows the result), send your live link, call someone (the phone's own contacts or a typed number, never stored), **Emergency** with the number from the country's cited profile (`data/locales/`; service-specific numbers are labelled, and an unverified country has no guessed number), her location in words to read out, and Mira last. **Emergency** is also a pill on Home and the journey screen.
 
-**Mira** is the in-app AI companion: warm, brief and practical. She knows your saved places, the time and your area. She can start a trip, find what's open nearby, or help you report something. She is not an emergency service and says so, pointing to 112 when someone says they're in danger.
+**Mira** is the in-app AI companion: warm, brief and practical. She knows your saved places, the time and your area. She can propose a trip, find nearby Help Points, or help you report something; actions require your tap. She is not an emergency service and says so, pointing to reviewed local emergency options when available.
 
 **It follows the time of day.** The theme shifts from sunrise to day to evening to night (dark mode with a dark map), set before first paint from the phone's clock. You can pin Light or Dark under Me → App. Mira knows the hour too: brisk in the morning, and after dark she leads with sharing your walk home.
 
-**Updates inbox** (bell on Home): a contact accepted your invite, you missed a check-in (and who was told), or your live location paused mid-trip. Push notifications replace the in-app inbox later.
+**Updates inbox** (bell on Home): a contact accepted your invite, you missed a check-in (and who was told), or your live location paused mid-trip. Web Push can also notify the traveller when configured and enabled on a supported device; the in-app inbox remains available.
 
 **Press and hold the map** on any spot to report something there or walk to it.
 
 **Street lighting on the route.** The route sheet shows how much of the way is *mapped as lit* (map data can be old; only MIRA walkers who agree can say a stretch is actually lit), with the share that's not known, and the map glows warm along lit stretches. Sources, strongest first: MIRA walkers' one-tap "Was the way lit?" after a walk in the dark (shown only when ≥ 3 people agree), OpenStreetMap `lit` tags, and streetlight poles detected in Mapillary imagery (optional `MAPILLARY_TOKEN`). Mira mentions it after dark. It's lighting information, never a safety rating.
 
-**Reports** take three taps: pick one of six tiles, then send. The location defaults to "here" and the time to "just now". Reports are private and reviewed by a person. They appear publicly only as calm, template-worded community notes once enough independent people report the same thing in a ~1.2 km area.
+**Reports** take three taps: pick one of six tiles, then send. The location defaults to "here" and the time to "just now". Reports stay private while publication is off. If staffed moderation and the release job are enabled later, only sufficiently corroborated, reviewed observations can become template-worded community notes.
 
 > MIRA 2.0 deliberately moved away from the V0 spec documents, now archived in [`docs/archive/v0/`](docs/archive/v0/). Those documents describe the V0 pilot; this README describes the current app.
 
 ---
 
-## Placeholders now, real providers later
+## Provider modes
 
-Every external service sits behind an interface in `src/server/providers/`. The app is fully usable with **no API keys**. `GET /api/me` reports which mode each capability is in, and the Me screen shows a small "Demo" pill while any placeholder is active.
+Every external service sits behind an interface in `src/server/providers/`. Local development works with no external API keys; the public beta requires live provider configuration and verification. `GET /api/me` reports which mode each capability is in, and the Me screen shows a small "Demo" pill while any placeholder is active.
 
-| Capability | Placeholder (today) | Real (later) | Env to set |
+| Capability | Local fallback | Connected mode | Env to set |
 |---|---|---|---|
 | Maps (search, routes, nearby, area names, basemap) | MIRA's OSM snapshot + live OpenStreetMap (Photon, Overpass, Nominatim) — used when no Google key is set, and as automatic fallback | **Connected:** Google Maps Platform — Places API (New), Routes API (walking), Geocoding API, Map Tiles API (day + dark night style) — `src/server/providers/geo/google.ts`, `tiles.ts` | `GOOGLE_MAPS_SERVER_KEY`, `GOOGLE_MAPS_BROWSER_KEY` |
-| Area names | Nearest locality from the map's own vector tiles, then a server-side Nominatim lookup (~100 m rounded, cached, ≤ 1 req/s) | Mapbox reverse geocoding | `REVERSE_GEOCODER_URL` (placeholder only; unset = off) |
-| Basemap | OpenFreeMap vector style ("dark" style at night) | Mapbox day + night styles | `MAP_STYLE_URL`, `MAP_STYLE_URL_NIGHT` (optional) |
-| Sign-in | "Continue" with a first name creates a local account; **adding an email (one-time link, no password) makes it durable** across phones | Google OAuth (adapter not built) | `SMTP_*` for email links; `AUTH_GOOGLE_*` later |
+| Area names | Vector-tile locality and bounded OpenStreetMap reverse lookup | Google Geocoding when Maps is configured | `GOOGLE_MAPS_SERVER_KEY`; `REVERSE_GEOCODER_URL` only for the fallback |
+| Basemap | OpenFreeMap vector style | Google Map Tiles when configured; custom vector styles can be supplied | `GOOGLE_MAPS_BROWSER_KEY`; optional `MAP_STYLE_URL`, `MAP_STYLE_URL_NIGHT` |
+| Sign-in | First-name account lives in one browser; email links can make it durable | Google OAuth is implemented; sign-in methods require an 18+ self-attestation in production | `RESEND_API_KEY` + `EMAIL_FROM` for email links; `AUTH_GOOGLE_ID` + `AUTH_GOOGLE_SECRET` |
 | Mira | Scripted persona engine over the real tools, streamed as NDJSON (English + Hinglish) — used when no key is set, and as the automatic fallback if Claude fails before replying | **Connected:** Claude (`claude-opus-5`, low effort, streaming tool loop, cached persona; never sees coordinates; location details scrubbed from saved history) — `src/server/providers/companion/claude.ts` | `ANTHROPIC_API_KEY` |
 | Contact delivery | SMTP (Mailpit locally) + in-app notifications | **Connected:** Resend HTTPS API (`src/server/mail/resend.ts`); WhatsApp / SMS later | `RESEND_API_KEY` + `EMAIL_FROM` (production), `SMTP_*` (local) |
 | Push | In-app inbox | **Connected:** Web Push to the traveller (worker outbox; payloads never carry location) | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` |
 
-Wiring a real adapter takes three steps: implement it next to `placeholder.ts`, flip its flag in `REAL_ADAPTERS` (`src/server/providers/modes.ts`), and set the env vars. A capability reports "real" only when **both** the adapter exists and its key is present, so setting a key alone never pretends a feature works.
+Runtime modes come from configured adapters and keys (`src/server/providers/modes.ts`). Production readiness also requires successful live checks; a configured key alone is not proof of provider availability.
 
 ## Run locally
 
@@ -95,7 +95,7 @@ Production mode locally: `npm run build && npm run start` and `npm run worker:st
 | Area | Routes |
 |---|---|
 | Account | `POST /api/auth/demo`, `POST /api/auth/signout`, `GET/PATCH/DELETE /api/me`, `/api/me/places[/id]`, `/api/me/contacts[/id]`, `GET/POST /api/me/notifications` (inbox / mark read) |
-| Maps | `POST /api/geo/search`, `POST /api/geo/reverse`, `POST /api/geo/route` (route + alternatives, lighting, Help Points), `POST /api/geo/nearby`, `POST /api/geo/help` (Help Points near a point) — coordinates go in POST bodies, never URLs |
+| Maps | `POST /api/geo/search`, `POST /api/geo/reverse`, `POST /api/geo/route` (route + alternatives, lighting, Help Points), `POST /api/geo/nearby`, `POST /api/geo/help` (Help Points near a point) — browser-to-MIRA coordinates go in POST bodies; some server-to-provider requests use rounded coordinates in GET URLs (see `docs/LOCATION_PRIVACY.md`) |
 | Trips | `POST /api/trips` (optional `routeMinutes` for a chosen alternative, clamped), `GET /api/trips/current` (+ `safetyNet`), `POST /api/trips/[id]/location`, `POST /api/trips/[id]/{arrive,end,extend}`, `GET /api/t/[token]` (contact view) |
 | Mira | `GET/DELETE /api/mira` (history), `POST /api/mira` (NDJSON stream: `text` / `card` / `done`) |
 | Reports | `POST /api/reports`, `/api/admin/*` (moderator session) |
@@ -113,7 +113,7 @@ Production mode locally: `npm run build && npm run start` and `npm run worker:st
 | Anonymous reports sent before signing in | Linked to your account on sign-in and re-keyed to one pseudonym (so you never count as two people); the browser's anonymous cookie is then discarded | With the report (≤ 30 days) |
 | Saved places | Label, emoji and point, for your account only (max 10) | With your account |
 | Trusted contacts | Encrypted email + keyed hash; they accept once, with no account needed | On removal or with your account |
-| Mira chat | Your messages and Mira's replies — minus anything about where you were (area names, walking times, nearby-place lists are shown live but never saved) | 30 days, or instantly with "Clear" |
+| Mira chat | Your messages as typed; Mira replies are scrubbed of location-derived fragments before storage | 30 days, or instantly with "Clear" |
 | Report | ~1.2 km geohash cell only, recency bucket, time band, hour-truncated time; text AES-256-GCM encrypted | ≤ 30 days |
 | Public community notes | `aggregate_releases` only: ≥ 5 independent contributors, fixed wording, no counts, points or times | 35 days |
 
@@ -131,18 +131,13 @@ MIRA's production target is **Railway**: a `postgis` service (`postgis/postgis:1
 - **Secrets from a secret store**, never from files in the repo. Required: `DATABASE_URL`, `APP_BASE_URL`, `SESSION_SECRET`, `DATA_ENCRYPTION_KEY`, `ADMIN_PASSWORD_HASH`, `PILOT_MANIFEST_PATH`, `MAP_TILE_URL`. Optional provider keys are listed in the table above. See `.env.example`, which documents each variable and the dotenv-safe `b64:` hash form.
 - **Backups**: expire in 30 days or less. After any restore, run the worker (or `purgeExpired`) **before** serving traffic, so expired reports and journeys are removed again. Use database disk encryption.
 - **Monitoring**: poll `/api/health/ready`. It returns 503 when the worker's journeys job hasn't completed a pass in 3 minutes (a running-but-failing worker counts as down). Publicly it returns only `{status}`; a signed-in moderator also sees the checks, including `contactAlertProblems24h` (a count only). Warnings are logged as `health.worker_stale` and `health.contact_alert_delivery_problems`; per-trip failures as `journey.failed`.
-- **Map tiles and geocoding**: OpenFreeMap and the public Nominatim, Photon and Overpass servers are fine for development and demos only. Switch to Mapbox (or another provider with an SLA) before real traffic.
+- **Maps**: use restricted Google Maps keys with quotas and budget alerts for the public beta. Public OpenStreetMap endpoints remain fallback sources and must be presented as unavailable when a lookup fails.
 
-## Not yet real (placeholders, clearly labelled)
+## Public beta release status
 
-| Item | Today | To complete |
-|---|---|---|
-| Google sign-in | First-name account, made durable with an email link | Add a Google OAuth adapter, flip `REAL_ADAPTERS.google`, set `AUTH_GOOGLE_*` |
-| Maps for production | **Google connected** (demo key) | Split into a browser key (website-restricted, Map Tiles only) and a server key (API-restricted); set budgets/quotas; show the Google logo on the map per Google's attribution rules |
-| Claude for Mira | **Done** — live whenever `ANTHROPIC_API_KEY` is set (tests and E2E force the placeholder) | Rotate the demo key before production |
-| Production email / push | Resend adapter built; Mailpit locally | Verify the sending domain in Resend, set `RESEND_API_KEY` + `EMAIL_FROM` / `VAPID_*` |
-| Background location on iOS | Browsers can't track in the background. Contacts see the last spot and time, and the missed-arrival alert still fires | Native app shell |
-| Hosting, HTTPS, backups | Railway config ready ([docs/DEPLOY.md](docs/DEPLOY.md)), not yet provisioned | Follow docs/DEPLOY.md |
+The Railway architecture and beta-hardening code are present, but a public launch requires owner-held domain and provider credentials, live inbox and device tests, backups, monitoring, moderation staffing and policy review. Follow [the release gates](docs/PUBLIC_BETA_RELEASE.md) and [Railway runbook](docs/DEPLOY.md). A green local test suite alone is not a launch verdict.
+
+Known device limit: browsers may pause location updates in the background, especially on iOS. The shared view shows the last position and its age; the worker still watches the check-in deadline.
 
 ## Implementation decisions (where the documents left room)
 

@@ -1,5 +1,6 @@
 import "server-only";
 import { getEnv } from "@/server/config/env";
+import { coordinateBearingGeoUrl } from "./coordinate-url";
 import type { GeoPoint } from "./types";
 
 /**
@@ -33,8 +34,7 @@ export async function osmArea(p: GeoPoint): Promise<Area | null> {
   let region: string | null = null;
   let ok = false;
   try {
-    const url = new URL("/reverse", base);
-    url.search = new URLSearchParams({ lat, lon, format: "jsonv2", zoom: "16", addressdetails: "1", "accept-language": "en" }).toString();
+    const url = coordinateBearingGeoUrl(base, "/reverse", { lat, lon, format: "jsonv2", zoom: "16", addressdetails: "1", "accept-language": "en" });
     const res = await fetch(url, { headers: { "user-agent": `MIRA/0.1 (placeholder geocoder; ${getEnv().APP_BASE_URL})` }, signal: AbortSignal.timeout(2500) });
     if (res.ok) {
       ok = true;
@@ -87,10 +87,9 @@ export async function nominatimSearch(q: string, near?: GeoPoint): Promise<Place
   if (hit && Date.now() - hit.at < 3600_000) return hit.hits;
   if (!(await nominatimTurn())) return [];
   try {
-    const url = new URL("/search", base);
     const params: Record<string, string> = { q, format: "jsonv2", limit: "8", addressdetails: "1", "accept-language": "en" };
     if (c) params.viewbox = `${c.lon - 0.5},${c.lat + 0.5},${c.lon + 0.5},${c.lat - 0.5}`; // bias, not a hard bound
-    url.search = new URLSearchParams(params).toString();
+    const url = coordinateBearingGeoUrl(base, "/search", params);
     const res = await fetch(url, { headers: { "user-agent": `MIRA/0.1 (placeholder geocoder; ${getEnv().APP_BASE_URL})` }, signal: AbortSignal.timeout(4000) });
     if (!res.ok) return [];
     type R = { osm_type?: string; osm_id?: number; lat: string; lon: string; name?: string; display_name: string; type?: string; address?: Record<string, string> };

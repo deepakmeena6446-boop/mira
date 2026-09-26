@@ -12,10 +12,10 @@ export const metadata: Metadata = { title: "Contribute" };
 export default async function ContributePage() {
   const sql = getSql();
   const user = await getUser(sql);
-  if (!user) return <ContributeScreen signedIn={false} durable={false} checks={[]} impact={null} />;
+  if (!user) return <ContributeScreen signedIn={false} durable={false} checks={[]} impact={null} pendingChecks={false} />;
   const now = new Date();
   // A walk that just ended may still be "preparing": finish hers now (bounded) rather than wait for the worker.
   await prepareChecks(sql, getGeo(), now, { userId: user.id, limit: 2 }).catch(() => undefined);
-  const [checks, impact] = await Promise.all([listChecks(sql, user.id, now), impactFor(sql, user, now)]);
-  return <ContributeScreen signedIn durable={user.durable} checks={checks} impact={impact} />;
+  const [checks, impact, pending] = await Promise.all([listChecks(sql, user.id, now), impactFor(sql, user, now), sql`SELECT 1 FROM mira_checks WHERE user_id = ${user.id} AND state = 'preparing' AND expires_at > ${now} LIMIT 1`]);
+  return <ContributeScreen signedIn durable={user.durable} checks={checks} impact={impact} pendingChecks={pending.length > 0} />;
 }

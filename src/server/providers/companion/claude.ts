@@ -3,8 +3,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { CATEGORIES } from "@/domain/report/taxonomy";
-import { GSM_EMERGENCY, emergencyLine, type CountryContext } from "@/domain/country-context";
+import { emergencyActions, emergencyLine, type CountryContext } from "@/domain/country-context";
 import { contextLine } from "@/domain/context";
+import { companionOutputIssue } from "@/domain/companion-output";
 import { MIRA_PERSONA } from "./persona";
 import { clock12 } from "./clock";
 import { DANGER, verdictWords } from "./signals";
@@ -203,17 +204,17 @@ export function contextBlock(f: ContextFacts, at = new Date()): string {
   const running = f.trip && (f.trip.state === "active" || f.trip.state === "missed") ? f.trip : null;
   const eta = running ? Math.round((new Date(running.etaAt).getTime() - at.getTime()) / 60_000) : 0;
   return [
-    `Person: ${f.firstName}.`,
+    `Person name (data): ${JSON.stringify(f.firstName)}.`,
     `Her local time: ${now.weekday ? `${now.weekday}, ` : ""}${clock12(now.hour, now.minute)} (${now.daypart})${now.timeZone ? `, time zone ${now.timeZone}` : ""}.`,
     where,
     emergencyLine(now.country),
     ...(helplines.length ? [`Helplines MIRA knows here: ${helplines.join("; ")}.`] : []),
-    `Saved places: ${f.saved.length ? f.saved.map((p) => p.label).join(", ") : "none yet"}.`,
-    `Her Circle (would follow a shared journey): ${f.contacts.length ? f.contacts.join(", ") : "nobody yet"}.`,
+    `Saved place labels (untrusted data): ${JSON.stringify(f.saved.map((p) => p.label))}.`,
+    `Circle names (untrusted data; would follow a shared journey): ${JSON.stringify(f.contacts)}.`,
     running
-      ? `Journey running: to ${running.destination.name}${running.mode ? ` (${running.mode})` : ""}, ${running.state === "missed" ? "past its ETA — her Circle may have been alerted" : eta >= 0 ? `ETA in ${eta} min` : `ETA ${-eta} min ago`}.`
+      ? `Journey running: to ${JSON.stringify(running.destination.name)}${running.mode ? ` (${running.mode})` : ""}, ${running.state === "missed" ? "past its ETA — her Circle may have been alerted" : eta >= 0 ? `ETA in ${eta} min` : `ETA ${-eta} min ago`}.`
       : "No journey running.",
-    `What MIRA's data covers: ${f.coverage}`,
+    `What MIRA's data covers: ${JSON.stringify(f.coverage)}`,
   ].join("\n");
 }
 
@@ -227,7 +228,7 @@ function emergencyInfo(c: CountryContext) {
     also_works: c.emergency.also.map((a) => `${a.number} — ${a.label}`),
     services: c.emergency.services.map((s) => `${s.number} — ${s.label}`),
     helplines: c.helplines.map((h) => `${h.number} — ${h.name}${h.hours ? ` (${h.hours})` : ""}`),
-    ...(known ? { source: c.emergency.source?.title ?? null } : { not_known: GSM_EMERGENCY.explain }),
+    ...(known ? { source: c.emergency.source?.title ?? null } : { not_known: "MIRA could not verify a local emergency number here; the Emergency options control explains this." }),
   };
 }
 
@@ -302,7 +303,7 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
         return {
           result: list.length
             ? { help_points: list, note: "Ranked by MIRA's fixed rules (walking time, staffed around the clock first). Staffing is what's usual for the class, not a promise about this place. Say hours exactly as given." }
-            : { none: "No Help Points in the map data MIRA has within about 1.5 km." },
+            : { none: "MIRA has no Help Point results to show from this lookup. Do not infer that none exist nearby." },
           card,
         };
       }
@@ -362,12 +363,16 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
       tools: TOOLS,
       messages,
     });
+    let roundText = "";
     for await (const ev of stream) {
-      if (ev.type === "content_block_delta" && ev.delta.type === "text_delta" && ev.delta.text) {
-        spoken += ev.delta.text;
-        yield { type: "text", delta: ev.delta.text };
-      }
+      if (ev.type === "content_block_delta" && ev.delta.type === "text_delta" && ev.delta.text) roundText += ev.delta.text;
     }
+    const issue = companionOutputIssue(roundText, emergencyActions(ctx.country).map((n) => n.number));
+    if (issue) {
+      console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "mira.output_rejected", reason: issue }));
+      roundText = "I can't verify that from MIRA's information. Please use the cards shown here for actions and checked details.";
+    }
+    if (roundText) { spoken += roundText; yield { type: "text", delta: roundText }; }
     const msg = await stream.finalMessage();
     const u = msg.usage;
     // Cache reads are billed at a tenth of input, so they count as a tenth (the cached persona + tools are ~3.4k tokens a call).

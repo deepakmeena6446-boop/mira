@@ -23,12 +23,13 @@ const log = (event: string, extra: Record<string, unknown> = {}) => console.warn
  * without a reply: if Claude fails, times out or the day's token budget is spent, the
  * placeholder answers instead. Only text, card and done events leave this function.
  */
-export async function* respond(sql: postgres.Sql, user: User, message: string, history: MiraTurn[], ctx: MiraContext): AsyncGenerator<MiraEvent> {
+export async function* respond(sql: postgres.Sql, user: User, message: string, history: MiraTurn[], ctx: MiraContext, modelAllowed = true): AsyncGenerator<MiraEvent> {
   const firstName = user.name.split(" ")[0];
   const tools = miraTools(sql, user, ctx);
   const fallback = () => placeholderMira(message, history, tools, firstName);
   const env = getEnv();
   const apiKey = env.ANTHROPIC_API_KEY;
+  if (!modelAllowed) { yield { type: "text", delta: RESTING_NOTE }; return yield* fallback(); }
   if (providerModes().companion !== "claude" || !apiKey) return yield* fallback();
 
   const max = Number(env.MIRA_DAILY_TOKEN_MAX ?? MIRA_DAILY_TOKEN_DEFAULT);

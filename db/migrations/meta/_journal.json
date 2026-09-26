@@ -99,6 +99,27 @@
       "when": 1790432819380,
       "tag": "0013_contributions",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790432819381,
+      "tag": "0014_lit_vote_identity_version",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1790432819382,
+      "tag": "0015_recomputable_receipts",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790432819383,
+      "tag": "0016_legacy_receipt_archive",
+      "breakpoints": true
     }
   ]
 }

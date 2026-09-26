@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { EvidenceState } from "@/domain/evidence-state";
 import { createPortal } from "react-dom";
 import { useOverlay } from "@/lib/use-overlay";
 import { useClock } from "@/lib/location-store";
@@ -21,6 +22,9 @@ export function HelpNearSheet({
   onClose,
   me,
   points,
+  evidence,
+  failed,
+  onRetry,
   loading,
   exclude,
   onPick,
@@ -29,6 +33,9 @@ export function HelpNearSheet({
   onClose: () => void;
   me: { lat: number; lon: number } | null;
   points: HelpPoint[];
+  evidence?: EvidenceState<HelpPoint[]> | null;
+  failed?: boolean;
+  onRetry?: () => void;
   loading: boolean;
   exclude?: readonly HelpClass[];
   onPick: (p: RankedHelpPoint) => void;
@@ -72,8 +79,10 @@ export function HelpNearSheet({
           <p className="mt-3 text-sm text-ink-muted">Turn on location to see Help Points near you.</p>
         ) : loading ? (
           <p className="mt-3 text-sm text-ink-muted">Finding Help Points near you…</p>
+        ) : failed || evidence?.state === "failed" ? (
+          <div role="status" className="mt-3 text-sm text-ink-muted"><p>MIRA couldn&apos;t check Help Points right now.</p>{onRetry ? <button type="button" onClick={onRetry} className="mt-2 min-h-11 font-bold text-accent">Retry</button> : null}</div>
         ) : !ranked.length ? (
-          <p className="mt-3 text-sm text-ink-muted">No Help Points found in map data near you (hospitals, police, stations, pharmacies, fuel, hotels). That may just mean the map has no data here.</p>
+          <p className="mt-3 text-sm text-ink-muted">No mapped Help Points were found from the sources checked. Other places may exist.</p>
         ) : (
           <>
             {classes.length > 1 ? (
@@ -116,6 +125,7 @@ export function HelpNearSheet({
             ) : null}
           </>
         )}
+        {evidence?.state === "partial" ? <p role="status" className="mt-2 text-xs text-ink-muted">Some sources couldn&apos;t be checked. Showing available results.</p> : null}
         {ranked.length ? (
           <p className="mt-3 text-xs text-ink-subtle">
             Kinds of places that usually have people or staff around, from {sources.join(" and ")}. Places listed as closed now are left out. Hours are as listed by the source; MIRA can&apos;t confirm who&apos;s there.

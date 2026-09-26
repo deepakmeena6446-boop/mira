@@ -1,4 +1,5 @@
 import type { HelpPoint } from "@/domain/help-points";
+import type { EvidenceState } from "@/domain/evidence-state";
 import type { TravelMode } from "@/domain/travel-mode";
 import type { Schedule } from "@/domain/opening-hours";
 
@@ -64,6 +65,8 @@ export interface GeoProvider {
    * may leave hours out here and give them through `helpHours` for a shortlist).
    */
   helpPlaces(points: GeoPoint[], radiusM: number, opts?: HelpLookupOptions): Promise<HelpPoint[]>;
+  /** Source-aware Help Point lookup used by evidence-facing APIs. */
+  helpPlacesEvidence?(points: GeoPoint[], radiusM: number, opts?: HelpLookupOptions): Promise<EvidenceState<HelpPoint[]>>;
   /**
    * Opening hours for a few Help Points by id (only ids this provider issued). Optional: a
    * provider without a per-place hours lookup leaves it out. Missing ids = hours not known.

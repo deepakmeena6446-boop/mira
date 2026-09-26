@@ -40,6 +40,7 @@ export function MeScreen({
   modes,
   emailAlerts,
   saved = false,
+  switchPreserved = false,
 }: {
   user: { id: string; name: string; avatarUrl: string | null; durable: boolean; google: boolean; emailHint: string | null; helpExclude: string[] } | null;
   places: SavedPlace[];
@@ -49,6 +50,7 @@ export function MeScreen({
   emailAlerts: boolean;
   /** Just came back from adding an email to this account. */
   saved?: boolean;
+  switchPreserved?: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -191,6 +193,7 @@ export function MeScreen({
           )}
         </Section>
 
+        {switchPreserved ? <p role="alert" className="rounded-2xl bg-warm-soft px-5 py-4 text-sm text-ink">This Google sign-in belongs to another MIRA account. Your current account and its places, contacts, and journeys were kept here. To keep this account after signing out, upgrade it with a different Google account or email first; then you can switch accounts. MIRA does not merge contribution identities automatically.</p> : null}
         <AccountSection durable={user.durable} google={user.google} emailHint={user.emailHint} emailAvailable={emailAlerts} googleAvailable={modes.auth === "google"} saved={saved} />
 
         <Section id="help" title="Help Points">

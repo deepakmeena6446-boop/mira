@@ -151,10 +151,10 @@ export function evaluateClaim(
   const voices = (cs: PlaceClaim[]) => new Set(relevant.filter((s) => cs.includes(s.claim)).map((s) => s.voter)).size;
   const pro = voices([claim]);
   const con = voices(against);
-  const total = pro + con;
-  if (pro >= MIN_PLACE_VOICES && pro / total >= MAJORITY) return { state: "corroborated", by: "corroboration" };
-  if (con >= MIN_PLACE_VOICES && con / total >= MAJORITY) return { state: "contradicted" };
+  // Conservative beta policy: independent opposing evidence means reports differ.
   if (pro >= 1 && con >= 1) return { state: "differ" };
+  if (pro >= MIN_PLACE_VOICES) return { state: "corroborated", by: "corroboration" };
+  if (con >= MIN_PLACE_VOICES) return { state: "contradicted" };
   if (pro >= 1 && provider === true && (claim === "open" || claim === "closed")) return { state: "corroborated", by: "provider" };
   return { state: "pending" };
 }

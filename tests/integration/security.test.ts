@@ -50,7 +50,9 @@ const PUBLIC_KEYS = new Set([
   // Help Points and route options: places and routes only (class, hours as listed, source, position along the route).
   "helpPoints", "cls", "open24h", "source", "hoursSource", "openNow", "checkedAt", "alongM", "alternatives", "schedule", "day", "from", "to", "freshness", "osmFrom", "osmTo", "polesTo",
   // Country Context: the country's cited emergency numbers and helplines (no place, no person).
-  "country", "iso", "countryName", "region", "emergency", "primary", "also", "services", "service", "url", "title", "number", "helplines", "timezone",
+  "country", "iso", "countryName", "region", "emergency", "primary", "also", "services", "service", "url", "title", "number", "helplines", "timezone", "scope", "qualification",
+  // Per-source availability accompanies public map evidence; it carries no private identifiers.
+  "helpEvidence", "lightingEvidence", "evidence", "data", "retryable",
   // The live view: how they're travelling and whether they asked to be checked on (no location history).
   "mode", "checkRequested",
   // The traveller's IANA time zone, so the viewer shows the ETA in her local time, labelled (no place, no person).

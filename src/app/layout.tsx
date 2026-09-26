@@ -9,6 +9,7 @@ import { DaypartSync } from "@/lib/daypart-store";
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", display: "swap" });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.APP_BASE_URL ?? "http://localhost:3100"),
   title: { default: "MIRA — walk home, your people will know", template: "%s · MIRA" },
   description: "Know more about the way before you go: lighting and Help Points on your route. Share your journey live in one tap, and have help close at hand.",
   applicationName: "MIRA",
@@ -31,7 +32,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const nonce = (await headers()).get("x-nonce") ?? undefined; // per-request, from src/proxy.ts
   return (
     // data-daypart is set before paint by the inline script (device clock), so it differs from the server render.
-    <html lang="en-IN" className={jakarta.variable} data-daypart="day" suppressHydrationWarning>
+    <html lang="en" className={jakarta.variable} data-daypart="day" suppressHydrationWarning>
       <head>
         {/* Blocking on purpose: sets the time-of-day theme before first paint (a few hundred bytes, cached). */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}

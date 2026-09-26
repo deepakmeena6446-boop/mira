@@ -16,8 +16,4 @@ A wrong emergency number is a safety bug.
 
 ## Fallback
 
-If a country has no profile, the Emergency pill still shows `112` with this line:
-
-> Emergency number for this country not confirmed in MIRA yet. 112 works on most mobile networks.
-
-It stays one tap. Never guess a local number to fill the gap.
+If a country has no reviewed profile, MIRA does not present a local dial number. The Emergency options control explains that it could not verify one. Service-specific profile numbers are labelled by service; an all-service direct dial action requires explicit evidence of all-service coverage. Nigeria's 112 profile records a national designation but does not establish operational coverage in every area, so MIRA qualifies that call option.

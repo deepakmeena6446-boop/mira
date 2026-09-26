@@ -11,6 +11,7 @@ import { POST as helpPOST } from "@/app/api/geo/help/route";
 import { hoursLine, hoursState, rankHelpPoints, type HelpPoint } from "@/domain/help-points";
 import type { GeoProvider } from "@/server/providers/geo";
 import type { HelpHours } from "@/server/providers/geo/types";
+import type { EvidenceState } from "@/domain/evidence-state";
 import { applyTestEnv } from "../setup/test-env";
 import { newJar, switchJar } from "../helpers/cookie-jar";
 import { jsonRequest } from "../helpers/http";
@@ -79,7 +80,7 @@ const detailCalls = () => calls.filter((c) => /\/v1\/places\/[^:]+$/.test(c.url.
 async function help(body: object) {
   const res = await helpPOST(jsonRequest("/api/geo/help", body));
   expect(res.status).toBe(200);
-  return (await res.json()) as { helpPoints: HelpPoint[] };
+  return (await res.json()) as { helpPoints: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> };
 }
 
 function useEnv(over: Record<string, string | undefined>) {
@@ -201,7 +202,9 @@ describe("Help Points from Google, hours only for the shortlist", () => {
   it("anywhere without map data: a coherent empty answer, no claims", async () => {
     failNearby = true;
     const r = await help({ lat: -33.8688, lon: 151.2093, country: "AU" }); // Sydney: Google down, no Overpass in tests
-    expect(r).toEqual({ helpPoints: [] });
+    expect(r.helpPoints).toEqual([]);
+    expect(r.evidence).toMatchObject({ state: "partial", data: [] });
+    expect(r.evidence.sources).toContainEqual({ source: "Google Places", state: "failed", retryable: true });
   });
 });
 

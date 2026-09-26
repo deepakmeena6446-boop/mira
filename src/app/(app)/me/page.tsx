@@ -27,6 +27,7 @@ export default async function MePage({ searchParams }: PageProps<"/me">) {
       modes={providerModes()}
       emailAlerts={smtpConfigured()}
       saved={(await searchParams).saved === "1"}
+      switchPreserved={(await searchParams).switch === "preserved"}
     />
   );
 }

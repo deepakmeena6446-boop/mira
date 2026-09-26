@@ -23,7 +23,7 @@ test.describe("Mira — the companion (placeholder engine)", () => {
 
     await box.fill("take me home");
     await page.getByRole("button", { name: "Send" }).click();
-    await expect(page.getByRole("log").getByText("To Home")).toBeVisible();
+    await expect(page.getByRole("log").getByText("To Home", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: /Start with MIRA/ }).last().click();
     await page.waitForURL("**/trip");
     await expect(page.getByText(/To Home/).first()).toBeVisible();
@@ -36,10 +36,11 @@ test.describe("Mira — the companion (placeholder engine)", () => {
     await page.getByPlaceholder("Message Mira…").fill("someone is following me, I'm scared");
     await page.getByRole("button", { name: "Send" }).click();
     await expect(page.getByRole("log").getByText(/If you're in danger right now/)).toBeVisible();
-    // E2E has no country (placeholder geocoder), so MIRA says it doesn't know the local number before dialling.
-    await page.getByRole("log").getByRole("button", { name: "Emergency" }).click();
-    await expect(page.getByText(/doesn't know which country you're in yet/)).toBeVisible();
-    await expect(page.getByRole("link", { name: /Call 112/ })).toHaveAttribute("href", "tel:112");
+    // The client has no verified country profile, so its deterministic call action does not invent a number.
+    await page.getByRole("log").getByRole("button", { name: "Emergency options" }).click();
+    const options = page.getByRole("dialog", { name: "Emergency call options" });
+    await expect(options.getByText(/could not verify a local emergency number/)).toBeVisible();
+    await expect(options.locator('a[href^="tel:"]')).toHaveCount(0);
     await page.getByRole("button", { name: "Close", exact: true }).click();
     await page.getByPlaceholder("Message Mira…").fill("who are you");
     await page.getByRole("button", { name: "Send" }).click();

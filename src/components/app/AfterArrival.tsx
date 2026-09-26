@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api-client";
 import { isNight } from "@/domain/help-points";
 import { CheckCard } from "@/components/app/CheckCard";
@@ -28,32 +29,41 @@ export function AfterArrival({
   const walked = trip.mode === "walk" && trip.autoArrival;
   const finished = trip.state === "arrived" || trip.state === "ended";
   const lit = hour !== null && walked && finished && route !== null && route.length > 2 && isNight(hour);
-  const check = useJourneyCheck(trip.id, trip.state === "arrived" && !lit);
-  if (hour === null) return null;
+  const preparation = useJourneyCheck(trip.id, finished && !lit);
+  if (!finished) return null;
+  if (hour === null) return <p className="mt-6 text-sm text-ink-muted">You&apos;ve arrived. Checking whether MIRA has one quick question…</p>;
   if (lit) return <LitQuestion route={route!} onDone={onDone} />;
-  if (check) return <div className="mt-6 w-full max-w-sm text-left animate-rise"><CheckCard check={check} /></div>;
-  return null;
+  if (preparation.check) return <div className="mt-6 w-full max-w-sm text-left animate-rise"><CheckCard check={preparation.check} /></div>;
+  return <div role="status" className="mt-6 w-full max-w-sm rounded-3xl bg-surface px-5 py-4 text-sm text-ink-muted shadow-[var(--shadow-card)]">
+    <p className="font-bold text-ink">You&apos;ve arrived ✓</p>
+    <p className="mt-1">{preparation.state === "none" ? "Nothing needed from you this time." : preparation.state === "later" ? "A question may still become available. You can check later in Contribute." : "MIRA may have one quick question about this journey. Preparing…"}</p>
+    {preparation.state === "later" ? <Link href="/contribute" className="mt-2 inline-flex min-h-11 items-center font-bold text-accent">Open Contribute</Link> : null}
+  </div>;
 }
 
-/** The MIRA Check for this journey, if the server prepared one (it may take a moment after arrival). */
-function useJourneyCheck(journeyId: string, want: boolean): Pick<CheckView, "id" | "question" | "options"> | null {
-  const [check, setCheck] = useState<Pick<CheckView, "id" | "question" | "options"> | null>(null);
+/** Bounded attempts: a transient provider error can resolve while the arrival view is open. */
+export const CHECK_RETRY_DELAYS_MS = [0, 1500, 2500, 4000, 6000] as const;
+type JourneyCheckState = { state: "preparing" | "none" | "later"; check: Pick<CheckView, "id" | "question" | "options"> | null };
+
+function useJourneyCheck(journeyId: string, want: boolean): JourneyCheckState {
+  const [result, setResult] = useState<JourneyCheckState>({ state: "preparing", check: null });
   useEffect(() => {
     if (!want) return;
     let stop = false;
-    const load = async (retry: boolean) => {
-      const r = await api<{ checks: Array<CheckView & { journeyId: string | null }> }>("/api/contribute");
-      if (stop || !r.ok) return;
-      const c = r.data.checks.find((x) => x.journeyId === journeyId);
-      if (c) setCheck(c);
-      else if (retry) setTimeout(() => void load(false), 2500);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const load = async (attempt: number) => {
+      const r = await api<{ checks: Array<CheckView & { journeyId: string | null }>; journeyCheck: "ready" | "pending" | "none" | "failed" }>(`/api/contribute?journeyId=${encodeURIComponent(journeyId)}`);
+      if (stop) return;
+      const check = r.ok ? r.data.checks.find((x) => x.journeyId === journeyId && new Date(x.expiresAt).getTime() > Date.now()) : null;
+      if (check) { setResult({ state: "preparing", check }); return; }
+      if (r.ok && r.data.journeyCheck === "none") { setResult({ state: "none", check: null }); return; }
+      if (attempt >= CHECK_RETRY_DELAYS_MS.length - 1) { setResult({ state: "later", check: null }); return; }
+      timer = setTimeout(() => void load(attempt + 1), CHECK_RETRY_DELAYS_MS[attempt + 1]);
     };
-    void load(true);
-    return () => {
-      stop = true;
-    };
+    void load(0);
+    return () => { stop = true; if (timer) clearTimeout(timer); };
   }, [journeyId, want]);
-  return check;
+  return result;
 }
 
 /** "Was the way lit?" — the walked route is turned into anonymous street cells on the server and discarded. */

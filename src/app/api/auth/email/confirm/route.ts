@@ -1,3 +1,4 @@
+import { assertAdultEligibility } from "@/server/account/adult-eligibility";
 import { cookies } from "next/headers";
 import { getSql } from "@/server/db/client";
 import { handle, json } from "@/server/http/handler";
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 /** Use the sign-in link held in the short-lived cookie (a tap, so mail scanners can't use it). */
 export const POST = handle(async (req: Request) => {
   assertSameOrigin(req);
+  await assertAdultEligibility();
   const sql = getSql();
   const now = new Date();
   await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "auth:email:confirm:ip:h", max: 30, windowMs: 3600_000 }], now);

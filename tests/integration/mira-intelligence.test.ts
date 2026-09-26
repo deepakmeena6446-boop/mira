@@ -84,7 +84,7 @@ describe("Mira: global context, budget and caps", () => {
     }
   });
 
-  it("the global daily message cap still applies", async () => {
+  it("the global model cap falls back to scripted Mira", async () => {
     await signIn("Vera");
     const sql = getSql();
     const now = new Date();
@@ -95,7 +95,9 @@ describe("Mira: global context, budget and caps", () => {
       await sql`INSERT INTO abuse_counters (key_hmac, bucket, window_start, count, expires_at)
                 VALUES (${key}, 'mira:global:d', ${windowStart}, 5000, ${new Date(now.getTime() + DAY_MS)})
                 ON CONFLICT (key_hmac, bucket, window_start) DO UPDATE SET count = 5000`;
-      expect((await miraPOST(jsonRequest("/api/mira", { message: "hi", context: ctx() }))).status).toBe(429);
+      const res = await miraPOST(jsonRequest("/api/mira", { message: "hi", context: ctx() }));
+      expect(res.status).toBe(200);
+      expect((await res.text()).includes(RESTING_NOTE)).toBe(true);
     } finally {
       await sql`UPDATE abuse_counters SET count = ${before?.count ?? 0} WHERE key_hmac = ${key} AND bucket = 'mira:global:d' AND window_start = ${windowStart}`;
     }

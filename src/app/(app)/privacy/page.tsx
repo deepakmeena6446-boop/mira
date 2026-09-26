@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { providerModes } from "@/server/providers/modes";
+import { emailConfigured } from "@/server/config/env";
 import { MiraOrb } from "@/components/app/MiraOrb";
 import { Icon } from "@/components/ui/Icon";
 
@@ -21,6 +22,7 @@ function Item({ emoji, title, children }: { emoji: string; title: string; childr
 }
 
 export default function PrivacyPage() {
+  const canEmailContacts = emailConfigured();
   return (
     <div className="bg-companion min-h-dvh px-4 pb-32 pt-[max(1.25rem,env(safe-area-inset-top))]">
       <article className="mx-auto max-w-xl">
@@ -32,6 +34,8 @@ export default function PrivacyPage() {
           <h1 className="text-3xl font-extrabold">Your privacy</h1>
         </div>
         <p className="mt-3 text-lg text-ink-muted">Plain words about what MIRA keeps, who sees it, and when it&apos;s gone.</p>
+
+        <p className="mt-2 text-sm text-ink-muted">Accounts are for adults 18 or older. MIRA keeps a signed self-attestation cookie for up to one year, without collecting a birth date. <Link href="/terms" className="font-bold text-accent underline">Read the beta terms</Link>.</p>
 
         <ul className="mt-6 space-y-3">
           <Item emoji="📍" title="Your location">
@@ -48,6 +52,7 @@ export default function PrivacyPage() {
                 (about 100 m–1 km) — never your exact spot, and never from your phone directly. The map itself loads from OpenFreeMap.
               </p>
             )}
+            <p>Some third-party geocoders require rounded coordinates in a server-to-provider request URL. MIRA keeps coordinates out of your browser URL and does not log those provider URLs.</p>
           </Item>
           <Item emoji="💜" title="Trips you share">
             <p>
@@ -56,8 +61,9 @@ export default function PrivacyPage() {
             </p>
             <p>&ldquo;Share link&rdquo; on the trip screen lets you send a live link to anyone you choose yourself — they can follow until you arrive.</p>
             <p>
-              If you don&apos;t check in, MIRA emails your trusted contacts once, and again when you arrive. People you sent the link to yourself aren&apos;t emailed. On a
-              journey with no trusted contacts, nobody is alerted. Emails are delivered by MIRA&apos;s email provider.
+              {canEmailContacts
+                ? "When accepted trusted contacts are on a journey, MIRA attempts an email if you miss your check-in. Sending can fail, and MIRA records the result. People you shared a link with yourself are not emailed. Without accepted contacts, nobody is alerted."
+                : "Contact email is unavailable in this version. MIRA does not email anyone if you miss a check-in. You can send your live link yourself from the trip screen."}
             </p>
             <p>
               The planned route of a journey stays on your phone (for Help Points ahead and the lighting question), not on MIRA&apos;s server, and is cleared when
@@ -74,10 +80,9 @@ export default function PrivacyPage() {
             <p>
               &ldquo;I feel unsafe&rdquo; and Emergency work on your phone alone: nothing is sent to MIRA or anyone else until you tap an action. Emergency opens your
               phone&apos;s dialler with the emergency number for the country you&apos;re in (from a cited list; where MIRA doesn&apos;t know it, it says so before you call); MIRA doesn&apos;t call, dispatch or alert anyone for you. &ldquo;Call someone&rdquo; uses your phone&apos;s
-              contacts or a number you type, and MIRA never sees or keeps it. &ldquo;Tell my people now&rdquo; emails your accepted trusted contacts your live link
-              and asks them to check on you — only when you tap it. &ldquo;Your location in words&rdquo; is shown on your screen only.
+              contacts or a number you type, and MIRA never sees or keeps it. {canEmailContacts ? "When accepted trusted contacts are available, ‘Tell my people now’ attempts to email them your live link after you tap; the screen shows whether the provider accepted each email." : "Contact email is unavailable, so ‘Tell my people now’ cannot email anyone."} &ldquo;Your location in words&rdquo; is shown on your screen only.
             </p>
-            <p>Help Points are staffed kinds of places (hospitals, police, stations, pharmacies, fuel, hotels) from map data. MIRA can&apos;t confirm they&apos;re open or who&apos;s there.</p>
+            <p>Help Points are types of places where help may be available (hospitals, police, stations, pharmacies, fuel, hotels) from map data. MIRA can&apos;t confirm they&apos;re open or who&apos;s there.</p>
           </Item>
           <Item emoji="👤" title="Your account">
             <p>
@@ -126,7 +131,7 @@ export default function PrivacyPage() {
               Answers to MIRA Checks (&ldquo;Was this pharmacy open?&rdquo;) and corrections are stored like lighting answers: per place, with the day, and a keyed
               code instead of your name, so they can&apos;t be joined into where you went. So MIRA can tell you when someone else confirms your answer, your account
               keeps a private, encrypted note of it until it&apos;s confirmed or expires (30 days for places, 90 for lighting) — then only the outcome stays
-              (&ldquo;verified&rdquo;, with the day and country). Your impact counts only verified answers; there are no points, rankings or public profiles, and
+              (&ldquo;verified&rdquo;, with the day and country). Your current impact counts only verifiable, verified answers. Older credited place answers without a recomputation link are retained until normal deletion but excluded from current impact and Local Steward; there are no points, rankings or public profiles, and
               reports never count towards anything.
             </p>
           </Item>

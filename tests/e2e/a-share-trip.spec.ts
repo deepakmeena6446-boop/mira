@@ -22,7 +22,7 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     // Home → "Where are you going?" → one tap on the saved place → context → Start with MIRA.
     await owner.page.goto("/");
     await expect(owner.page.getByRole("heading", { name: "Where are you going?", exact: true })).toBeVisible();
-    await expect(owner.page.getByText(/Mum get your live link by email/)).toBeVisible(); // the alert channel, stated
+    await expect(owner.page.getByText(/MIRA attempts to email Mum a live link/)).toBeVisible(); // the alert channel, stated
     await expect(owner.page.getByRole("link", { name: /Emergency call, 112/ })).toHaveAttribute("href", "tel:112");
     await owner.page.getByRole("button", { name: /Home/ }).first().click();
     await expect(owner.page.getByRole("region", { name: "Help Points along this route" })).toBeVisible();

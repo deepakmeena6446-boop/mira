@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { cx } from "@/components/ui/cx";
 import { api } from "@/lib/api-client";
 import { EmailSignIn } from "./EmailSignIn";
+import { AdultAttestation, confirmAdultEligibility } from "./AdultAttestation";
 
 export interface SignInOptions {
   google: boolean;
@@ -61,13 +62,20 @@ function GoogleMark() {
  */
 export function GoogleButton({ className, label = "Continue with Google" }: { className?: string; label?: string }) {
   const [busy, setBusy] = useState(false);
+  const [adult, setAdult] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   return (
-    <button
+    <div>
+      <AdultAttestation checked={adult} onChange={setAdult} />
+      <button
       type="button"
-      disabled={busy}
+      disabled={busy || !adult}
       aria-busy={busy || undefined}
-      onClick={() => {
+      onClick={async () => {
         setBusy(true);
+        setError(null);
+        const eligibility = await confirmAdultEligibility();
+        if (!eligibility.ok) { setError(eligibility.message); setBusy(false); return; }
         const here = window.location.pathname + window.location.search;
         // A real top-level navigation on purpose: a route handler that redirects off-site to Google.
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination
@@ -80,7 +88,9 @@ export function GoogleButton({ className, label = "Continue with Google" }: { cl
     >
       {busy ? <span aria-hidden className="size-5 animate-spin rounded-full border-2 border-[#1f1f1f] border-t-transparent" /> : <GoogleMark />}
       <span>{label}</span>
-    </button>
+      </button>
+      {error ? <p role="alert" className="mt-2 text-sm text-error">{error}</p> : null}
+    </div>
   );
 }
 
@@ -92,6 +102,7 @@ export function GoogleButton({ className, label = "Continue with Google" }: { cl
 export function SignInSheet({ open, onClose, reason }: { open: boolean; onClose: () => void; reason?: string }) {
   const router = useRouter();
   const [name, setName] = useState("");
+  const [adult, setAdult] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { options, failed } = useSignInOptions(open);
@@ -136,9 +147,11 @@ export function SignInSheet({ open, onClose, reason }: { open: boolean; onClose:
             className={cx(!onlyName && "mt-4 border-t border-line pt-4")}
             onSubmit={async (e) => {
               e.preventDefault();
-              if (!name.trim() || busy) return;
+              if (!name.trim() || !adult || busy) return;
               setBusy(true);
               setError(null);
+              const eligibility = await confirmAdultEligibility();
+              if (!eligibility.ok) { setError(eligibility.message); setBusy(false); return; }
               const res = await api("/api/auth/demo", { body: { name: name.trim() } });
               setBusy(false);
               if (res.ok) {
@@ -160,8 +173,9 @@ export function SignInSheet({ open, onClose, reason }: { open: boolean; onClose:
               placeholder="Your first name"
               className="mt-1.5 w-full min-h-13 rounded-2xl border border-line bg-sunken px-4 text-lg outline-none focus:border-accent focus:bg-surface"
             />
+            <AdultAttestation checked={adult} onChange={setAdult} />
             {error ? <p className="mt-2 text-sm font-medium text-error">{error}</p> : null}
-            <Button type="submit" variant={onlyName ? "hero" : "secondary"} size="lg" className="mt-3" busy={busy} busyLabel="Setting up…" disabled={!name.trim()}>
+            <Button type="submit" variant={onlyName ? "hero" : "secondary"} size="lg" className="mt-3" busy={busy} busyLabel="Setting up…" disabled={!name.trim() || !adult}>
               Continue
             </Button>
             <p className="mt-3 text-center text-xs text-ink-subtle">

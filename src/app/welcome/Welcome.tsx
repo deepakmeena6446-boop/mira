@@ -54,7 +54,7 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
         {[
           ["🧭", "Before you go", "How much of the way is mapped as lit, and the Help Points along it"],
           ["📍", "On the way", "The people you choose see you live until you arrive — then it switches off"],
-          ["📞", "If something feels wrong", "The nearest Help Point, your people, and the local emergency number — one tap each"],
+          ["📞", "If something feels wrong", "The nearest Help Point, your people, and a local emergency number where verified — one tap each"],
         ].map(([e, t, d]) => (
           <li key={t} className="flex items-start gap-3 rounded-2xl bg-surface/80 px-4 py-3 shadow-[var(--shadow-card)]">
             <span aria-hidden className="text-2xl">

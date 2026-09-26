@@ -59,7 +59,9 @@ describe("journeys by mode: walk, ride / car, transit", () => {
     const implicit = await route({ from: START, to: HOME });
     const explicit = await route({ from: START, to: HOME, mode: "walk" });
     expect(implicit.status).toBe(200);
-    expect(Object.keys(implicit.body).sort()).toEqual(["alternatives", "helpPoints", "lighting", "notes", "route"]);
+    expect(Object.keys(implicit.body).sort()).toEqual(["alternatives", "helpEvidence", "helpPoints", "lighting", "lightingEvidence", "notes", "route"]);
+    expect(implicit.body.helpEvidence).toHaveProperty("state");
+    expect(implicit.body.lightingEvidence).toHaveProperty("state");
     expect(Object.keys(implicit.body.route).sort()).toEqual(["approximate", "geometry", "meters", "minutes"]);
     expect(implicit.body.route.approximate).toBe(false);
     expect(explicit.body).toEqual(implicit.body);

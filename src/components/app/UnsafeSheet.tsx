@@ -40,6 +40,7 @@ export function UnsafeSheet({
   helpPoints,
   helpLoading,
   helpFailed = false,
+  helpPartial = false,
   route,
   onGoHelpPoint,
   goLabel,
@@ -57,6 +58,7 @@ export function UnsafeSheet({
   helpLoading: boolean;
   /** The Help Point lookup failed (offline, server error): never shown as "none nearby". */
   helpFailed?: boolean;
+  helpPartial?: boolean;
   route?: Array<[number, number]> | null;
   onGoHelpPoint: (p: RankedHelpPoint) => void;
   goLabel: string;
@@ -143,9 +145,10 @@ export function UnsafeSheet({
                   ? "Finding Help Points near you…"
                   : helpFailed
                     ? "Couldn't load Help Points — check your connection. Calling and Emergency still work."
-                    : "No Help Points found in map data near you. If you can, move towards a lit street with people around."}
+                    : "No mapped Help Points were found from the sources checked. Other places may exist nearby."}
             </p>
           )}
+          {helpPartial ? <p role="status" className="mt-2 text-xs text-ink-muted">Some Help Point sources couldn&apos;t be checked. Showing results that were available.</p> : null}
           {more.length ? (
             <ul className="mt-2 space-y-1">
               {more.slice(0, 2).map((p) => (
@@ -230,7 +233,7 @@ export function UnsafeSheet({
         </div>
 
         <p className="mt-3 text-xs leading-relaxed text-ink-subtle">
-          {ranked.length ? `Help Points are kinds of places that usually have people or staff around, from ${sources.join(" and ")}. MIRA can't confirm who's there right now. ` : ""}
+          {ranked.length ? `Help Points are types of places where help may be available, from ${sources.join(" and ")}. MIRA can't confirm who's there right now. ` : ""}
           Emergency opens your phone&apos;s dialler: MIRA doesn&apos;t call or alert anyone for you.
           {onTrip ? " Your live location keeps updating only while the trip screen is open." : ""}
         </p>

@@ -5,6 +5,7 @@ import { HELP_CLASSES, classWeight, dedupeHelpPoints, helpPointsAlongRoute, help
 import { haversineMeters } from "@/domain/pilot";
 import type { GeoPoint, GeoProvider } from "@/server/providers/geo";
 import type { HelpHours } from "@/server/providers/geo/types";
+import { evidenceState, type EvidenceState } from "@/domain/evidence-state";
 
 /**
  * Help Points for route sheets and "near me" (rules in src/domain/help-points.ts). The
@@ -107,6 +108,30 @@ export async function helpPointsNear(geo: GeoProvider, p: GeoPoint, opts: { coun
   // Hours lookups go first to classes where hours decide whether it's worth walking there; order stays ranked.
   const enriched = new Map((await enrichHours(geo, [...ranked.filter((h) => HELP_CLASSES[h.cls].hoursMatter), ...ranked.filter((h) => !HELP_CLASSES[h.cls].hoursMatter)])).map((h) => [h.id, h]));
   return ranked.map((h) => enriched.get(h.id) ?? h);
+}
+
+
+/** Provider-aware variant for user-facing lookups. A failed source is never an empty result. */
+export async function helpPointsNearEvidence(geo: GeoProvider, p: GeoPoint, opts: { country?: string | null } = {}): Promise<EvidenceState<HelpPoint[]>> {
+  const convenience = classWeight("convenience", helpWeightsFor(opts.country)) > 0;
+  const source = geo.helpPlacesEvidence
+    ? await geo.helpPlacesEvidence([p], NEAR_RADIUS_M, { convenience })
+    : await geo.helpPlaces([p], NEAR_RADIUS_M, { convenience }).then((data) => evidenceState(data, data.length > 0, [{ source: "map provider", state: "ready" as const }])).catch(() => ({ state: "failed" as const, sources: [{ source: "map provider", state: "failed" as const, retryable: true }], retryable: true }));
+  if (!("data" in source)) return source;
+  const ranked = await helpPointsNear({ ...geo, helpPlaces: async () => source.data }, p, opts);
+  return evidenceState(ranked, ranked.length > 0, source.sources);
+}
+
+export async function helpPointsEvidenceForRoutes(geo: GeoProvider, geometries: Array<Array<[number, number]>>): Promise<Array<EvidenceState<HelpPoint[]>>> {
+  const real = geometries.filter((g) => g.length > 2);
+  if (!real.length) return geometries.map(() => ({ state: "unavailable", sources: [], retryable: false }));
+  const points = samplePointsForRoutes(real);
+  const source = geo.helpPlacesEvidence
+    ? await geo.helpPlacesEvidence(points, SAMPLE_RADIUS_M)
+    : await geo.helpPlaces(points, SAMPLE_RADIUS_M).then((data) => evidenceState(data, data.length > 0, [{ source: "map provider", state: "ready" as const }])).catch(() => ({ state: "failed" as const, sources: [{ source: "map provider", state: "failed" as const, retryable: true }], retryable: true }));
+  if (!("data" in source)) return geometries.map(() => source);
+  const all = await helpPointsForRoutes({ ...geo, helpPlaces: async () => source.data }, geometries);
+  return geometries.map((g, i) => g.length > 2 ? evidenceState(all[i], all[i].length > 0, source.sources) : { state: "unavailable", sources: [], retryable: false });
 }
 
 /**

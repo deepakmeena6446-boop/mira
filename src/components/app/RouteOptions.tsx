@@ -1,10 +1,11 @@
 "use client";
 
 import type { RouteLighting } from "@/domain/lighting";
+import type { EvidenceState } from "@/domain/evidence-state";
 import { walkMinutesTo, type HelpPoint } from "@/domain/help-points";
 import { distanceUnits, formatDistance, type TravelMode } from "@/domain/travel-mode";
 import { useCountry } from "@/lib/locale-store";
-import { lightingLine } from "./LightingSummary";
+import { lightingEvidenceLine } from "./LightingSummary";
 import { NO_HELP_WHY, helpPointsLine } from "./HelpPointList";
 import { ContextRow } from "./ContextRow";
 import { cx } from "@/components/ui/cx";
@@ -12,7 +13,9 @@ import { cx } from "@/components/ui/cx";
 export interface RouteOption {
   route: { meters: number; minutes: number; geometry: Array<[number, number]>; approximate: boolean };
   lighting: RouteLighting | null;
+  lightingEvidence?: EvidenceState<RouteLighting>;
   helpPoints: HelpPoint[];
+  helpEvidence?: EvidenceState<HelpPoint[]>;
 }
 
 /**
@@ -40,8 +43,8 @@ export function RouteOptions({ options, selected, onSelect }: { options: RouteOp
                 {o.route.minutes} min · {formatDistance(o.route.meters, units)}
                 {i === 0 ? <span className="ml-2 rounded-full bg-sunken px-2 py-0.5 text-xs font-semibold text-ink-muted">Fastest</span> : null}
               </span>
-              <span className="block text-sm text-ink-muted">Lighting: {lightingLine(o.lighting)}</span>
-              <span className="block text-sm text-ink-muted">{helpPointsLine(o.helpPoints)}</span>
+              <span className="block text-sm text-ink-muted">Lighting: {lightingEvidenceLine(o.lightingEvidence, o.lighting)}</span>
+              <span className="block text-sm text-ink-muted">{helpPointsLine(o.helpPoints, o.helpEvidence)}</span>
             </span>
           </label>
         ))}
@@ -73,7 +76,7 @@ export function ArrivalContextLines({ mode, arrivalHelp, dest }: { mode: Exclude
             </span>
           </>
         ) : (
-          "No Help Points found near where you arrive"
+          "No mapped Help Points from sources checked near where you arrive"
         )}
       </ContextRow>
     </dl>

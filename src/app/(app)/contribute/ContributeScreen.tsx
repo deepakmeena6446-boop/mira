@@ -19,7 +19,7 @@ import type { ImpactView } from "@/server/contributions";
 /** Same wording everywhere a report is offered: honest about review, never promises a person. */
 const REPORT_PRIVACY_LINE = "Submitted privately. Reports may be reviewed before they can contribute to MIRA's information.";
 
-export function ContributeScreen({ signedIn, durable, checks, impact }: { signedIn: boolean; durable: boolean; checks: CheckView[]; impact: ImpactView | null }) {
+export function ContributeScreen({ signedIn, durable, checks, impact, pendingChecks = false }: { signedIn: boolean; durable: boolean; checks: CheckView[]; impact: ImpactView | null; pendingChecks?: boolean }) {
   const [signIn, setSignIn] = useState(false);
 
   if (!signedIn) {
@@ -49,7 +49,7 @@ export function ContributeScreen({ signedIn, durable, checks, impact }: { signed
           <p className="mt-1 text-ink-muted">Help MIRA know your area better.</p>
         </header>
 
-        <ChecksSection checks={checks} durable={durable} />
+        <ChecksSection checks={checks} durable={durable} pendingChecks={pendingChecks} />
         <CorrectSection durable={durable} />
 
         <Section id="report" title="Report something">
@@ -67,12 +67,13 @@ export function ContributeScreen({ signedIn, durable, checks, impact }: { signed
   );
 }
 
-function ChecksSection({ checks, durable }: { checks: CheckView[]; durable: boolean }) {
+function ChecksSection({ checks, durable, pendingChecks }: { checks: CheckView[]; durable: boolean; pendingChecks: boolean }) {
   return (
     <section aria-labelledby="checks-h">
       <h2 id="checks-h" className="mb-2 px-1 text-sm font-bold uppercase tracking-wider text-ink-subtle">
         MIRA Checks
       </h2>
+      {pendingChecks ? <p role="status" className="mb-3 rounded-[var(--radius-card)] bg-surface px-5 py-3 text-sm text-ink-muted shadow-[var(--shadow-card)]">A journey question is still being prepared. Check back here later.</p> : null}
       {checks.length ? (
         <div className="flex flex-col gap-3">
           {checks.map((c) => (
@@ -178,6 +179,7 @@ function ImpactSection({ impact }: { impact: ImpactView }) {
       <div className="flex flex-col gap-3 p-5 text-sm">
         <p className="text-base font-bold">{impact.line ?? "Nothing verified yet."}</p>
         {!impact.line ? <p className="text-ink-muted">When someone else confirms what you told MIRA, it shows here.</p> : null}
+        {s.archived ? <p className="text-ink-muted">{s.archived} earlier credited {s.archived === 1 ? "answer is" : "answers are"} kept for your record but cannot be rechecked, so {s.archived === 1 ? "it no longer counts" : "they no longer count"} toward current impact or Local Steward.</p> : null}
         {s.pending ? <p className="text-ink-muted">{s.pending} waiting for someone else to confirm.</p> : null}
         {s.differed ? <p className="text-ink-muted">{s.differed} where reports differed, so nobody was credited.</p> : null}
         <div className="rounded-2xl bg-sunken p-4">

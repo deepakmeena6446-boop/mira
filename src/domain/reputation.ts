@@ -17,6 +17,7 @@ export interface ReceiptRow {
   kind: ReceiptKind;
   status: ReceiptStatus;
   counted: boolean;
+  legacyUnverifiable?: boolean;
   /** YYYY-MM-DD */
   day: string;
   areaKey: string | null;
@@ -26,6 +27,8 @@ export interface ImpactSummary {
   /** Verified and counted: what "You helped verify N pieces of local information" says. */
   verified: number;
   byKind: Record<ReceiptKind, number>;
+  /** Older credited place answers retained for audit but excluded from current impact. */
+  archived: number;
   /** Waiting for someone else to confirm. */
   pending: number;
   /** Reports differed or the opposite was confirmed: nobody credited. */
@@ -49,12 +52,13 @@ export const DISAGREEMENT_FLAG = 0.5;
 export const DISAGREEMENT_MIN_DECIDED = 6;
 
 export function impactSummary(receipts: ReceiptRow[]): ImpactSummary {
-  const counted = receipts.filter((r) => r.status === "verified" && r.counted);
-  const verifiedAll = receipts.filter((r) => r.status === "verified").length;
-  const differed = receipts.filter((r) => r.status === "contradicted").length;
+  const active = receipts.filter((r) => !r.legacyUnverifiable);
+  const counted = active.filter((r) => r.status === "verified" && r.counted);
+  const verifiedAll = active.filter((r) => r.status === "verified").length;
+  const differed = active.filter((r) => r.status === "contradicted").length;
   const decided = verifiedAll + differed;
   const perDay = new Map<string, number>();
-  for (const r of receipts) perDay.set(r.day, (perDay.get(r.day) ?? 0) + 1);
+  for (const r of active) perDay.set(r.day, (perDay.get(r.day) ?? 0) + 1);
   const flags: AnomalyFlag[] = [];
   if ([...perDay.values()].some((n) => n > BURST_PER_DAY)) flags.push("burst");
   if (decided >= DISAGREEMENT_MIN_DECIDED && differed / decided > DISAGREEMENT_FLAG) flags.push("high_disagreement");
@@ -65,7 +69,8 @@ export function impactSummary(receipts: ReceiptRow[]): ImpactSummary {
       place_status: counted.filter((r) => r.kind === "place_status").length,
       correction: counted.filter((r) => r.kind === "correction").length,
     },
-    pending: receipts.filter((r) => r.status === "pending").length,
+    archived: receipts.filter((r) => r.legacyUnverifiable && r.status === "verified" && r.counted).length,
+    pending: active.filter((r) => r.status === "pending").length,
     differed,
     activeDays: new Set(counted.map((r) => r.day)).size,
     areas: new Set(counted.map((r) => r.areaKey).filter(Boolean)).size,

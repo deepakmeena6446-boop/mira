@@ -5,6 +5,7 @@ import { VectorTile } from "@mapbox/vector-tile";
 import { PbfReader } from "pbf";
 import { hmacHex } from "@/server/crypto";
 import { getEnv } from "@/server/config/env";
+import { evidenceState, type EvidenceState, type SourceState } from "@/domain/evidence-state";
 
 /**
  * Street lighting along routes (see src/domain/lighting.ts for the layers and rules).
@@ -50,7 +51,7 @@ async function osmLitWays(b: Box): Promise<LitWay[]> {
   const key = boxKey(b);
   const hit = waysCache.get(key);
   if (hit) return hit;
-  if (Date.now() - lastOverpass < 1000) return []; // polite rate; next request will fill the cache
+  if (Date.now() - lastOverpass < 1000) throw new Error("lighting_osm_retry_later"); // polite rate; report unknown source state
   lastOverpass = Date.now();
   // `meta` adds each way's last-edit timestamp: old map data is shown as old.
   const query = `[out:json][timeout:8];way[highway][lit~"^(yes|no)$"](${b.s},${b.w},${b.n},${b.e});out tags geom meta 400;`;
@@ -60,7 +61,7 @@ async function osmLitWays(b: Box): Promise<LitWay[]> {
     body: new URLSearchParams({ data: query }),
     signal: AbortSignal.timeout(LAYER_TIMEOUT_MS),
   });
-  if (!res.ok) return [];
+  if (!res.ok) throw new Error("lighting_osm_http");
   type El = { tags?: Record<string, string>; geometry?: Array<{ lat: number; lon: number }>; timestamp?: string };
   const ways = (((await res.json()) as { elements?: El[] }).elements ?? [])
     .filter((e) => e.geometry?.length && (e.tags?.lit === "yes" || e.tags?.lit === "no"))
@@ -90,7 +91,7 @@ async function mapillaryTile(token: string, x: number, y: number): Promise<Pole[
   const hit = tileCache.get(key);
   if (hit) return hit;
   const res = await fetch(`https://tiles.mapillary.com/maps/vtp/mly_map_feature_point/2/${TILE_Z}/${x}/${y}?access_token=${encodeURIComponent(token)}`, { signal: AbortSignal.timeout(LAYER_TIMEOUT_MS) });
-  if (!res.ok) return [];
+  if (!res.ok) throw new Error("lighting_mapillary_http");
   const vt = new VectorTile(new PbfReader(new Uint8Array(await res.arrayBuffer())));
   const layer = vt.layers.point;
   const lights: Pole[] = [];
@@ -123,40 +124,46 @@ async function walkerCells(sql: postgres.Sql, cells: string[], now: Date): Promi
   if (!cells.length) return [];
   return sql<WalkerCell[]>`
     SELECT cell, count(*) FILTER (WHERE value = 1)::int AS lit, count(*) FILTER (WHERE value = 0)::int AS partly, count(*) FILTER (WHERE value = -1)::int AS dark
-    FROM lit_votes WHERE cell = ANY(${cells}) AND day > ${new Date(now.getTime() - WALKER_WINDOW_DAYS * 86_400_000)}
+    FROM lit_votes WHERE cell = ANY(${cells}) AND identity_version = 2 AND day > ${new Date(now.getTime() - WALKER_WINDOW_DAYS * 86_400_000)}
     GROUP BY cell`;
 }
 
-const quiet = async <T>(p: Promise<T>, empty: T, layer: string): Promise<T> => {
-  try {
-    return await p;
-  } catch (err) {
-    console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "lighting.layer_failed", layer, error: err instanceof Error ? err.name : "unknown" }));
-    return empty;
+async function source<T>(name: string, request: () => Promise<T>, empty: T, configured = true): Promise<{ data: T; status: SourceState }> {
+  if (!configured) return { data: empty, status: { source: name, state: "unavailable" } };
+  try { return { data: await request(), status: { source: name, state: "ready" } }; }
+  catch (err) {
+    console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "lighting.layer_failed", layer: name, error: err instanceof Error ? err.name : "unknown" }));
+    return { data: empty, status: { source: name, state: "failed", retryable: true } };
   }
-};
-
-/** Lighting along a real walking route (not for straight-line estimates, which don't follow streets). */
-export async function lightingForRoute(sql: postgres.Sql, geometry: Array<[number, number]>, now = new Date()): Promise<RouteLighting | null> {
-  return (await lightingForRoutes(sql, [geometry], now))[0];
 }
 
-/**
- * Lighting for several route options at once. The layers are fetched ONCE for a box around
- * all of them, so every option is judged on the same data (a second Overpass call inside the
- * polite-rate window would return nothing and make one option look less mapped than it is).
- * Entries shorter than 3 points (straight-line estimates) get null.
- */
-export async function lightingForRoutes(sql: postgres.Sql, geometries: Array<Array<[number, number]>>, now = new Date()): Promise<Array<RouteLighting | null>> {
+/** Detailed source state is returned alongside the coverage for each route. */
+export async function lightingEvidenceForRoutes(sql: postgres.Sql, geometries: Array<Array<[number, number]>>, now = new Date()): Promise<Array<EvidenceState<RouteLighting>>> {
   const real = geometries.filter((g) => g.length >= 3);
-  if (!real.length) return geometries.map(() => null);
+  if (!real.length) return geometries.map(() => ({ state: "unavailable", sources: [], retryable: false }));
   const b = bboxOf(real.flat());
+  const env = getEnv();
   const [walkers, ways, poles] = await Promise.all([
-    quiet(walkerCells(sql, [...new Set(real.flatMap((g) => cellsForRoute(g)))], now), [], "walkers"),
-    quiet(osmLitWays(b), [], "osm"),
-    quiet(mapillaryPoles(b), [], "mapillary"),
+    source("MIRA walkers", () => walkerCells(sql, [...new Set(real.flatMap((g) => cellsForRoute(g)))], now), []),
+    source("OpenStreetMap", () => osmLitWays(b), [], Boolean(env.OVERPASS_URL)),
+    source("Mapillary", () => mapillaryPoles(b), [], Boolean(env.MAPILLARY_TOKEN)),
   ]);
-  return geometries.map((g) => (g.length >= 3 ? routeLighting(g, { walkers, ways, poles }) : null));
+  const sources = [walkers.status, ways.status, poles.status];
+  return geometries.map((g) => {
+    if (g.length < 3) return { state: "unavailable", sources: [], retryable: false };
+    const data = routeLighting(g, { walkers: walkers.data, ways: ways.data, poles: poles.data });
+    const hasEvidence = data.summary.lit + data.summary.poles + data.summary.dark > 0;
+    return evidenceState(data, hasEvidence, sources);
+  });
+}
+
+/** Compatibility for callers that need coverage alone. */
+export async function lightingForRoutes(sql: postgres.Sql, geometries: Array<Array<[number, number]>>, now = new Date()): Promise<Array<RouteLighting | null>> {
+  return (await lightingEvidenceForRoutes(sql, geometries, now)).map((r) => "data" in r ? r.data : null);
+}
+
+export async function lightingForRoute(sql: postgres.Sql, geometry: Array<[number, number]>, now = new Date()): Promise<RouteLighting | null> {
+  return (await lightingForRoutes(sql, [geometry], now))[0];
 }
 
 const VALUE: Record<LitVote, number> = { lit: 1, partly: 0, dark: -1 };
@@ -184,8 +191,8 @@ export async function recordLitVote(sql: postgres.Sql, userId: string, geometry:
   // The key still differs per stretch, so her stretches can't be joined into a route.
   for (const cell of cells) {
     await sql`
-      INSERT INTO lit_votes (cell, value, voter_hash, day) VALUES (${cell}, ${VALUE[vote]}, ${litVoterHash(userId, cell)}, ${day})
-      ON CONFLICT (cell, voter_hash) DO UPDATE SET value = EXCLUDED.value, day = EXCLUDED.day`;
+      INSERT INTO lit_votes (cell, value, voter_hash, day, identity_version) VALUES (${cell}, ${VALUE[vote]}, ${litVoterHash(userId, cell)}, ${day}, 2)
+      ON CONFLICT (cell, voter_hash) DO UPDATE SET value = EXCLUDED.value, day = EXCLUDED.day, identity_version = 2`;
   }
   return cells.length;
 }

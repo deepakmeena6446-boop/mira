@@ -1,6 +1,7 @@
 "use client";
 
 import type { RouteLighting } from "@/domain/lighting";
+import type { EvidenceState } from "@/domain/evidence-state";
 
 type Part = { key: string; label: string; pct: number; swatch: string };
 
@@ -34,6 +35,16 @@ export function lightingLine(lighting: RouteLighting | null): string {
   return [s.lit ? `${lit}% ${litLabel}` : null, s.poles ? `${s.poles}% streetlights mapped` : null, s.dark ? `${s.dark}% mapped as unlit` : null, s.unknown ? `${s.unknown}% not known` : null]
     .filter(Boolean)
     .join(" · ");
+}
+
+
+export function lightingEvidenceLine(evidence: EvidenceState<RouteLighting> | undefined, lighting: RouteLighting | null): string {
+  if (!evidence) return lightingLine(lighting);
+  if (evidence.state === "failed") return "MIRA couldn't check lighting sources right now.";
+  if (evidence.state === "unavailable") return "Lighting evidence is unavailable for this route.";
+  const prefix = evidence.state === "empty" ? "No mapped lighting evidence from sources checked" : lightingLine("data" in evidence ? evidence.data : lighting);
+  const unavailable = evidence.sources.filter((s) => s.state !== "ready").map((s) => s.source);
+  return unavailable.length ? `${prefix} · Couldn't check ${unavailable.join(" and ")}` : prefix;
 }
 
 /**

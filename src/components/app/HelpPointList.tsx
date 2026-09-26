@@ -1,17 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import type { EvidenceState } from "@/domain/evidence-state";
 import { HELP_CLASSES, SOURCE_NAME, hoursLine, hoursState, isNight, minutesIn, type HelpPoint } from "@/domain/help-points";
 import { localTime } from "@/domain/opening-hours";
 import { Icon } from "@/components/ui/Icon";
 import type { RouteOption } from "./RouteOptions";
-import { lightingLine, lightingWhy } from "./LightingSummary";
+import { lightingEvidenceLine, lightingWhy } from "./LightingSummary";
 import { ContextRow } from "./ContextRow";
 
 /** "4 Help Points along this journey" — a summary line (for option cards and the route sheet). */
-export function helpPointsLine(points: HelpPoint[]): string {
-  if (!points.length) return "No Help Points found along the way";
-  return `${points.length} Help Point${points.length === 1 ? "" : "s"} along the way`;
+export function helpPointsLine(points: HelpPoint[], evidence?: EvidenceState<HelpPoint[]>): string {
+  if (evidence?.state === "failed") return "MIRA couldn't check Help Points right now.";
+  if (evidence?.state === "unavailable") return "Help Point mapping is unavailable here.";
+  const base = points.length ? `${points.length} mapped Help Point${points.length === 1 ? "" : "s"} along the way` : "No mapped Help Points from sources checked";
+  return evidence?.state === "partial" ? `${base} · Some sources couldn't be checked` : base;
 }
 
 /**
@@ -30,7 +33,7 @@ function routeHoursLine(p: HelpPoint): string {
  * exactly as the source states them ("hours not known" otherwise), and the source. Collapsed
  * to a summary by default so the route sheet stays short.
  */
-export function HelpPointList({ points, onPick, defaultOpen = false }: { points: HelpPoint[]; onPick?: (p: HelpPoint) => void; defaultOpen?: boolean }) {
+export function HelpPointList({ points, evidence, onPick, defaultOpen = false }: { points: HelpPoint[]; evidence?: EvidenceState<HelpPoint[]>; onPick?: (p: HelpPoint) => void; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   const nearest = points[0];
   const sources = [...new Set(points.map((p) => SOURCE_NAME[p.source]))];
@@ -38,7 +41,7 @@ export function HelpPointList({ points, onPick, defaultOpen = false }: { points:
     <section className="mt-5" aria-label="Help Points along this route">
       <h3 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">Help Points</h3>
       {!points.length ? (
-        <p className="mt-2 text-sm text-ink-muted">None found along this way (hospitals, police, stations, pharmacies, fuel, hotels). That may just mean the map has no data here.</p>
+        <p className="mt-2 text-sm text-ink-muted">{helpPointsLine(points, evidence)}. Other places may exist.</p>
       ) : (
         <>
           <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="mt-2 flex min-h-12 w-full items-center gap-3 rounded-2xl bg-surface px-4 py-2.5 text-left shadow-[var(--shadow-card)]">
@@ -46,7 +49,7 @@ export function HelpPointList({ points, onPick, defaultOpen = false }: { points:
               {HELP_CLASSES[nearest.cls].emoji}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block font-semibold">{helpPointsLine(points)}</span>
+              <span className="block font-semibold">{helpPointsLine(points, evidence)}</span>
               <span className="block truncate text-sm text-ink-muted">
                 First: {nearest.name} · {HELP_CLASSES[nearest.cls].label}, {minutesIn(nearest.alongM ?? 0)}
               </span>
@@ -72,6 +75,7 @@ export function HelpPointList({ points, onPick, defaultOpen = false }: { points:
               ))}
             </ul>
           ) : null}
+          {evidence?.state === "partial" ? <p role="status" className="mt-2 text-xs text-ink-muted">Some Help Point sources couldn&apos;t be checked. Showing results that were available.</p> : null}
           <p className="mt-1.5 text-xs text-ink-subtle">Kinds of places that usually have people or staff around, from {sources.join(" and ")}. Hours are as listed; MIRA can&apos;t confirm who&apos;s there or that they&apos;re open.</p>
         </>
       )}
@@ -81,7 +85,7 @@ export function HelpPointList({ points, onPick, defaultOpen = false }: { points:
 
 /** Why "no Help Points" may just be missing map data (shown in one tap). */
 export const NO_HELP_WHY =
-  "MIRA looks for places that are usually staffed (hospitals, police, stations, pharmacies, fuel stations, hotels) close to the way. None are on the map here, which may only mean the map has no data yet. Adding missing places to OpenStreetMap helps everyone.";
+  "MIRA checks mapped types of places where help may be available near the way. No results from checked sources does not mean no places exist.";
 
 /**
  * Two short lines above "Start with MIRA": the route's lighting and its Help Points, facts only,
@@ -92,10 +96,10 @@ export function RouteContextLines({ option }: { option: RouteOption }) {
   return (
     <dl className="mt-3" aria-label="What's known about this way">
       <ContextRow label="Lighting" why={lightingWhy(option.lighting)}>
-        {lightingLine(option.lighting)}
+        {lightingEvidenceLine(option.lightingEvidence, option.lighting)}
       </ContextRow>
       <ContextRow label="Help" why={first ? undefined : NO_HELP_WHY}>
-        {helpPointsLine(option.helpPoints)}
+        {helpPointsLine(option.helpPoints, option.helpEvidence)}
         {first ? (
           <span className="text-ink-muted">
             {" "}

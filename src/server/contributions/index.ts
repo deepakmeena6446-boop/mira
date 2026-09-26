@@ -34,10 +34,10 @@ export interface ImpactView {
 
 /** Her impact from her own receipts only. Pending, differing, expired never count; incident reports have no receipts. */
 export async function impactFor(sql: postgres.Sql, user: { id: string; durable: boolean }, now: Date): Promise<ImpactView> {
-  const rows = await sql<{ kind: ReceiptRow["kind"]; status: ReceiptRow["status"]; counted: boolean; day: string; area_key: string | null }[]>`
-    SELECT kind, status, counted, to_char(day, 'YYYY-MM-DD') AS day, area_key FROM contribution_receipts WHERE user_id = ${user.id}`;
+  const rows = await sql<{ kind: ReceiptRow["kind"]; status: ReceiptRow["status"]; counted: boolean; legacy_unverifiable: boolean; day: string; area_key: string | null }[]>`
+    SELECT kind, status, counted, legacy_unverifiable, to_char(day, 'YYYY-MM-DD') AS day, area_key FROM contribution_receipts WHERE user_id = ${user.id}`;
   const [u] = await sql<{ created_at: Date }[]>`SELECT created_at FROM users WHERE id = ${user.id}`;
-  const summary = impactSummary(rows.map((r) => ({ kind: r.kind, status: r.status, counted: r.counted, day: r.day, areaKey: r.area_key })));
+  const summary = impactSummary(rows.map((r) => ({ kind: r.kind, status: r.status, counted: r.counted, legacyUnverifiable: r.legacy_unverifiable, day: r.day, areaKey: r.area_key })));
   const steward = stewardStatus(summary, { durable: user.durable, createdAt: new Date(u?.created_at ?? now) }, stewardThresholds(), now);
   const { flags: _flags, ...rest } = summary;
   void _flags; // flags are internal: they appear only as a plain "what's still needed" line

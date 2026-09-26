@@ -3,7 +3,7 @@ import { getSql } from "@/server/db/client";
 import { handle, json, readJson } from "@/server/http/handler";
 import { clientIp, dailyKey, enforce } from "@/server/ratelimit";
 import { getGeo } from "@/server/providers/geo";
-import { helpPointsNear, withoutCorroboratedGone } from "@/server/help-points";
+import { helpPointsNearEvidence, withoutCorroboratedGone } from "@/server/help-points";
 
 export const dynamic = "force-dynamic";
 
@@ -31,5 +31,8 @@ export const POST = handle(async (req: Request) => {
   const now = new Date();
   await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "geo:help:m", max: 240, windowMs: 60_000 }], now);
   const { country, ...p } = await readJson(req, body, 256);
-  return json({ helpPoints: await withoutCorroboratedGone(sql, await helpPointsNear(getGeo(), p, { country }), now) });
+  const evidence = await helpPointsNearEvidence(getGeo(), p, { country });
+  const points = "data" in evidence ? await withoutCorroboratedGone(sql, evidence.data, now) : [];
+  const state = "data" in evidence ? { ...evidence, data: points, state: evidence.state === "ready" && !points.length ? "empty" : evidence.state } : evidence;
+  return json({ helpPoints: points, evidence: state });
 });

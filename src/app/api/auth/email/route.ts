@@ -1,3 +1,4 @@
+import { assertAdultEligibility } from "@/server/account/adult-eligibility";
 import { getSql } from "@/server/db/client";
 import { handle, json, readJson } from "@/server/http/handler";
 import { assertSameOrigin } from "@/server/http/csrf";
@@ -15,6 +16,7 @@ export const dynamic = "force-dynamic";
  */
 export const POST = handle(async (req: Request) => {
   assertSameOrigin(req);
+  await assertAdultEligibility();
   if (!smtpConfigured()) throw unavailable("email_unavailable", "Email sign-in isn't switched on in this version yet.");
   const sql = getSql();
   const now = new Date();

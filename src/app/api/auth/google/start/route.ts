@@ -1,3 +1,4 @@
+import { assertAdultEligibility } from "@/server/account/adult-eligibility";
 import { cookies } from "next/headers";
 import { getEnv, googleSignInConfigured } from "@/server/config/env";
 import { cookieName, cookieOptions } from "@/server/session/cookies";
@@ -12,6 +13,7 @@ const redirect = (to: string) => new Response(null, { status: 302, headers: { lo
  * only in a sealed, httpOnly, 10-minute cookie; `next` is kept only if it's a path on MIRA.
  */
 export async function GET(req: Request) {
+  await assertAdultEligibility();
   const env = getEnv();
   if (!googleSignInConfigured(env)) return redirect(new URL("/?signin=failed", env.APP_BASE_URL).toString());
   const s = newGoogleState(new URL(req.url).searchParams.get("next") ?? "/");

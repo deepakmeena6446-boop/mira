@@ -233,10 +233,26 @@ export async function signInWithGoogle(sql: postgres.Sql, id: GoogleIdentity, cu
   const hash = emailHash(id.email);
   const enc = encryptText(id.email, "user_email");
   const r = await sql.begin(async (tx) => {
+    const protectDemo = async (targetId: string) => {
+      if (!current || current.durable || current.id === targetId) return;
+      // A collision with an existing account must not cascade user-created data or create
+      // a second contribution identity. Keep the current session and ask for a separate upgrade.
+      const [meaningful] = await tx<{ yes: boolean }[]>`
+        SELECT EXISTS(SELECT 1 FROM saved_places WHERE user_id = ${current.id})
+          OR EXISTS(SELECT 1 FROM contacts WHERE user_id = ${current.id})
+          OR EXISTS(SELECT 1 FROM journeys WHERE user_id = ${current.id})
+          OR EXISTS(SELECT 1 FROM journey_habits WHERE user_id = ${current.id})
+          OR EXISTS(SELECT 1 FROM contribution_receipts WHERE user_id = ${current.id})
+          OR EXISTS(SELECT 1 FROM mira_messages WHERE user_id = ${current.id})
+          OR EXISTS(SELECT 1 FROM reports_private WHERE user_id = ${current.id})
+          OR EXISTS(SELECT 1 FROM users WHERE id = ${current.id} AND (onboarded_at IS NOT NULL OR cardinality(help_exclude) > 0)) AS yes`;
+      if (meaningful?.yes) throw new GoogleAuthError("demo_data_preserved");
+    };
     const [linked] = await tx<{ user_id: string }[]>`SELECT user_id FROM auth_accounts WHERE provider = 'google' AND provider_user_id = ${id.sub}`;
-    if (linked) return { userId: linked.user_id, how: "returning" as const };
+    if (linked) { await protectDemo(linked.user_id); return { userId: linked.user_id, how: "returning" as const }; }
     const [byEmail] = await tx<{ id: string }[]>`SELECT id FROM users WHERE email_hash = ${hash}`;
     if (byEmail) {
+      await protectDemo(byEmail.id);
       await tx`INSERT INTO auth_accounts (provider, provider_user_id, user_id) VALUES ('google', ${id.sub}, ${byEmail.id})`;
       return { userId: byEmail.id, how: "linked_email" as const };
     }

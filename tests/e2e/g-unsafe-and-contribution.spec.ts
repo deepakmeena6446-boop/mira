@@ -113,10 +113,11 @@ test.describe("Degraded states are honest", () => {
     await page.getByRole("button", { name: "Use my location" }).click();
     await page.waitForURL((u) => u.pathname === "/"); // no account needed to look around
     await expect(page.getByText(/Location is off for MIRA/)).toBeVisible();
-    // Country not known (location off): Emergency is still one tap away, and explains before dialling 112.
-    await page.getByRole("button", { name: "Emergency", exact: true }).first().click();
-    await expect(page.getByText(/doesn't know which country you're in yet/)).toBeVisible();
-    await expect(page.getByRole("link", { name: /Call 112/ })).toHaveAttribute("href", "tel:112");
+    // Country not known (location off): Emergency is still one tap away, without an invented dial number.
+    await page.getByRole("button", { name: "Emergency options" }).first().click();
+    const options = page.getByRole("dialog", { name: "Emergency call options" });
+    await expect(options.getByText(/could not verify a local emergency number/)).toBeVisible();
+    await expect(options.locator('a[href^="tel:"]')).toHaveCount(0);
     await page.getByRole("button", { name: "Close", exact: true }).click();
     await page.getByRole("button", { name: "I feel unsafe" }).click();
     await expect(page.getByText("Turn on location to see Help Points near you.")).toBeVisible();

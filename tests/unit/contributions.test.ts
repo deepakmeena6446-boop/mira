@@ -42,13 +42,13 @@ describe("place corroboration (engine doc §6.5)", () => {
     expect(evaluateClaim("gone", { weekday: null, band: null }, [sig("gone", "a", { weekday: null, band: null })], NOW, true)).toEqual({ state: "pending" });
   });
 
-  it("disagreement means reports differ and nobody is credited, unless outvoted 3 to 1", () => {
+  it("disagreement means reports differ and nobody is credited, even at 3 to 1", () => {
     const differ = evaluateClaim("open", at, [sig("open", "a"), sig("closed", "b")], NOW);
     expect(differ).toEqual({ state: "differ" });
     expect(receiptDecision(differ)).toEqual({ status: "contradicted" });
     expect(evaluateClaim("open", at, [sig("open", "a"), sig("open", "b"), sig("closed", "c")], NOW).state).toBe("differ");
-    expect(evaluateClaim("open", at, [sig("open", "a"), sig("open", "b"), sig("open", "c"), sig("closed", "d")], NOW).state).toBe("corroborated");
-    expect(evaluateClaim("closed", at, [sig("open", "a"), sig("open", "b"), sig("open", "c"), sig("closed", "d")], NOW).state).toBe("contradicted");
+    expect(evaluateClaim("open", at, [sig("open", "a"), sig("open", "b"), sig("open", "c"), sig("closed", "d")], NOW).state).toBe("differ");
+    expect(evaluateClaim("closed", at, [sig("open", "a"), sig("open", "b"), sig("open", "c"), sig("closed", "d")], NOW).state).toBe("differ");
     // A provider can't outvote a person who disagrees.
     expect(evaluateClaim("open", at, [sig("open", "a"), sig("closed", "b")], NOW, true).state).toBe("differ");
   });
@@ -123,6 +123,13 @@ describe("impact and Local Steward", () => {
     expect(impactLine(s)).toBe("You helped verify 2 pieces of local information.");
     expect(impactLine(impactSummary([r({ status: "pending", counted: false })]))).toBeNull();
     expect(impactLine(impactSummary([r()]))).toBe("You helped verify 1 piece of local information.");
+  });
+
+  it("archives unrecomputable old place credit without helping impact or Steward", () => {
+    const historical = r({ legacyUnverifiable: true });
+    const summary = impactSummary([historical, r({ kind: "lighting" })]);
+    expect(summary).toMatchObject({ verified: 1, archived: 1, activeDays: 1, areas: 1, agreement: 1 });
+    expect(stewardStatus(impactSummary([historical, ...good.slice(0, 3)]), old, t, NOW).steward).toBe(false);
   });
 
   it("flags bursts and high disagreement", () => {

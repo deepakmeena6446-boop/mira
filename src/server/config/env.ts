@@ -44,6 +44,7 @@ const EMAIL_FROM_PATTERN = /^(?:[^<>@\s]+@[^<>@\s]+\.[^<>@\s]+|[^<>]*<[^<>@\s]+@
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  PUBLIC_BETA_STRICT: optionalNonEmpty.refine((v) => v === undefined || v === "on" || v === "off", 'must be "on" or "off"'),
   DATABASE_URL: z
     .string()
     .min(1)
@@ -162,6 +163,13 @@ export function parseEnv(source: Record<string, string | undefined>): ServerEnv 
   // Half an OAuth client is always a mistake: sign-in would fail at the callback, not at boot.
   if (Boolean(env.AUTH_GOOGLE_ID) !== Boolean(env.AUTH_GOOGLE_SECRET)) {
     issues.push(`${env.AUTH_GOOGLE_ID ? "AUTH_GOOGLE_SECRET" : "AUTH_GOOGLE_ID"}: AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET must be set together`);
+  }
+  if (env.NODE_ENV === "production" && env.PUBLIC_BETA_STRICT === "on") {
+    for (const key of ["RESEND_API_KEY", "EMAIL_FROM", "GOOGLE_MAPS_SERVER_KEY", "GOOGLE_MAPS_BROWSER_KEY", "AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET", "ANTHROPIC_API_KEY", "MAPILLARY_TOKEN", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"] as const) {
+      if (!env[key]) issues.push(`${key}: required for the public beta`);
+    }
+    if (env.GOOGLE_PLACES_HOURS !== "on") issues.push('GOOGLE_PLACES_HOURS: must be "on" for the public beta');
+    if (env.PUBLIC_AGGREGATE_RELEASES === "on") issues.push('PUBLIC_AGGREGATE_RELEASES: must stay "off" until moderation release is approved');
   }
   if (issues.length) throw new EnvValidationError(issues);
   return env;
