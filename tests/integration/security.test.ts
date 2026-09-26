@@ -49,8 +49,8 @@ const PUBLIC_KEYS = new Set([
   "lighting", "segments", "coords", "summary", "sources", "lit", "dark", "poles", "unknown", "walkers", "osm", "confirmed",
   // Help Points and route options: places and routes only (class, hours as listed, source, position along the route).
   "helpPoints", "cls", "open24h", "source", "alongM", "alternatives", "schedule", "day", "from", "to", "freshness", "osmFrom", "osmTo", "polesTo",
-  // Location Context: the country's cited emergency number and helplines (no place, no person).
-  "locale", "iso", "emergency", "number", "confirmed", "helplines", "timezone",
+  // Country Context: the country's cited emergency numbers and helplines (no place, no person).
+  "country", "iso", "countryName", "region", "emergency", "primary", "also", "services", "service", "url", "number", "helplines", "timezone",
   // The live view: how they're travelling and whether they asked to be checked on (no location history).
   "mode", "checkRequested",
 ]);
