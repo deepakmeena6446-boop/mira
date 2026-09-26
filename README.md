@@ -1,10 +1,12 @@
-# MIRA — your walking companion
+# MIRA — walk home, your people will know
 
-An installable, mobile-first web app (PWA) that works anywhere in the world. Open it and it already knows the time and where you are. Three taps to let the people you trust follow your walk home live:
+An installable, mobile-first web app (PWA). It helps a woman understand the way before she goes, keeps the people she chooses with her until she arrives, and puts help one tap away. It never says a route, place or person is safe; it shows what's known, where it's from, and what isn't known.
 
-1. **Where to?** Search, or tap a saved place like 🏠 Home. You get the walking route, the ETA, what's open along the way and any community notes.
-2. **Share my trip.** Your trusted contacts get a live link. You get a trip screen with "I'm here" and "+10 min".
-3. **Arrive.** Arrival is auto-detected. The link goes dark and the live points are deleted. If you don't check in, each accepted contact gets **one** email.
+1. **Where are you going?** Search, or tap a saved place like 🏠 Home. You get the walking route (and up to two alternatives when the maps provider has them), the time, how much of the way is **mapped as lit**, and the **Help Points** along it (hospitals, police, stations, pharmacies, fuel, hotel receptions), each with hours exactly as the source lists them or "hours not known".
+2. **Start with MIRA.** Share with your trusted contacts (by email), or keep it to yourself and send your **live link** with the phone's share sheet (WhatsApp, SMS…). The journey screen has *I'm here*, *+10 min*, the nearest Help Point, *I feel unsafe* and Emergency.
+3. **Arrive.** Arrival is auto-detected. The link goes dark and the live points are deleted. If you don't check in, each accepted contact gets **one** email. After a journey at night, one tap: "Was the way lit?"
+
+**I feel unsafe** (Home and journey screen) opens instantly, with no AI and no network wait: the nearest Help Point ranked for right now, send your live link, call someone (the phone's own contacts or a typed number, never stored), **Emergency 112** (the phone's own dialler; MIRA doesn't call or dispatch anyone), and Mira last. **Emergency 112** is also a pill on Home and the journey screen.
 
 **Mira** is the in-app AI companion: warm, brief and practical. She knows your saved places, the time and your area. She can start a trip, find what's open nearby, or help you report something. She is not an emergency service and says so, pointing to 112 when someone says they're in danger.
 
@@ -14,7 +16,7 @@ An installable, mobile-first web app (PWA) that works anywhere in the world. Ope
 
 **Press and hold the map** on any spot to report something there or walk to it.
 
-**Street lighting on the route.** The route sheet shows how much of the way is lit, and the map glows warm along lit stretches. Sources, strongest first: MIRA walkers' one-tap "Was the way lit?" after a walk in the dark (shown only when ≥ 3 people agree), OpenStreetMap `lit` tags, and streetlight poles detected in Mapillary imagery (optional `MAPILLARY_TOKEN`). Mira mentions it after dark. It's lighting information, never a safety rating.
+**Street lighting on the route.** The route sheet shows how much of the way is *mapped as lit* (map data can be old; only MIRA walkers who agree can say a stretch is actually lit), with the share that's not known, and the map glows warm along lit stretches. Sources, strongest first: MIRA walkers' one-tap "Was the way lit?" after a walk in the dark (shown only when ≥ 3 people agree), OpenStreetMap `lit` tags, and streetlight poles detected in Mapillary imagery (optional `MAPILLARY_TOKEN`). Mira mentions it after dark. It's lighting information, never a safety rating.
 
 **Reports** take three taps: pick one of six tiles, then send. The location defaults to "here" and the time to "just now". Reports are private and reviewed by a person. They appear publicly only as calm, template-worded community notes once enough independent people report the same thing in a ~1.2 km area.
 
@@ -53,7 +55,7 @@ npm run worker:dev              # second terminal: missed arrivals, deletion, we
 ```
 
 - Moderator area: `http://localhost:3100/admin/login`, using the password printed by `env:local`. To get a new one, run `npm run env:local -- --force`.
-- Walkthrough: open `/`, follow the three welcome steps, save a place as Home from its route sheet, add a trusted contact on **Me**, open their invite from Mailpit in another browser, then tap Home → **Share my trip**.
+- Walkthrough: open `/`, follow the three welcome steps, save a place as Home from its route sheet, add a trusted contact on **Me**, open their invite from Mailpit in another browser, then tap Home → **Start with MIRA**. The *I feel unsafe* button and the Emergency pill are on Home and the journey screen.
 - All mail, including contact invites, trip links and missed-arrival alerts, is captured in Mailpit at http://localhost:8025. Nothing reaches a real inbox.
 - To re-fetch a newer OSM snapshot (one rate-respecting Overpass request), run `npm run pilot:fetch -- --refresh`, then `npm run pilot:import`.
 
@@ -79,7 +81,8 @@ Production mode locally: `npm run build && npm run start` and `npm run worker:st
 - **Next.js 16 App Router + TypeScript + Tailwind v4.** Screens live in `src/app/(app)`: Home (map + sheet), Trip, Mira, Report and Me. `/welcome` handles onboarding, `/t/[token]` is the contact's live view, `/invite` accepts a contact invite, and `/admin` is moderation.
 - **PWA**: `src/app/manifest.ts`, icons in `public/`, and `public/sw.js` (an offline shell that never caches `/api`, `/t` or `/invite`).
 - **PostgreSQL 17 + PostGIS 3.5**: SQL migrations in `db/migrations` (`0006_accounts_trips` and `0007_trip_share` are the 2.0 schema).
-- **Separate Node worker** (`src/worker`): missed-arrival alerts (at most once), expiry, purge, retention and aggregation. Heartbeat every 30 s; trips can't start while it's unhealthy.
+- **Separate Node worker** (`src/worker`): missed-arrival alerts (at most once), expiry, purge, retention and aggregation. Heartbeat every 30 s; trips can't start while it's unhealthy, and an open journey tells the traveller when missed-arrival checks are paused. The worker exits (for its supervisor to restart it) if the journeys job stalls past the readiness window or the database stays unreachable; every statement is capped at 30 s.
+- **Help Points** (`src/domain/help-points.ts`): classes, the deterministic ranking (walking time, tier, hours known at night, ahead/behind on a trip) and conservative name checks. No model ranks or filters them. Providers implement `helpPlaces()`; `src/server/help-points` samples along routes.
 - **Pure domain rules** in `src/domain`: geohash cells, journey state machine, PII detection, moderation, aggregation, routing.
 - **MapLibre GL** (`src/components/map/WorldMap.tsx`) with route, community-note and "you" layers. Everything on the map is also in the sheet as text.
 
@@ -88,8 +91,8 @@ Production mode locally: `npm run build && npm run start` and `npm run worker:st
 | Area | Routes |
 |---|---|
 | Account | `POST /api/auth/demo`, `POST /api/auth/signout`, `GET/PATCH/DELETE /api/me`, `/api/me/places[/id]`, `/api/me/contacts[/id]`, `GET/POST /api/me/notifications` (inbox / mark read) |
-| Maps | `POST /api/geo/search`, `POST /api/geo/reverse`, `POST /api/geo/route`, `POST /api/geo/nearby` (coordinates go in POST bodies, never URLs) |
-| Trips | `POST /api/trips`, `GET /api/trips/current`, `POST /api/trips/[id]/location`, `POST /api/trips/[id]/{arrive,end,extend}`, `GET /api/t/[token]` (contact view) |
+| Maps | `POST /api/geo/search`, `POST /api/geo/reverse`, `POST /api/geo/route` (route + alternatives, lighting, Help Points), `POST /api/geo/nearby`, `POST /api/geo/help` (Help Points near a point) — coordinates go in POST bodies, never URLs |
+| Trips | `POST /api/trips` (optional `routeMinutes` for a chosen alternative, clamped), `GET /api/trips/current` (+ `safetyNet`), `POST /api/trips/[id]/location`, `POST /api/trips/[id]/{arrive,end,extend}`, `GET /api/t/[token]` (contact view) |
 | Mira | `GET/DELETE /api/mira` (history), `POST /api/mira` (NDJSON stream: `text` / `card` / `done`) |
 | Reports | `POST /api/reports`, `/api/admin/*` (moderator session) |
 
@@ -98,6 +101,7 @@ Production mode locally: `npm run build && npm run start` and `npm run worker:st
 | Data | Stored as | Deleted |
 |---|---|---|
 | Live location | Last 20 points of an open trip. Each accepted contact gets **their own** unguessable link (hashed), revoked the moment you remove them; you can also send your own link to anyone you choose. After the trip, links show only "arrived/ended" + first name for 30 min, then nothing | **The moment the trip closes**; the trip row within 6 h |
+| Planned route of a journey | On the device only (sessionStorage, this tab), for Help Points ahead and the lighting question | When the journey is done |
 | Home screen location | In browser memory only; refreshed while the app is visible, paused when hidden. A long-pressed spot goes to Report in memory, never in the URL | Never stored |
 | Offline cache (service worker) | Only an offline page and static files. Pages are never cached, because they carry your name, places and contacts | Replaced on each app update |
 | Inbox | Short in-app updates (contact accepted, missed check-in, location paused) | With your account |
