@@ -94,6 +94,8 @@ const envSchema = z.object({
   // "on" = ask Google for Help Point opening hours (Places Enterprise SKU: higher cost). Default off.
   GOOGLE_PLACES_HOURS: optionalNonEmpty.refine((v) => v === undefined || v === "on" || v === "off", 'must be "on" or "off"'),
   MIRA_GLOBAL_DAILY_MAX: optionalNonEmpty.refine((v) => v === undefined || /^\d{1,7}$/.test(v), "must be a whole number"),
+  // Mira's daily token ceiling across everyone (input + output); over it, the scripted Mira answers. Default 2,000,000.
+  MIRA_DAILY_TOKEN_MAX: optionalNonEmpty.refine((v) => v === undefined || /^\d{1,10}$/.test(v), "must be a whole number"),
   // Sign in with Google (OIDC). Both set = Google is the sign-in; first-name sign-in becomes a fallback.
   AUTH_GOOGLE_ID: optionalNonEmpty,
   AUTH_GOOGLE_SECRET: optionalNonEmpty,

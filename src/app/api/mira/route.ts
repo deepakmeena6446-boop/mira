@@ -22,6 +22,8 @@ const body = z
       .object({
         localTime: z.iso.datetime({ offset: true }),
         tzOffsetMin: z.number().int().min(-840).max(840),
+        // IANA time zone from the device (Intl), for her local time and weekday; checked again on the server.
+        tz: z.string().max(64).regex(/^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+){0,2}$/).nullable().optional(),
         location: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).strict().nullable(),
         // Locality name the device read from its map tiles; display text only.
         area: z.string().trim().max(60).regex(/^[^\p{Cc}<>]*$/u).nullable().optional(),
@@ -33,12 +35,12 @@ const body = z
 type Stored = { text: string; cards?: MiraCard[] };
 
 /**
- * Cards kept in history carry nothing about where the person was: nearby-place lists
- * (coordinates + distances from them) aren't stored, and trip cards drop the walking time.
+ * Cards kept in history carry nothing about where the person was: nearby-place and Help
+ * Point lists (coordinates + distances from them) aren't stored, and trip cards drop the walking time.
  */
 function storableCard(card: MiraCard): MiraCard | null {
-  if (card.type === "places") return null;
-  if (card.type === "trip") return { type: "trip", destination: card.destination, minutes: null, contacts: card.contacts };
+  if (card.type === "places" || card.type === "help_points") return null;
+  if (card.type === "trip") return { type: "trip", destination: card.destination, minutes: null, contacts: card.contacts, ...(card.mode ? { mode: card.mode } : {}) };
   return card;
 }
 
@@ -97,6 +99,7 @@ export const POST = handle(async (req: Request) => {
             scrubbed = ev.text;
             continue; // server-only
           }
+          if (ev.type === "usage") continue; // server-only (respond() consumes it; never forwarded)
           if (ev.type === "text" && !ev.private) text += ev.delta;
           if (ev.type === "card") {
             const kept = storableCard(ev.card);
