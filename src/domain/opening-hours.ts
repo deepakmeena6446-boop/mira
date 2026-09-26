@@ -121,6 +121,28 @@ export function openState(schedule: Schedule | null | undefined, now: LocalTime,
   return { state: "open", closesAt };
 }
 
+/**
+ * When the listed period she is in now began, on today's clock (negative = it began yesterday
+ * evening), or null when the listed hours don't cover this moment. For "Listed 9 AM–9 PM".
+ */
+export function openedAt(schedule: Schedule | null | undefined, now: LocalTime): number | null {
+  if (!schedule || schedule === "24/7") return null;
+  const yesterday = (now.day + 6) % 7;
+  const starts = schedule
+    .map((p) => (p.day === now.day ? p : p.day === yesterday && p.to > 1440 ? { day: now.day, from: p.from - 1440, to: p.to - 1440 } : null))
+    .filter((p): p is Period => p !== null && p.from <= now.minute && now.minute < p.to)
+    .map((p) => p.from);
+  return starts.length ? Math.min(...starts) : null;
+}
+
+/** "9 AM", "9:30 PM", "12 AM" (midnight): the form used in listed-hours copy. Deterministic, device-independent. */
+export function clock12(minutes: number): string {
+  const m = ((minutes % 1440) + 1440) % 1440;
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return `${h % 12 === 0 ? 12 : h % 12}${mm ? `:${String(mm).padStart(2, "0")}` : ""} ${h < 12 ? "AM" : "PM"}`;
+}
+
 export function clockLabel(minutes: number): string {
   const m = ((minutes % 1440) + 1440) % 1440;
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;

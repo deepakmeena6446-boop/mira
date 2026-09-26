@@ -1,23 +1,30 @@
 import { haversineMeters } from "./pilot";
-import { clockLabel, openState, type LocalTime, type OpenState, type Schedule } from "./opening-hours";
+import { clock12, localTime, openState, openedAt, type LocalTime, type OpenState, type Schedule } from "./opening-hours";
 
 /**
- * Help Points: nearby places where help is likely to be available — staffed, open,
- * reachable (blueprint §5E). MIRA never calls a place "safe". Everything here is
- * deterministic, so it is instant, predictable and works without a model: the
- * "I feel unsafe" sheet depends on it. An LLM never ranks or filters Help Points.
+ * Help Points: staffed or open places that may be useful when she wants assistance, or simply
+ * wants to move towards somewhere with people and staff around (blueprint §5E). MIRA never
+ * calls a place "safe", and never says a place is staffed because map data says "open".
+ * Everything here is deterministic, so it is instant, predictable and works without a model:
+ * the "I feel unsafe" sheet depends on it. An LLM never ranks or filters Help Points.
  *
- * Classes start conservative. Clinics and doctors (often shut at night), ATMs, banks,
- * cafés, shops and bus stops are not Help Points.
+ * Classes stay conservative. Clinics, doctors and labs (often shut at night), ATMs, banks,
+ * cafés, ordinary shops and bus stops are not Help Points. Convenience stores are a class only
+ * where a country turns them on (24-hour stores are common in e.g. Japan or Thailand).
  */
 
-export type HelpClass = "hospital" | "police" | "transit" | "hotel" | "pharmacy" | "fuel";
+export type HelpClass = "hospital" | "police" | "transit" | "airport" | "hotel" | "pharmacy" | "fuel" | "convenience";
 
 interface ClassInfo {
   label: string;
   emoji: string;
-  /** 1 = staffed around the clock or while operating; 2 = staffed while open. */
-  tier: 1 | 2;
+  /**
+   * Default class weight, 0–1: a small tie-break after walking time and opening hours, never a
+   * tier that lifts a far place over a near one. 0 = off unless her country turns it on.
+   */
+  weight: number;
+  /** Promoted when the situation is "emergency" (police, hospital). */
+  emergency: boolean;
   /** Whether staffing depends on opening hours (so unknown hours matter at night). */
   hoursMatter: boolean;
   /** Class default, stated as a default — never as a promise about this place. */
@@ -25,16 +32,45 @@ interface ClassInfo {
 }
 
 export const HELP_CLASSES: Record<HelpClass, ClassInfo> = {
-  hospital: { label: "Hospital", emoji: "🏥", tier: 1, hoursMatter: false, staffing: "Hospitals are usually staffed day and night" },
-  police: { label: "Police station", emoji: "👮", tier: 1, hoursMatter: false, staffing: "Police stations are usually staffed day and night" },
-  transit: { label: "Metro / train station", emoji: "🚇", tier: 1, hoursMatter: true, staffing: "Stations have staff while trains are running" },
-  hotel: { label: "Hotel reception", emoji: "🏨", tier: 2, hoursMatter: false, staffing: "Hotel receptions are often open late" },
-  pharmacy: { label: "Pharmacy", emoji: "💊", tier: 2, hoursMatter: true, staffing: "Pharmacies are staffed while open" },
-  fuel: { label: "Fuel station", emoji: "⛽", tier: 2, hoursMatter: true, staffing: "Fuel stations are often open late" },
+  hospital: { label: "Hospital", emoji: "🏥", weight: 1, emergency: true, hoursMatter: false, staffing: "Hospitals with an emergency department are usually open day and night" },
+  police: { label: "Police station", emoji: "👮", weight: 1, emergency: true, hoursMatter: false, staffing: "Police stations are often open day and night" },
+  transit: { label: "Metro / train station", emoji: "🚇", weight: 1, emergency: false, hoursMatter: true, staffing: "Stations usually have staff while trains are running" },
+  airport: { label: "Airport", emoji: "✈️", weight: 1, emergency: false, hoursMatter: true, staffing: "Airports usually have staff and help desks while flights operate" },
+  hotel: { label: "Hotel reception", emoji: "🏨", weight: 0.9, emergency: false, hoursMatter: false, staffing: "Hotel receptions are often open late" },
+  pharmacy: { label: "Pharmacy", emoji: "💊", weight: 0.9, emergency: false, hoursMatter: true, staffing: "Pharmacies have people at the counter while open" },
+  fuel: { label: "Fuel station", emoji: "⛽", weight: 0.8, emergency: false, hoursMatter: true, staffing: "Fuel stations are often open late" },
+  convenience: { label: "Convenience store", emoji: "🏪", weight: 0, emergency: false, hoursMatter: true, staffing: "Convenience stores have people at the counter while open" },
 };
+
+/** Class weights (0 = off). Country weights and, later, her own preferences are both this shape. */
+export type HelpWeights = Partial<Record<HelpClass, number>>;
+
+/**
+ * Per-country class weights (blueprint §5E "weight by locale"). Product defaults, not claims
+ * about any place: they only reorder near-equal options, and turn convenience stores on where
+ * 24-hour stores are common. Countries without an entry use the class defaults.
+ */
+export const COUNTRY_HELP_WEIGHTS: Record<string, HelpWeights> = {
+  JP: { convenience: 0.9 },
+  KR: { convenience: 0.9 },
+  TW: { convenience: 0.9 },
+  TH: { convenience: 0.9 },
+  IN: { fuel: 0.9 },
+};
+
+export function helpWeightsFor(iso: string | null | undefined): HelpWeights {
+  return (iso && COUNTRY_HELP_WEIGHTS[iso.toUpperCase()]) || {};
+}
+
+/** A class's effective weight: class default × country weight × her preference (clamped to 0–1.5). */
+export function classWeight(cls: HelpClass, weights: HelpWeights = {}, prefer: HelpWeights = {}): number {
+  return Math.min(1.5, Math.max(0, (weights[cls] ?? HELP_CLASSES[cls].weight) * (prefer[cls] ?? 1)));
+}
 
 export type HelpSource = "google" | "osm";
 export const SOURCE_NAME: Record<HelpSource, string> = { google: "Google Maps", osm: "OpenStreetMap" };
+/** Short source name for hours lines ("Open now · Google"). */
+export const SOURCE_SHORT: Record<HelpSource, string> = { google: "Google", osm: "OpenStreetMap" };
 
 export interface HelpPoint {
   id: string;
@@ -42,13 +78,21 @@ export interface HelpPoint {
   cls: HelpClass;
   lat: number;
   lon: number;
-  /** True only when the source itself says the place is open 24/7. */
+  /** True only when the source itself lists the place as open 24 hours. */
   open24h: boolean;
-  /** Opening hours exactly as the source lists them, or null when not listed. */
+  /** Opening hours as the source lists them (text), or null when not listed. */
   hours: string | null;
   /** The same hours, parsed (null when not listed or not understood: then they're "not known"). */
   schedule?: Schedule | null;
   source: HelpSource;
+  /** Where the hours came from, when that isn't the place's own source. */
+  hoursSource?: HelpSource;
+  /**
+   * The source's own "open now" (Google `currentOpeningHours.openNow`, which counts special
+   * hours such as holidays) and when it said so (epoch ms). Trusted only while fresh.
+   */
+  openNow?: boolean;
+  checkedAt?: number;
   /** On a route: metres from the start of the route to the point nearest this place. */
   alongM?: number;
 }
@@ -61,20 +105,29 @@ export function helpClassFromOsm(tags: Record<string, string | undefined>): Help
   if (tags.amenity === "fuel") return "fuel";
   if (tags.tourism === "hotel") return "hotel";
   if (tags.railway === "station" || tags.railway === "subway_entrance") return "transit";
+  // Airports with scheduled service (an IATA code, or tagged international): not airstrips or helipads.
+  if (tags.aeroway === "aerodrome" && (tags.iata || tags.aerodrome === "international" || tags["aerodrome:type"] === "international")) return "airport";
+  if (tags.shop === "convenience") return "convenience";
   return null;
 }
 
-/** Google place types (Places API (New), Table A) we ask for, and what they mean. */
+/**
+ * Google place types (Places API (New), Table A) we ask for, and what they mean. Bus stations
+ * and generic `transit_station`s are left out: the type can't tell a staffed hub from a stop.
+ */
 export const GOOGLE_HELP_TYPES: Record<string, HelpClass> = {
   hospital: "hospital",
   police: "police",
   subway_station: "transit",
   train_station: "transit",
   light_rail_station: "transit",
+  airport: "airport",
+  international_airport: "airport",
   hotel: "hotel",
   pharmacy: "pharmacy",
   drugstore: "pharmacy",
   gas_station: "fuel",
+  convenience_store: "convenience",
 };
 
 /**
@@ -88,9 +141,10 @@ export function helpClassFromGoogle(primaryType: string | undefined): HelpClass 
 /**
  * Conservative name checks for the two noisiest classes (deterministic, source-independent).
  * In map data "hotel" also covers PGs, room rentals and co-living; "hospital" also covers
- * labs, dispensaries and health offices. None of those is a place to walk to for help.
+ * labs, dispensaries, clinics, suppliers and health offices. None of those is a place to walk to for help.
  */
-const NOT_A_HOSPITAL = /\b(lab|labs|laborator\w*|diagnostic\w*|dental|dentist|clinic|dispensary|council|pathology|scan|imaging|ayurved\w*|homeopath\w*)\b/i;
+const NOT_A_HOSPITAL =
+  /\b(lab|labs|laborator\w*|diagnostic\w*|dental|dentist|clinic\w*|dispensary|council|pathology|scan|imaging|ayurved\w*|homeopath\w*|pharmaceutical\w*|braces|orthodont\w*|aesthetic\w*|cosmetic\w*|diet|physiotherap\w*|ivf|fertility|medical (?:equipment|supplies|devices))\b/i;
 const HOTEL_NAME = /\b(hotel|hotels|inn|resort)\b/i;
 const NOT_A_HOTEL = /\b(pg|paying guest|hostel|co-?living|oyo life)\b/i;
 
@@ -209,6 +263,72 @@ export function walkMinutesTo(from: { lat: number; lon: number }, to: { lat: num
   return Math.max(1, Math.round((haversineMeters(from, to) * DETOUR) / M_PER_MIN));
 }
 
+/**
+ * Why she's looking. Browsing a route, "near me" and "I feel unsafe" treat every class alike
+ * (police is one category among several, never automatically first); only "emergency"
+ * promotes police and hospitals.
+ */
+export type HelpSituation = "route" | "nearby" | "unsafe" | "emergency";
+
+/** A source's "open now" is trusted for this long after it was checked; after that, listed hours decide. */
+export const OPEN_NOW_FRESH_MS = 20 * 60_000;
+const CLOCK_SKEW_MS = 5 * 60_000;
+
+/**
+ * What is known about opening hours right now, and from which source:
+ * - `open_24h`: listed as open 24 hours;
+ * - `open_now`: the source itself says open now (fresh);
+ * - `listed_open`: the listed hours cover now (and her arrival);
+ * - `closing`: listed hours end before she'd get there;
+ * - `closed`: closed now (source-stated, or per listed hours);
+ * - `listed`: hours are listed but MIRA can't read them (shown as text);
+ * - `unknown`: no hours listed.
+ */
+export type HoursState =
+  | { kind: "open_24h"; source: HelpSource }
+  | { kind: "open_now"; source: HelpSource; closesAt: number | null }
+  | { kind: "listed_open"; source: HelpSource; from: number | null; closesAt: number }
+  | { kind: "closing"; source: HelpSource; closesAt: number }
+  | { kind: "closed"; source: HelpSource; listed: boolean }
+  | { kind: "listed"; source: HelpSource; text: string }
+  | { kind: "unknown" };
+
+/**
+ * Hours for right now on the device's clock (the device is where the place is). `atMs` is the
+ * device's epoch time, used only to judge whether the source's own "open now" is still fresh.
+ */
+export function hoursState(p: HelpPoint, now: LocalTime | undefined, arriveInMin = 0, atMs?: number): HoursState {
+  const source = p.hoursSource ?? p.source;
+  const age = atMs !== undefined && p.checkedAt !== undefined ? atMs - p.checkedAt : null;
+  // `checkedAt` is the server's clock; allow a few minutes of device clock skew, never more.
+  const fresh = p.openNow !== undefined && age !== null && age >= -CLOCK_SKEW_MS && age <= OPEN_NOW_FRESH_MS;
+  const listed: OpenState = now ? openState(p.schedule, now, arriveInMin) : { state: "unknown" };
+  if (fresh && p.openNow === false) return { kind: "closed", source, listed: false }; // e.g. closed for a holiday
+  if (p.open24h || p.schedule === "24/7" || (listed.state === "open" && listed.closesAt === null)) return { kind: "open_24h", source };
+  if (listed.state === "closing") return { kind: "closing", source, closesAt: listed.closesAt };
+  if (fresh && p.openNow) return { kind: "open_now", source, closesAt: listed.state === "open" ? listed.closesAt : null };
+  if (listed.state === "open") return { kind: "listed_open", source, from: now ? openedAt(p.schedule, now) : null, closesAt: listed.closesAt! };
+  if (listed.state === "closed") return { kind: "closed", source, listed: true };
+  if (p.hours) return { kind: "listed", source, text: p.hours };
+  return { kind: "unknown" };
+}
+
+function toOpenState(h: HoursState): OpenState {
+  switch (h.kind) {
+    case "open_24h":
+      return { state: "open", closesAt: null };
+    case "open_now":
+    case "listed_open":
+      return { state: "open", closesAt: h.closesAt };
+    case "closing":
+      return { state: "closing", closesAt: h.closesAt };
+    case "closed":
+      return { state: "closed" };
+    default:
+      return { state: "unknown" };
+  }
+}
+
 export interface RankedHelpPoint extends HelpPoint {
   /** Estimated walk from where she is now (straight line × detour; an estimate, labelled as one). */
   minutes: number;
@@ -216,53 +336,141 @@ export interface RankedHelpPoint extends HelpPoint {
   ahead: boolean | null;
   /** At night, a class whose staffing depends on hours and whose hours aren't known. */
   mayBeClosed: boolean;
-  /** From listed hours, on the device's clock: open now (and still when she'd arrive)? */
+  /** Open now (and still when she'd arrive)? Kept for older callers; `hoursNow` says how it's known. */
   open: OpenState;
+  hoursNow: HoursState;
+}
+
+export interface RankOptions {
+  situation: HelpSituation;
+  night: boolean;
+  route?: LonLat[] | null;
+  /** The device's local time (the device is where the place is). Without it, hours are "not known". */
+  now?: LocalTime;
+  /** The device's epoch ms, to judge freshness of a source's "open now" (defaults to the current time when `now` is given). */
+  at?: number;
+  /** Classes she chose not to see (e.g. police). */
+  exclude?: readonly HelpClass[];
+  /** Country weights (helpWeightsFor(iso)). */
+  weights?: HelpWeights;
+  /** Her own preferences, multiplied in (0.5 = less often, 0 = never). No UI yet. */
+  prefer?: HelpWeights;
+}
+
+/**
+ * Penalties, in minutes of walking: how much further she'd reasonably walk for a better option.
+ * Walking time dominates; these only break near-ties.
+ */
+const AVAILABILITY_MIN = { open: 0, listedOpen: 1, unknownDay: 2, unknownNight: 3, unknownNightHoursMatter: 6 } as const;
+const BEHIND_MIN: Record<HelpSituation, number> = { route: 4, nearby: 2, unsafe: 2, emergency: 2 };
+const CLASS_SPAN_MIN = 3;
+const EMERGENCY_BONUS_MIN = 5;
+
+function availabilityPenalty(h: HoursState, night: boolean, hoursMatter: boolean): number {
+  if (h.kind === "open_24h" || h.kind === "open_now") return AVAILABILITY_MIN.open;
+  if (h.kind === "listed_open") return AVAILABILITY_MIN.listedOpen;
+  if (!night) return AVAILABILITY_MIN.unknownDay;
+  return hoursMatter ? AVAILABILITY_MIN.unknownNightHoursMatter : AVAILABILITY_MIN.unknownNight;
 }
 
 /**
  * Order Help Points by immediate usefulness (blueprint §5E), deterministically:
- * walking time first; Tier 1 preferred over Tier 2 when within ~2 minutes; at night a
- * place whose hours matter but aren't known is demoted (still shown, and labelled);
- * during a trip, places behind her are slightly demoted.
+ * 1. leave out places known closed now, or closing before she'd arrive, and classes she excluded
+ *    (or that are off: weight 0, e.g. convenience stores outside the countries that turn them on);
+ * 2. walking time, with a preference for places likely open now: open now or 24 h (source) >
+ *    listed hours that are open now > hours not known by day > hours not known at night (and
+ *    labelled "may be closed" when the class depends on hours);
+ * 3. during a trip, places ahead of her over places behind;
+ * 4. class weight (class default × country × her preference) as a small tie-break;
+ * 5. in an emergency only, police and hospitals are promoted.
  */
-export function rankHelpPoints(
-  points: HelpPoint[],
-  from: { lat: number; lon: number },
-  opts: { night: boolean; route?: LonLat[] | null; now?: LocalTime; exclude?: readonly HelpClass[] },
-): RankedHelpPoint[] {
+export function rankHelpPoints(points: HelpPoint[], from: { lat: number; lon: number }, opts: RankOptions): RankedHelpPoint[] {
   const route = opts.route && opts.route.length > 1 ? opts.route : null;
   const myAlong = route ? projectOnRoute(from, route).alongM : 0;
+  const at = opts.at ?? (opts.now ? Date.now() : undefined);
   return dedupeHelpPoints(points)
     .filter((p) => !opts.exclude?.includes(p.cls))
-    .map((p) => {
+    .map((p) => ({ p, w: classWeight(p.cls, opts.weights, opts.prefer) }))
+    .filter(({ w }) => w > 0)
+    .map(({ p, w }) => {
       const info = HELP_CLASSES[p.cls];
       const minutes = walkMinutesTo(from, p);
-      const open: OpenState = p.open24h ? { state: "open", closesAt: null } : opts.now ? openState(p.schedule, opts.now, minutes) : { state: "unknown" };
-      const mayBeClosed = opts.night && info.hoursMatter && open.state === "unknown";
+      const hoursNow = hoursState(p, opts.now, minutes, at);
+      const unknown = hoursNow.kind === "unknown" || hoursNow.kind === "listed";
+      const mayBeClosed = opts.night && info.hoursMatter && unknown;
       const ahead = route ? projectOnRoute(p, route).alongM >= myAlong - 50 : null;
-      const key = minutes + (info.tier - 1) * 2 + (mayBeClosed ? 3 : 0) + (ahead === false ? 1 : 0);
-      return { p: { ...p, minutes, ahead, mayBeClosed, open }, key };
+      const key =
+        minutes +
+        availabilityPenalty(hoursNow, opts.night, info.hoursMatter) +
+        (ahead === false ? BEHIND_MIN[opts.situation] : 0) +
+        (1 - Math.min(w, 1)) * CLASS_SPAN_MIN -
+        (opts.situation === "emergency" && info.emergency ? EMERGENCY_BONUS_MIN : 0);
+      return { p: { ...p, minutes, ahead, mayBeClosed, open: toOpenState(hoursNow), hoursNow }, key, w };
     })
-    // Known closed now, or closing before she'd get there (listed hours): not a place to go.
-    .filter(({ p }) => p.open.state !== "closed" && p.open.state !== "closing")
-    .sort((a, b) => a.key - b.key || a.p.minutes - b.p.minutes || a.p.name.localeCompare(b.p.name))
+    // Known closed now, or closing before she'd get there: not a place to go.
+    .filter(({ p }) => p.hoursNow.kind !== "closed" && p.hoursNow.kind !== "closing")
+    .sort((a, b) => a.key - b.key || a.p.minutes - b.p.minutes || b.w - a.w || a.p.name.localeCompare(b.p.name) || a.p.id.localeCompare(b.p.id))
     .map(({ p }) => p);
+}
+
+/**
+ * Help Points for an emergency: the same rules, with police and hospitals promoted. Pure apart
+ * from reading the clock when `now` isn't given. For Mira and the emergency context (no UI yet).
+ */
+export function emergencyHelpPoints(
+  points: HelpPoint[],
+  me: { lat: number; lon: number },
+  opts: { now?: Date; exclude?: readonly HelpClass[]; weights?: HelpWeights; route?: LonLat[] | null } = {},
+): RankedHelpPoint[] {
+  const d = opts.now ?? new Date();
+  return rankHelpPoints(points, me, { situation: "emergency", night: isNight(d.getHours()), now: localTime(d), at: d.getTime(), exclude: opts.exclude, weights: opts.weights, route: opts.route });
 }
 
 // ── Copy (templates only; no verdicts) ────────────────────────────────────────────
 
 /**
- * "Open 24h", "Open until 21:00 (listed)", "Closed now (listed hours)", "Listed hours: …",
- * "Hours not known", plus a night caveat. Pass `open` (computed on the device) when known.
+ * One line about hours, always with its source, never "staffed":
+ * "Open 24 hours (listed) · Google", "Open now · Google", "Listed 9 AM–9 PM · OpenStreetMap",
+ * "Closes 9 PM, before you'd get there (listed) · Google", "Hours not known" (+ "may be closed
+ * now" at night). Pass a ranked point (its `hoursNow` was computed on the device).
  */
-export function hoursLine(p: HelpPoint & { mayBeClosed?: boolean; open?: OpenState }): string {
-  if (p.open24h || (p.open?.state === "open" && p.open.closesAt === null)) return "Open 24h";
-  if (p.open?.state === "open") return `Open until ${clockLabel(p.open.closesAt!)} (listed)`;
-  if (p.open?.state === "closing") return `Closes ${clockLabel(p.open.closesAt)}, before you'd get there (listed)`;
-  if (p.open?.state === "closed") return "Closed now (listed hours)";
-  if (p.hours) return `Listed hours: ${p.hours.slice(0, 40)}`;
-  return p.mayBeClosed ? "Hours not known · may be closed now" : "Hours not known";
+export function hoursLine(p: HelpPoint & { mayBeClosed?: boolean; hoursNow?: HoursState }): string {
+  const h = p.hoursNow ?? hoursState(p, undefined);
+  const src = (s: HelpSource) => ` · ${SOURCE_SHORT[s]}`;
+  switch (h.kind) {
+    case "open_24h":
+      return `Open 24 hours (listed)${src(h.source)}`;
+    case "open_now":
+      return h.closesAt === null ? `Open now${src(h.source)}` : `Open now, listed until ${clock12(h.closesAt)}${src(h.source)}`;
+    case "listed_open":
+      return `Listed ${h.from === null ? "until " : `${clock12(h.from)}–`}${clock12(h.closesAt)}${src(h.source)}`;
+    case "closing":
+      return `Closes ${clock12(h.closesAt)}, before you'd get there (listed)${src(h.source)}`;
+    case "closed":
+      return `Closed now${h.listed ? " (listed hours)" : ""}${src(h.source)}`;
+    case "listed":
+      return `Listed: ${h.text.slice(0, 40)}${src(h.source)}`;
+    default:
+      return p.mayBeClosed ? "Hours not known · may be closed now" : "Hours not known";
+  }
+}
+
+/** Short form for compact rows: "open now", "open 24 h (listed)", "listed hours", "hours not known". */
+export function hoursShort(h: HoursState, mayBeClosed = false): string {
+  switch (h.kind) {
+    case "open_24h":
+      return "open 24 h (listed)";
+    case "open_now":
+      return "open now";
+    case "listed_open":
+      return `listed until ${clock12(h.closesAt)}`;
+    case "listed":
+      return "listed hours";
+    case "unknown":
+      return mayBeClosed ? "may be closed" : "hours not known";
+    default:
+      return "";
+  }
 }
 
 export function minutesIn(alongM: number): string {

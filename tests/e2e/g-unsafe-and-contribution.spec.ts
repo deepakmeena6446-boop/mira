@@ -8,7 +8,7 @@ test.describe("When something feels wrong — instant, deterministic help", () =
     page.on("request", (r) => new URL(r.url()).pathname.startsWith("/api/mira") && miraCalls.push(r.url()));
     // Help Points are fetched ahead when Home gets a location; wait until they're in (first open), then close.
     await page.getByRole("button", { name: "I feel unsafe" }).click();
-    await expect(page.getByRole("dialog", { name: "Right now" }).getByRole("button", { name: /Go to the nearest Help Point/ })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Right now" }).getByRole("button", { name: /Go to a Help Point/ })).toBeVisible();
     await page.getByRole("button", { name: "I'm okay now" }).click();
     await expect(page.getByRole("dialog", { name: "Right now" })).toBeHidden();
 
@@ -19,7 +19,7 @@ test.describe("When something feels wrong — instant, deterministic help", () =
       b.click();
       await new Promise((r) => requestAnimationFrame(() => r(null)));
       const d = document.querySelector('[role="dialog"][aria-labelledby="unsafe-h"]');
-      const ready = Boolean(d?.querySelector('a[href="tel:112"]') && d?.textContent?.includes("Call someone") && d?.textContent?.includes("Go to the nearest Help Point"));
+      const ready = Boolean(d?.querySelector('a[href="tel:112"]') && d?.textContent?.includes("Call someone") && d?.textContent?.includes("Go to a Help Point"));
       return ready ? performance.now() - t0 : null;
     });
     expect(renderedAt).not.toBeNull();
@@ -34,8 +34,8 @@ test.describe("When something feels wrong — instant, deterministic help", () =
     await sheet.getByRole("button", { name: /Call someone/ }).click();
     await expect(sheet.getByLabel("Phone number to call")).toBeVisible();
 
-    // The nearest Help Point opens its walk, ready to start with MIRA.
-    await sheet.getByRole("button", { name: /Go to the nearest Help Point/ }).click();
+    // The best Help Point for right now opens its walk, ready to start with MIRA.
+    await sheet.getByRole("button", { name: /Go to a Help Point/ }).click();
     await expect(sheet).toBeHidden();
     await expect(page.getByRole("button", { name: /Start with MIRA/ })).toBeVisible();
     expect(miraCalls).toEqual([]);
@@ -52,7 +52,7 @@ test.describe("When something feels wrong — instant, deterministic help", () =
     const sheet = page.getByRole("dialog", { name: "Right now" });
     await expect(sheet.getByRole("button", { name: /Send my live link/ })).toBeVisible();
     await expect(sheet.getByRole("link", { name: /Emergency call, 112/ })).toHaveAttribute("href", "tel:112");
-    await sheet.getByRole("button", { name: /Go to the nearest Help Point/ }).click();
+    await sheet.getByRole("button", { name: /Go to a Help Point/ }).click();
     await expect(page.getByRole("link", { name: /Directions in Maps/ })).toBeVisible();
     await page.getByRole("button", { name: "End trip without arriving" }).click();
     await page.getByRole("button", { name: "End trip", exact: true }).click();
@@ -117,7 +117,7 @@ test.describe("Degraded states are honest", () => {
     await expect(page.getByText(/Location is off for MIRA/)).toBeVisible();
     await expect(page.getByRole("link", { name: /Emergency call, 112/ })).toHaveAttribute("href", "tel:112");
     await page.getByRole("button", { name: "I feel unsafe" }).click();
-    await expect(page.getByText("Turn on location to see the nearest Help Point.")).toBeVisible();
+    await expect(page.getByText("Turn on location to see Help Points near you.")).toBeVisible();
     await page.getByRole("button", { name: "I'm okay now" }).click();
     await page.getByRole("button", { name: /Search a place or address/ }).click();
     await page.getByPlaceholder("Search a place or address").fill("Vishwavidyalaya");

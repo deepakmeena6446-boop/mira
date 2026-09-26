@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useOverlay } from "@/lib/use-overlay";
 import { useClock } from "@/lib/location-store";
-import { HELP_CLASSES, SOURCE_NAME, hoursLine, isNight, rankHelpPoints, type HelpClass, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
+import { HELP_CLASSES, SOURCE_NAME, helpWeightsFor, hoursLine, hoursShort, isNight, rankHelpPoints, type HelpClass, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
 import { localTime } from "@/domain/opening-hours";
 import { useCountry } from "@/lib/locale-store";
 import { EmergencyPill } from "@/components/app/EmergencyPill";
@@ -26,9 +26,10 @@ export interface UnsafeTellAction {
 /**
  * "I feel unsafe": a first-class state (blueprint §5D). Every action on this sheet is
  * deterministic and local-first, so it appears the instant it's opened — no model call and
- * no network round-trip before anything she can do. Help Points come from lookups made
- * earlier (route / around her) and are ranked here on the device. Mira is the last,
- * quietest option, never the first.
+ * no network round-trip before anything she can do. In order: go to a Help Point (the best
+ * one and two more, ranked here on the device for this situation; ahead on her route when a
+ * journey is running), tell her people (her Circle and live link, with nothing to re-enter),
+ * call someone, Emergency, and — last and quietest — Mira.
  */
 export function UnsafeSheet({
   open,
@@ -71,14 +72,31 @@ export function UnsafeSheet({
   const locale = useCountry();
   const night = isNight((now ?? new Date()).getHours());
   const minuteKey = now ? Math.floor(now.getTime() / 60_000) : 0;
+  const weights = useMemo(() => helpWeightsFor(locale.iso), [locale.iso]);
   const ranked = useMemo(
-    () => (me ? rankHelpPoints(helpPoints, me, { night, route, now: minuteKey ? localTime(new Date(minuteKey * 60_000)) : undefined, exclude }) : []),
-    [helpPoints, me, night, route, minuteKey, exclude],
+    () =>
+      me
+        ? rankHelpPoints(helpPoints, me, {
+            situation: "unsafe",
+            night,
+            route,
+            now: minuteKey ? localTime(new Date(minuteKey * 60_000)) : undefined,
+            at: minuteKey ? minuteKey * 60_000 : undefined,
+            exclude,
+            weights,
+          })
+        : [],
+    [helpPoints, me, night, route, minuteKey, exclude, weights],
   );
   const [first, ...more] = ranked;
   if (!open) return null;
 
   const sources = [...new Set(ranked.slice(0, 3).map((p) => SOURCE_NAME[p.source]))];
+  const aheadNote = (p: RankedHelpPoint) => (p.ahead ? " · ahead on your way" : "");
+  const shortHours = (p: RankedHelpPoint) => {
+    const s = hoursShort(p.hoursNow, p.mayBeClosed);
+    return s ? ` · ${s}` : "";
+  };
   // Portal: screens are position:fixed (their own stacking context), and this must sit above the tab bar.
   return createPortal(
     <div role="dialog" aria-modal="true" aria-labelledby="unsafe-h" className="fixed inset-0 z-50 flex items-end justify-center bg-[rgb(10_6_24/0.5)] animate-fade sm:items-center" onClick={onClose}>
@@ -100,7 +118,7 @@ export function UnsafeSheet({
           </button>
         </div>
 
-        {/* 1. Nearest Help Point */}
+        {/* 1. Go to a Help Point: the best one for right now, and two more */}
         <div className="mt-4">
           {first ? (
             <button type="button" onClick={() => onGoHelpPoint(first)} className="flex w-full items-center gap-3 rounded-3xl bg-accent-soft p-4 text-left">
@@ -108,10 +126,10 @@ export function UnsafeSheet({
                 {HELP_CLASSES[first.cls].emoji}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block font-extrabold text-accent-strong">Go to the nearest Help Point</span>
+                <span className="block font-extrabold text-accent-strong">Go to a Help Point</span>
                 <span className="block truncate font-semibold">{first.name}</span>
                 <span className="block text-sm text-ink-muted">
-                  {HELP_CLASSES[first.cls].label} · about {first.minutes} min walk · {hoursLine(first)}
+                  {HELP_CLASSES[first.cls].label} · about {first.minutes} min walk{aheadNote(first)} · {hoursLine(first)}
                 </span>
               </span>
               <span className="shrink-0 text-sm font-bold text-accent">{goLabel}</span>
@@ -119,12 +137,12 @@ export function UnsafeSheet({
           ) : (
             <p className="rounded-3xl bg-sunken p-4 text-sm text-ink-muted">
               {!me
-                ? "Turn on location to see the nearest Help Point."
+                ? "Turn on location to see Help Points near you."
                 : helpLoading
                   ? "Finding Help Points near you…"
                   : helpFailed
                     ? "Couldn't load Help Points — check your connection. Calling and Emergency still work."
-                    : "No Help Points found close by. Head towards open shops and other people if you can."}
+                    : "No Help Points found in map data near you. If you can, move towards a lit street with people around."}
             </p>
           )}
           {more.length ? (
@@ -139,7 +157,7 @@ export function UnsafeSheet({
                       <span className="font-semibold">{p.name}</span>
                       <span className="text-ink-muted">
                         {" "}
-                        · {HELP_CLASSES[p.cls].label} · {p.minutes} min{p.mayBeClosed ? " · may be closed" : ""}
+                        · {HELP_CLASSES[p.cls].label} · {p.minutes} min{aheadNote(p)}{shortHours(p)}
                       </span>
                     </span>
                   </button>
@@ -198,7 +216,7 @@ export function UnsafeSheet({
         </div>
 
         <p className="mt-3 text-xs leading-relaxed text-ink-subtle">
-          {ranked.length ? `Help Points are places usually staffed, from ${sources.join(" and ")}; MIRA can't confirm who's there right now. ` : ""}
+          {ranked.length ? `Help Points are kinds of places that usually have people or staff around, from ${sources.join(" and ")}. MIRA can't confirm who's there right now. ` : ""}
           Emergency opens your phone&apos;s dialler: MIRA doesn&apos;t call or alert anyone for you.
           {onTrip ? " Your live location keeps updating only while the trip screen is open." : ""}
         </p>

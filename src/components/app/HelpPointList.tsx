@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { HELP_CLASSES, SOURCE_NAME, hoursLine, minutesIn, type HelpPoint } from "@/domain/help-points";
-import { localTime, openState } from "@/domain/opening-hours";
+import { HELP_CLASSES, SOURCE_NAME, hoursLine, hoursState, isNight, minutesIn, type HelpPoint } from "@/domain/help-points";
+import { localTime } from "@/domain/opening-hours";
 import { Icon } from "@/components/ui/Icon";
 import type { RouteOption } from "./RouteOptions";
 import { lightingLine, lightingWhy } from "./LightingSummary";
@@ -12,6 +12,17 @@ import { ContextRow } from "./ContextRow";
 export function helpPointsLine(points: HelpPoint[]): string {
   if (!points.length) return "No Help Points found along the way";
   return `${points.length} Help Point${points.length === 1 ? "" : "s"} along the way`;
+}
+
+/**
+ * Hours for a place on the route, on the device's clock, for when she'd get there from the
+ * start: "Open now · Google", "Listed 9 AM–9 PM · OpenStreetMap", "Hours not known"…
+ */
+function routeHoursLine(p: HelpPoint): string {
+  const now = new Date();
+  const hoursNow = hoursState(p, localTime(now), Math.round((p.alongM ?? 0) / 75), now.getTime());
+  const unknown = hoursNow.kind === "unknown" || hoursNow.kind === "listed";
+  return hoursLine({ ...p, hoursNow, mayBeClosed: unknown && isNight(now.getHours()) && HELP_CLASSES[p.cls].hoursMatter });
 }
 
 /**
@@ -53,7 +64,7 @@ export function HelpPointList({ points, onPick, defaultOpen = false }: { points:
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold">{p.name}</span>
                       <span className="block truncate text-xs text-ink-muted">
-                        {HELP_CLASSES[p.cls].label} · {minutesIn(p.alongM ?? 0)} · {hoursLine({ ...p, open: openState(p.schedule, localTime(new Date()), Math.round((p.alongM ?? 0) / 75)) })}
+                        {HELP_CLASSES[p.cls].label} · {minutesIn(p.alongM ?? 0)} · {routeHoursLine(p)}
                       </span>
                     </span>
                   </button>
@@ -61,7 +72,7 @@ export function HelpPointList({ points, onPick, defaultOpen = false }: { points:
               ))}
             </ul>
           ) : null}
-          <p className="mt-1.5 text-xs text-ink-subtle">Places that are usually staffed, from {sources.join(" and ")}. MIRA can&apos;t confirm who&apos;s there or that they&apos;re open.</p>
+          <p className="mt-1.5 text-xs text-ink-subtle">Kinds of places that usually have people or staff around, from {sources.join(" and ")}. Hours are as listed; MIRA can&apos;t confirm who&apos;s there or that they&apos;re open.</p>
         </>
       )}
     </section>
