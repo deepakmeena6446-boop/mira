@@ -23,6 +23,7 @@ import type { Clock } from "@/server/clock";
 import type { Mailer } from "@/server/mail";
 import { inviteEmail } from "@/server/mail/templates";
 import { displayName } from "@/domain/know-copy";
+import { onTripArrived } from "@/server/trips/on-arrival";
 
 export const LABEL_MAX = 60;
 
@@ -199,18 +200,19 @@ function closeFields(now: Date) {
 
 export async function userAction(sql: postgres.Sql, actorHash: string, id: string, action: UserAction, clock: Clock): Promise<JourneyView> {
   const now = clock.now();
-  const row = await sql.begin(async (tx) => {
+  const { row, arrived } = await sql.begin(async (tx) => {
     const j = await loadOwned(tx, actorHash, id, true);
     const t = userTransition(j.state, action);
     if (!t.ok) throw conflict("journey_closed", "This journey has already finished.");
-    if (!t.changed) return j;
+    if (!t.changed) return { row: j, arrived: false };
     const { closed, purge } = closeFields(now);
     const [updated] = await tx<JourneyRow[]>`
       UPDATE journeys SET state = ${t.next}, closed_at = ${closed}, purge_at = ${purge} WHERE id = ${id} RETURNING *`;
     await tx`UPDATE contact_invites SET expires_at = LEAST(expires_at, ${now}) WHERE journey_id = ${id}`;
     await tx`DELETE FROM trip_locations WHERE journey_id = ${id}`; // live points never outlive the trip
-    return updated;
+    return { row: updated, arrived: t.next === "arrived" };
   });
+  if (arrived) await onTripArrived(sql, id, now); // after commit: best-effort, never undoes the arrival
   return toView(await withPlace(sql, row), now);
 }
 

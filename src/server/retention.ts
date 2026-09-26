@@ -5,6 +5,7 @@ import { deleteAccount } from "@/server/account/users";
 import { purgeOldLitVotes } from "@/server/lighting";
 import { encryptLegacyPlaces } from "@/server/account/places";
 import { purgeAuthLinks } from "@/server/account/email-auth";
+import { purgeStaleHabits } from "@/server/account/habits";
 
 /** Durable (email) accounts unused for this long are deleted, with everything tied to them. */
 export const INACTIVE_ACCOUNT_DAYS = 400;
@@ -39,6 +40,8 @@ export async function purgeExpired(sql: postgres.Sql, now: Date): Promise<Record
   const authLinks = await purgeAuthLinks(sql, now);
   const placesEncrypted = await encryptLegacyPlaces(sql);
   const litVotes = await purgeOldLitVotes(sql, now);
+  // Journey habits unused for over 400 days (she can also forget them any time in Me).
+  const habits = await purgeStaleHabits(sql, now);
   return {
     reports: reports.count,
     actorSessions: actors.count,
@@ -54,5 +57,6 @@ export async function purgeExpired(sql: postgres.Sql, now: Date): Promise<Record
     authLinks,
     placesEncrypted,
     litVotes,
+    habits,
   };
 }

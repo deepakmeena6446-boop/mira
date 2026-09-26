@@ -1,0 +1,24 @@
+/**
+ * Extra fields for POST /api/trips, read from THIS phone at the moment she starts: its IANA
+ * time zone (so her contacts' emails and the live link show her local time, labelled) and the
+ * local start hour. `savedPlaceId` only when the destination is one of her saved places — that
+ * is the only case MIRA may learn a habit from, and only on arrival.
+ *
+ *   await api("/api/trips", { body: { from, to, share, ...tripStartExtras(place?.id) } })
+ */
+export function tripStartExtras(savedPlaceId?: string | null, now: Date = new Date()): { tz?: string; startHour: number; savedPlaceId?: string } {
+  let tz: string | undefined;
+  try {
+    tz = Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    tz = undefined; // the server then shows times in UTC, labelled
+  }
+  return { ...(tz ? { tz } : {}), startHour: now.getHours(), ...(savedPlaceId ? { savedPlaceId } : {}) };
+}
+
+/** Query string for GET /api/me/habits/suggestion: her local hour now (the server never guesses it). */
+export function suggestionQuery(mode?: string, now: Date = new Date()): string {
+  const q = new URLSearchParams({ hour: String(now.getHours()) });
+  if (mode) q.set("mode", mode);
+  return `?${q.toString()}`;
+}

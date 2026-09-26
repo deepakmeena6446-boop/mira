@@ -20,6 +20,7 @@ import type { Contact } from "@/server/account/contacts";
 import { HELP_CLASSES, type HelpClass } from "@/domain/help-points";
 import { Section } from "@/components/app/Section";
 import { AccountSection, PushSection } from "./MeSections";
+import { CircleRow, PersonalSections } from "./PersonalSections";
 import type { ProviderModes } from "@/server/providers/modes";
 
 const EMOJIS = [
@@ -109,6 +110,7 @@ export function MeScreen({
           </div>
         </header>
 
+        <CircleRow accepted={contacts.filter((c) => c.status === "accepted").length} invited={contacts.filter((c) => c.status === "invited").length} />
 
         <Section
           id="places"
@@ -218,6 +220,8 @@ export function MeScreen({
             </ul>
           </div>
         </Section>
+
+        <PersonalSections />
 
         <PushSection available={modes.push === "web_push"} />
 

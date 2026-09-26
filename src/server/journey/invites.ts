@@ -11,6 +11,8 @@ export interface InviteView {
   etaAt?: string;
   expiresAt?: string;
   placeName?: string | null;
+  /** The traveller's time zone when known; times are shown in it, labelled (otherwise UTC). */
+  tz?: string | null;
 }
 
 type InviteRow = {
@@ -21,15 +23,16 @@ type InviteRow = {
   state: string;
   eta_at: Date;
   place_id: string | null;
+  tz: string | null;
 };
 
 async function find(sql: postgres.Sql | postgres.TransactionSql, token: string, lock = false): Promise<InviteRow | null> {
   if (!token || token.length > 128) return null;
   const hash = hashToken("invite", token);
   const rows = lock
-    ? await sql<InviteRow[]>`SELECT i.journey_id, i.accepted_at, i.revoked_at, i.expires_at, j.state, j.eta_at, j.place_id
+    ? await sql<InviteRow[]>`SELECT i.journey_id, i.accepted_at, i.revoked_at, i.expires_at, j.state, j.eta_at, j.place_id, j.tz
         FROM contact_invites i JOIN journeys j ON j.id = i.journey_id WHERE i.token_hash = ${hash} FOR UPDATE OF i, j`
-    : await sql<InviteRow[]>`SELECT i.journey_id, i.accepted_at, i.revoked_at, i.expires_at, j.state, j.eta_at, j.place_id
+    : await sql<InviteRow[]>`SELECT i.journey_id, i.accepted_at, i.revoked_at, i.expires_at, j.state, j.eta_at, j.place_id, j.tz
         FROM contact_invites i JOIN journeys j ON j.id = i.journey_id WHERE i.token_hash = ${hash}`;
   return rows[0] ?? null;
 }
@@ -55,7 +58,7 @@ export async function viewInvite(sql: postgres.Sql, token: string, now: Date): P
     const [p] = await sql<{ name: string | null; kind: string }[]>`SELECT name, tags->>'mira:kind' AS kind FROM places WHERE id = ${r.place_id}`;
     if (p) placeName = displayName(p.name, p.kind ?? "Place");
   }
-  return { status, etaAt: new Date(r.eta_at).toISOString(), expiresAt: new Date(r.expires_at).toISOString(), placeName };
+  return { status, etaAt: new Date(r.eta_at).toISOString(), expiresAt: new Date(r.expires_at).toISOString(), placeName, tz: r.tz };
 }
 
 export async function acceptInvite(sql: postgres.Sql, token: string, now: Date): Promise<InviteStatus> {

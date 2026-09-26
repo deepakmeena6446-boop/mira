@@ -19,7 +19,7 @@ export const POST = handle(async (req: Request) => {
   await enforce(sql, [dailyKey("actor", user.id, now)], [{ bucket: "trips:start:h", max: 12, windowMs: 3600_000 }], now);
   await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "trips:start:ip:h", max: 300, windowMs: 3600_000 }], now);
   if (!(await workerStatus(sql, systemClock)).healthy) throw unavailable("trips_unavailable", "Trip sharing is paused for a moment. Please try again shortly.");
-  const input = await readJson(req, startTripSchema, 1024);
+  const input = await readJson(req, startTripSchema, 2048); // room for tz + savedPlaceId + a long non-Latin name
   const trip = await startTrip(sql, user, input, systemClock);
   console.log(JSON.stringify({ t: now.toISOString(), src: "web", event: "trip.started", trip: trip.id, contacts: trip.sharedWith.length }));
   return json({ trip }, 201);
