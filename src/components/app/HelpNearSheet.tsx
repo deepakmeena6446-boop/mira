@@ -1,13 +1,21 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOverlay } from "@/lib/use-overlay";
-import { HELP_CLASSES, SOURCE_NAME, hoursLine, isNight, rankHelpPoints, type HelpClass, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
+import { useClock } from "@/lib/location-store";
+import { useCountry } from "@/lib/locale-store";
+import { HELP_CLASSES, SOURCE_NAME, helpWeightsFor, hoursLine, isNight, rankHelpPoints, type HelpClass, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
 import { localTime } from "@/domain/opening-hours";
 import { Icon } from "@/components/ui/Icon";
 
-/** "Help Points near me": the same deterministic ranking as the unsafe sheet, as a calm list. */
+/** How many places show before "Show more" (the ones the server looked up hours for). */
+const FIRST = 5;
+
+/**
+ * "Help Points near me": the same deterministic ranking as the unsafe sheet (situation
+ * "nearby"), as a calm list, with each place's hours state and its source.
+ */
 export function HelpNearSheet({
   open,
   onClose,
@@ -26,11 +34,28 @@ export function HelpNearSheet({
   onPick: (p: RankedHelpPoint) => void;
 }) {
   useOverlay(open, onClose);
+  const clock = useClock();
+  const locale = useCountry();
+  const [only, setOnly] = useState<HelpClass | null>(null);
+  const [all, setAll] = useState(false);
+  const minuteKey = clock ? Math.floor(clock.getTime() / 60_000) : 0;
+  const weights = useMemo(() => helpWeightsFor(locale.iso), [locale.iso]);
   const ranked = useMemo(() => {
-    const now = new Date();
-    return me ? rankHelpPoints(points, me, { night: isNight(now.getHours()), now: localTime(now), exclude }) : [];
-  }, [points, me, exclude]);
+    if (!me) return [];
+    const at = minuteKey ? new Date(minuteKey * 60_000) : null;
+    return rankHelpPoints(points, me, {
+      situation: "nearby",
+      night: isNight((at ?? new Date()).getHours()),
+      now: at ? localTime(at) : undefined,
+      at: at?.getTime(),
+      exclude,
+      weights,
+    });
+  }, [points, me, minuteKey, exclude, weights]);
   if (!open) return null;
+  const classes = [...new Set(ranked.map((p) => p.cls))];
+  const filtered = only && classes.includes(only) ? ranked.filter((p) => p.cls === only) : ranked;
+  const shown = all ? filtered : filtered.slice(0, FIRST);
   const sources = [...new Set(ranked.map((p) => SOURCE_NAME[p.source]))];
   return createPortal(
     <div role="dialog" aria-modal="true" aria-labelledby="near-h" className="fixed inset-0 z-50 flex items-end justify-center bg-[rgb(10_6_24/0.45)] animate-fade sm:items-center" onClick={onClose}>
@@ -48,28 +73,54 @@ export function HelpNearSheet({
         ) : loading ? (
           <p className="mt-3 text-sm text-ink-muted">Finding Help Points near you…</p>
         ) : !ranked.length ? (
-          <p className="mt-3 text-sm text-ink-muted">None found close by (hospitals, police, stations, pharmacies, fuel, hotels). That may just mean the map has no data here.</p>
+          <p className="mt-3 text-sm text-ink-muted">No Help Points found in map data near you (hospitals, police, stations, pharmacies, fuel, hotels). That may just mean the map has no data here.</p>
         ) : (
-          <ul className="mt-3 divide-y divide-line">
-            {ranked.map((p) => (
-              <li key={p.id}>
-                <button type="button" onClick={() => onPick(p)} className="flex min-h-14 w-full items-center gap-3 py-2.5 text-left">
-                  <span aria-hidden className="text-xl">
-                    {HELP_CLASSES[p.cls].emoji}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold">{p.name}</span>
-                    <span className="block truncate text-xs text-ink-muted">
-                      {HELP_CLASSES[p.cls].label} · about {p.minutes} min · {hoursLine(p)}
+          <>
+            {classes.length > 1 ? (
+              <div role="group" aria-label="Show only" className="-mx-1 mt-3 flex gap-1.5 overflow-x-auto px-1 pb-1">
+                {[null, ...classes].map((c) => (
+                  <button
+                    key={c ?? "all"}
+                    type="button"
+                    aria-pressed={only === c}
+                    onClick={() => setOnly(c)}
+                    className={`min-h-9 shrink-0 whitespace-nowrap rounded-full px-3 text-sm font-semibold ${only === c ? "bg-accent text-accent-ink" : "bg-sunken text-ink-muted"}`}
+                  >
+                    {c ? `${HELP_CLASSES[c].emoji} ${HELP_CLASSES[c].label}` : "All"}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <ul className="mt-2 divide-y divide-line">
+              {shown.map((p) => (
+                <li key={p.id}>
+                  <button type="button" onClick={() => onPick(p)} className="flex min-h-14 w-full items-center gap-3 py-2.5 text-left">
+                    <span aria-hidden className="text-xl">
+                      {HELP_CLASSES[p.cls].emoji}
                     </span>
-                  </span>
-                  <Icon name="chevron" className="size-4 text-ink-subtle" />
-                </button>
-              </li>
-            ))}
-          </ul>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold">{p.name}</span>
+                      <span className="block truncate text-xs text-ink-muted">
+                        {HELP_CLASSES[p.cls].label} · about {p.minutes} min · {hoursLine(p)}
+                      </span>
+                    </span>
+                    <Icon name="chevron" className="size-4 text-ink-subtle" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {!all && filtered.length > FIRST ? (
+              <button type="button" onClick={() => setAll(true)} className="mt-1 min-h-11 text-sm font-bold text-accent">
+                Show {filtered.length - FIRST} more
+              </button>
+            ) : null}
+          </>
         )}
-        {ranked.length ? <p className="mt-3 text-xs text-ink-subtle">Usually staffed kinds of places, from {sources.join(" and ")}. Places listed as closed now are left out. MIRA can&apos;t confirm who&apos;s there.</p> : null}
+        {ranked.length ? (
+          <p className="mt-3 text-xs text-ink-subtle">
+            Kinds of places that usually have people or staff around, from {sources.join(" and ")}. Places listed as closed now are left out. Hours are as listed by the source; MIRA can&apos;t confirm who&apos;s there.
+          </p>
+        ) : null}
       </div>
     </div>,
     document.body,

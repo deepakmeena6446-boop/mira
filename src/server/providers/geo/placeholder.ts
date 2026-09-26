@@ -91,7 +91,7 @@ export function placeholderGeo(sql: postgres.Sql): GeoProvider {
 
     walkRoutes,
 
-    async helpPlaces(points, radiusM) {
+    async helpPlaces(points, radiusM, opts) {
       if (!points.length) return [];
       type HelpRow = { id: string; name: string | null; kind: string | null; place_type: string; tags: Record<string, string>; lat: number; lon: number };
       const rows = await sql<HelpRow[]>`
@@ -110,7 +110,7 @@ export function placeholderGeo(sql: postgres.Sql): GeoProvider {
         local.push({ id: r.id, name: displayName(r.name, r.kind ?? HELP_CLASSES[cls].label), cls, lat: r.lat, lon: r.lon, open24h: isOpen24h(hours), hours: isOpen24h(hours) ? null : hours, schedule: parseOpeningHours(hours), source: "osm" });
       }
       // The local snapshot covers one small area; elsewhere ask live OpenStreetMap once for the whole corridor.
-      const live = local.length >= 3 ? [] : await overpassHelp(points, radiusM);
+      const live = local.length >= 3 ? [] : await overpassHelp(points, radiusM, opts);
       return dedupeHelpPoints([...local, ...live]);
     },
 

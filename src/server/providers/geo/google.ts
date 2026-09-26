@@ -4,8 +4,8 @@ import { FAR_M } from "@/domain/search-rank";
 import { GoogleBudgetExceeded, takeGoogleCall } from "./budget";
 import { getEnv } from "@/server/config/env";
 import { scheduleFromGoogle } from "@/domain/opening-hours";
-import { GOOGLE_HELP_TYPES, HELP_CLASSES, helpClassFromGoogle, type HelpPoint } from "@/domain/help-points";
-import type { GeoPoint, GeoProvider, PlaceHit, WalkRoute } from "./types";
+import { GOOGLE_HELP_TYPES, helpClassFromGoogle, type HelpClass, type HelpPoint } from "@/domain/help-points";
+import type { GeoPoint, GeoProvider, HelpHours, PlaceHit, WalkRoute } from "./types";
 
 /**
  * Google Maps Platform provider (Places API (New), Routes API, Geocoding API). Called only
@@ -13,7 +13,9 @@ import type { GeoPoint, GeoProvider, PlaceHit, WalkRoute } from "./types";
  * positions are rounded to what each task needs. Every call falls back to the placeholder
  * (OpenStreetMap) provider on any failure, so search and routes keep working.
  *
- * Field masks keep requests on the cheaper SKUs (no opening hours / ratings / photos).
+ * Field masks keep requests on the cheaper SKUs (no opening hours / ratings / photos). The
+ * one exception is Help Point hours: a Place Details call per place, only for the few places
+ * shown, only with GOOGLE_PLACES_HOURS=on, cached for up to 6 hours (helpHours).
  */
 
 const PLACES = "https://places.googleapis.com/v1";
@@ -54,6 +56,7 @@ function cache<T>(max: number, ttlMs: number) {
       if (m.size >= max) m.delete(m.keys().next().value!);
       m.set(k, { at: Date.now(), v });
     },
+    clear: () => m.clear(),
   };
 }
 const searchCache = cache<PlaceHit[]>(500, 10 * 60_000);
@@ -141,22 +144,24 @@ async function computeWalks(key: string, a: GeoPoint, b: GeoPoint, alternatives:
   return routes.sort((x, y) => x.minutes - y.minutes).slice(0, 3);
 }
 
-/** Google place types to ask for, by Help Point tier (src/domain/help-points.ts). */
-const HELP_TIER_TYPES = {
-  1: Object.keys(GOOGLE_HELP_TYPES).filter((t) => HELP_CLASSES[GOOGLE_HELP_TYPES[t]].tier === 1),
-  2: Object.keys(GOOGLE_HELP_TYPES).filter((t) => HELP_CLASSES[GOOGLE_HELP_TYPES[t]].tier === 2),
+/**
+ * Google place types to ask for (src/domain/help-points.ts), in separate lookups for "near me"
+ * so nearby pharmacies or shops can't crowd out a hospital, station or police station.
+ */
+const typesFor = (classes: readonly HelpClass[]) => Object.keys(GOOGLE_HELP_TYPES).filter((t) => classes.includes(GOOGLE_HELP_TYPES[t]));
+const HELP_TYPE_GROUPS = {
+  main: typesFor(["hospital", "police", "transit", "airport"]),
+  late: typesFor(["hotel", "pharmacy", "fuel"]),
+  convenience: typesFor(["convenience"]),
 } as const;
 const helpCache = cache<HelpPoint[]>(1000, 10 * 60_000);
 
-type GHelpPlace = GPlace & {
-  primaryType?: string;
-  regularOpeningHours?: { periods?: Array<{ open?: { day: number; hour: number; minute: number }; close?: { day: number; hour: number; minute: number } }>; weekdayDescriptions?: string[] };
-};
+type GHelpPlace = GPlace & { primaryType?: string };
 
 /**
- * Help Point candidates around one (already rounded) point. Same Pro-SKU fields as the
- * nearby list plus the machine place types. With GOOGLE_PLACES_HOURS=on the listed opening
- * hours come too (Enterprise SKU); off, every Google Help Point honestly says "hours not known".
+ * Help Point candidates around one (already rounded) point. Pro-SKU fields only (id, name,
+ * location, primary type): no opening hours here. Hours come separately, and only for the few
+ * places actually shown (helpHours below), so a lookup never pays the Enterprise SKU for 20+ places.
  */
 async function helpNearby(key: string, c: GeoPoint, radiusM: number, types: readonly string[]): Promise<HelpPoint[]> {
   const ck = `${c.lat},${c.lon}|${Math.round(radiusM)}|${types.join(",")}`;
@@ -167,28 +172,54 @@ async function helpNearby(key: string, c: GeoPoint, radiusM: number, types: read
     "searchNearby",
     // includedPrimaryTypes: a doctor whose secondary types include "hospital" is not returned.
     { includedPrimaryTypes: types, maxResultCount: 20, rankPreference: "DISTANCE", languageCode: "en", locationRestriction: { circle: { center: { latitude: c.lat, longitude: c.lon }, radius: radiusM } } },
-    // Opening hours are a pricier Places SKU: only when the owner has switched them on (GOOGLE_PLACES_HOURS=on).
-    "places.id,places.displayName,places.location,places.primaryType" + (getEnv().GOOGLE_PLACES_HOURS === "on" ? ",places.regularOpeningHours" : ""),
+    HELP_NEARBY_FIELDS,
   )) as GHelpPlace[];
   const out: HelpPoint[] = [];
   for (const p of found) {
     const cls = helpClassFromGoogle(p.primaryType);
     if (!cls || !p.location || !p.displayName?.text) continue;
-    const schedule = scheduleFromGoogle(p.regularOpeningHours?.periods);
-    out.push({
-      id: `g:${p.id}`,
-      name: p.displayName.text,
-      cls,
-      lat: p.location.latitude,
-      lon: p.location.longitude,
-      open24h: schedule === "24/7",
-      hours: schedule && schedule !== "24/7" ? (p.regularOpeningHours?.weekdayDescriptions?.[(new Date().getDay() + 6) % 7] ?? null) : null,
-      schedule,
-      source: "google",
-    });
+    out.push({ id: `g:${p.id}`, name: p.displayName.text, cls, lat: p.location.latitude, lon: p.location.longitude, open24h: false, hours: null, schedule: null, source: "google" });
   }
   helpCache.set(ck, out);
   return out;
+}
+
+/** Field masks, exported for tests: nearby discovery never asks for hours. */
+export const HELP_NEARBY_FIELDS = "places.id,places.displayName,places.location,places.primaryType";
+export const HELP_HOURS_FIELDS = "id,regularOpeningHours,currentOpeningHours.openNow";
+/** At most this many Place Details (hours) calls per request. */
+export const MAX_HOURS_LOOKUPS = 5;
+/** Hours per place are kept in memory for at most 6 hours. */
+const HOURS_TTL_MS = 6 * 60 * 60_000;
+const HOURS_TIMEOUT_MS = 2500;
+const hoursCache = cache<HelpHours>(2000, HOURS_TTL_MS);
+const hoursInFlight = new Map<string, Promise<HelpHours>>();
+
+type GPeriod = { open?: { day: number; hour: number; minute: number }; close?: { day: number; hour: number; minute: number } };
+
+/** Place Details (New) for one place, hours fields only (Enterprise SKU; counted against the budget). */
+async function placeHours(key: string, placeId: string): Promise<HelpHours> {
+  if (!takeGoogleCall()) throw new GoogleBudgetExceeded();
+  const res = await fetch(`${PLACES}/places/${encodeURIComponent(placeId)}?languageCode=en`, {
+    headers: { "x-goog-api-key": key, "x-goog-fieldmask": HELP_HOURS_FIELDS },
+    signal: AbortSignal.timeout(HOURS_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`details_${res.status}`);
+  const d = (await res.json()) as { regularOpeningHours?: { periods?: GPeriod[]; weekdayDescriptions?: string[] }; currentOpeningHours?: { openNow?: boolean } };
+  const schedule = scheduleFromGoogle(d.regularOpeningHours?.periods);
+  const openNow = d.currentOpeningHours?.openNow;
+  return {
+    schedule,
+    text: schedule && schedule !== "24/7" ? (d.regularOpeningHours?.weekdayDescriptions?.join("; ").slice(0, 400) ?? null) : null,
+    ...(typeof openNow === "boolean" ? { openNow, checkedAt: Date.now() } : {}),
+  };
+}
+
+/** Test hook: forget cached Help Point lookups and hours. */
+export function resetGoogleHelpCaches() {
+  helpCache.clear();
+  hoursCache.clear();
+  hoursInFlight.clear();
 }
 
 const warn = (op: string, err: unknown) =>
@@ -267,19 +298,58 @@ export function googleGeo(key: string, fallback: GeoProvider): GeoProvider {
       }
     },
 
-    async helpPlaces(points, radiusM) {
+    async helpPlaces(points, radiusM, opts) {
       if (!points.length) return [];
       const r = Math.min(Math.max(radiusM, 300), 5000);
-      // One point ("near me"): ask for each tier separately so nearby pharmacies can't crowd
-      // out the hospital or police station. Along a route: one lookup per sample point.
-      const groups = points.length === 1 ? [HELP_TIER_TYPES[1], HELP_TIER_TYPES[2]] : [[...HELP_TIER_TYPES[1], ...HELP_TIER_TYPES[2]]];
+      // One point ("near me"): separate lookups so pharmacies (or convenience stores) can't crowd
+      // out a hospital, station or police station. Along a route: one lookup per sample point.
+      const groups =
+        points.length === 1
+          ? [HELP_TYPE_GROUPS.main, HELP_TYPE_GROUPS.late, ...(opts?.convenience ? [HELP_TYPE_GROUPS.convenience] : [])]
+          : [[...HELP_TYPE_GROUPS.main, ...HELP_TYPE_GROUPS.late]];
       try {
         const found = await Promise.all(points.flatMap((p) => groups.map((types) => helpNearby(key, round(p, 3), r, types))));
         return found.flat();
       } catch (err) {
         warn("help_places", err);
-        return fallback.helpPlaces(points, radiusM);
+        return fallback.helpPlaces(points, radiusM, opts);
       }
+    },
+
+    /**
+     * Listed hours (and Google's own "open now", which counts special hours) for at most
+     * MAX_HOURS_LOOKUPS Google places. Off unless GOOGLE_PLACES_HOURS=on. Each call is a
+     * Place Details (Enterprise SKU) request counted against the Google budget; results are
+     * cached per place for ≤ 6 h. A failed or over-budget lookup just means "hours not known".
+     */
+    async helpHours(ids) {
+      const out = new Map<string, HelpHours>();
+      if (getEnv().GOOGLE_PLACES_HOURS !== "on") return out;
+      const wanted = [...new Set(ids.filter((id) => id.startsWith("g:")))].slice(0, MAX_HOURS_LOOKUPS);
+      await Promise.all(
+        wanted.map(async (id) => {
+          const cached = hoursCache.get(id);
+          if (cached) {
+            out.set(id, cached);
+            return;
+          }
+          let pending = hoursInFlight.get(id);
+          if (!pending) {
+            pending = placeHours(key, id.slice(2));
+            hoursInFlight.set(id, pending);
+          }
+          try {
+            const h = await pending;
+            hoursCache.set(id, h);
+            out.set(id, h);
+          } catch (err) {
+            if (!(err instanceof GoogleBudgetExceeded)) warn("help_hours", err);
+          } finally {
+            hoursInFlight.delete(id);
+          }
+        }),
+      );
+      return out;
     },
 
     async nearby(p, radiusM, kinds) {

@@ -39,16 +39,16 @@ describe("Help Points with listed hours and her filters", () => {
 
   it("leaves out places listed as closed now, or closing before she'd get there", () => {
     const shop = near("day-pharmacy", { schedule: parseOpeningHours("Mo-Sa 09:00-21:00") });
-    expect(rankHelpPoints([shop], me, { night: false, now: mondayNoon })[0].open.state).toBe("open");
-    expect(rankHelpPoints([shop], me, { night: true, now: mondayLate })).toEqual([]);
+    expect(rankHelpPoints([shop], me, { situation: "nearby", night: false, now: mondayNoon })[0].open.state).toBe("open");
+    expect(rankHelpPoints([shop], me, { situation: "nearby", night: true, now: mondayLate })).toEqual([]);
     const closing = near("closing", { schedule: parseOpeningHours("Mo-Su 08:00-12:01") });
-    expect(rankHelpPoints([closing], me, { night: false, now: mondayNoon })).toEqual([]); // ~1 min walk, closes in 1: she wouldn't make it
+    expect(rankHelpPoints([closing], me, { situation: "nearby", night: false, now: mondayNoon })).toEqual([]); // ~1 min walk, closes in 1: she wouldn't make it
   });
 
   it("does not demote a place listed as open at night", () => {
     const allNight = near("all-night", { schedule: parseOpeningHours("18:00-06:00") });
     const unknown = near("unknown-hours", { lat: 28.6904 });
-    const r = rankHelpPoints([unknown, allNight], me, { night: true, now: mondayLate });
+    const r = rankHelpPoints([unknown, allNight], me, { situation: "nearby", night: true, now: mondayLate });
     expect(r[0].id).toBe("all-night");
     expect(r[1].mayBeClosed).toBe(true);
   });
@@ -56,6 +56,6 @@ describe("Help Points with listed hours and her filters", () => {
   it("honours her filters (e.g. no police)", () => {
     const police = near("police", { cls: "police" });
     const pharmacy = near("pharmacy", {});
-    expect(rankHelpPoints([police, pharmacy], me, { night: false, exclude: ["police"] }).map((p) => p.id)).toEqual(["pharmacy"]);
+    expect(rankHelpPoints([police, pharmacy], me, { situation: "nearby", night: false, exclude: ["police"] }).map((p) => p.id)).toEqual(["pharmacy"]);
   });
 });

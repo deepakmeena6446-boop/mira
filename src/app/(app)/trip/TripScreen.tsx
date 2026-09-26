@@ -143,7 +143,7 @@ export function TripScreen({
   const night = isNight((clock ?? new Date()).getHours());
   const minuteKey = clock ? Math.floor(clock.getTime() / 60_000) : 0;
   const ranked = useMemo(
-    () => (me && help ? rankHelpPoints(help.points, me, { night, route, now: minuteKey ? localTime(new Date(minuteKey * 60_000)) : undefined, exclude }) : []),
+    () => (me && help ? rankHelpPoints(help.points, me, { situation: "route", night, route, now: minuteKey ? localTime(new Date(minuteKey * 60_000)) : undefined, exclude }) : []),
     [me, help, night, route, minuteKey, exclude],
   );
   const nextHelp = ranked[0] ?? null;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clockLabel, openState, parseOpeningHours, scheduleFromGoogle } from "@/domain/opening-hours";
+import { clock12, clockLabel, openState, openedAt, parseOpeningHours, scheduleFromGoogle } from "@/domain/opening-hours";
 
 const at = (day: number, hhmm: string) => ({ day, minute: +hhmm.slice(0, 2) * 60 + +hhmm.slice(3) }); // day 0 = Monday
 
@@ -45,5 +45,14 @@ describe("opening hours (listed hours, parsed strictly)", () => {
     const s = scheduleFromGoogle([{ open: { day: 1, hour: 9, minute: 0 }, close: { day: 1, hour: 17, minute: 30 } }])!;
     expect(openState(s, at(0, "10:00"))).toMatchObject({ state: "open", closesAt: 17 * 60 + 30 });
     expect(clockLabel(26 * 60)).toBe("02:00");
+  });
+
+  it("says when the current listed period began, and formats listed hours as '9 AM–9:30 PM'", () => {
+    const s = parseOpeningHours("Mo-Sa 09:00-21:30; Su off")!;
+    expect(openedAt(s, at(0, "12:00"))).toBe(9 * 60);
+    expect(openedAt(s, at(6, "12:00"))).toBeNull();
+    expect(openedAt(parseOpeningHours("18:00-06:00"), at(2, "01:00"))).toBe(-6 * 60); // began yesterday evening
+    expect(openedAt("24/7", at(0, "12:00"))).toBeNull();
+    expect([0, 9 * 60, 12 * 60, 21 * 60 + 30, -6 * 60, 26 * 60].map(clock12)).toEqual(["12 AM", "9 AM", "12 PM", "9:30 PM", "6 PM", "2 AM"]);
   });
 });

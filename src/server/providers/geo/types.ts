@@ -1,4 +1,5 @@
 import type { HelpPoint } from "@/domain/help-points";
+import type { Schedule } from "@/domain/opening-hours";
 
 export interface GeoPoint {
   lat: number;
@@ -47,7 +48,28 @@ export interface GeoProvider {
   /**
    * Help Point candidates (src/domain/help-points.ts classes) within `radiusM` of any of the
    * points — one point for "near me", several samples along a route. Classified by the
-   * provider from its own place types/tags; hours only as the source states them.
+   * provider from its own place types/tags; hours only as the source states them (a provider
+   * may leave hours out here and give them through `helpHours` for a shortlist).
    */
-  helpPlaces(points: GeoPoint[], radiusM: number): Promise<HelpPoint[]>;
+  helpPlaces(points: GeoPoint[], radiusM: number, opts?: HelpLookupOptions): Promise<HelpPoint[]>;
+  /**
+   * Opening hours for a few Help Points by id (only ids this provider issued). Optional: a
+   * provider without a per-place hours lookup leaves it out. Missing ids = hours not known.
+   */
+  helpHours?(ids: string[]): Promise<Map<string, HelpHours>>;
+}
+
+export interface HelpLookupOptions {
+  /** Also look for convenience stores (only where her country turns that class on). */
+  convenience?: boolean;
+}
+
+/** Hours for one place, as its source lists them. */
+export interface HelpHours {
+  schedule: Schedule | null;
+  /** Listed hours as text (for "listed hours may be out of date" context), or null. */
+  text: string | null;
+  /** The source's own "open now" and when it said so (epoch ms). */
+  openNow?: boolean;
+  checkedAt?: number;
 }

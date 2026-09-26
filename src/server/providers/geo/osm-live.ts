@@ -102,12 +102,12 @@ const helpCache = cached<HelpPoint[]>(500, 60 * 60_000);
  * several coordinates covers the line through them, so a whole route corridor costs the
  * same as a single spot (and stays inside the public server's polite rate).
  */
-export async function overpassHelp(points: GeoPoint[], radiusM: number): Promise<HelpPoint[]> {
+export async function overpassHelp(points: GeoPoint[], radiusM: number, opts?: { convenience?: boolean }): Promise<HelpPoint[]> {
   const base = getEnv().OVERPASS_URL;
   if (!base || !points.length) return [];
   const pts = points.slice(0, 8).map(round);
   const r = Math.min(Math.round(radiusM), 1500);
-  const key = `${pts.map((c) => `${c.lat},${c.lon}`).join(";")}|${r}`;
+  const key = `${pts.map((c) => `${c.lat},${c.lon}`).join(";")}|${r}|${opts?.convenience ? "c" : ""}`;
   const hit = helpCache.get(key);
   if (hit) return hit;
   if (Date.now() - lastOverpass < 1000) return [];
@@ -118,6 +118,7 @@ export async function overpassHelp(points: GeoPoint[], radiusM: number): Promise
     nwr${around}[healthcare~"^(hospital|pharmacy)$"];
     nwr${around}[tourism=hotel];
     nwr${around}[railway~"^(station|subway_entrance)$"];
+    nwr${around}[aeroway=aerodrome][iata];${opts?.convenience ? `\n    nwr${around}[shop=convenience];` : ""}
   );out center tags 120;`;
   try {
     const res = await fetch(base, {
