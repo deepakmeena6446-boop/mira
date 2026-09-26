@@ -2,9 +2,9 @@ import { z } from "zod";
 import { getSql } from "@/server/db/client";
 import { handle, json, readJson } from "@/server/http/handler";
 import { assertSameOrigin } from "@/server/http/csrf";
-import { notFound } from "@/server/http/errors";
+import { forbidden } from "@/server/http/errors";
 import { clientIp, dailyKey, enforce } from "@/server/ratelimit";
-import { providerModes } from "@/server/providers/modes";
+import { demoSignInAllowed } from "@/server/config/env";
 import { createDemoUser } from "@/server/account/users";
 import { personName } from "@/server/http/person-name";
 import { startSession } from "@/server/session/user";
@@ -14,10 +14,13 @@ import { notifyInApp } from "@/server/providers/notify";
 
 export const dynamic = "force-dynamic";
 
-/** Placeholder for "Continue with Google": creates a real local account with the given name. */
+/**
+ * First-name sign-in: a real local account with only the given name, and no way back in once
+ * signed out. A fallback only: refused once Google sign-in is configured, unless ALLOW_DEMO_SIGNIN=on.
+ */
 export const POST = handle(async (req: Request) => {
   assertSameOrigin(req);
-  if (providerModes().auth !== "demo") throw notFound();
+  if (!demoSignInAllowed()) throw forbidden("Sign in with Google instead.");
   const sql = getSql();
   const now = new Date();
   await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "auth:demo:h", max: 20, windowMs: 3600_000 }], now);

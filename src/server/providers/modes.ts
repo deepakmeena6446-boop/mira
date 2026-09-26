@@ -6,7 +6,7 @@ import "server-only";
  * UI never claims a live integration that isn't wired. Real adapters plug in at each
  * provider's `get*()` factory and flip the matching flag below.
  */
-const REAL_ADAPTERS = { mapbox: false, googleMaps: true, google: false, claude: true, webPush: true } as const;
+const REAL_ADAPTERS = { mapbox: false, googleMaps: true, google: true, claude: true, webPush: true } as const;
 
 export interface ProviderModes {
   maps: "placeholder" | "google" | "mapbox";

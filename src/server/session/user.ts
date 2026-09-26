@@ -15,7 +15,7 @@ export interface User {
   email: string | null;
   avatarUrl: string | null;
   onboarded: boolean;
-  /** Has an email login, so she can sign in again elsewhere (a first-name-only account can't). */
+  /** Has an email or Google login (email_hash set), so she can sign in again elsewhere (a first-name-only account can't). */
   durable: boolean;
   /** Help Point classes she chose not to see (e.g. police). */
   helpExclude: string[];
@@ -47,7 +47,12 @@ export async function requireUser(sql: postgres.Sql = getSql()): Promise<User> {
   return u;
 }
 
+/**
+ * Start a fresh session. Always rotates: any session this browser already holds is ended first,
+ * so a token issued before sign-in (or to another account) never stays valid alongside the new one.
+ */
 export async function startSession(sql: postgres.Sql, userId: string): Promise<void> {
+  await endSession(sql);
   const token = randomToken(32);
   const expires = new Date(Date.now() + USER_SESSION_DAYS * 86_400_000);
   await sql`INSERT INTO user_sessions (user_id, token_hash, expires_at) VALUES (${userId}, ${hashToken("admin", `user:${token}`)}, ${expires})`;

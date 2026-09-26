@@ -40,7 +40,7 @@ export function MeScreen({
   emailAlerts,
   saved = false,
 }: {
-  user: { id: string; name: string; avatarUrl: string | null; durable: boolean; emailHint: string | null; helpExclude: string[] } | null;
+  user: { id: string; name: string; avatarUrl: string | null; durable: boolean; google: boolean; emailHint: string | null; helpExclude: string[] } | null;
   places: SavedPlace[];
   contacts: Contact[];
   modes: ProviderModes;
@@ -187,7 +187,7 @@ export function MeScreen({
           )}
         </Section>
 
-        <AccountSection durable={user.durable} emailHint={user.emailHint} emailAvailable={emailAlerts} saved={saved} />
+        <AccountSection durable={user.durable} google={user.google} emailHint={user.emailHint} emailAvailable={emailAlerts} googleAvailable={modes.auth === "google"} saved={saved} />
 
         <Section id="help" title="Help Points">
           <div className="p-5">
