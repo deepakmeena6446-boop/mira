@@ -5,7 +5,7 @@ import { placeholderGeo } from "./placeholder";
 import { googleGeo } from "./google";
 import type { GeoProvider } from "./types";
 
-export type { GeoPoint, GeoProvider, PlaceHit, WalkRoute } from "./types";
+export type { GeoPoint, GeoProvider, ModeRoute, PlaceHit, WalkRoute } from "./types";
 
 /**
  * Maps provider factory: Google Maps Platform when a server key is set (with the

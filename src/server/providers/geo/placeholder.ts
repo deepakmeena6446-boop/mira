@@ -10,7 +10,7 @@ import { haversineMeters, inBounds } from "@/domain/pilot";
 import { pathCoords, planRoutes, WALKING_SPEED_KMH } from "@/domain/routing";
 import { displayName } from "@/domain/know-copy";
 import { loadGraph } from "@/server/know/graph";
-import type { GeoPoint, GeoProvider, PlaceHit, WalkRoute } from "./types";
+import type { GeoPoint, GeoProvider, ModeRoute, PlaceHit, WalkRoute } from "./types";
 
 /**
  * Placeholder maps provider. Uses MIRA's own OpenStreetMap snapshot (real places and a
@@ -90,6 +90,14 @@ export function placeholderGeo(sql: postgres.Sql): GeoProvider {
     },
 
     walkRoutes,
+
+    // Only walking is routed here. There is no open driving or transit router behind MIRA yet,
+    // so ride and transit are "not known" (the app asks when she expects to arrive) — never a
+    // straight line dressed up as a drive.
+    async routes(a, b, mode): Promise<ModeRoute[]> {
+      if (mode !== "walk") return [];
+      return (await walkRoutes(a, b)).map((r) => ({ ...r, provider: r.approximate ? "estimate" : "osm" }));
+    },
 
     async helpPlaces(points, radiusM) {
       if (!points.length) return [];

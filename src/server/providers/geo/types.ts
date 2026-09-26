@@ -1,4 +1,5 @@
 import type { HelpPoint } from "@/domain/help-points";
+import type { TravelMode } from "@/domain/travel-mode";
 
 export interface GeoPoint {
   lat: number;
@@ -30,6 +31,11 @@ export interface WalkRoute {
   approximate: boolean;
 }
 
+/** A route for any travel mode, with who computed it ("estimate" = straight line, no provider route). */
+export interface ModeRoute extends WalkRoute {
+  provider: "google" | "osm" | "estimate";
+}
+
 /** Everything MIRA needs from a maps provider. Mapbox implements this later. */
 export interface GeoProvider {
   /** `deep`: an explicit search (Enter) — may use slower, more thorough sources. */
@@ -42,6 +48,12 @@ export interface GeoProvider {
   walk(a: GeoPoint, b: GeoPoint): Promise<WalkRoute>;
   /** Up to three walking routes, fastest first (one when the provider has no alternatives). */
   walkRoutes(a: GeoPoint, b: GeoPoint): Promise<WalkRoute[]>;
+  /**
+   * Routes for a travel mode, fastest first. Walk: as walkRoutes. Ride / transit: at most one
+   * provider route, or none when the provider has none (transit often doesn't exist, or isn't
+   * covered): an empty list means "not known", never an error and never a guess.
+   */
+  routes(a: GeoPoint, b: GeoPoint, mode: TravelMode): Promise<ModeRoute[]>;
   /** Nearby places, optionally limited to kinds (metro, bus, pharmacy, health, police, food, shop, toilets, finance). */
   nearby(p: GeoPoint, radiusM: number, kinds?: string[]): Promise<PlaceHit[]>;
   /**
