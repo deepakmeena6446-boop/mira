@@ -35,7 +35,9 @@ If an unusual number of different people report the same category in the same ar
 
 ## Review
 
-A person reviews every report. Each decision uses a **fixed reason code**, never free text, and is recorded:
+Reports may be reviewed before they can contribute to MIRA's information. **Right now nobody is on moderation duty**, so the app never says a person has reviewed or will review a report. Until moderation operations exist, reports simply stay private (and are deleted on schedule), and **no new community notes are published**: the weekly job does nothing unless the operator switches `PUBLIC_AGGREGATE_RELEASES=on`.
+
+When a maintainer does review, each decision uses a **fixed reason code**, never free text, and is recorded:
 
 - **Hold:** needs redaction, possible coordinated burst, possible duplicate, unclear, other.
 - **Reject:** identifying content, outside the pilot area, abusive or spam, duplicate, not an observation, other.
@@ -47,7 +49,7 @@ Approving a report does **not** publish it; it only lets it count toward a commu
 
 ## When a community note appears
 
-Notes are prepared once a week. A note appears only when all of these hold:
+Publishing notes is **switched off** during the beta (see *Review*). When it is switched on, notes are prepared once a week, and a note appears only when all of these hold:
 
 - At least **five independent people** have approved reports in the same area, the same time band and the same category. Different categories are never combined to reach five.
 - Each person counts once. Duplicates (the same person or browser reporting the same thing, or identical text) count as one.
@@ -58,6 +60,10 @@ Notes are prepared once a week. A note appears only when all of these hold:
 The wording is a fixed template, for example: *"Multiple reviewed observations mention poor lighting in this area during the evening."* A note shows only that sentence, the time band and the week it was released, as a line on the route card of a journey that passes through the area, with a "Why am I seeing this?" explanation. Notes are not drawn on the map. It never shows a count, an exact place, a time or a quote.
 
 Each note **expires after 35 days** and disappears.
+
+## Reports are not contributions
+
+Reports are a separate, private system. They never earn anything: no impact count, no badge, no Local Steward progress. The Contribute tab's confirmations and corrections (open / closed, entrance closed, place gone…) are about places, not people, and change nothing until an independent person or the place's listed hours agree. How those work, and what is kept, is in [docs/CONTRIBUTIONS.md](docs/CONTRIBUTIONS.md).
 
 ## Withdrawal and removal
 

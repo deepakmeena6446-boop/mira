@@ -141,7 +141,8 @@ export function nextIstMonday(): Date {
 
 export function runAggregation(at: Date): string {
   return execFileSync("npx", ["tsx", "scripts/run-aggregation.ts", "--at", at.toISOString()], {
-    env: { ...process.env, DATABASE_URL: E2E_DB },
+    // Public notes are off by default (no moderation operations yet); this test exercises the release path.
+    env: { ...process.env, DATABASE_URL: E2E_DB, PUBLIC_AGGREGATE_RELEASES: "on" },
     encoding: "utf8",
   });
 }

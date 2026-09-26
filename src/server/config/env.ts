@@ -103,6 +103,16 @@ const envSchema = z.object({
   VAPID_PRIVATE_KEY: optionalNonEmpty,
   // Contact for push services (mailto: or https:); defaults to APP_BASE_URL.
   VAPID_SUBJECT: optionalNonEmpty.refine((v) => v === undefined || /^(mailto:|https:\/\/)/.test(v), "must start with mailto: or https://"),
+  // ── Contributions (Contribute tab, docs/CONTRIBUTIONS.md) ──
+  // "on" = the weekly job may publish community notes from approved reports. Default OFF (fail safe)
+  // until moderation operations exist: reports stay private and nothing new is published.
+  PUBLIC_AGGREGATE_RELEASES: optionalNonEmpty.refine((v) => v === undefined || v === "on" || v === "off", 'must be "on" or "off"'),
+  // Local Steward thresholds (beta defaults in src/domain/reputation.ts; not final).
+  STEWARD_MIN_VERIFIED: optionalNonEmpty.refine((v) => v === undefined || /^\d{1,5}$/.test(v), "must be a whole number"),
+  STEWARD_MIN_ACTIVE_DAYS: optionalNonEmpty.refine((v) => v === undefined || /^\d{1,4}$/.test(v), "must be a whole number"),
+  STEWARD_MIN_AREAS: optionalNonEmpty.refine((v) => v === undefined || /^\d{1,4}$/.test(v), "must be a whole number"),
+  STEWARD_MIN_AGREEMENT_PCT: optionalNonEmpty.refine((v) => v === undefined || (/^\d{1,3}$/.test(v) && Number(v) <= 100), "must be a whole number from 0 to 100"),
+  STEWARD_MIN_ACCOUNT_DAYS: optionalNonEmpty.refine((v) => v === undefined || /^\d{1,4}$/.test(v), "must be a whole number"),
 });
 
 export type ServerEnv = z.infer<typeof envSchema>;

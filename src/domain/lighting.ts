@@ -72,7 +72,8 @@ function distToSegmentM(p: { lat: number; lon: number }, a: [number, number], b:
   return Math.hypot(ax + t * dx, ay + t * dy);
 }
 
-function walkerVerdict(c: WalkerCell | undefined): "lit" | "dark" | null {
+/** The walker rule (also used to decide lighting contribution receipts, src/domain/contributions.ts). */
+export function walkerVerdict(c: WalkerCell | undefined): "lit" | "dark" | null {
   if (!c) return null;
   const voters = c.lit + c.partly + c.dark;
   if (voters < MIN_LIT_VOTERS) return null;
