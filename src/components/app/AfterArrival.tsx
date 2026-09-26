@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
 import { isNight } from "@/domain/help-points";
+import { CheckCard } from "@/components/app/CheckCard";
+import type { CheckView } from "@/server/contributions/checks";
 
 /**
  * The one factual question after a journey (blueprint §9 "Arrival"): chosen by relevance, or
- * nothing. Today that's "Was the way lit?" after a walk in the dark, when this phone still has
- * the route. The single slot on the trip screen's arrival view — extend it here (e.g. MIRA
- * Checks), not in TripScreen.
+ * nothing: "Was the way lit?" after a walk in the dark (when this phone still has the route), else
+ * the MIRA Check the server prepared from places this journey actually passed. At most one.
  */
 export function AfterArrival({
   trip,
@@ -24,11 +25,35 @@ export function AfterArrival({
   /** Called once she has answered, so the device can forget the route. */
   onDone: () => void;
 }) {
-  if (hour === null) return null;
   const walked = trip.mode === "walk" && trip.autoArrival;
   const finished = trip.state === "arrived" || trip.state === "ended";
-  if (walked && finished && route !== null && route.length > 2 && isNight(hour)) return <LitQuestion route={route} onDone={onDone} />;
+  const lit = hour !== null && walked && finished && route !== null && route.length > 2 && isNight(hour);
+  const check = useJourneyCheck(trip.id, trip.state === "arrived" && !lit);
+  if (hour === null) return null;
+  if (lit) return <LitQuestion route={route!} onDone={onDone} />;
+  if (check) return <div className="mt-6 w-full max-w-sm text-left animate-rise"><CheckCard check={check} /></div>;
   return null;
+}
+
+/** The MIRA Check for this journey, if the server prepared one (it may take a moment after arrival). */
+function useJourneyCheck(journeyId: string, want: boolean): Pick<CheckView, "id" | "question" | "options"> | null {
+  const [check, setCheck] = useState<Pick<CheckView, "id" | "question" | "options"> | null>(null);
+  useEffect(() => {
+    if (!want) return;
+    let stop = false;
+    const load = async (retry: boolean) => {
+      const r = await api<{ checks: Array<CheckView & { journeyId: string | null }> }>("/api/contribute");
+      if (stop || !r.ok) return;
+      const c = r.data.checks.find((x) => x.journeyId === journeyId);
+      if (c) setCheck(c);
+      else if (retry) setTimeout(() => void load(false), 2500);
+    };
+    void load(true);
+    return () => {
+      stop = true;
+    };
+  }, [journeyId, want]);
+  return check;
 }
 
 /** "Was the way lit?" — the walked route is turned into anonymous street cells on the server and discarded. */
@@ -51,7 +76,7 @@ function LitQuestion({ route, onDone }: { route: Array<[number, number]>; onDone
           </button>
         ))}
       </div>
-      <p className="mt-2 text-xs text-ink-subtle">{state === "failed" ? "Couldn't send that — check your connection and try again." : "One tap, about the street, not about you. Saved per stretch of street, not linked to you or this journey."}</p>
+      <p className="mt-2 text-xs text-ink-subtle">{state === "failed" ? "Couldn't send that — check your connection and try again." : "One tap, about the street, not about you. Saved per stretch of street, not linked to this journey; your account keeps a private, encrypted note until someone else confirms it."}</p>
     </div>
   );
 }

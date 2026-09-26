@@ -29,6 +29,8 @@ import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api-client";
 import { shareLiveLink } from "@/lib/share";
 import { keepTripRoute } from "@/lib/trip-route";
+import { suggestionQuery, tripStartExtras } from "@/lib/trip-start";
+import type { HabitSuggestion } from "@/domain/habits";
 import { greetingFor, setArea, setPendingReportSpot, takePendingDestination, useClock, useLocation, watchWhileVisible, type PickedSpot } from "@/lib/location-store";
 import type { SavedPlace } from "@/server/account/places";
 import type { Contact } from "@/server/account/contacts";
@@ -131,7 +133,8 @@ export function HomeScreen({
   const [etaMin, setEtaMin] = useState(30);
   // With a provider ride/transit time, MIRA proposes the ETA; she can set her own instead.
   const [ownTime, setOwnTime] = useState(false);
-  const units = distanceUnits(useCountry().iso);
+  const countryIso = useCountry().iso;
+  const units = distanceUnits(countryIso);
   const exclude = useMemo(() => (user?.helpExclude ?? []) as HelpClass[], [user?.helpExclude]);
   const accepted = contacts.filter((c) => c.status === "accepted" && c.isDefault);
   const [shareWithCircle, setShareWithCircle] = useState(true);
@@ -161,7 +164,8 @@ export function HomeScreen({
       const [r, n, h] = await Promise.all([
         api<{ label: string | null; country?: CountryContext }>("/api/geo/reverse", { body: me }),
         api<{ places: Place[]; notes: Note[] }>("/api/geo/nearby", { body: me }),
-        api<{ helpPoints: HelpPoint[] }>("/api/geo/help", { body: me }),
+        // The country (once known) turns on locale-weighted classes, e.g. 24-hour convenience stores in Japan.
+        api<{ helpPoints: HelpPoint[] }>("/api/geo/help", { body: { ...me, ...(countryIso ? { country: countryIso } : {}) } }),
       ]);
       if (stop) return;
       if (r.ok) {
@@ -288,12 +292,15 @@ export function HomeScreen({
     const picked = !to && option > 0 ? chosen : null;
     setStarting(true);
     const walking = to || mode === "walk";
+    // A habit is only ever learned from a journey to one of her saved places (and only on arrival).
+    const saved = places.find((p) => p.lat === target.lat && p.lon === target.lon);
     const res = await api<{ trip: TripView }>("/api/trips", {
       body: {
         from: me,
         to: { lat: target.lat, lon: target.lon, name: target.name.slice(0, 80) },
         share: sharesWithCircle,
         ...(walking ? (picked ? { routeMinutes: picked.route.minutes } : {}) : { mode, etaMinutes: tripEta }),
+        ...tripStartExtras(saved?.id),
       },
     });
     setStarting(false);
@@ -335,10 +342,10 @@ export function HomeScreen({
         },
       }
     : !user
-      ? { label: "Share my journey live", detail: "Sign in with just your first name, then send a live link to anyone.", onShare: () => (setUnsafe(false), setSignIn("Sign in to start with MIRA")) }
+      ? { label: "Share my journey live", detail: "Sign in, then send a live link to anyone.", onShare: () => (setUnsafe(false), setSignIn("Sign in to start with MIRA")) }
       : dest || home
         ? {
-            label: `Share my walk to ${dest ? dest.name : home!.label}`,
+            label: `Share my journey to ${dest ? dest.name : home!.label}`,
             detail: "Starts a live journey now. Then send the link to anyone you choose.",
             onShare: () => {
               setUnsafe(false);
@@ -394,13 +401,27 @@ export function HomeScreen({
     </>
   );
 
+  // "Like usual" — only when her own finished journeys back it up (>= 3 to this saved place around this hour).
+  const [habit, setHabit] = useState<HabitSuggestion | null>(null);
+  const activeId = activeTrip?.id;
+  useEffect(() => {
+    if (!user || activeId) return;
+    let stop = false;
+    void api<{ suggestion: HabitSuggestion | null }>(`/api/me/habits/suggestion${suggestionQuery()}`).then((r) => !stop && r.ok && setHabit(r.data.suggestion));
+    return () => {
+      stop = true;
+    };
+  }, [user, activeId]);
+
   const nudge = useMemo(() => {
     if (activeTrip || !user) return null;
+    const usual = habit ? places.find((p) => p.id === habit.placeId) : undefined;
+    if (habit && usual && me) return { text: habit.text, cta: "Start with MIRA", action: () => pick({ name: usual.label, lat: usual.lat, lon: usual.lon }) };
     if (g?.late && home && me) return { text: `Heading home, ${firstName}?`, cta: `Take me ${home.label === "Home" ? "home" : "to " + home.label}`, action: () => pick({ name: home.label, lat: home.lat, lon: home.lon }) };
     if (!home) return { text: "Save Home once, and the walk back is one tap.", cta: "Find it", action: () => setSearchOpen(true) };
     return null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, g?.late, home, me, activeTrip]);
+  }, [user, g?.late, home, me, activeTrip, habit, places]);
 
   return (
     <div className="fixed inset-0 overflow-hidden">
@@ -675,7 +696,7 @@ export function HomeScreen({
               {/* Who follows and whether anyone is alerted: stated before she starts, never implied. */}
               <p className="mt-2 text-center text-xs text-ink-muted">
                 {!user
-                  ? "You'll sign in with just your first name. Then send a live link to anyone; it stops by itself when you arrive."
+                  ? "You'll sign in first. Then send a live link to anyone; it stops by itself when you arrive."
                   : sharesWithCircle
                     ? `${names(accepted.map((c) => c.name))} get your live link by email now, and an email if you don't arrive.`
                     : accepted.length && emailAlerts

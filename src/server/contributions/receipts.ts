@@ -18,7 +18,7 @@ import {
   type PlaceSignal,
 } from "@/domain/contributions";
 import { decryptText, encryptText, hmacHex } from "@/server/crypto";
-import { isoWeek } from "@/server/lighting";
+import { isoWeek, litVoterHash } from "@/server/lighting";
 
 /*
  * ── Privacy design (read with docs/CONTRIBUTIONS.md) ─────────────────────────────────────
@@ -95,7 +95,8 @@ async function lightingCells(sql: postgres.Sql, userId: string, cells: string[],
   const weeks = new Set<string>();
   for (let t = since.getTime(); t <= now.getTime() + DAY_MS; t += DAY_MS) weeks.add(isoWeek(new Date(t)));
   return cells.map((cell) => {
-    const mine = new Set([...weeks].map((w) => hmacHex("lit-vote", `${userId}:${cell}:${w}`)));
+    // Her per-stretch voice, plus week-keyed voices from before votes were keyed per stretch.
+    const mine = new Set([litVoterHash(userId, cell), ...[...weeks].map((w) => hmacHex("lit-vote", `${userId}:${cell}:${w}`))]);
     const out: WalkerCell = { cell, lit: 0, partly: 0, dark: 0 };
     let herCounted = false;
     for (const r of rows) {

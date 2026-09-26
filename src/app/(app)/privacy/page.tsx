@@ -81,9 +81,18 @@ export default function PrivacyPage() {
           </Item>
           <Item emoji="👤" title="Your account">
             <p>
-              Your name, saved places (encrypted) and trusted contacts (their emails are encrypted). If you add your email to keep your account, it&apos;s stored
-              encrypted and only used for sign-in links. Delete your account in Me and all of it is erased; any reports you sent stay anonymous and can no longer be linked
+              Your first name, saved places (encrypted) and trusted contacts (their emails are encrypted). If you sign in with Google, MIRA keeps your Google account
+              id, your first name and a protected (encrypted) copy of your email — nothing else from Google: no photo, no contacts, no location history. If you add your
+              email to keep your account, it&apos;s stored encrypted and only used for sign-in links. Delete your account in Me and all of it is erased; any reports you sent stay anonymous and can no longer be linked
               to you. An account with an email that isn&apos;t used for over a year is deleted; one without an email goes when you sign out or its session ends.
+            </p>
+          </Item>
+          <Item emoji="🧭" title="What MIRA remembers about how you travel">
+            <p>
+              Only what you chose: your preferred way of travelling, and — after a journey to one of <em>your saved places</em> that you finished — a counter of how
+              often you go there, by which way, at about which hour, and who you shared it with last time. No routes, no coordinates, no times finer than the hour.
+              It&apos;s used only to suggest &ldquo;like usual&rdquo; when you&apos;ve done the same thing at least three times. See it, switch it off or delete it
+              in Me &rarr; What MIRA remembers. MIRA never records where you go in the background.
             </p>
           </Item>
           <Item emoji="✨" title="Chatting with Mira">
@@ -101,7 +110,8 @@ export default function PrivacyPage() {
           <Item emoji="📝" title="Reports">
             <p>Only a rough area (about 1 km), roughly when, and the kind of thing are kept — never your exact spot. Notes are encrypted and read only by a moderator.</p>
             <p>
-              Nothing is shown on its own. A fixed-wording note appears on a route that passes through the area only when at least five different people have reported something similar nearby, and disappears after five weeks. Reports are deleted within 30 days. How reports are reviewed is in MIRA&apos;s moderation policy (MODERATION_POLICY.md in the project).
+              Reports are submitted privately. They may be reviewed before they can contribute to MIRA&apos;s information, and public notes are currently switched
+              off: nothing from reports is shown to anyone during this beta. When switched on, a fixed-wording note appears on a route that passes through the area only when at least five different people have reported something similar nearby, and disappears after five weeks. Reports are deleted within 30 days. How reports are reviewed is in MIRA&apos;s moderation policy (MODERATION_POLICY.md in the project).
             </p>
           </Item>
           <Item emoji="💡" title="Street lighting">
@@ -110,6 +120,15 @@ export default function PrivacyPage() {
               your name, your account, your trip, or a time — and nothing links one stretch to the next, so it can&apos;t be joined back into your route.
             </p>
             <p>A stretch shows as lit or dark only once at least three different people agree. Answers older than 90 days stop counting and are deleted after 120.</p>
+          </Item>
+          <Item emoji="🤝" title="Contributions and your impact">
+            <p>
+              Answers to MIRA Checks (&ldquo;Was this pharmacy open?&rdquo;) and corrections are stored like lighting answers: per place, with the day, and a keyed
+              code instead of your name, so they can&apos;t be joined into where you went. So MIRA can tell you when someone else confirms your answer, your account
+              keeps a private, encrypted note of it until it&apos;s confirmed or expires (30 days for places, 90 for lighting) — then only the outcome stays
+              (&ldquo;verified&rdquo;, with the day and country). Your impact counts only verified answers; there are no points, rankings or public profiles, and
+              reports never count towards anything.
+            </p>
           </Item>
           <Item emoji="🚫" title="What MIRA never does">
             <p>No ads, no selling data, no analytics trackers, no public profiles, no &ldquo;safe/unsafe&rdquo; scores or crime maps, and no tracking you didn&apos;t start.</p>

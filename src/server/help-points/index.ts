@@ -1,4 +1,6 @@
 import "server-only";
+import { placeStatusFor } from "@/server/contributions";
+import type postgres from "postgres";
 import { classWeight, dedupeHelpPoints, helpPointsAlongRoute, helpWeightsFor, rankHelpPoints, samplePointsForRoutes, type HelpPoint } from "@/domain/help-points";
 import { haversineMeters } from "@/domain/pilot";
 import type { GeoPoint, GeoProvider } from "@/server/providers/geo";
@@ -103,4 +105,20 @@ export async function helpPointsNear(geo: GeoProvider, p: GeoPoint, opts: { coun
     geo,
     shortlist.map((h) => keep.get(h.id)!),
   );
+}
+
+/**
+ * Community corrections, used only once corroborated (≥ 2 independent people; a single voice
+ * never changes anything): places people confirmed are gone, or aren't this kind of place, are
+ * left out. Time-of-day claims (closed at this time) need her local time and stay with Mira/UI.
+ * A lookup failure leaves the list unchanged — corrections refine, they never block help.
+ */
+export async function withoutCorroboratedGone(sql: postgres.Sql, points: HelpPoint[], now = new Date()): Promise<HelpPoint[]> {
+  if (!points.length) return points;
+  try {
+    const status = await placeStatusFor(sql, points.map((p) => p.id), { weekday: now.getUTCDay(), band: "day" }, now);
+    return points.filter((p) => !(status.get(p.id)?.gone || status.get(p.id)?.wrongKind));
+  } catch {
+    return points;
+  }
 }

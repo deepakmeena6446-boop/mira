@@ -27,14 +27,14 @@ contribution → pending signal → independent corroboration or provider agreem
 
 ## Privacy design
 
-1. **Signals are unlinkable.** `lit_votes` and `place_signals` hold a keyed hash of (person, subject, ISO week), the claim, the day, and for time-dependent claims the local weekday and time band. No user id, no journey, no time of day.
+1. **Signals are unlinkable.** `lit_votes` holds a keyed hash of (person, street stretch) — one voice per person per stretch, the newest answer replacing the older one — and `place_signals` a keyed hash of (person, subject, ISO week); both, the claim, the day, and for time-dependent claims the local weekday and time band. No user id, no journey, no time of day.
 2. **Receipts are a separate per-person ledger** (`contribution_receipts`): kind, status, day, country, `area_key` = HMAC(person, ~5 km geohash) for diversity, `subject_hash` = HMAC(person, subject) for one-voice-per-window and diminishing returns. Keys are server secrets; the hashes differ per person, so receipts can't be compared across people or joined to signals without the key.
 3. **The link from a receipt to its subject is encrypted and short-lived.** `subject_enc` (AES-256-GCM) holds the place id and answer, or ≤ 8 sampled street cells for lighting (never the route). It is deleted in the same statement that decides the receipt, and receipts are decided or expired within 30 days (places) or 90 days (lighting).
 4. `subject_hash` is cleared 30 days after the decision; expired receipts are deleted after 30 days, decided ones after a year. `place_signals` are deleted after 45 days.
 5. **MIRA Checks** (`mira_checks`) hold the journey's last points encrypted only while being prepared (minutes), then just the place id and name, for ≤ 24 h; answering removes those too.
 6. **Deleting the account** deletes receipts and checks (foreign-key cascade). Signals stay, and nothing links them to anyone.
 
-Why receipts guard independence: a signal's voter hash rotates weekly, so on its own it can't tell that two weeks' answers came from one person. Before a new place signal is stored, the server checks her receipts for the same subject inside the claim's window. Lighting receipts are decided with her voice counted once per cell across all weeks.
+Why receipts guard independence: a place signal's voter hash rotates weekly, so on its own it can't tell that two weeks' answers came from one person. Before a new place signal is stored, the server checks her receipts for the same subject inside the claim's window. Lighting receipts are decided with her voice counted once per cell across all weeks.
 
 ## Reports and public notes
 

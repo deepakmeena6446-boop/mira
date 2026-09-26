@@ -21,6 +21,7 @@ import { HELP_CLASSES, type HelpClass } from "@/domain/help-points";
 import { Section } from "@/components/app/Section";
 import { AccountSection, PushSection } from "./MeSections";
 import { CircleRow, PersonalSections } from "./PersonalSections";
+import { ImpactRow } from "./ImpactRow";
 import type { ProviderModes } from "@/server/providers/modes";
 
 const EMOJIS = [
@@ -111,6 +112,9 @@ export function MeScreen({
         </header>
 
         <CircleRow accepted={contacts.filter((c) => c.status === "accepted").length} invited={contacts.filter((c) => c.status === "invited").length} />
+        <div className="mt-3 overflow-hidden rounded-3xl bg-surface shadow-[var(--shadow-card)]">
+          <ImpactRow />
+        </div>
 
         <Section
           id="places"

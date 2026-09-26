@@ -173,13 +173,18 @@ export const isoWeek = (d: Date) => {
  * discarded; each cell's row carries only a per-cell keyed hash (so one person counts
  * once per cell per week) and the day — nothing joins the cells back into a path.
  */
+/** A person's keyed, per-stretch voice in lit_votes (see recordLitVote). */
+export const litVoterHash = (userId: string, cell: string) => hmacHex("lit-vote", `${userId}:${cell}`);
+
 export async function recordLitVote(sql: postgres.Sql, userId: string, geometry: Array<[number, number]>, vote: LitVote, now = new Date()): Promise<number> {
   const cells = cellsForRoute(geometry).slice(0, 400);
-  const week = isoWeek(now);
   const day = now.toISOString().slice(0, 10);
+  // One voice per person per street stretch, whenever she answers: a newer answer replaces her
+  // older one (so walking the same street in three different weeks can't make it "agreed").
+  // The key still differs per stretch, so her stretches can't be joined into a route.
   for (const cell of cells) {
     await sql`
-      INSERT INTO lit_votes (cell, value, voter_hash, day) VALUES (${cell}, ${VALUE[vote]}, ${hmacHex("lit-vote", `${userId}:${cell}:${week}`)}, ${day})
+      INSERT INTO lit_votes (cell, value, voter_hash, day) VALUES (${cell}, ${VALUE[vote]}, ${litVoterHash(userId, cell)}, ${day})
       ON CONFLICT (cell, voter_hash) DO UPDATE SET value = EXCLUDED.value, day = EXCLUDED.day`;
   }
   return cells.length;

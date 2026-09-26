@@ -276,7 +276,7 @@ describe("Contribute: MIRA Checks, receipts, corroboration, privacy", () => {
     const sql = getSql();
     await sql`DELETE FROM lit_votes`;
     const ROUTE: Array<[number, number]> = [[77.2, 28.69], [77.2031, 28.69]];
-    // One person answering in three different weeks: three lit_votes rows per cell, but never her own corroboration.
+    // One person answering in three different weeks: one voice per stretch (on the map too), never her own corroboration.
     const solo = await signIn("Lata");
     const t0 = Date.now();
     for (let w = 0; w < 3; w++) {
@@ -284,6 +284,9 @@ describe("Contribute: MIRA Checks, receipts, corroboration, privacy", () => {
       await recordLitVote(sql, solo.id, ROUTE, "lit", at);
       await recordLightingReceipt(sql, solo.id, ROUTE, "lit", at);
     }
+    const perCell = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM lit_votes GROUP BY cell`;
+    expect(perCell.length).toBeGreaterThan(0);
+    expect(perCell.every((r) => r.n === 1)).toBe(true); // the public lighting layer can't be "agreed" by one person
     await decidePending(sql, new Date(t0 + 15 * 86_400_000));
     expect((await sql`SELECT status FROM contribution_receipts WHERE user_id = ${solo.id}`).every((r) => r.status === "pending")).toBe(true);
     await sql`DELETE FROM lit_votes`;

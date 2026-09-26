@@ -6,7 +6,7 @@ import { point } from "@/server/http/geo-input";
 import { getGeo, type GeoPoint, type GeoProvider } from "@/server/providers/geo";
 import { cellsAlongRoute, notesForCells } from "@/server/notes";
 import { lightingForRoutes } from "@/server/lighting";
-import { helpPointsForRoutes } from "@/server/help-points";
+import { helpPointsForRoutes, withoutCorroboratedGone } from "@/server/help-points";
 import { dedupeHelpPoints, type HelpPoint } from "@/domain/help-points";
 import { TRAVEL_MODES } from "@/domain/travel-mode";
 import { haversineMeters } from "@/domain/pilot";
@@ -73,7 +73,7 @@ export const POST = handle(async (req: Request) => {
   const routes = all.filter((r, i) => i === 0 || (!r.approximate && r.minutes <= all[0].minutes * ALT_MAX_STRETCH)).slice(0, 3);
   // Only real street routes get lighting and Help Points: a straight-line estimate doesn't follow any street.
   const streets = routes.map((r) => (r.approximate ? [] : r.geometry));
-  const [notes, lighting, helpPoints] = await Promise.all([notesForCells(sql, cellsAlongRoute(routes[0].geometry)), lightingForRoutes(sql, streets), helpPointsForRoutes(geo, streets)]);
+  const [notes, lighting, helpPoints] = await Promise.all([notesForCells(sql, cellsAlongRoute(routes[0].geometry)), lightingForRoutes(sql, streets), helpPointsForRoutes(geo, streets).then((all) => Promise.all(all.map((pts) => withoutCorroboratedGone(sql, pts))))]);
   return json({
     route: routes[0],
     lighting: lighting[0],
