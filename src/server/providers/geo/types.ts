@@ -15,6 +15,13 @@ export interface PlaceHit {
   hours?: string | null;
 }
 
+export interface Reverse {
+  label: string | null;
+  precise: boolean;
+  country?: string | null;
+  region?: string | null;
+}
+
 export interface WalkRoute {
   meters: number;
   minutes: number;
@@ -27,8 +34,11 @@ export interface WalkRoute {
 export interface GeoProvider {
   /** `deep`: an explicit search (Enter) — may use slower, more thorough sources. */
   search(q: string, near?: GeoPoint, opts?: { deep?: boolean }): Promise<PlaceHit[]>;
-  /** A human place name near the point, or null when unknown — never raw coordinates. */
-  reverse(p: GeoPoint): Promise<{ label: string | null; precise: boolean }>;
+  /**
+   * A human place name near the point, or null when unknown — never raw coordinates — plus the
+   * country (ISO 3166-1 alpha-2) and state (ISO 3166-2) when known, for the Location Context.
+   */
+  reverse(p: GeoPoint): Promise<Reverse>;
   walk(a: GeoPoint, b: GeoPoint): Promise<WalkRoute>;
   /** Up to three walking routes, fastest first (one when the provider has no alternatives). */
   walkRoutes(a: GeoPoint, b: GeoPoint): Promise<WalkRoute[]>;

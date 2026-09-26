@@ -1,5 +1,7 @@
 import "server-only";
 import { lightingForRoute } from "@/server/lighting";
+import { helpPointsForRoutes } from "@/server/help-points";
+import { helpPointItems, lightingItems } from "@/domain/context";
 import { daypartFor, type Daypart } from "@/domain/daypart";
 import type postgres from "postgres";
 import { getGeo } from "@/server/providers/geo";
@@ -38,8 +40,15 @@ export function miraTools(sql: postgres.Sql, user: User, ctx: MiraContext) {
       const [contacts, route] = await Promise.all([shareTargets(sql, user.id), ctx.location ? getGeo().walk(ctx.location, dest) : Promise.resolve(null)]);
       // After dark, lighting along the way is worth knowing (only for real street routes).
       const { hour } = await getContext();
-      const lighting = route && !route.approximate && (hour >= 18 || hour < 6) ? await lightingForRoute(sql, route.geometry).catch(() => null) : null;
-      return { destination: dest, minutes: route?.minutes ?? null, contacts: contacts.map((c) => c.name), lighting: lighting?.summary ?? null };
+      const night = hour >= 18 || hour < 6;
+      const street = route && !route.approximate ? route.geometry : null;
+      const [lighting, help] = await Promise.all([
+        street && night ? lightingForRoute(sql, street).catch(() => null) : Promise.resolve(null),
+        street ? helpPointsForRoutes(getGeo(), [street]).then((r) => r[0]).catch(() => []) : Promise.resolve([]),
+      ]);
+      // Evidence as context items (deterministic, sourced). Mira chooses what matters; it never adds facts.
+      const context = [...(night ? lightingItems(lighting) : []), ...helpPointItems(help)];
+      return { destination: dest, minutes: route?.minutes ?? null, contacts: contacts.map((c) => c.name), context };
     },
     tripStatus: () => currentTrip(sql, user.id, new Date()),
     async trustedContacts() {

@@ -3,7 +3,7 @@
 // outlive sign-out or be shown to the next person on a shared phone. API responses and
 // live trip data are never cached either (private and time-sensitive).
 // v2 replaces v1, which cached personal pages; activation deletes the old cache.
-const CACHE = "mira-shell-v2";
+const CACHE = "mira-shell-v3";
 const SHELL = ["/offline.html", "/daypart.js", "/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
@@ -15,7 +15,7 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/t/") || url.pathname.startsWith("/invite")) return;
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/t/") || url.pathname.startsWith("/invite") || url.pathname.startsWith("/auth/")) return;
   if (e.request.mode === "navigate") {
     e.respondWith(fetch(e.request).catch(() => caches.match("/offline.html")));
     return;
@@ -27,4 +27,28 @@ self.addEventListener("fetch", (e) => {
       return res;
     })));
   }
+});
+
+// Web Push to the traveller (her own updates only: contact accepted, missed check-in, location
+// paused, an alert that may not have gone out). Payloads carry no location. Tapping opens MIRA
+// on the page the update is about — same-origin paths only.
+self.addEventListener("push", (e) => {
+  let data = { title: "MIRA", body: "", href: "/inbox" };
+  try {
+    data = { ...data, ...(e.data ? e.data.json() : {}) };
+  } catch {
+    /* not JSON: show the default */
+  }
+  e.waitUntil(self.registration.showNotification(data.title, { body: data.body, icon: "/icon-192.png", badge: "/icon-192.png", data: { href: data.href }, tag: data.tag }));
+});
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const raw = e.notification.data && e.notification.data.href;
+  const href = typeof raw === "string" && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/inbox";
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const c of list) if (new URL(c.url).origin === location.origin && "focus" in c) return c.navigate(href).then((w) => (w || c).focus());
+      return self.clients.openWindow(href);
+    }),
+  );
 });

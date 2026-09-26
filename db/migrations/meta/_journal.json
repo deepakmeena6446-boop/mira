@@ -78,6 +78,13 @@
       "when": 1790350511222,
       "tag": "0010_lit_votes",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790422684319,
+      "tag": "0011_p1_accounts_push_modes",
+      "breakpoints": true
     }
   ]
 }

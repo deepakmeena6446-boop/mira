@@ -2,6 +2,8 @@ import "server-only";
 import { haversineMeters } from "@/domain/pilot";
 import { FAR_M } from "@/domain/search-rank";
 import { GoogleBudgetExceeded, takeGoogleCall } from "./budget";
+import { getEnv } from "@/server/config/env";
+import { scheduleFromGoogle } from "@/domain/opening-hours";
 import { GOOGLE_HELP_TYPES, HELP_CLASSES, helpClassFromGoogle, type HelpPoint } from "@/domain/help-points";
 import type { GeoPoint, GeoProvider, PlaceHit, WalkRoute } from "./types";
 
@@ -56,7 +58,7 @@ function cache<T>(max: number, ttlMs: number) {
 }
 const searchCache = cache<PlaceHit[]>(500, 10 * 60_000);
 const nearbyCache = cache<PlaceHit[]>(500, 10 * 60_000);
-const areaCache = cache<string | null>(1000, 60 * 60_000);
+const areaCache = cache<{ label: string | null; country: string | null; region: string | null }>(1000, 60 * 60_000);
 
 async function places(key: string, method: "searchText" | "searchNearby", body: unknown, fields: string): Promise<GPlace[]> {
   if (!takeGoogleCall()) throw new GoogleBudgetExceeded();
@@ -146,7 +148,10 @@ const HELP_TIER_TYPES = {
 } as const;
 const helpCache = cache<HelpPoint[]>(1000, 10 * 60_000);
 
-type GHelpPlace = GPlace & { primaryType?: string };
+type GHelpPlace = GPlace & {
+  primaryType?: string;
+  regularOpeningHours?: { periods?: Array<{ open?: { day: number; hour: number; minute: number }; close?: { day: number; hour: number; minute: number } }>; weekdayDescriptions?: string[] };
+};
 
 /**
  * Help Point candidates around one (already rounded) point. Same Pro-SKU fields as the
@@ -162,13 +167,25 @@ async function helpNearby(key: string, c: GeoPoint, radiusM: number, types: read
     "searchNearby",
     // includedPrimaryTypes: a doctor whose secondary types include "hospital" is not returned.
     { includedPrimaryTypes: types, maxResultCount: 20, rankPreference: "DISTANCE", languageCode: "en", locationRestriction: { circle: { center: { latitude: c.lat, longitude: c.lon }, radius: radiusM } } },
-    "places.id,places.displayName,places.location,places.primaryType",
+    // Opening hours are a pricier Places SKU: only when the owner has switched them on (GOOGLE_PLACES_HOURS=on).
+    "places.id,places.displayName,places.location,places.primaryType" + (getEnv().GOOGLE_PLACES_HOURS === "on" ? ",places.regularOpeningHours" : ""),
   )) as GHelpPlace[];
   const out: HelpPoint[] = [];
   for (const p of found) {
     const cls = helpClassFromGoogle(p.primaryType);
     if (!cls || !p.location || !p.displayName?.text) continue;
-    out.push({ id: `g:${p.id}`, name: p.displayName.text, cls, lat: p.location.latitude, lon: p.location.longitude, open24h: false, hours: null, source: "google" });
+    const schedule = scheduleFromGoogle(p.regularOpeningHours?.periods);
+    out.push({
+      id: `g:${p.id}`,
+      name: p.displayName.text,
+      cls,
+      lat: p.location.latitude,
+      lon: p.location.longitude,
+      open24h: schedule === "24/7",
+      hours: schedule && schedule !== "24/7" ? (p.regularOpeningHours?.weekdayDescriptions?.[(new Date().getDay() + 6) % 7] ?? null) : null,
+      schedule,
+      source: "google",
+    });
   }
   helpCache.set(ck, out);
   return out;
@@ -209,19 +226,23 @@ export function googleGeo(key: string, fallback: GeoProvider): GeoProvider {
       const r = round(p, 3); // ~100 m: enough for a neighbourhood name
       const ck = `${r.lat},${r.lon}`;
       const cached = areaCache.get(ck);
-      if (cached !== undefined) return { label: cached, precise: false };
+      if (cached !== undefined) return { ...cached, precise: false };
       try {
         if (!takeGoogleCall()) throw new GoogleBudgetExceeded();
         const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
         url.search = new URLSearchParams({ latlng: `${r.lat},${r.lon}`, language: "en", key }).toString();
         const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-        const data = (await res.json()) as { status: string; results: Array<{ address_components: Array<{ long_name: string; types: string[] }> }> };
+        const data = (await res.json()) as { status: string; results: Array<{ address_components: Array<{ long_name: string; short_name?: string; types: string[] }> }> };
         if (data.status !== "OK" && data.status !== "ZERO_RESULTS") throw new Error(`geocode_${data.status}`);
         const comps = data.results.flatMap((x) => x.address_components);
         const pick = (t: string) => comps.find((c) => c.types.includes(t))?.long_name;
         const label = pick("neighborhood") ?? pick("sublocality_level_2") ?? pick("sublocality_level_1") ?? pick("sublocality") ?? pick("locality") ?? null;
-        areaCache.set(ck, label);
-        return { label, precise: false };
+        const short = (t: string) => comps.find((c) => c.types.includes(t))?.short_name;
+        const country = short("country")?.toUpperCase().slice(0, 2) ?? null;
+        const state = short("administrative_area_level_1");
+        const region = country && state && /^[A-Z0-9]{1,3}$/.test(state) ? `${country}-${state}` : null;
+        areaCache.set(ck, { label, country, region });
+        return { label, precise: false, country, region };
       } catch (err) {
         warn("reverse", err);
         return fallback.reverse(p);

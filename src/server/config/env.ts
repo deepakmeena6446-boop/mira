@@ -82,6 +82,7 @@ const envSchema = z.object({
   SMTP_SECURE: optionalNonEmpty,
   // Real providers (optional; placeholders are used until adapters + keys exist).
   ANTHROPIC_API_KEY: optionalNonEmpty,
+  MIRA_MODEL: optionalNonEmpty.refine((v) => v === undefined || /^claude-[a-z0-9-]+$/.test(v), "must be a Claude model id"),
   MAPBOX_TOKEN: optionalNonEmpty,
   // Google Maps Platform: server key (Places API (New), Routes, Geocoding) and browser key (Map Tiles).
   GOOGLE_MAPS_SERVER_KEY: optionalNonEmpty,
@@ -90,11 +91,15 @@ const envSchema = z.object({
   MAPILLARY_TOKEN: optionalNonEmpty,
   // Spend ceilings (public defaults in code; production may override). See src/server/providers/geo/budget.ts, api/mira.
   GOOGLE_MAX_CALLS_PER_MIN: optionalNonEmpty.refine((v) => v === undefined || /^\d{1,6}$/.test(v), "must be a whole number"),
+  // "on" = ask Google for Help Point opening hours (Places Enterprise SKU: higher cost). Default off.
+  GOOGLE_PLACES_HOURS: optionalNonEmpty.refine((v) => v === undefined || v === "on" || v === "off", 'must be "on" or "off"'),
   MIRA_GLOBAL_DAILY_MAX: optionalNonEmpty.refine((v) => v === undefined || /^\d{1,7}$/.test(v), "must be a whole number"),
   AUTH_GOOGLE_ID: optionalNonEmpty,
   AUTH_GOOGLE_SECRET: optionalNonEmpty,
   VAPID_PUBLIC_KEY: optionalNonEmpty,
   VAPID_PRIVATE_KEY: optionalNonEmpty,
+  // Contact for push services (mailto: or https:); defaults to APP_BASE_URL.
+  VAPID_SUBJECT: optionalNonEmpty.refine((v) => v === undefined || /^(mailto:|https:\/\/)/.test(v), "must start with mailto: or https://"),
 });
 
 export type ServerEnv = z.infer<typeof envSchema>;

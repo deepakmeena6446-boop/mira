@@ -8,11 +8,17 @@ import type { GeoPoint } from "./types";
  * rounded to ~1 km, and cached. Respects Nominatim's 1 request/second policy. Mapbox
  * reverse geocoding replaces this when MAPBOX_TOKEN is set.
  */
-const cache = new Map<string, string | null>();
+type Area = { name: string | null; country: string | null; region: string | null };
+const cache = new Map<string, Area>();
 const MAX_CACHE = 1000;
 let lastCall = 0;
 
 export async function osmAreaName(p: GeoPoint): Promise<string | null> {
+  return (await osmArea(p))?.name ?? null;
+}
+
+/** Area name plus country (ISO 3166-1) and state (ISO 3166-2), for the Location Context. */
+export async function osmArea(p: GeoPoint): Promise<Area | null> {
   const base = getEnv().REVERSE_GEOCODER_URL;
   if (!base) return null;
   // ~1 km: enough for a suburb/neighbourhood name, and it's all the service ever sees.
@@ -23,6 +29,8 @@ export async function osmAreaName(p: GeoPoint): Promise<string | null> {
   if (Date.now() - lastCall < 1000) return null; // over the polite rate: skip, don't queue
   lastCall = Date.now();
   let name: string | null = null;
+  let country: string | null = null;
+  let region: string | null = null;
   let ok = false;
   try {
     const url = new URL("/reverse", base);
@@ -32,16 +40,19 @@ export async function osmAreaName(p: GeoPoint): Promise<string | null> {
       ok = true;
       const a = ((await res.json()) as { address?: Record<string, string> }).address ?? {};
       name = a.neighbourhood ?? a.suburb ?? a.quarter ?? a.city_district ?? a.village ?? a.town ?? a.city ?? null;
+      country = a.country_code ? a.country_code.toUpperCase().slice(0, 2) : null;
+      region = a["ISO3166-2-lvl4"] ?? a["ISO3166-2-lvl3"] ?? null;
     }
   } catch {
     name = null; // network/timeout: no label is better than a wrong one
   }
   // Only remember real answers: a timeout or 429 shouldn't hide the area name for good.
+  const area = { name, country, region };
   if (name !== null || ok) {
     if (cache.size >= MAX_CACHE) cache.delete(cache.keys().next().value!);
-    cache.set(key, name);
+    cache.set(key, area);
   }
-  return name;
+  return area;
 }
 
 /** Wait for our turn under Nominatim's 1 request/second rule (only for explicit searches). */

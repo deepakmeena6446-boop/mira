@@ -23,6 +23,14 @@ const SAMPLE_M = 15;
 export interface LitWay {
   lit: "yes" | "no";
   coords: Array<[number, number]>; // [lon, lat]
+  /** Year the street was last edited in OpenStreetMap (its lit tag may be older still). */
+  editedYear?: number;
+}
+export interface Pole {
+  lat: number;
+  lon: number;
+  /** Year a street-imagery detection last saw this pole. */
+  seenYear?: number;
 }
 export interface WalkerCell {
   cell: string;
@@ -87,14 +95,18 @@ export interface RouteLighting {
    */
   confirmed: { lit: number; dark: number };
   sources: { walkers: boolean; osm: boolean; poles: boolean };
+  /** How old the map evidence is, from the stretches actually used on this route (years). */
+  freshness?: { osmFrom?: number; osmTo?: number; polesTo?: number };
 }
 
-export function routeLighting(geometry: Array<[number, number]>, layers: { walkers: WalkerCell[]; ways: LitWay[]; poles: Array<{ lat: number; lon: number }> }): RouteLighting {
+export function routeLighting(geometry: Array<[number, number]>, layers: { walkers: WalkerCell[]; ways: LitWay[]; poles: Pole[] }): RouteLighting {
   const samples = samplePolyline(geometry);
   const byCell = new Map(layers.walkers.map((c) => [c.cell, c]));
   const used = { walkers: false, osm: false, poles: false };
   let walkerLit = 0;
   let walkerDark = 0;
+  const osmYears: number[] = [];
+  const poleYears: number[] = [];
   const statuses: LightStatus[] = samples.map((p) => {
     const w = walkerVerdict(byCell.get(encodeGeohash(p.lat, p.lon, LIT_CELL_PRECISION)));
     if (w) {
@@ -104,10 +116,17 @@ export function routeLighting(geometry: Array<[number, number]>, layers: { walke
     }
     for (const way of layers.ways) {
       for (let i = 0; i < way.coords.length - 1; i++) {
-        if (distToSegmentM(p, way.coords[i], way.coords[i + 1]) <= 20) return (used.osm = true), way.lit === "yes" ? "lit" : "dark";
+        if (distToSegmentM(p, way.coords[i], way.coords[i + 1]) <= 20) {
+          if (way.editedYear) osmYears.push(way.editedYear);
+          return (used.osm = true), way.lit === "yes" ? "lit" : "dark";
+        }
       }
     }
-    if (layers.poles.some((l) => haversineMeters(p, l) <= 25)) return (used.poles = true), "poles";
+    const pole = layers.poles.find((l) => haversineMeters(p, l) <= 25);
+    if (pole) {
+      if (pole.seenYear) poleYears.push(pole.seenYear);
+      return (used.poles = true), "poles";
+    }
     return "unknown";
   });
 
@@ -129,5 +148,9 @@ export function routeLighting(geometry: Array<[number, number]>, layers: { walke
   for (const s of ["lit", "dark", "poles", "unknown"] as LightStatus[]) summary[s] = Math.round((count(s) / total) * 100);
   const share = (n: number) => Math.round((n / total) * 100);
   const confirmed = { lit: Math.min(summary.lit, share(walkerLit)), dark: Math.min(summary.dark, share(walkerDark)) };
-  return { segments: segments.filter((s) => s.coords.length > 1), summary, confirmed, sources: used };
+  const freshness = {
+    ...(osmYears.length ? { osmFrom: Math.min(...osmYears), osmTo: Math.max(...osmYears) } : {}),
+    ...(poleYears.length ? { polesTo: Math.max(...poleYears) } : {}),
+  };
+  return { segments: segments.filter((s) => s.coords.length > 1), summary, confirmed, sources: used, ...(Object.keys(freshness).length ? { freshness } : {}) };
 }

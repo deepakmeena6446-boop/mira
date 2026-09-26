@@ -1,4 +1,5 @@
 import "server-only";
+import { parseOpeningHours } from "@/domain/opening-hours";
 import { classifyPlace, type PlaceType } from "@/domain/osm";
 import { helpClassFromOsm, isOpen24h, type HelpPoint } from "@/domain/help-points";
 import { haversineMeters } from "@/domain/pilot";
@@ -134,7 +135,7 @@ export async function overpassHelp(points: GeoPoint[], radiusM: number): Promise
       const name = e.tags?.["name:en"] ?? e.tags?.name;
       if (!at || !cls || !name) continue;
       const hours = e.tags?.opening_hours ?? null;
-      out.push({ id: `osm:${e.type}/${e.id}`, name, cls, lat: at.lat, lon: at.lon, open24h: isOpen24h(hours), hours: isOpen24h(hours) ? null : hours, source: "osm" });
+      out.push({ id: `osm:${e.type}/${e.id}`, name, cls, lat: at.lat, lon: at.lon, open24h: isOpen24h(hours), hours: isOpen24h(hours) ? null : hours, schedule: parseOpeningHours(hours), source: "osm" });
     }
     helpCache.set(key, out);
     return out;

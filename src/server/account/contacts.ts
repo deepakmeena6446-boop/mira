@@ -129,7 +129,7 @@ export async function acceptContactInvite(sql: postgres.Sql, token: string): Pro
       kind: "contact_accepted",
       title: `${first.name} accepted your invite`,
       body: `${first.name} can now follow along live whenever you share a trip.`,
-      href: "/me#contacts",
+      href: "/circle",
     });
     return true;
   }

@@ -3,6 +3,11 @@ import { purgeExpiredCounters } from "@/server/ratelimit";
 import { purgeOldReleases } from "@/server/aggregate/run";
 import { deleteAccount } from "@/server/account/users";
 import { purgeOldLitVotes } from "@/server/lighting";
+import { encryptLegacyPlaces } from "@/server/account/places";
+import { purgeAuthLinks } from "@/server/account/email-auth";
+
+/** Durable (email) accounts unused for this long are deleted, with everything tied to them. */
+export const INACTIVE_ACCOUNT_DAYS = 400;
 
 /**
  * Hard-delete expired private data (architecture §3). Runs in the worker.
@@ -23,10 +28,16 @@ export async function purgeExpired(sql: postgres.Sql, now: Date): Promise<Record
   // orphaned forever (with contacts' encrypted emails). Remove them the same way as a delete.
   const orphans = await sql<{ id: string }[]>`
     SELECT u.id FROM users u JOIN auth_accounts a ON a.user_id = u.id AND a.provider = 'demo'
-    WHERE u.created_at < ${new Date(now.getTime() - 3600_000)}
+    WHERE u.created_at < ${new Date(now.getTime() - 3600_000)} AND u.email_hash IS NULL
       AND NOT EXISTS (SELECT 1 FROM user_sessions s WHERE s.user_id = u.id AND s.expires_at > ${now})
     LIMIT 100`;
   for (const o of orphans) await deleteAccount(sql, o.id);
+  // Durable accounts can be signed back into, so they stay — until unused for over a year.
+  const inactive = await sql<{ id: string }[]>`
+    SELECT id FROM users WHERE email_hash IS NOT NULL AND last_active_at < ${new Date(now.getTime() - INACTIVE_ACCOUNT_DAYS * 86_400_000)} LIMIT 100`;
+  for (const u of inactive) await deleteAccount(sql, u.id);
+  const authLinks = await purgeAuthLinks(sql, now);
+  const placesEncrypted = await encryptLegacyPlaces(sql);
   const litVotes = await purgeOldLitVotes(sql, now);
   return {
     reports: reports.count,
@@ -39,6 +50,9 @@ export async function purgeExpired(sql: postgres.Sql, now: Date): Promise<Record
     notifications: inbox.count,
     userSessions: userSessions.count,
     orphanedDemoAccounts: orphans.length,
+    inactiveAccounts: inactive.length,
+    authLinks,
+    placesEncrypted,
     litVotes,
   };
 }

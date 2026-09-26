@@ -1,4 +1,5 @@
 import { haversineMeters } from "./pilot";
+import { clockLabel, openState, type LocalTime, type OpenState, type Schedule } from "./opening-hours";
 
 /**
  * Help Points: nearby places where help is likely to be available — staffed, open,
@@ -43,8 +44,10 @@ export interface HelpPoint {
   lon: number;
   /** True only when the source itself says the place is open 24/7. */
   open24h: boolean;
-  /** Opening hours exactly as the source lists them (unparsed), or null when not listed. */
+  /** Opening hours exactly as the source lists them, or null when not listed. */
   hours: string | null;
+  /** The same hours, parsed (null when not listed or not understood: then they're "not known"). */
+  schedule?: Schedule | null;
   source: HelpSource;
   /** On a route: metres from the start of the route to the point nearest this place. */
   alongM?: number;
@@ -213,6 +216,8 @@ export interface RankedHelpPoint extends HelpPoint {
   ahead: boolean | null;
   /** At night, a class whose staffing depends on hours and whose hours aren't known. */
   mayBeClosed: boolean;
+  /** From listed hours, on the device's clock: open now (and still when she'd arrive)? */
+  open: OpenState;
 }
 
 /**
@@ -221,27 +226,41 @@ export interface RankedHelpPoint extends HelpPoint {
  * place whose hours matter but aren't known is demoted (still shown, and labelled);
  * during a trip, places behind her are slightly demoted.
  */
-export function rankHelpPoints(points: HelpPoint[], from: { lat: number; lon: number }, opts: { night: boolean; route?: LonLat[] | null }): RankedHelpPoint[] {
+export function rankHelpPoints(
+  points: HelpPoint[],
+  from: { lat: number; lon: number },
+  opts: { night: boolean; route?: LonLat[] | null; now?: LocalTime; exclude?: readonly HelpClass[] },
+): RankedHelpPoint[] {
   const route = opts.route && opts.route.length > 1 ? opts.route : null;
   const myAlong = route ? projectOnRoute(from, route).alongM : 0;
   return dedupeHelpPoints(points)
+    .filter((p) => !opts.exclude?.includes(p.cls))
     .map((p) => {
       const info = HELP_CLASSES[p.cls];
       const minutes = walkMinutesTo(from, p);
-      const mayBeClosed = opts.night && info.hoursMatter && !p.open24h;
+      const open: OpenState = p.open24h ? { state: "open", closesAt: null } : opts.now ? openState(p.schedule, opts.now, minutes) : { state: "unknown" };
+      const mayBeClosed = opts.night && info.hoursMatter && open.state === "unknown";
       const ahead = route ? projectOnRoute(p, route).alongM >= myAlong - 50 : null;
       const key = minutes + (info.tier - 1) * 2 + (mayBeClosed ? 3 : 0) + (ahead === false ? 1 : 0);
-      return { p: { ...p, minutes, ahead, mayBeClosed }, key };
+      return { p: { ...p, minutes, ahead, mayBeClosed, open }, key };
     })
+    // Known closed now, or closing before she'd get there (listed hours): not a place to go.
+    .filter(({ p }) => p.open.state !== "closed" && p.open.state !== "closing")
     .sort((a, b) => a.key - b.key || a.p.minutes - b.p.minutes || a.p.name.localeCompare(b.p.name))
     .map(({ p }) => p);
 }
 
 // ── Copy (templates only; no verdicts) ────────────────────────────────────────────
 
-/** "Open 24h", "Listed hours: Mo-Sa 09:00-21:00", "Hours not known", plus a night caveat. */
-export function hoursLine(p: HelpPoint & { mayBeClosed?: boolean }): string {
-  if (p.open24h) return "Open 24h";
+/**
+ * "Open 24h", "Open until 21:00 (listed)", "Closed now (listed hours)", "Listed hours: …",
+ * "Hours not known", plus a night caveat. Pass `open` (computed on the device) when known.
+ */
+export function hoursLine(p: HelpPoint & { mayBeClosed?: boolean; open?: OpenState }): string {
+  if (p.open24h || (p.open?.state === "open" && p.open.closesAt === null)) return "Open 24h";
+  if (p.open?.state === "open") return `Open until ${clockLabel(p.open.closesAt!)} (listed)`;
+  if (p.open?.state === "closing") return `Closes ${clockLabel(p.open.closesAt)}, before you'd get there (listed)`;
+  if (p.open?.state === "closed") return "Closed now (listed hours)";
   if (p.hours) return `Listed hours: ${p.hours.slice(0, 40)}`;
   return p.mayBeClosed ? "Hours not known · may be closed now" : "Hours not known";
 }

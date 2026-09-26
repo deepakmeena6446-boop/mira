@@ -6,7 +6,7 @@ import "server-only";
  * UI never claims a live integration that isn't wired. Real adapters plug in at each
  * provider's `get*()` factory and flip the matching flag below.
  */
-const REAL_ADAPTERS = { mapbox: false, googleMaps: true, google: false, claude: true, webPush: false } as const;
+const REAL_ADAPTERS = { mapbox: false, googleMaps: true, google: false, claude: true, webPush: true } as const;
 
 export interface ProviderModes {
   maps: "placeholder" | "google" | "mapbox";
@@ -21,7 +21,7 @@ export function providerModes(): ProviderModes {
     maps: REAL_ADAPTERS.googleMaps && env.GOOGLE_MAPS_SERVER_KEY ? "google" : REAL_ADAPTERS.mapbox && env.MAPBOX_TOKEN ? "mapbox" : "placeholder",
     auth: REAL_ADAPTERS.google && env.AUTH_GOOGLE_ID && env.AUTH_GOOGLE_SECRET ? "google" : "demo",
     companion: REAL_ADAPTERS.claude && env.ANTHROPIC_API_KEY ? "claude" : "placeholder",
-    push: REAL_ADAPTERS.webPush && env.VAPID_PUBLIC_KEY ? "web_push" : "in_app",
+    push: REAL_ADAPTERS.webPush && env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY ? "web_push" : "in_app",
   };
 }
 

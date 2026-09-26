@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["postgres", "nodemailer"],
   logging: {
     // Dev request logs must never contain invitation bearer tokens.
-    incomingRequests: { ignore: [/^\/invite\//, /^\/t\//, /^\/api\/t\//] },
+    incomingRequests: { ignore: [/^\/invite\//, /^\/t\//, /^\/api\/t\//, /^\/auth\/link\//] },
   },
   async headers() {
     const common = [
@@ -26,6 +26,7 @@ const nextConfig: NextConfig = {
       // Invitation landing and page: never leak the URL via Referer.
       { source: "/invite", headers: [{ key: "Referrer-Policy", value: "no-referrer" }, { key: "Cache-Control", value: "no-store" }] },
       { source: "/invite/:token*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }, { key: "Cache-Control", value: "no-store" }] },
+      { source: "/auth/link/:token*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }, { key: "Cache-Control", value: "no-store" }, { key: "X-Robots-Tag", value: "noindex" }] },
       { source: "/t/:token*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }, { key: "Cache-Control", value: "no-store" }, { key: "X-Robots-Tag", value: "noindex" }] },
       { source: "/api/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
       { source: "/admin/:path*", headers: [{ key: "Cache-Control", value: "no-store" }, { key: "X-Robots-Tag", value: "noindex" }] },

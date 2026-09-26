@@ -1,11 +1,12 @@
 import "server-only";
-import { osmAreaName } from "./osm-reverse";
+import { parseOpeningHours } from "@/domain/opening-hours";
+import { osmArea } from "./osm-reverse";
 import { overpassHelp, overpassNearby, photonSearch } from "./osm-live";
 import { HELP_CLASSES, dedupeHelpPoints, helpClassFromOsm, isOpen24h, type HelpPoint } from "@/domain/help-points";
 import { nominatimSearch } from "./osm-reverse";
 import { rankPlaces } from "@/domain/search-rank";
 import type postgres from "postgres";
-import { haversineMeters } from "@/domain/pilot";
+import { haversineMeters, inBounds } from "@/domain/pilot";
 import { pathCoords, planRoutes, WALKING_SPEED_KMH } from "@/domain/routing";
 import { displayName } from "@/domain/know-copy";
 import { loadGraph } from "@/server/know/graph";
@@ -77,8 +78,11 @@ export function placeholderGeo(sql: postgres.Sql): GeoProvider {
         FROM places
         WHERE name IS NOT NULL AND ST_DWithin(point::geography, ST_SetSRID(ST_MakePoint(${p.lon}, ${p.lat}), 4326)::geography, 500)
         ORDER BY d LIMIT 1`;
-      if (row?.name) return { label: `Near ${row.name}`, precise: true };
-      return { label: await osmAreaName(p), precise: false };
+      // MIRA's local map snapshot is the DU North Campus pilot (Delhi).
+      const pilot = inBounds(p) ? { country: "IN", region: "IN-DL" } : null;
+      if (row?.name) return { label: `Near ${row.name}`, precise: true, ...pilot };
+      const area = await osmArea(p);
+      return { label: area?.name ?? null, precise: false, country: area?.country ?? pilot?.country ?? null, region: area?.region ?? pilot?.region ?? null };
     },
 
     async walk(a, b): Promise<WalkRoute> {
@@ -103,7 +107,7 @@ export function placeholderGeo(sql: postgres.Sql): GeoProvider {
         const cls = helpClassFromOsm(r.tags);
         if (!cls) continue;
         const hours = r.tags.opening_hours ?? null;
-        local.push({ id: r.id, name: displayName(r.name, r.kind ?? HELP_CLASSES[cls].label), cls, lat: r.lat, lon: r.lon, open24h: isOpen24h(hours), hours: isOpen24h(hours) ? null : hours, source: "osm" });
+        local.push({ id: r.id, name: displayName(r.name, r.kind ?? HELP_CLASSES[cls].label), cls, lat: r.lat, lon: r.lon, open24h: isOpen24h(hours), hours: isOpen24h(hours) ? null : hours, schedule: parseOpeningHours(hours), source: "osm" });
       }
       // The local snapshot covers one small area; elsewhere ask live OpenStreetMap once for the whole corridor.
       const live = local.length >= 3 ? [] : await overpassHelp(points, radiusM);

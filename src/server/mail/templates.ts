@@ -50,13 +50,18 @@ export function missedAlertEmail(args: { etaAt: Date; placeName: string | null }
  */
 const about = (min: number) => (min <= 1 ? "a minute" : `about ${min} minutes`);
 
-export function tripSharedEmail(args: { contactName: string; ownerName: string; destination: string; minutesToEta: number; liveUrl: string }) {
+/** How the journey is described to contacts ("is walking to", "is on the way to"). */
+export function journeyVerb(mode: string | undefined): string {
+  return mode === "ride" ? "is on the way by auto or cab to" : mode === "transit" ? "is on the way by metro or bus to" : mode === "other" ? "is on the way to" : "is walking to";
+}
+
+export function tripSharedEmail(args: { contactName: string; ownerName: string; destination: string; minutesToEta: number; liveUrl: string; mode?: string }) {
   return {
     subject: `${args.ownerName} is sharing a trip with you`,
     text: [
       `Hi ${args.contactName},`,
       "",
-      `${args.ownerName} is walking to ${args.destination} and shared the trip with you on MIRA.`,
+      `${args.ownerName} ${journeyVerb(args.mode)} ${args.destination} and shared the trip with you on MIRA.`,
       `They expect to arrive in ${about(args.minutesToEta)}. Follow along live until they arrive:`,
       args.liveUrl,
       "",
@@ -93,6 +98,53 @@ export function tripArrivedEmail(args: { ownerName: string; destination: string 
       "Their trip is closed and live sharing has stopped.",
       "",
       "You don't need to do anything. This is the last email about this trip.",
+    ].join("\n"),
+  };
+}
+
+/**
+ * "Tell my people now": she asked her trusted contacts to check on her. Care wording, not an
+ * SOS: a false tap should cost little, and MIRA never implies anyone else was contacted.
+ */
+export function checkOnMeEmail(args: { ownerName: string; liveUrl: string | null }) {
+  return {
+    subject: `${args.ownerName} asked you to check on them`,
+    text: [
+      "Hello,",
+      "",
+      `${args.ownerName} tapped "Tell my people now" on MIRA and asked you to check on them.`,
+      ...(args.liveUrl ? ["See where they are right now (the link works while they're sharing):", args.liveUrl] : []),
+      "",
+      "The best next step is usually to call or message them.",
+      "MIRA is not an emergency service and hasn't contacted anyone else. If you believe they're in danger, call your local emergency number.",
+    ].join("\n"),
+  };
+}
+
+export function signInLinkEmail(args: { url: string; adding: boolean }) {
+  return {
+    subject: "Your MIRA sign-in link",
+    text: [
+      "Hello,",
+      "",
+      args.adding ? "Open this link to add this email to your MIRA account, so you can sign in on another phone:" : "Open this link to sign in to MIRA:",
+      args.url,
+      "",
+      "It works once, for 20 minutes. If you didn't ask for it, ignore this email — nothing changes.",
+    ].join("\n"),
+  };
+}
+
+export function unknownAccountEmail() {
+  return {
+    subject: "Signing in to MIRA",
+    text: [
+      "Hello,",
+      "",
+      "Someone asked to sign in to MIRA with this email address, but no MIRA account uses it yet.",
+      "To keep an account, open MIRA, start with your first name, then add this email in Me.",
+      "",
+      "If this wasn't you, ignore this email.",
     ].join("\n"),
   };
 }

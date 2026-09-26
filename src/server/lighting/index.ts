@@ -1,6 +1,6 @@
 import "server-only";
 import type postgres from "postgres";
-import { cellsForRoute, routeLighting, type LitVote, type LitWay, type RouteLighting, type WalkerCell } from "@/domain/lighting";
+import { cellsForRoute, routeLighting, type LitVote, type LitWay, type Pole, type RouteLighting, type WalkerCell } from "@/domain/lighting";
 import { VectorTile } from "@mapbox/vector-tile";
 import { PbfReader } from "pbf";
 import { hmacHex } from "@/server/crypto";
@@ -52,7 +52,8 @@ async function osmLitWays(b: Box): Promise<LitWay[]> {
   if (hit) return hit;
   if (Date.now() - lastOverpass < 1000) return []; // polite rate; next request will fill the cache
   lastOverpass = Date.now();
-  const query = `[out:json][timeout:8];way[highway][lit~"^(yes|no)$"](${b.s},${b.w},${b.n},${b.e});out tags geom 400;`;
+  // `meta` adds each way's last-edit timestamp: old map data is shown as old.
+  const query = `[out:json][timeout:8];way[highway][lit~"^(yes|no)$"](${b.s},${b.w},${b.n},${b.e});out tags geom meta 400;`;
   const res = await fetch(base, {
     method: "POST",
     headers: { "user-agent": UA(), "content-type": "application/x-www-form-urlencoded" },
@@ -60,10 +61,13 @@ async function osmLitWays(b: Box): Promise<LitWay[]> {
     signal: AbortSignal.timeout(LAYER_TIMEOUT_MS),
   });
   if (!res.ok) return [];
-  type El = { tags?: Record<string, string>; geometry?: Array<{ lat: number; lon: number }> };
+  type El = { tags?: Record<string, string>; geometry?: Array<{ lat: number; lon: number }>; timestamp?: string };
   const ways = (((await res.json()) as { elements?: El[] }).elements ?? [])
     .filter((e) => e.geometry?.length && (e.tags?.lit === "yes" || e.tags?.lit === "no"))
-    .map((e) => ({ lit: e.tags!.lit as "yes" | "no", coords: e.geometry!.map((g) => [g.lon, g.lat] as [number, number]) }));
+    .map((e) => {
+      const year = e.timestamp ? new Date(e.timestamp).getUTCFullYear() : NaN;
+      return { lit: e.tags!.lit as "yes" | "no", coords: e.geometry!.map((g) => [g.lon, g.lat] as [number, number]), ...(Number.isFinite(year) ? { editedYear: year } : {}) };
+    });
   waysCache.set(key, ways);
   return ways;
 }
@@ -74,14 +78,14 @@ async function osmLitWays(b: Box): Promise<LitWay[]> {
  * their search endpoint returns nothing for many areas, the tiles are what mapillary.com uses.
  */
 const TILE_Z = 14;
-const tileCache = ttlCache<Array<{ lat: number; lon: number }>>(200, 24 * 3600_000);
+const tileCache = ttlCache<Pole[]>(200, 24 * 3600_000);
 const tileXY = (lat: number, lon: number) => {
   const n = 2 ** TILE_Z;
   const r = (lat * Math.PI) / 180;
   return [Math.floor(((lon + 180) / 360) * n), Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n)] as const;
 };
 
-async function mapillaryTile(token: string, x: number, y: number): Promise<Array<{ lat: number; lon: number }>> {
+async function mapillaryTile(token: string, x: number, y: number): Promise<Pole[]> {
   const key = `${x}/${y}`;
   const hit = tileCache.get(key);
   if (hit) return hit;
@@ -89,18 +93,21 @@ async function mapillaryTile(token: string, x: number, y: number): Promise<Array
   if (!res.ok) return [];
   const vt = new VectorTile(new PbfReader(new Uint8Array(await res.arrayBuffer())));
   const layer = vt.layers.point;
-  const lights: Array<{ lat: number; lon: number }> = [];
+  const lights: Pole[] = [];
   for (let i = 0; layer && i < layer.length; i++) {
     const f = layer.feature(i);
     if (f.properties.value !== "object--street-light") continue;
     const g = f.toGeoJSON(x, y, TILE_Z).geometry;
-    if (g.type === "Point") lights.push({ lon: g.coordinates[0], lat: g.coordinates[1] });
+    // last_seen_at (ms): when street imagery last showed this pole. A pole is not a working light either way.
+    const seen = Number(f.properties.last_seen_at);
+    const seenYear = Number.isFinite(seen) && seen > 0 ? new Date(seen).getUTCFullYear() : undefined;
+    if (g.type === "Point") lights.push({ lon: g.coordinates[0], lat: g.coordinates[1], ...(seenYear ? { seenYear } : {}) });
   }
   tileCache.set(key, lights);
   return lights;
 }
 
-async function mapillaryPoles(b: Box): Promise<Array<{ lat: number; lon: number }>> {
+async function mapillaryPoles(b: Box): Promise<Pole[]> {
   const token = getEnv().MAPILLARY_TOKEN;
   if (!token) return [];
   const [x0, y0] = tileXY(b.n, b.w);

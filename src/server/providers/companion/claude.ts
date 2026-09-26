@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { CATEGORIES } from "@/domain/report/taxonomy";
 import { MIRA_PERSONA } from "./persona";
+import { contextLine } from "@/domain/context";
 import type { MiraTools } from "./tools";
 import type { MiraCard, MiraEvent, MiraTurn } from "./types";
 
@@ -14,10 +15,11 @@ import type { MiraCard, MiraEvent, MiraTurn } from "./types";
  * is scrubbed from the text that gets saved to history.
  */
 
-export const MIRA_MODEL = "claude-opus-5";
+/** Operators can switch Mira's model without a deploy (e.g. after re-measuring latency and replies). */
+export const MIRA_MODEL = process.env.MIRA_MODEL || "claude-opus-5";
 const MAX_ROUNDS = 4; // tool round-trips per message (each costs latency)
 
-const TOOL_GUIDE = `How you work in the MIRA app:
+export const TOOL_GUIDE = `How you work in the MIRA app:
 - The context block tells you the time, the person's area, their saved places and trusted contacts. Use it; don't ask for things you already know.
 - Call a tool only when it directly helps with what they just asked. A greeting or "what time is it?" needs no tool — except late at night, when offering the walk home (propose_trip) is kind.
 - Offer actions through tools; the app shows them as cards the person taps. Never say a trip started or a report was sent — you only propose.
@@ -32,7 +34,7 @@ const TOOL_GUIDE = `How you work in the MIRA app:
 const REPORT_CATEGORIES = CATEGORIES.filter((c) => c !== "other") as unknown as [string, ...string[]];
 const KINDS = ["pharmacy", "health", "police", "metro", "bus", "food", "shop", "toilets", "finance"] as const;
 
-const TOOLS: Anthropic.Tool[] = [
+export const TOOLS: Anthropic.Tool[] = [
   {
     name: "find_nearby",
     description: "Find places near the person right now (e.g. pharmacies, metro, cafés). Shows them a list they can tap to walk to. Returns names, kinds, walking distance and a place_ref for propose_trip.",
@@ -170,13 +172,18 @@ export async function* claudeMira(opts: { apiKey: string; message: string; histo
         const ref = typeof input.place_ref === "string" ? refs.get(input.place_ref) : undefined;
         const dest = savedPlace ? { name: savedPlace.label, lat: savedPlace.lat, lon: savedPlace.lon } : ref ? { name: ref.name, lat: ref.lat, lon: ref.lon } : null;
         if (!dest) return { result: { error: "Unknown destination. Use a saved place label or a place_ref from find_nearby." } };
-        const { lighting, ...t } = await tools.proposeTrip(dest);
+        const { context, ...t } = await tools.proposeTrip(dest);
         return {
           result: {
             destination: dest.name,
             walk_minutes: t.minutes,
             contacts_who_would_follow: t.contacts,
-            ...(lighting ? { street_lighting_percent_of_route: lighting, lighting_note: "lit = mapped as lit in OpenStreetMap (or confirmed by MIRA walkers); poles = streetlights mapped, may not work; dark = mapped as unlit or reported dark; unknown = not known. Say 'mapped as lit', mention the unknown share, and never call a route safe or unsafe." } : {}),
+            ...(context.length
+              ? {
+                  known_about_the_way: context.map((c) => ({ line: contextLine(c), source: c.source.name, confidence: c.confidence, not_known: c.unknowns })),
+                  context_note: "These are the only facts you have about the way. Pick at most one or two that matter to them now, keep the source and what isn't known, and never call a route or place safe or unsafe.",
+                }
+              : {}),
             note: "Shown as a card; nothing starts until they tap it.",
           },
           card: { type: "trip", ...t },

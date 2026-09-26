@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, writeFileSync } from "node:fs";
 import { hash } from "@node-rs/argon2";
+import webpush from "web-push";
 
 /**
  * Generate an ignored .env.local for local development with fresh random secrets.
@@ -40,6 +41,11 @@ async function main() {
     "SMTP_HOST=127.0.0.1",
     "SMTP_PORT=1025",
     "SMTP_FROM=MIRA <no-reply@mira.localhost>",
+    "# Web Push to the traveller (fresh local VAPID key pair; production needs its own).",
+    ...(() => {
+      const v = webpush.generateVAPIDKeys();
+      return [`VAPID_PUBLIC_KEY=${v.publicKey}`, `VAPID_PRIVATE_KEY=${v.privateKey}`];
+    })(),
     "# Real providers (optional). MIRA uses placeholders until adapters + keys exist.",
     "ANTHROPIC_API_KEY=",
     "MAPBOX_TOKEN=",

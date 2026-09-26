@@ -1,0 +1,57 @@
+{
+  "iso": "IN",
+  "name": "India",
+  "version": "2026-09-26",
+  "timezone": "Asia/Kolkata",
+  "timezoneSource": {
+    "url": "https://www.pib.gov.in/PressReleasePage.aspx?PRID=2096622",
+    "title": "Department of Consumer Affairs, Government of India notifies Draft Legal Metrology (Indian Standard Time) Rules, 2025 to Synchronize Time across India (PIB, 27 Jan 2025)",
+    "retrieved": "2026-09-26"
+  },
+  "emergency": {
+    "general": {
+      "number": "112",
+      "label": "Emergency (police, fire, ambulance)",
+      "sms": true,
+      "source": {
+        "url": "https://www.mha.gov.in/en/commoncontent/emergency-response-support-system-erss",
+        "title": "Emergency Response Support System (ERSS) - Ministry of Home Affairs, Government of India",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "women_helpline": [
+      {
+        "number": "181",
+        "name": "Women Helpline (WHL) 181",
+        "scope": "national",
+        "hours": "24h",
+        "source": {
+          "url": "https://wcd.gov.in/offerings/women--helpline--scheme",
+          "title": "Women Helpline 181 | Ministry of Women and Child Development",
+          "retrieved": "2026-09-26"
+        },
+        "notIn": [
+          "IN-WB"
+        ],
+        "notInSource": {
+          "url": "https://wcd.gov.in/offerings/women--helpline--scheme",
+          "title": "Women Helpline 181 | Ministry of Women and Child Development",
+          "retrieved": "2026-09-26",
+          "says": "operational in all States/UTs except West Bengal"
+        }
+      }
+    ],
+    "notes": [
+      "ERSS-112 is established in all 36 States and UTs, with computer-aided dispatch of field/police resources. Source: https://www.pib.gov.in/PressReleseDetailm.aspx?PRID=2203027&reg=3&lang=2 (PIB, 12 Dec 2025), retrieved 2026-09-26.",
+      "ERSS-112 is run State by State: each State/UT's Public Safety Answering Point receives calls, SMS and other channels and dispatches Police / Health / Fire / Disaster / Women / Children / Railways services. Source: https://www.mha.gov.in/en/commoncontent/emergency-response-support-system-erss, retrieved 2026-09-26.",
+      "ERSS uses a location-based service/global positioning service to identify the location of a distressed caller. Source: https://www.mha.gov.in/MHA1/Par2017/pdfs/par2025-pdfs/LS11032025/1954.pdf (MHA, Lok Sabha Unstarred Q. 1954, 11 Mar 2025), retrieved 2026-09-26.",
+      "Women Helpline 181 is operational in all States/UTs except West Bengal. Source: https://wcd.gov.in/offerings/women--helpline--scheme, retrieved 2026-09-26.",
+      "Women Helpline 181 is integrated with ERSS-112 and connects callers to police, fire and ambulance services and One Stop Centres. Source: https://wcd.gov.in/offerings/women--helpline--scheme, retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "en",
+    "hi"
+  ],
+  "reviewers": []
+}

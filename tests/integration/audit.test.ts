@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 vi.mock("next/headers", async () => (await import("../helpers/cookie-jar")).nextHeadersMock);
 
 import { getSql } from "@/server/db/client";
+import { listPlaces } from "@/server/account/places";
 import { resetEnvCache } from "@/server/config/env";
 import { resetMailer, getMailer } from "@/server/mail";
 import { fixedClock, MINUTE } from "@/server/clock";
@@ -206,9 +207,14 @@ describe("audit regressions", () => {
     await placesPOST(jsonRequest("/api/me/places", { label: "Home", emoji: "🏠", ...HOME }));
     await placesPOST(jsonRequest("/api/me/places", { label: "home", emoji: "🏠", ...START }));
     const [{ id }] = await getSql()`SELECT id FROM users WHERE name = 'Lata' ORDER BY created_at DESC LIMIT 1`; // this run's Lata
-    const rows = await getSql()`SELECT lat FROM saved_places WHERE user_id = ${id}`;
+    const rows = await getSql()`SELECT lat, lon, address, place_enc FROM saved_places WHERE user_id = ${id}`;
     expect(rows).toHaveLength(1);
-    expect(rows[0].lat).toBeCloseTo(START.lat, 5);
+    // Encrypted at rest: no readable point or address in the row…
+    expect(rows[0]).toMatchObject({ lat: null, lon: null, address: null });
+    expect(String(rows[0].place_enc)).toMatch(/^v1\./);
+    // …and the owner still gets it back, moved to the new spot.
+    const [place] = await listPlaces(getSql(), id);
+    expect(place.lat).toBeCloseTo(START.lat, 5);
   });
 
   it("refuses routes longer than a walk (no huge work for one request)", async () => {

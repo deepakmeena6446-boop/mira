@@ -32,8 +32,9 @@ export async function claimAnonymousReports(sql: postgres.Sql, userId: string, a
   });
 }
 
-export async function updateProfile(sql: postgres.Sql, userId: string, patch: { name?: string; onboarded?: boolean }): Promise<void> {
+export async function updateProfile(sql: postgres.Sql, userId: string, patch: { name?: string; onboarded?: boolean; helpExclude?: string[] }): Promise<void> {
   if (patch.name) await sql`UPDATE users SET name = ${patch.name} WHERE id = ${userId}`;
+  if (patch.helpExclude) await sql`UPDATE users SET help_exclude = ${patch.helpExclude} WHERE id = ${userId}`;
   if (patch.onboarded) await sql`UPDATE users SET onboarded_at = COALESCE(onboarded_at, now()) WHERE id = ${userId}`;
 }
 
