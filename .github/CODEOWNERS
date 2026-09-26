@@ -1,0 +1,62 @@
+# Code owners. Later lines take precedence over earlier ones.
+# The maintainer handle below is a placeholder until more maintainers join (kept to 1-3 people).
+# Protected areas are listed explicitly so they stay visible when owners are added: changes
+# there need 2 approvals, including a maintainer, plus the protected-area checklist in
+# CONTRIBUTING.md.
+
+# Default: everything
+*                                   @deepakmeena6446
+
+# --- Protected areas ------------------------------------------------------------------
+
+# Emergency workflows: trips, arrival, missed alerts, worker
+/src/server/trips/                  @deepakmeena6446
+/src/server/journey/                @deepakmeena6446
+/src/domain/journey.ts              @deepakmeena6446
+/src/worker/                        @deepakmeena6446
+/src/app/(app)/trip/                @deepakmeena6446
+/src/app/t/                         @deepakmeena6446
+/src/domain/emergency.ts            @deepakmeena6446
+/src/domain/help-points.ts          @deepakmeena6446
+
+# Emergency numbers and other per-country locale data
+/data/locales/                      @deepakmeena6446
+
+# Authentication and sessions
+/src/server/session/                @deepakmeena6446
+/src/server/admin/                  @deepakmeena6446
+/src/app/api/auth/                  @deepakmeena6446
+/src/server/http/csrf.ts            @deepakmeena6446
+/src/proxy.ts                       @deepakmeena6446
+
+# Privacy, retention and user data
+/db/migrations/                     @deepakmeena6446
+/src/server/retention.ts            @deepakmeena6446
+/src/server/crypto/                 @deepakmeena6446
+/src/server/account/                @deepakmeena6446
+/src/app/(app)/privacy/             @deepakmeena6446
+/public/sw.js                       @deepakmeena6446
+
+# Location handling
+/src/lib/location-store.ts          @deepakmeena6446
+/src/server/providers/geo/          @deepakmeena6446
+/src/server/http/geo-input.ts       @deepakmeena6446
+
+# Moderation, trust thresholds and safety algorithms
+/src/server/report/                 @deepakmeena6446
+/src/domain/moderation.ts           @deepakmeena6446
+/src/domain/aggregation.ts          @deepakmeena6446
+/src/domain/lighting.ts             @deepakmeena6446
+/src/domain/report/                 @deepakmeena6446
+/src/server/aggregate/              @deepakmeena6446
+/src/app/admin/                     @deepakmeena6446
+/src/app/api/admin/                 @deepakmeena6446
+
+# AI behaviour
+/src/server/providers/companion/    @deepakmeena6446
+
+# Project policies
+/PRINCIPLES.md                      @deepakmeena6446
+/MODERATION_POLICY.md               @deepakmeena6446
+/SECURITY.md                        @deepakmeena6446
+/.github/                           @deepakmeena6446

@@ -13,6 +13,7 @@
 | 6 — Community contribution loop | PASS |
 | 7 — Production hardening | PASS WITH KNOWN RISK (code) · ops items external |
 | 8 — Final QA / handover | PASS WITH KNOWN RISK (real devices + ops pending) |
+| P1 — Complete Horizon 1 (gap analysis §2 P1) | see "P1 EXECUTION" below |
 
 ---
 
@@ -215,3 +216,39 @@ KNOWN RISKS:
 FILES CHANGED: `MIRA_IMPLEMENTATION_AUDIT.md`, this file, `README.md`.
 
 NEXT (owner): hosting + SMTP + key rotation (Phase 7 ops list), then real-device checks (launch audit Part 6, Phase 6), then P1 in the audit's order.
+
+---
+
+## P1 EXECUTION (owner request: "Fix the P1 issues, commit, then merge")
+
+Owner decisions taken up front (AskUserQuestion): license **AGPL-3.0**; durable sign-in by **email magic link**; Mira model: **measure, then choose**; merge into **main**.
+
+| Gap-analysis P1 item | Status | Where |
+|---|---|---|
+| 1. Help Point hours + deterministic ranking + filters; "Help Points near me" | Done. The OSM `opening_hours` strict parser runs open/closing/closed on the device clock, and places known closed (or closing before she'd arrive) are left out. Google hours sit behind `GOOGLE_PLACES_HOURS=on` (pricier SKU, owner's call; default off). Class filters are stored with the account. There's a "Help Points near me" sheet on Home | `domain/opening-hours.ts`, `domain/help-points.ts`, `HelpNearSheet.tsx`, Me → Help Points |
+| 2. Tell my people now + location in words | Done. It emails accepted contacts their live link with care wording, rate-limited to one per 5 minutes. On a private journey it adds her contacts (her tap is the consent); with no journey running it starts a "share where I am" one. The viewer page shows "asked you to check on them". Location in words (landmark, area, coordinates) is shown only on her screen, with a copy button | `trips/index.ts tellMyPeopleNow`, `UnsafeSheet.tsx`, `SharedTripView.tsx` |
+| 3. Route alternatives | Done in P0 | — |
+| 4. Next Help Point ahead on the trip | Done in P0, now hours-aware and filtered | `TripScreen.tsx` |
+| 5. Widen "Was the way lit?"; viewer → user line | Done in P0 | — |
+| 6. Web Push; durable sign-in | Done. Web Push: a worker outbox pushes each traveller update once and removes dead subscriptions; subscriptions are encrypted; there's a Me toggle and service-worker handlers. Email sign-in: one-time 20-min links via cookie + tap (mail scanners can't consume them), no enumeration, encrypted address, and sign-out no longer deletes a durable account | `providers/notify/push.ts`, `worker/jobs.ts`, `public/sw.js`, `account/email-auth.ts`, `/auth/link` |
+| 7. Non-walking journeys with manual ETA | Done. Walk, Auto/cab or Metro/bus; she chooses the ETA; the 25 km walk limit doesn't apply; copy is mode-aware (trip screen, emails, viewer) | `trips/index.ts`, `HomeScreen.tsx` |
+| 8. Emergency number + time zone via Location Context (India profile) | Done. `data/locales/IN.json` has every value verified on official pages (MHA ERSS 112, WCD 181 with "not in West Bengal" honoured, PIB IST). Reverse geocoding returns country/state, and the pill, sheet, missed banner and Mira SOS card use it. Without a profile it shows "not confirmed… 112 works on most mobile networks". Times use the place's zone label, not hardcoded "IST" | `server/locale`, `lib/locale-store.ts`, `lib/time.ts` |
+| 9. ContextItem read-model; lighting freshness | Done. `domain/context.ts` (claim, source, observedAt, confidence tier, unknowns, verdict-free templates) feeds Mira's trip proposals: Mira gets evidence and picks relevance. Lighting shows "streets last edited 2016–2024" (OSM `out meta`) and "last seen" (Mapillary) | `domain/context.ts`, `server/lighting`, `LightingSummary.tsx` |
+| 10. Notes display, encrypt saved places, tabs, OG image, attribution, Mira model | Done. Notes: off the map and out of "Around you"; a dated route-card line with "Why am I seeing this?". Places: AES-GCM at rest, with a worker backfill for old rows. Tabs: Home · Circle · Me. OG image. Google mark on Google tiles. Mira: measured (below), kept `claude-opus-5`, switchable via `MIRA_MODEL` | various |
+| 11. Public moderation policy; open-source readiness | Done. MODERATION_POLICY.md (describes what the code actually does); LICENSE (AGPL-3.0, verbatim from gnu.org), CONTRIBUTING, SECURITY, CODE_OF_CONDUCT (Contributor Covenant 2.1), PRINCIPLES, CODEOWNERS, CI workflow; V0 docs moved to `docs/archive/v0/` | repo root, `.github/` |
+| (from P0 risks) Inactivity retention before durable accounts | Done. Email accounts unused for 400 days are deleted; activity is recorded to the day only | `retention.ts`, `session/user.ts` |
+
+**Mira model measurement (2026-09-26, live API, one run per cell, first round).**
+- **Opus 5:** 1.4–3.1 s.
+- **Sonnet 5:** 1.7–1.9 s.
+- **Haiku 4.5:** 1.1–1.8 s. It said "get home **safely**", which breaks the no-safety-promise rule.
+
+All three chose the right tools: "uneasy" → options first (confirming the P0 fix on live Claude), and followed → emergency first. **Kept Opus 5:** the gap is under a second, it was fastest on the emergency prompt, and Mira is off every urgent path. `MIRA_MODEL` allows switching without a deploy.
+
+KNOWN RISKS (P1):
+- Opening-hours parsing ignores public-holiday rules. Hours are always labelled "listed".
+- Google hours stay "not known" until the owner switches on the SKU.
+- The "Google" mark is text, not the official logo asset. Replace it with Google's logo file before launch per their attribution guidelines.
+- Web Push needs an installed PWA on iOS (16.4+). Delivery depends on the platform push services.
+- The locale profile has no reviewers yet (the file requires 2 approvals). SMS to 112 is marked true per MHA's channel list, but support varies by state.
+- Durable sign-in is email-only. Google OAuth is still not built (needs your OAuth credentials).

@@ -95,7 +95,11 @@ Browser verification at 375×812 on the production build with live Google Maps: 
 
 ## P1 REMAINING
 
-Help Point hours (SKU decision or OSM `opening_hours` parsing) and filters ("no police"). "Help Points near me" as its own entry on Home. *Tell my people now* (a user-triggered alert). Location in words on the sheet. The emergency number via Location Context (India profile). Web Push and durable sign-in. Non-walking journeys with a manual ETA. ContextItem read-model and lighting freshness. Notes off the map. Encrypted saved places. Home · Circle · Me tabs. OG image and Google attribution. Mira model decision. Inactivity retention before durable accounts. Public moderation policy and open-source readiness.
+The P1 list was implemented in a second round (see `MIRA_EXECUTION_STATUS.md` → P1 EXECUTION). What's left of Horizon 1 needs you or a partner, not code:
+- **Google sign-in:** needs OAuth credentials. Email sign-in works now.
+- **Google Help Point hours:** a pricier SKU, behind `GOOGLE_PLACES_HOURS=on`.
+- **The official Google logo asset** on the map.
+- **Reviewer sign-off** on `data/locales/IN.json`.
 
 ## P2 / P3 NOT TOUCHED
 

@@ -6,7 +6,11 @@ An installable, mobile-first web app (PWA). It helps a woman understand the way 
 2. **Start with MIRA.** Share with your trusted contacts (by email), or keep it to yourself and send your **live link** with the phone's share sheet (WhatsApp, SMS…). The journey screen has *I'm here*, *+10 min*, the nearest Help Point, *I feel unsafe* and Emergency.
 3. **Arrive.** Arrival is auto-detected. The link goes dark and the live points are deleted. If you don't check in, each accepted contact gets **one** email. After a journey at night, one tap: "Was the way lit?"
 
-**I feel unsafe** (Home and journey screen) opens instantly, with no AI and no network wait: the nearest Help Point ranked for right now, send your live link, call someone (the phone's own contacts or a typed number, never stored), **Emergency 112** (the phone's own dialler; MIRA doesn't call or dispatch anyone), and Mira last. **Emergency 112** is also a pill on Home and the journey screen.
+**Walking, by auto/cab, or by metro/bus.** Walks get routes and context; for rides she picks the ETA (and they can be longer than a walk). "Tell my people now" can also start a journey that just shares where she is.
+
+**Navigation is Home · Circle · Me.** Circle holds trusted contacts; Me holds places, Help Point filters (e.g. no police), notifications on this phone, and adding an email to keep the account. Mira is a button (Home, "I feel unsafe"), and Report is reached from long-press, Home, after a journey, and Me.
+
+**I feel unsafe** (Home and journey screen) opens instantly, with no AI and no network wait: the nearest Help Point ranked for right now (listed as closed now → left out), **Tell my people now** (emails her accepted contacts her live link and asks them to check on her), send your live link, call someone (the phone's own contacts or a typed number, never stored), **Emergency** with the number from the country's cited profile (`data/locales/`; 112 until known, plus helplines such as Women Helpline 181 where they operate), her location in words to read out, and Mira last. **Emergency 112** is also a pill on Home and the journey screen.
 
 **Mira** is the in-app AI companion: warm, brief and practical. She knows your saved places, the time and your area. She can start a trip, find what's open nearby, or help you report something. She is not an emergency service and says so, pointing to 112 when someone says they're in danger.
 
@@ -20,7 +24,7 @@ An installable, mobile-first web app (PWA). It helps a woman understand the way 
 
 **Reports** take three taps: pick one of six tiles, then send. The location defaults to "here" and the time to "just now". Reports are private and reviewed by a person. They appear publicly only as calm, template-worded community notes once enough independent people report the same thing in a ~1.2 km area.
 
-> MIRA 2.0 deliberately moved away from the V0 spec documents (`MIRA_*.md`). Those documents describe the V0 pilot; this README describes the current app.
+> MIRA 2.0 deliberately moved away from the V0 spec documents, now archived in [`docs/archive/v0/`](docs/archive/v0/). Those documents describe the V0 pilot; this README describes the current app.
 
 ---
 
@@ -33,10 +37,10 @@ Every external service sits behind an interface in `src/server/providers/`. The 
 | Maps (search, routes, nearby, area names, basemap) | MIRA's OSM snapshot + live OpenStreetMap (Photon, Overpass, Nominatim) — used when no Google key is set, and as automatic fallback | **Connected:** Google Maps Platform — Places API (New), Routes API (walking), Geocoding API, Map Tiles API (day + dark night style) — `src/server/providers/geo/google.ts`, `tiles.ts` | `GOOGLE_MAPS_SERVER_KEY`, `GOOGLE_MAPS_BROWSER_KEY` |
 | Area names | Nearest locality from the map's own vector tiles, then a server-side Nominatim lookup (~100 m rounded, cached, ≤ 1 req/s) | Mapbox reverse geocoding | `REVERSE_GEOCODER_URL` (placeholder only; unset = off) |
 | Basemap | OpenFreeMap vector style ("dark" style at night) | Mapbox day + night styles | `MAP_STYLE_URL`, `MAP_STYLE_URL_NIGHT` (optional) |
-| Sign-in | "Continue" with a first name creates a real local account | Google OAuth | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` |
+| Sign-in | "Continue" with a first name creates a local account; **adding an email (one-time link, no password) makes it durable** across phones | Google OAuth (adapter not built) | `SMTP_*` for email links; `AUTH_GOOGLE_*` later |
 | Mira | Scripted persona engine over the real tools, streamed as NDJSON (English + Hinglish) — used when no key is set, and as the automatic fallback if Claude fails before replying | **Connected:** Claude (`claude-opus-5`, low effort, streaming tool loop, cached persona; never sees coordinates; location details scrubbed from saved history) — `src/server/providers/companion/claude.ts` | `ANTHROPIC_API_KEY` |
 | Contact delivery | SMTP (Mailpit locally) + in-app notifications | Production SMTP / WhatsApp / SMS | `SMTP_*` |
-| Push | In-app only | Web Push | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` |
+| Push | In-app inbox | **Connected:** Web Push to the traveller (worker outbox; payloads never carry location) | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` |
 
 Wiring a real adapter takes three steps: implement it next to `placeholder.ts`, flip its flag in `REAL_ADAPTERS` (`src/server/providers/modes.ts`), and set the env vars. A capability reports "real" only when **both** the adapter exists and its key is present, so setting a key alone never pretends a feature works.
 
@@ -129,7 +133,7 @@ There's no location history, no public profile, no safety score and no heatmap. 
 
 | Item | Today | To complete |
 |---|---|---|
-| Google sign-in | Demo sign-in with a first name (real local account and session) | Add the Auth.js Google adapter, flip `REAL_ADAPTERS.google`, set `AUTH_GOOGLE_*` |
+| Google sign-in | First-name account, made durable with an email link | Add a Google OAuth adapter, flip `REAL_ADAPTERS.google`, set `AUTH_GOOGLE_*` |
 | Maps for production | **Google connected** (demo key) | Split into a browser key (website-restricted, Map Tiles only) and a server key (API-restricted); set budgets/quotas; show the Google logo on the map per Google's attribution rules |
 | Claude for Mira | **Done** — live whenever `ANTHROPIC_API_KEY` is set (tests and E2E force the placeholder) | Rotate the demo key before production |
 | Production SMTP / push | Mailpit + in-app | Set `SMTP_*` / `VAPID_*` |
@@ -151,3 +155,9 @@ There's no location history, no public profile, no safety score and no heatmap. 
 11. **Security hardening from the A–Z audit:** per-request script nonces in the CSP (`src/proxy.ts`); rate limits per person/link with only a high per-IP ceiling (campus Wi-Fi and carrier NAT share IPs); invite emails have a fixed subject, names can't contain links, invites are single-use and expire in 7 days; walking routes are capped at 25 km.
 12. **Honest delivery:** the trip screen only claims contacts whose link email actually went out; a failed missed-arrival email is followed by an in-app correction; contacts who got a "missed" email get an "arrived" email once.
 13. **Demo sign-out deletes the demo account** (there's no way back in), and retention removes any demo account whose session expired.
+
+## Contributing & license
+
+Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, tests, the review flow and protected areas. Every change is checked against the [product principles](PRINCIPLES.md). Community reports are handled under the [moderation policy](MODERATION_POLICY.md). Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), and follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+MIRA is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). If you run a modified version as a network service, you must offer its source code, under the same license, to the people who use it.
