@@ -1,0 +1,81 @@
+{
+  "iso": "LK",
+  "name": "Sri Lanka",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "119",
+      "label": "Police emergency",
+      "source": {
+        "url": "https://www.police.lk/",
+        "title": "SRI LANKA POLICE",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "also": [
+      {
+        "number": "112",
+        "label": "Police emergency hotline",
+        "source": {
+          "url": "https://www.trc.gov.lk/content/files/numbering/3-digit%20Short%20Codes.pdf",
+          "title": "3-digit and 4 digit Short Codes - Web Update.xlsx",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "services": [
+      {
+        "service": "police",
+        "number": "119",
+        "label": "Police",
+        "source": {
+          "url": "https://www.police.lk/",
+          "title": "SRI LANKA POLICE",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "fire",
+        "number": "110",
+        "label": "Fire and rescue",
+        "source": {
+          "url": "https://www.trc.gov.lk/content/files/numbering/3-digit%20Short%20Codes.pdf",
+          "title": "3-digit and 4 digit Short Codes - Web Update.xlsx",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "ambulance",
+        "number": "1990",
+        "label": "1990 Suwa Seriya ambulance",
+        "source": {
+          "url": "https://www.1990.lk/faq/",
+          "title": "1990",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "women_helpline": [
+      {
+        "number": "1938",
+        "name": "Women Helpline",
+        "scope": "national",
+        "source": {
+          "url": "https://www.childwomenmin.gov.lk/landing/key-contacts/3/en",
+          "title": "Landing - Ministry of Women and Child Affairs",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "notes": [
+      "The telecom regulator lists 119 as the Sri Lanka Police Department's Police Emergency Service, 107 as the police emergency service in Tamil for the Northern and Eastern Provinces, and 109 for reporting abuse of children and women (Bureau for the Prevention of Abuse of Children and Women). Source: https://www.trc.gov.lk/pages_e.php?id=122 (Telecommunications Regulatory Commission, 3 Digits Short Codes for Special Services), retrieved 2026-09-26.",
+      "1990 is a toll-free ambulance number that can be dialled from any service provider, or through the 1990 mobile app. Source: https://www.1990.lk/faq/ (1990 Suwa Seriya Foundation), retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "si",
+    "ta",
+    "en"
+  ],
+  "reviewers": []
+}

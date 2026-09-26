@@ -1,0 +1,67 @@
+{
+  "iso": "SA",
+  "name": "Saudi Arabia",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "999",
+      "label": "Police emergency",
+      "source": {
+        "url": "https://www.cst.gov.sa/en/about/Numbering",
+        "title": "Numbering",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "services": [
+      {
+        "service": "police",
+        "number": "999",
+        "label": "Police",
+        "source": {
+          "url": "https://www.cst.gov.sa/en/about/Numbering",
+          "title": "Numbering",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "ambulance",
+        "number": "997",
+        "label": "Ambulance (Saudi Red Crescent)",
+        "source": {
+          "url": "https://www.cst.gov.sa/en/about/Numbering",
+          "title": "Numbering",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "fire",
+        "number": "998",
+        "label": "Civil Defense (fire)",
+        "source": {
+          "url": "https://www.cst.gov.sa/en/about/Numbering",
+          "title": "Numbering",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "women_helpline": [
+      {
+        "number": "1919",
+        "name": "Ministry of Social Affairs (harm and family violence reports)",
+        "scope": "national",
+        "source": {
+          "url": "https://www.cst.gov.sa/en/about/Numbering",
+          "title": "Numbering",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "notes": [
+      "911 is the unified emergency number only in the Makkah, Madinah, Riyadh and Eastern regions; elsewhere use 999 (police), 997 (ambulance), 998 (civil defense). Source: https://www.spa.gov.sa/en/N2412577 (Saudi Press Agency, National Security Operations Center), retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "ar"
+  ],
+  "reviewers": []
+}

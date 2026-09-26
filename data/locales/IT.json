@@ -14,6 +14,51 @@
     },
     "notes": [
       "112 is the single European emergency number: free of charge from fixed and mobile phones in every EU Member State, and it works alongside any national emergency numbers (EU law: Directive (EU) 2018/1972, Article 109). Source: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32018L1972, retrieved 2026-09-26."
+    ],
+    "services": [
+      {
+        "service": "police",
+        "number": "113",
+        "label": "Police",
+        "source": {
+          "url": "https://www.poliziadistato.it/articolo/soccorso-pubblico-e-le-grandi-emergenze",
+          "title": "Soccorso pubblico e le grandi emergenze | Polizia di Stato",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "fire",
+        "number": "115",
+        "label": "Fire brigade",
+        "source": {
+          "url": "https://www.vigilfuoco.it/emergenza-115",
+          "title": "Emergenza 115 | Corpo Nazionale dei Vigili del Fuoco",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "ambulance",
+        "number": "118",
+        "label": "Medical emergency",
+        "source": {
+          "url": "https://www.salute.gov.it/new/it/tema/112-118-e-pronto-soccorso/il-numero-118-e-il-numero-di-emergenza-unico-europeo-112",
+          "title": "Ministero della Salute - Il numero 118 e il Numero di emergenza unico europeo (112)",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "women_helpline": [
+      {
+        "number": "1522",
+        "name": "Numero antiviolenza e anti stalking 1522",
+        "scope": "national",
+        "source": {
+          "url": "https://www.salute.gov.it/new/it/tema/salute-della-donna/violenza-sulle-donne/?paragraph=0",
+          "title": "Ministero della Salute - Violenza sulle donne",
+          "retrieved": "2026-09-26"
+        },
+        "hours": "24h"
+      }
     ]
   },
   "languages": [

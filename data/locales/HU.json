@@ -14,6 +14,38 @@
     },
     "notes": [
       "112 is the single European emergency number: free of charge from fixed and mobile phones in every EU Member State, and it works alongside any national emergency numbers (EU law: Directive (EU) 2018/1972, Article 109). Source: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32018L1972, retrieved 2026-09-26."
+    ],
+    "services": [
+      {
+        "service": "police",
+        "number": "107",
+        "label": "Police",
+        "source": {
+          "url": "https://nmhh.hu/cikk/188545/Segelyhivo_szamok",
+          "title": "Segélyhívó számok – Nemzeti Média- és Hírközlési Hatóság",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "ambulance",
+        "number": "104",
+        "label": "Ambulance",
+        "source": {
+          "url": "https://nmhh.hu/cikk/188545/Segelyhivo_szamok",
+          "title": "Segélyhívó számok – Nemzeti Média- és Hírközlési Hatóság",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "fire",
+        "number": "105",
+        "label": "Fire service",
+        "source": {
+          "url": "https://nmhh.hu/cikk/188545/Segelyhivo_szamok",
+          "title": "Segélyhívó számok – Nemzeti Média- és Hírközlési Hatóság",
+          "retrieved": "2026-09-26"
+        }
+      }
     ]
   },
   "languages": [

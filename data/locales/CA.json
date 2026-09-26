@@ -1,0 +1,24 @@
+{
+  "iso": "CA",
+  "name": "Canada",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "911",
+      "label": "Emergency",
+      "source": {
+        "url": "https://www.rcmp.ca/en/contact-rcmp",
+        "title": "Contact the Royal Canadian Mounted Police | Royal Canadian Mounted Police",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "notes": [
+      "If you are in immediate danger or need urgent help, the RCMP says to call 9-1-1, your local RCMP detachment or the police service of jurisdiction in your area. MIRA has not yet confirmed 9-1-1 coverage in every territory (e.g. Nunavut). Source: https://www.rcmp.ca/en/contact-rcmp, retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "en",
+    "fr"
+  ],
+  "reviewers": []
+}

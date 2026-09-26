@@ -1,0 +1,56 @@
+{
+  "iso": "MA",
+  "name": "Morocco",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "19",
+      "label": "Police emergency",
+      "source": {
+        "url": "https://www.anrt.ma/infos-pratiques/ce-que-vous-devez-savoir/numerotation",
+        "title": "Numérotation | ANRT | Agence Nationale de Réglementation des Télécommunications",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "services": [
+      {
+        "service": "police",
+        "number": "19",
+        "label": "Police",
+        "source": {
+          "url": "https://www.anrt.ma/infos-pratiques/ce-que-vous-devez-savoir/numerotation",
+          "title": "Numérotation | ANRT | Agence Nationale de Réglementation des Télécommunications",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "police",
+        "number": "177",
+        "label": "Royal Gendarmerie",
+        "source": {
+          "url": "https://www.anrt.ma/infos-pratiques/ce-que-vous-devez-savoir/numerotation",
+          "title": "Numérotation | ANRT | Agence Nationale de Réglementation des Télécommunications",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "fire",
+        "number": "15",
+        "label": "Fire brigade",
+        "source": {
+          "url": "https://www.anrt.ma/infos-pratiques/ce-que-vous-devez-savoir/numerotation",
+          "title": "Numérotation | ANRT | Agence Nationale de Réglementation des Télécommunications",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "notes": [
+      "The telecom regulator ANRT assigns emergency numbers 177 (Royal Gendarmerie), 19 (Police) and 15 (Fire brigade); they can be reached from mobile and fixed phones. Source: https://www.anrt.ma/infos-pratiques/ce-que-vous-devez-savoir/numerotation, retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "ar",
+    "fr"
+  ],
+  "reviewers": []
+}

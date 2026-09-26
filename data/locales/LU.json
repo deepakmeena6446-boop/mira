@@ -14,6 +14,18 @@
     },
     "notes": [
       "112 is the single European emergency number: free of charge from fixed and mobile phones in every EU Member State, and it works alongside any national emergency numbers (EU law: Directive (EU) 2018/1972, Article 109). Source: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32018L1972, retrieved 2026-09-26."
+    ],
+    "services": [
+      {
+        "service": "police",
+        "number": "113",
+        "label": "Police",
+        "source": {
+          "url": "https://police.public.lu/fr/votre-police/appel-urgence-113.html",
+          "title": "Appel d'urgence 113 - Votre Police - Portail de la Police Grand-Ducale - Luxembourg",
+          "retrieved": "2026-09-26"
+        }
+      }
     ]
   },
   "languages": [

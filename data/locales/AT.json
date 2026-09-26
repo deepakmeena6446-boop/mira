@@ -14,6 +14,38 @@
     },
     "notes": [
       "112 is the single European emergency number: free of charge from fixed and mobile phones in every EU Member State, and it works alongside any national emergency numbers (EU law: Directive (EU) 2018/1972, Article 109). Source: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32018L1972, retrieved 2026-09-26."
+    ],
+    "services": [
+      {
+        "service": "police",
+        "number": "133",
+        "label": "Police",
+        "source": {
+          "url": "https://www.oesterreich.gv.at/en/themen/notfaelle_unfaelle_und_kriminalitaet/notrufnummern",
+          "title": "Emergency numbers",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "ambulance",
+        "number": "144",
+        "label": "Ambulance",
+        "source": {
+          "url": "https://www.oesterreich.gv.at/en/themen/notfaelle_unfaelle_und_kriminalitaet/notrufnummern",
+          "title": "Emergency numbers",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "fire",
+        "number": "122",
+        "label": "Fire service",
+        "source": {
+          "url": "https://www.oesterreich.gv.at/en/themen/notfaelle_unfaelle_und_kriminalitaet/notrufnummern",
+          "title": "Emergency numbers",
+          "retrieved": "2026-09-26"
+        }
+      }
     ]
   },
   "languages": [

@@ -1,0 +1,49 @@
+{
+  "iso": "RW",
+  "name": "Rwanda",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "112",
+      "label": "Emergency",
+      "source": {
+        "url": "https://www.gov.rw/emergency",
+        "title": "Emergency",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "services": [
+      {
+        "service": "ambulance",
+        "number": "912",
+        "label": "Ambulance",
+        "source": {
+          "url": "https://www.gov.rw/emergency",
+          "title": "Emergency",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "women_helpline": [
+      {
+        "number": "3512",
+        "name": "Gender-based violence line",
+        "scope": "national",
+        "source": {
+          "url": "https://www.gov.rw/emergency",
+          "title": "Emergency",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "notes": [
+      "The Government of Rwanda also lists 113 for traffic accidents, 118 for traffic police, 110 for maritime problems, 114 for health services and 116 for the child helpline. Source: https://www.gov.rw/emergency, retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "rw",
+    "en",
+    "fr"
+  ],
+  "reviewers": []
+}

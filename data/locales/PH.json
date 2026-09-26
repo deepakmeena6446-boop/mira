@@ -1,0 +1,21 @@
+{
+  "iso": "PH",
+  "name": "Philippines",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "911",
+      "label": "National Emergency Hotline",
+      "source": {
+        "url": "https://ehotlines.e.gov.ph/",
+        "title": "PH Emergency Hotlines",
+        "retrieved": "2026-09-26"
+      }
+    }
+  },
+  "languages": [
+    "fil",
+    "en"
+  ],
+  "reviewers": []
+}

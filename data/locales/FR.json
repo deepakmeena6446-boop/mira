@@ -14,6 +14,51 @@
     },
     "notes": [
       "112 is the single European emergency number: free of charge from fixed and mobile phones in every EU Member State, and it works alongside any national emergency numbers (EU law: Directive (EU) 2018/1972, Article 109). Source: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32018L1972, retrieved 2026-09-26."
+    ],
+    "services": [
+      {
+        "service": "police",
+        "number": "17",
+        "label": "Police",
+        "source": {
+          "url": "https://www.service-public.fr/particuliers/vosdroits/F33954",
+          "title": "Quels sont les numéros en cas d'urgence (Samu, pompiers...) et les numéros d'écoute ? | Service Public",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "ambulance",
+        "number": "15",
+        "label": "Medical emergency (SAMU)",
+        "source": {
+          "url": "https://www.service-public.fr/particuliers/vosdroits/F33954",
+          "title": "Quels sont les numéros en cas d'urgence (Samu, pompiers...) et les numéros d'écoute ? | Service Public",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "fire",
+        "number": "18",
+        "label": "Fire brigade",
+        "source": {
+          "url": "https://www.service-public.fr/particuliers/vosdroits/F33954",
+          "title": "Quels sont les numéros en cas d'urgence (Samu, pompiers...) et les numéros d'écoute ? | Service Public",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "women_helpline": [
+      {
+        "number": "3919",
+        "name": "Violences Femmes Info",
+        "scope": "national",
+        "source": {
+          "url": "https://www.service-public.fr/particuliers/vosdroits/F33954",
+          "title": "Quels sont les numéros en cas d'urgence (Samu, pompiers...) et les numéros d'écoute ? | Service Public",
+          "retrieved": "2026-09-26"
+        },
+        "hours": "24h"
+      }
     ]
   },
   "languages": [

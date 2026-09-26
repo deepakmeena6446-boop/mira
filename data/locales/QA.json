@@ -1,0 +1,21 @@
+{
+  "iso": "QA",
+  "name": "Qatar",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "999",
+      "label": "Emergency (police, fire, ambulance)",
+      "source": {
+        "url": "https://portal.moi.gov.qa/UNCCPCJDoha/English/Emergency_Services.html",
+        "title": ".:: Emergency Services (999-992)",
+        "retrieved": "2026-09-26"
+      }
+    }
+  },
+  "languages": [
+    "ar",
+    "en"
+  ],
+  "reviewers": []
+}

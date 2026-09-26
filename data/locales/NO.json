@@ -1,0 +1,65 @@
+{
+  "iso": "NO",
+  "name": "Norway",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "112",
+      "label": "Police emergency",
+      "source": {
+        "url": "https://nkom.no/telefoni-og-telefonnummer/informasjon-om-telefoni-for-sluttbruker/n%C3%B8dnummer-og-n%C3%B8danrop",
+        "title": "Nødnummer og nødanrop - Nkom",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "services": [
+      {
+        "service": "police",
+        "number": "112",
+        "label": "Police",
+        "source": {
+          "url": "https://nkom.no/telefoni-og-telefonnummer/informasjon-om-telefoni-for-sluttbruker/n%C3%B8dnummer-og-n%C3%B8danrop",
+          "title": "Nødnummer og nødanrop - Nkom",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "fire",
+        "number": "110",
+        "label": "Fire",
+        "source": {
+          "url": "https://nkom.no/telefoni-og-telefonnummer/informasjon-om-telefoni-for-sluttbruker/n%C3%B8dnummer-og-n%C3%B8danrop",
+          "title": "Nødnummer og nødanrop - Nkom",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "ambulance",
+        "number": "113",
+        "label": "Ambulance",
+        "source": {
+          "url": "https://nkom.no/telefoni-og-telefonnummer/informasjon-om-telefoni-for-sluttbruker/n%C3%B8dnummer-og-n%C3%B8danrop",
+          "title": "Nødnummer og nødanrop - Nkom",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "women_helpline": [
+      {
+        "number": "116006",
+        "name": "Vold- og overgrepslinjen (domestic violence helpline)",
+        "scope": "national",
+        "hours": "24h",
+        "source": {
+          "url": "https://www.bufdir.no/vold/aresrelatert/hjelp-til-utsatte/",
+          "title": "Hjelp til utsatte | Bufdir",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ]
+  },
+  "languages": [
+    "no"
+  ],
+  "reviewers": []
+}

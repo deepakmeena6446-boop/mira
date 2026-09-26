@@ -1,0 +1,68 @@
+{
+  "iso": "NP",
+  "name": "Nepal",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "100",
+      "label": "Police emergency",
+      "source": {
+        "url": "https://www.nepalpolice.gov.np/",
+        "title": "नेपाल प्रहरी - www.nepalpolice.gov.np",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "services": [
+      {
+        "service": "police",
+        "number": "100",
+        "label": "Police",
+        "source": {
+          "url": "https://www.nepalpolice.gov.np/",
+          "title": "नेपाल प्रहरी - www.nepalpolice.gov.np",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "fire",
+        "number": "101",
+        "label": "Fire",
+        "source": {
+          "url": "https://www.nta.gov.np/uploads/contents/National%20Numbering%20Allocation%20Plan.pdf",
+          "title": "Microsoft Word - National Numbering Allocation Plan",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "ambulance",
+        "number": "102",
+        "label": "Ambulance",
+        "source": {
+          "url": "https://www.nta.gov.np/uploads/contents/National%20Numbering%20Allocation%20Plan.pdf",
+          "title": "Microsoft Word - National Numbering Allocation Plan",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "women_helpline": [
+      {
+        "number": "1145",
+        "name": "National Women Commission hotline (Khabar Garaun 1145)",
+        "scope": "national",
+        "hours": "24h",
+        "source": {
+          "url": "https://nwc.gov.np/",
+          "title": "National women Commission",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "notes": [
+      "Khabar Garaun 1145 is a toll-free helpline run by the National Women Commission for gender-based violence and violence against women, accessible 24/7. Source: https://nwchelpline.gov.np/?lang=en (Khabar Garau, National Women Commission), retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "ne"
+  ],
+  "reviewers": []
+}

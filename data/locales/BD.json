@@ -1,0 +1,32 @@
+{
+  "iso": "BD",
+  "name": "Bangladesh",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "999",
+      "label": "National Emergency Service (police, fire, ambulance)",
+      "source": {
+        "url": "https://telecom-police.portal.gov.bd/pages/static-pages/695e3b0cc4774958d7b72321",
+        "title": "জাতীয় জরুরি সেবা ৯৯৯ | পাতা | পুলিশ টেলিকম সংস্থা",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "women_helpline": [
+      {
+        "number": "109",
+        "name": "National helpline for preventing violence against women and children",
+        "scope": "national",
+        "source": {
+          "url": "https://mowca.gov.bd/pages/static-pages/694032d135ce18e1c0562ea7",
+          "title": "ই সার্ভিস সমূহ | পাতা | মহিলা ও শিশু বিষয়ক মন্ত্রণালয়",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ]
+  },
+  "languages": [
+    "bn"
+  ],
+  "reviewers": []
+}

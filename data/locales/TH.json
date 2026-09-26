@@ -1,0 +1,69 @@
+{
+  "iso": "TH",
+  "name": "Thailand",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "191",
+      "label": "Police emergency",
+      "source": {
+        "url": "https://thailand.prd.go.th/en/content/category/detail/id/2078/iid/447104",
+        "title": "Thailand's Tourist Assistance Contact Numbers",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "also": [
+      {
+        "number": "1155",
+        "label": "Tourist Police",
+        "source": {
+          "url": "https://thailand.prd.go.th/en/content/category/detail/id/2078/iid/447104",
+          "title": "Thailand's Tourist Assistance Contact Numbers",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "services": [
+      {
+        "service": "police",
+        "number": "191",
+        "label": "Police (Royal Thai Police Emergency Call Center)",
+        "source": {
+          "url": "https://thailand.prd.go.th/en/content/category/detail/id/2078/iid/447104",
+          "title": "Thailand's Tourist Assistance Contact Numbers",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "ambulance",
+        "number": "1669",
+        "label": "Medical emergency",
+        "source": {
+          "url": "https://thailand.prd.go.th/en/content/category/detail/id/2078/iid/447104",
+          "title": "Thailand's Tourist Assistance Contact Numbers",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "women_helpline": [
+      {
+        "number": "1300",
+        "name": "Thailand Hotline 1300 (Ministry of Social Development and Human Security)",
+        "scope": "national",
+        "hours": "24h",
+        "source": {
+          "url": "https://www.prd.go.th/th/content/category/detail/id/31/iid/511136",
+          "title": "ก้าวข้ามความเงียบ: แนวทางและกลไกรัฐในการช่วยเหลือผู้ถูกกระทำด้วยความรุนแรงในครอบครัว",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "notes": [
+      "Government Public Relations Department list for travellers: Tourist Police Bureau 1155, Emergency Call Center (Royal Thai Police) 191, Medical Emergency Call Center 1669. Source: https://thailand.prd.go.th/en/content/category/detail/id/2078/iid/447104, retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "th"
+  ],
+  "reviewers": []
+}

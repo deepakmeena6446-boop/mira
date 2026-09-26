@@ -1,0 +1,33 @@
+{
+  "iso": "TR",
+  "name": "Türkiye",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "112",
+      "label": "Emergency (police, fire, ambulance, gendarmerie)",
+      "source": {
+        "url": "https://www.112.gov.tr/acil-durumda-tek-numara-112",
+        "title": "112 Acil Çağrı Merkezi - Acil Durumda... Tek Numara! 112",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "women_helpline": [
+      {
+        "number": "183",
+        "name": "ALO 183 Social Support Line",
+        "scope": "national",
+        "hours": "24h",
+        "source": {
+          "url": "https://www.aile.gov.tr/ksgm/siddete-maruz-kalindiginda/",
+          "title": "Kadının Statüsü Genel Müdürlüğü | Şiddete Maruz Kalındığında",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ]
+  },
+  "languages": [
+    "tr"
+  ],
+  "reviewers": []
+}

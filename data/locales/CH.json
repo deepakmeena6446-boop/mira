@@ -1,0 +1,68 @@
+{
+  "iso": "CH",
+  "name": "Switzerland",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "112",
+      "label": "Emergency (connects to police)",
+      "source": {
+        "url": "https://www.ch.ch/en/safety-and-justice/emergencies-and-danger/",
+        "title": "Emergencies and danger",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "services": [
+      {
+        "service": "police",
+        "number": "117",
+        "label": "Police",
+        "source": {
+          "url": "https://www.ch.ch/en/safety-and-justice/emergencies-and-danger/",
+          "title": "Emergencies and danger",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "fire",
+        "number": "118",
+        "label": "Fire brigade",
+        "source": {
+          "url": "https://www.ch.ch/en/safety-and-justice/emergencies-and-danger/",
+          "title": "Emergencies and danger",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "ambulance",
+        "number": "144",
+        "label": "Ambulance",
+        "source": {
+          "url": "https://www.ch.ch/en/safety-and-justice/emergencies-and-danger/",
+          "title": "Emergencies and danger",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "women_helpline": [
+      {
+        "number": "142",
+        "name": "Victim support for people affected by violence (Opferhilfe 142)",
+        "scope": "national",
+        "hours": "24h",
+        "source": {
+          "url": "https://www.bj.admin.ch/de/opferhilfe",
+          "title": "Opferhilfe",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ]
+  },
+  "languages": [
+    "de",
+    "fr",
+    "it",
+    "rm"
+  ],
+  "reviewers": []
+}

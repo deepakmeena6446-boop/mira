@@ -1,0 +1,37 @@
+{
+  "iso": "MY",
+  "name": "Malaysia",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "999",
+      "label": "Emergency (police, fire, ambulance, civil defence)",
+      "source": {
+        "url": "https://www.malaysia.gov.my/en/categories/safety-and-community/public-safety/mers-999-emergency-line",
+        "title": "MERS 999 Emergency Line",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "women_helpline": [
+      {
+        "number": "15999",
+        "name": "Talian Kasih 15999",
+        "scope": "national",
+        "hours": "24h",
+        "source": {
+          "url": "https://www.malaysia.gov.my/en/personas/women/undang-undang-dan-perlindungan-wanita/talian-kasih-15999",
+          "title": "Talian Kasih 15999",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "notes": [
+      "MERS 999 connects to the Royal Malaysia Police, Fire and Rescue Department, Ministry of Health, Civil Defence Force and Maritime Enforcement Agency. Misuse of 999 is an offence. Source: https://www.malaysia.gov.my/en/categories/safety-and-community/public-safety/mers-999-emergency-line, retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "ms",
+    "en"
+  ],
+  "reviewers": []
+}

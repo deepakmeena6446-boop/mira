@@ -1,0 +1,35 @@
+{
+  "iso": "UG",
+  "name": "Uganda",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "999",
+      "label": "Police emergency",
+      "source": {
+        "url": "https://upf.go.ug/faq/",
+        "title": "FAQ - Uganda Police Force",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "also": [
+      {
+        "number": "112",
+        "label": "Police emergency (also works)",
+        "source": {
+          "url": "https://upf.go.ug/faq/",
+          "title": "FAQ - Uganda Police Force",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "notes": [
+      "In an emergency, the Uganda Police Force says to dial 999 or 112 (toll free). Source: https://upf.go.ug/faq/ and https://upf.go.ug/national-emergence-toll-free-numbers-for-public-safety/ (Uganda Police Force), retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "en",
+    "sw"
+  ],
+  "reviewers": []
+}

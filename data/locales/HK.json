@@ -1,0 +1,24 @@
+{
+  "iso": "HK",
+  "name": "Hong Kong",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "999",
+      "label": "Emergency (police, fire, ambulance)",
+      "source": {
+        "url": "https://www.police.gov.hk/ppp_en/01_about_us/pp_operation.html",
+        "title": "Operations Wing (999 Emergency Calls) | Performance Pledge | Hong Kong Police Force",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "notes": [
+      "For police, Fire Services Department or ambulance help, dial 999. People with speech or hearing impairment can send an SMS to 992. Source: https://www.gov.hk/en/nonresidents/visitinghk/usefulinfo/emergency.htm (GovHK: Getting Emergency Help), retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "zh",
+    "en"
+  ],
+  "reviewers": []
+}

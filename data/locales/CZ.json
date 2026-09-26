@@ -14,6 +14,38 @@
     },
     "notes": [
       "112 is the single European emergency number: free of charge from fixed and mobile phones in every EU Member State, and it works alongside any national emergency numbers (EU law: Directive (EU) 2018/1972, Article 109). Source: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32018L1972, retrieved 2026-09-26."
+    ],
+    "services": [
+      {
+        "service": "police",
+        "number": "158",
+        "label": "Police",
+        "source": {
+          "url": "https://policie.gov.cz/clanek/narodni-linka-tisnoveho-volani-158.aspx",
+          "title": "Archiv: Národní tísňové číslo 158 - Policie České republiky",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "ambulance",
+        "number": "155",
+        "label": "Ambulance",
+        "source": {
+          "url": "https://policie.gov.cz/clanek/narodni-linka-tisnoveho-volani-158.aspx",
+          "title": "Archiv: Národní tísňové číslo 158 - Policie České republiky",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "fire",
+        "number": "150",
+        "label": "Fire and rescue",
+        "source": {
+          "url": "https://policie.gov.cz/clanek/narodni-linka-tisnoveho-volani-158.aspx",
+          "title": "Archiv: Národní tísňové číslo 158 - Policie České republiky",
+          "retrieved": "2026-09-26"
+        }
+      }
     ]
   },
   "languages": [

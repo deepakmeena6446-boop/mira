@@ -14,6 +14,31 @@
     },
     "notes": [
       "112 is the single European emergency number: free of charge from fixed and mobile phones in every EU Member State, and it works alongside any national emergency numbers (EU law: Directive (EU) 2018/1972, Article 109). Source: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32018L1972, retrieved 2026-09-26."
+    ],
+    "services": [
+      {
+        "service": "police",
+        "number": "110",
+        "label": "Police",
+        "source": {
+          "url": "https://www.bundesnetzagentur.de/DE/Fachthemen/Telekommunikation/Nummerierung/Notruf/artikel.html",
+          "title": "Bundesnetzagentur - Homepage - 110, 112 Notruf",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "women_helpline": [
+      {
+        "number": "116016",
+        "name": "Hilfetelefon Gewalt gegen Frauen",
+        "scope": "national",
+        "source": {
+          "url": "https://www.hilfetelefon.de/",
+          "title": "Startseite: Hilfetelefon",
+          "retrieved": "2026-09-26"
+        },
+        "hours": "24h"
+      }
     ]
   },
   "languages": [

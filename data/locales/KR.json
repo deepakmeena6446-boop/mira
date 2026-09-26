@@ -1,0 +1,69 @@
+{
+  "iso": "KR",
+  "name": "South Korea",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "112",
+      "label": "Police emergency",
+      "source": {
+        "url": "https://112.go.kr/",
+        "title": "112신고포털",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "services": [
+      {
+        "service": "police",
+        "number": "112",
+        "label": "Police",
+        "source": {
+          "url": "https://112.go.kr/",
+          "title": "112신고포털",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "fire",
+        "number": "119",
+        "label": "Fire and rescue",
+        "source": {
+          "url": "https://www.119.go.kr/Center119/sense01.do",
+          "title": "소방상식",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "ambulance",
+        "number": "119",
+        "label": "Ambulance",
+        "source": {
+          "url": "https://www.119.go.kr/Center119/sense01.do",
+          "title": "소방상식",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "women_helpline": [
+      {
+        "number": "1366",
+        "name": "Women's Emergency Hotline 1366",
+        "scope": "national",
+        "hours": "24h",
+        "source": {
+          "url": "https://www.mogef.go.kr/cc/wcc/cc_wcc_f001.do",
+          "title": "성평등가족부",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "notes": [
+      "The Korean National Police Agency's English site lists Crime Report 112 and Fire/Accidents/Rescue 119. Source: https://www.police.go.kr/eng/main.do (Korean National Police Agency), retrieved 2026-09-26.",
+      "Korea's emergency numbers were integrated into 112 and 119 for emergencies and 110 for non-emergency public service (as of Oct. 2016). Source: https://www.mois.go.kr/eng/sub/a03/bestPractices3/screen.do (Ministry of the Interior and Safety), retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "ko"
+  ],
+  "reviewers": []
+}

@@ -1,0 +1,56 @@
+{
+  "iso": "TZ",
+  "name": "Tanzania",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "112",
+      "label": "Police emergency",
+      "source": {
+        "url": "https://polisi.go.tz/mawasiliano",
+        "title": "Polisi | Mwanzo",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "services": [
+      {
+        "service": "police",
+        "number": "112",
+        "label": "Police",
+        "source": {
+          "url": "https://polisi.go.tz/mawasiliano",
+          "title": "Polisi | Mwanzo",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "fire",
+        "number": "114",
+        "label": "Fire and rescue",
+        "source": {
+          "url": "https://polisi.go.tz/mawasiliano",
+          "title": "Polisi | Mwanzo",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "ambulance",
+        "number": "115",
+        "label": "Ambulance",
+        "source": {
+          "url": "https://polisi.go.tz/mawasiliano",
+          "title": "Polisi | Mwanzo",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "notes": [
+      "The Tanzania Police Force lists these emergency numbers: 112 police, 114 fire and rescue (Zimamoto), 115 ambulance (Gari ya wagonjwa), 116 child helpline (Msaada kwa mtoto). Source: https://polisi.go.tz/mawasiliano (Tanzania Police Force), retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "sw",
+    "en"
+  ],
+  "reviewers": []
+}

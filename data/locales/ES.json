@@ -14,6 +14,31 @@
     },
     "notes": [
       "112 is the single European emergency number: free of charge from fixed and mobile phones in every EU Member State, and it works alongside any national emergency numbers (EU law: Directive (EU) 2018/1972, Article 109). Source: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32018L1972, retrieved 2026-09-26."
+    ],
+    "services": [
+      {
+        "service": "police",
+        "number": "062",
+        "label": "Guardia Civil",
+        "source": {
+          "url": "https://web.guardiacivil.es/es/colaboracion/atencionciudadano_1/",
+          "title": "Contacta",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "women_helpline": [
+      {
+        "number": "016",
+        "name": "016 (gender-violence line)",
+        "scope": "national",
+        "source": {
+          "url": "https://violenciagenero.igualdad.gob.es/informacion-3/recursos/telefono016/",
+          "title": "Teléfono 016 - 016 online - WhatsApp",
+          "retrieved": "2026-09-26"
+        },
+        "hours": "24h"
+      }
     ]
   },
   "languages": [

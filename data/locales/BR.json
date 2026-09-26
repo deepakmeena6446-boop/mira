@@ -1,0 +1,65 @@
+{
+  "iso": "BR",
+  "name": "Brazil",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "190",
+      "label": "Police emergency (Polícia Militar)",
+      "source": {
+        "url": "https://www.gov.br/anatel/pt-br/regulado/numeracao/codigos-nacionais/servicos-de-utilidade-publica-e-de-emergencia",
+        "title": "Serviços de Utilidade Pública e de Emergência (SUP)",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "services": [
+      {
+        "service": "police",
+        "number": "190",
+        "label": "Military Police",
+        "source": {
+          "url": "https://www.gov.br/anatel/pt-br/regulado/numeracao/codigos-nacionais/servicos-de-utilidade-publica-e-de-emergencia",
+          "title": "Serviços de Utilidade Pública e de Emergência (SUP)",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "ambulance",
+        "number": "192",
+        "label": "Ambulance (SAMU)",
+        "source": {
+          "url": "https://www.gov.br/anatel/pt-br/regulado/numeracao/codigos-nacionais/servicos-de-utilidade-publica-e-de-emergencia",
+          "title": "Serviços de Utilidade Pública e de Emergência (SUP)",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "service": "fire",
+        "number": "193",
+        "label": "Fire brigade",
+        "source": {
+          "url": "https://www.gov.br/anatel/pt-br/regulado/numeracao/codigos-nacionais/servicos-de-utilidade-publica-e-de-emergencia",
+          "title": "Serviços de Utilidade Pública e de Emergência (SUP)",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "women_helpline": [
+      {
+        "number": "180",
+        "name": "Central de Atendimento à Mulher – Ligue 180",
+        "scope": "national",
+        "hours": "24h",
+        "source": {
+          "url": "https://www.gov.br/mulheres/pt-br/ligue180",
+          "title": "Ligue 180 - Central de Atendimento à Mulher",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ]
+  },
+  "languages": [
+    "pt"
+  ],
+  "reviewers": []
+}
