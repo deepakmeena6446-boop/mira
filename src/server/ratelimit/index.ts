@@ -50,9 +50,21 @@ export function clientIp(req: Request): string {
   if (xff) {
     const parts = xff.split(",").map((p) => p.trim()).filter(Boolean);
     const pick = parts[Math.max(0, parts.length - hops)];
-    if (pick) return pick.slice(0, 64);
+    if (pick) return ipBucket(pick.slice(0, 64));
   }
-  return req.headers.get("x-real-ip")?.slice(0, 64) ?? "unknown";
+  return ipBucket(req.headers.get("x-real-ip")?.slice(0, 64) ?? "unknown");
+}
+
+/**
+ * IPv6 clients usually hold a whole /64, so one person could otherwise rotate through
+ * unlimited addresses (and unlimited rate-limit buckets). Count a /64 as one address.
+ */
+export function ipBucket(ip: string): string {
+  if (!ip.includes(":") || /^::ffff:\d+\.\d+\.\d+\.\d+$/i.test(ip)) return ip;
+  const [head] = ip.split("::");
+  const groups = ip.includes("::") ? head.split(":").filter(Boolean) : ip.split(":");
+  const full = ip.includes("::") ? [...groups, "0", "0", "0", "0"].slice(0, 4) : groups.slice(0, 4);
+  return `${full.map((g) => g.toLowerCase()).join(":")}::/64`;
 }
 
 export async function purgeExpiredCounters(sql: postgres.Sql, now: Date): Promise<number> {

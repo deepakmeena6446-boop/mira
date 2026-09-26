@@ -1,3 +1,5 @@
+import type { HelpPoint } from "@/domain/help-points";
+
 export interface GeoPoint {
   lat: number;
   lon: number;
@@ -28,6 +30,14 @@ export interface GeoProvider {
   /** A human place name near the point, or null when unknown — never raw coordinates. */
   reverse(p: GeoPoint): Promise<{ label: string | null; precise: boolean }>;
   walk(a: GeoPoint, b: GeoPoint): Promise<WalkRoute>;
+  /** Up to three walking routes, fastest first (one when the provider has no alternatives). */
+  walkRoutes(a: GeoPoint, b: GeoPoint): Promise<WalkRoute[]>;
   /** Nearby places, optionally limited to kinds (metro, bus, pharmacy, health, police, food, shop, toilets, finance). */
   nearby(p: GeoPoint, radiusM: number, kinds?: string[]): Promise<PlaceHit[]>;
+  /**
+   * Help Point candidates (src/domain/help-points.ts classes) within `radiusM` of any of the
+   * points — one point for "near me", several samples along a route. Classified by the
+   * provider from its own place types/tags; hours only as the source states them.
+   */
+  helpPlaces(points: GeoPoint[], radiusM: number): Promise<HelpPoint[]>;
 }

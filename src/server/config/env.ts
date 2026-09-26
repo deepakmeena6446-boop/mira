@@ -88,6 +88,9 @@ const envSchema = z.object({
   GOOGLE_MAPS_BROWSER_KEY: optionalNonEmpty,
   // Street-lighting layer: streetlight poles detected in Mapillary imagery (optional).
   MAPILLARY_TOKEN: optionalNonEmpty,
+  // Spend ceilings (public defaults in code; production may override). See src/server/providers/geo/budget.ts, api/mira.
+  GOOGLE_MAX_CALLS_PER_MIN: optionalNonEmpty.refine((v) => v === undefined || /^\d{1,6}$/.test(v), "must be a whole number"),
+  MIRA_GLOBAL_DAILY_MAX: optionalNonEmpty.refine((v) => v === undefined || /^\d{1,7}$/.test(v), "must be a whole number"),
   AUTH_GOOGLE_ID: optionalNonEmpty,
   AUTH_GOOGLE_SECRET: optionalNonEmpty,
   VAPID_PUBLIC_KEY: optionalNonEmpty,

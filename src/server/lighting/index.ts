@@ -131,14 +131,25 @@ const quiet = async <T>(p: Promise<T>, empty: T, layer: string): Promise<T> => {
 
 /** Lighting along a real walking route (not for straight-line estimates, which don't follow streets). */
 export async function lightingForRoute(sql: postgres.Sql, geometry: Array<[number, number]>, now = new Date()): Promise<RouteLighting | null> {
-  if (geometry.length < 3) return null;
-  const b = bboxOf(geometry);
+  return (await lightingForRoutes(sql, [geometry], now))[0];
+}
+
+/**
+ * Lighting for several route options at once. The layers are fetched ONCE for a box around
+ * all of them, so every option is judged on the same data (a second Overpass call inside the
+ * polite-rate window would return nothing and make one option look less mapped than it is).
+ * Entries shorter than 3 points (straight-line estimates) get null.
+ */
+export async function lightingForRoutes(sql: postgres.Sql, geometries: Array<Array<[number, number]>>, now = new Date()): Promise<Array<RouteLighting | null>> {
+  const real = geometries.filter((g) => g.length >= 3);
+  if (!real.length) return geometries.map(() => null);
+  const b = bboxOf(real.flat());
   const [walkers, ways, poles] = await Promise.all([
-    quiet(walkerCells(sql, cellsForRoute(geometry), now), [], "walkers"),
+    quiet(walkerCells(sql, [...new Set(real.flatMap((g) => cellsForRoute(g)))], now), [], "walkers"),
     quiet(osmLitWays(b), [], "osm"),
     quiet(mapillaryPoles(b), [], "mapillary"),
   ]);
-  return routeLighting(geometry, { walkers, ways, poles });
+  return geometries.map((g) => (g.length >= 3 ? routeLighting(g, { walkers, ways, poles }) : null));
 }
 
 const VALUE: Record<LitVote, number> = { lit: 1, partly: 0, dark: -1 };

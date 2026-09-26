@@ -1,6 +1,7 @@
 import "server-only";
 import { osmAreaName } from "./osm-reverse";
-import { overpassNearby, photonSearch } from "./osm-live";
+import { overpassHelp, overpassNearby, photonSearch } from "./osm-live";
+import { HELP_CLASSES, dedupeHelpPoints, helpClassFromOsm, isOpen24h, type HelpPoint } from "@/domain/help-points";
 import { nominatimSearch } from "./osm-reverse";
 import { rankPlaces } from "@/domain/search-rank";
 import type postgres from "postgres";
@@ -27,6 +28,24 @@ export function placeholderGeo(sql: postgres.Sql): GeoProvider {
     distanceM: Math.round(r.d),
     hours: r.hours,
   });
+
+  const walkRoutes = async (a: GeoPoint, b: GeoPoint): Promise<WalkRoute[]> => {
+    const graph = await loadGraph(sql).catch(() => null);
+    if (graph) {
+      const plan = planRoutes(graph, a, b);
+      if (plan.ok && plan.routes.length) {
+        return plan.routes.map((r) => ({
+          meters: Math.round(r.lengthM),
+          minutes: r.minutes,
+          geometry: [[a.lon, a.lat], ...pathCoords(graph, r.path).map((c) => [c.lon, c.lat] as [number, number]), [b.lon, b.lat]],
+          approximate: false,
+        }));
+      }
+    }
+    // Straight line with a typical street-network detour factor.
+    const meters = Math.round(haversineMeters(a, b) * 1.3);
+    return [{ meters, minutes: Math.max(1, Math.ceil(meters / ((WALKING_SPEED_KMH * 1000) / 60))), geometry: [[a.lon, a.lat], [b.lon, b.lat]], approximate: true }];
+  };
 
   return {
     async search(q, near, opts) {
@@ -63,18 +82,32 @@ export function placeholderGeo(sql: postgres.Sql): GeoProvider {
     },
 
     async walk(a, b): Promise<WalkRoute> {
-      const graph = await loadGraph(sql).catch(() => null);
-      if (graph) {
-        const plan = planRoutes(graph, a, b);
-        if (plan.ok && plan.routes[0]) {
-          const r = plan.routes[0];
-          const coords = pathCoords(graph, r.path);
-          return { meters: Math.round(r.lengthM), minutes: r.minutes, geometry: [[a.lon, a.lat], ...coords.map((c) => [c.lon, c.lat] as [number, number]), [b.lon, b.lat]], approximate: false };
-        }
+      return (await walkRoutes(a, b))[0];
+    },
+
+    walkRoutes,
+
+    async helpPlaces(points, radiusM) {
+      if (!points.length) return [];
+      type HelpRow = { id: string; name: string | null; kind: string | null; place_type: string; tags: Record<string, string>; lat: number; lon: number };
+      const rows = await sql<HelpRow[]>`
+        SELECT id, name, tags->>'mira:kind' AS kind, place_type, tags, ST_Y(point) AS lat, ST_X(point) AS lon
+        FROM places
+        WHERE place_type = ANY(${["health", "police", "metro", "rail", "pharmacy", "accommodation"]})
+          AND ST_DWithin(point::geography,
+                (SELECT ST_Collect(ST_SetSRID(ST_MakePoint(x, y), 4326)) FROM unnest(${points.map((p) => p.lon)}::float8[], ${points.map((p) => p.lat)}::float8[]) AS t(x, y))::geography,
+                ${radiusM})
+        LIMIT 80`;
+      const local: HelpPoint[] = [];
+      for (const r of rows) {
+        const cls = helpClassFromOsm(r.tags);
+        if (!cls) continue;
+        const hours = r.tags.opening_hours ?? null;
+        local.push({ id: r.id, name: displayName(r.name, r.kind ?? HELP_CLASSES[cls].label), cls, lat: r.lat, lon: r.lon, open24h: isOpen24h(hours), hours: isOpen24h(hours) ? null : hours, source: "osm" });
       }
-      // Straight line with a typical street-network detour factor.
-      const meters = Math.round(haversineMeters(a, b) * 1.3);
-      return { meters, minutes: Math.max(1, Math.ceil(meters / ((WALKING_SPEED_KMH * 1000) / 60))), geometry: [[a.lon, a.lat], [b.lon, b.lat]], approximate: true };
+      // The local snapshot covers one small area; elsewhere ask live OpenStreetMap once for the whole corridor.
+      const live = local.length >= 3 ? [] : await overpassHelp(points, radiusM);
+      return dedupeHelpPoints([...local, ...live]);
     },
 
     async nearby(p, radiusM, kinds) {

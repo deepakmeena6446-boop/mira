@@ -1,5 +1,6 @@
 import "server-only";
 import { classifyPlace, type PlaceType } from "@/domain/osm";
+import { helpClassFromOsm, isOpen24h, type HelpPoint } from "@/domain/help-points";
 import { haversineMeters } from "@/domain/pilot";
 import { getEnv } from "@/server/config/env";
 import type { GeoPoint, PlaceHit } from "./types";
@@ -91,6 +92,55 @@ export async function overpassNearby(p: GeoPoint, radiusM: number, allowed: stri
     .filter((h) => h.distanceM! <= radiusM)
     .sort((a, b) => a.distanceM! - b.distanceM!)
     .slice(0, 30);
+}
+
+const helpCache = cached<HelpPoint[]>(500, 60 * 60_000);
+
+/**
+ * Help Point candidates near any of the points, in ONE Overpass request: `around` with
+ * several coordinates covers the line through them, so a whole route corridor costs the
+ * same as a single spot (and stays inside the public server's polite rate).
+ */
+export async function overpassHelp(points: GeoPoint[], radiusM: number): Promise<HelpPoint[]> {
+  const base = getEnv().OVERPASS_URL;
+  if (!base || !points.length) return [];
+  const pts = points.slice(0, 8).map(round);
+  const r = Math.min(Math.round(radiusM), 1500);
+  const key = `${pts.map((c) => `${c.lat},${c.lon}`).join(";")}|${r}`;
+  const hit = helpCache.get(key);
+  if (hit) return hit;
+  if (Date.now() - lastOverpass < 1000) return [];
+  lastOverpass = Date.now();
+  const around = `(around:${r},${pts.map((c) => `${c.lat},${c.lon}`).join(",")})`;
+  const query = `[out:json][timeout:8];(
+    nwr${around}[amenity~"^(hospital|police|pharmacy|fuel)$"];
+    nwr${around}[healthcare~"^(hospital|pharmacy)$"];
+    nwr${around}[tourism=hotel];
+    nwr${around}[railway~"^(station|subway_entrance)$"];
+  );out center tags 120;`;
+  try {
+    const res = await fetch(base, {
+      method: "POST",
+      headers: { "user-agent": UA(), "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ data: query }),
+      signal: AbortSignal.timeout(9000),
+    });
+    if (!res.ok) return [];
+    type El = { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
+    const out: HelpPoint[] = [];
+    for (const e of ((await res.json()) as { elements: El[] }).elements ?? []) {
+      const at = e.center ?? (e.lat !== undefined && e.lon !== undefined ? { lat: e.lat, lon: e.lon } : null);
+      const cls = e.tags ? helpClassFromOsm(e.tags) : null;
+      const name = e.tags?.["name:en"] ?? e.tags?.name;
+      if (!at || !cls || !name) continue;
+      const hours = e.tags?.opening_hours ?? null;
+      out.push({ id: `osm:${e.type}/${e.id}`, name, cls, lat: at.lat, lon: at.lon, open24h: isOpen24h(hours), hours: isOpen24h(hours) ? null : hours, source: "osm" });
+    }
+    helpCache.set(key, out);
+    return out;
+  } catch {
+    return [];
+  }
 }
 
 const searchCache = cached<PlaceHit[]>(500, 60 * 60_000);

@@ -26,8 +26,18 @@ export const startTripSchema = z
     from: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).strict(),
     to: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180), name: z.string().trim().min(1).max(80) }).strict(),
     share: z.boolean().default(true),
+    /** Walking minutes of the route option she chose, when it isn't the fastest (clamped on the server). */
+    routeMinutes: z.number().int().min(1).max(240).optional(),
   })
   .strict();
+
+/** A chosen alternative can make the ETA later than the fastest walk, but not absurdly so. */
+export const ROUTE_CHOICE_MAX_STRETCH = 1.6;
+
+export function chosenMinutes(fastest: number, chosen: number | undefined): number {
+  if (chosen === undefined) return fastest;
+  return Math.min(Math.max(chosen, fastest), Math.ceil(fastest * ROUTE_CHOICE_MAX_STRETCH));
+}
 
 export function tripOwnerHash(userId: string): string {
   return hmacHex("user-actor", userId);
@@ -106,8 +116,9 @@ const COLS = "id, state, dest_lat, dest_lon, dest_name, eta_at, route_meters, ex
 export async function startTrip(sql: postgres.Sql, user: User, input: z.infer<typeof startTripSchema>, clock: Clock): Promise<TripView> {
   const now = clock.now();
   const route = await getGeo().walk(input.from, input.to);
-  if (tooLongForTrip(route.minutes)) throw new ApiError(400, "too_far", "That's more than a 3-hour walk. Try sharing a closer stop.");
-  const eta = etaFor(route.minutes, now);
+  const minutes = chosenMinutes(route.minutes, input.routeMinutes);
+  if (tooLongForTrip(minutes)) throw new ApiError(400, "too_far", "That's more than a 3-hour walk. Try sharing a closer stop.");
+  const eta = etaFor(minutes, now);
   const ownerToken = randomToken(24); // the traveller's own "Share link" (they choose who gets it)
   let created: { row: Row; links: Array<{ contactId: string; name: string; email: string; token: string }> };
   try {

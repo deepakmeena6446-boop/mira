@@ -4,10 +4,16 @@ import { handle, json, readJson } from "@/server/http/handler";
 import { assertSameOrigin } from "@/server/http/csrf";
 import { clientIp, dailyKey, enforce } from "@/server/ratelimit";
 import { requireUser } from "@/server/session/user";
+import { getEnv } from "@/server/config/env";
 import { respond, type MiraCard, type MiraTurn } from "@/server/providers/companion";
 import type { MiraEvent } from "@/server/providers/companion/types";
 
 export const dynamic = "force-dynamic";
+
+/** Messages per person per day: bounds AI spend on a public URL (launch audit P0-7). */
+export const MIRA_DAILY_MAX = 60;
+/** Messages per day across everyone (override with MIRA_GLOBAL_DAILY_MAX). */
+const MIRA_GLOBAL_DAILY_DEFAULT = 5000;
 
 const body = z
   .object({
@@ -60,8 +66,10 @@ export const POST = handle(async (req: Request) => {
   const sql = getSql();
   const user = await requireUser(sql);
   const now = new Date();
-  await enforce(sql, [dailyKey("actor", user.id, now)], [{ bucket: "mira:m", max: 20, windowMs: 60_000 }, { bucket: "mira:d", max: 400, windowMs: 86_400_000 }], now);
+  await enforce(sql, [dailyKey("actor", user.id, now)], [{ bucket: "mira:m", max: 20, windowMs: 60_000 }, { bucket: "mira:d", max: MIRA_DAILY_MAX, windowMs: 86_400_000 }], now);
   await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "mira:ip:m", max: 300, windowMs: 60_000 }], now);
+  // A ceiling for the whole service, so many accounts can't add up to unbounded AI spend.
+  await enforce(sql, [dailyKey("global", "mira", now)], [{ bucket: "mira:global:d", max: Number(getEnv().MIRA_GLOBAL_DAILY_MAX ?? MIRA_GLOBAL_DAILY_DEFAULT), windowMs: 86_400_000 }], now);
   const { message, context } = await readJson(req, body, 8192);
   const recent = await sql<{ role: "user" | "assistant"; content: Stored }[]>`
     SELECT role, content FROM (SELECT * FROM mira_messages WHERE user_id = ${user.id} ORDER BY id DESC LIMIT 12) m ORDER BY id`;

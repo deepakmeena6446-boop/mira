@@ -81,6 +81,11 @@ export interface RouteLighting {
   segments: LightingSegment[];
   /** Share of the route (0–100, rounded) in each status. */
   summary: Record<LightStatus, number>;
+  /**
+   * The part of `summary.lit` / `summary.dark` that comes from walkers who agree (the only
+   * source that knows whether a light works tonight); the rest of lit/dark is *mapped*.
+   */
+  confirmed: { lit: number; dark: number };
   sources: { walkers: boolean; osm: boolean; poles: boolean };
 }
 
@@ -88,9 +93,15 @@ export function routeLighting(geometry: Array<[number, number]>, layers: { walke
   const samples = samplePolyline(geometry);
   const byCell = new Map(layers.walkers.map((c) => [c.cell, c]));
   const used = { walkers: false, osm: false, poles: false };
+  let walkerLit = 0;
+  let walkerDark = 0;
   const statuses: LightStatus[] = samples.map((p) => {
     const w = walkerVerdict(byCell.get(encodeGeohash(p.lat, p.lon, LIT_CELL_PRECISION)));
-    if (w) return (used.walkers = true), w;
+    if (w) {
+      if (w === "lit") walkerLit++;
+      else walkerDark++;
+      return (used.walkers = true), w;
+    }
     for (const way of layers.ways) {
       for (let i = 0; i < way.coords.length - 1; i++) {
         if (distToSegmentM(p, way.coords[i], way.coords[i + 1]) <= 20) return (used.osm = true), way.lit === "yes" ? "lit" : "dark";
@@ -116,5 +127,7 @@ export function routeLighting(geometry: Array<[number, number]>, layers: { walke
   const total = Math.max(1, statuses.length);
   const summary = { lit: 0, dark: 0, poles: 0, unknown: 0 } as Record<LightStatus, number>;
   for (const s of ["lit", "dark", "poles", "unknown"] as LightStatus[]) summary[s] = Math.round((count(s) / total) * 100);
-  return { segments: segments.filter((s) => s.coords.length > 1), summary, sources: used };
+  const share = (n: number) => Math.round((n / total) * 100);
+  const confirmed = { lit: Math.min(summary.lit, share(walkerLit)), dark: Math.min(summary.dark, share(walkerDark)) };
+  return { segments: segments.filter((s) => s.coords.length > 1), summary, confirmed, sources: used };
 }

@@ -16,6 +16,7 @@ import { POST as searchPOST } from "@/app/api/geo/search/route";
 import { POST as reversePOST } from "@/app/api/geo/reverse/route";
 import { POST as routePOST } from "@/app/api/geo/route/route";
 import { POST as nearbyPOST } from "@/app/api/geo/nearby/route";
+import { POST as helpPOST } from "@/app/api/geo/help/route";
 import { GET as liveGET } from "@/app/api/health/live/route";
 import { GET as readyGET } from "@/app/api/health/ready/route";
 import { POST as reportPOST } from "@/app/api/reports/route";
@@ -45,7 +46,9 @@ const PUBLIC_KEYS = new Set([
   "workerHeartbeatAgeSeconds", "pilotMapData", "contactEmail", "contactAlertProblems24h", "received", "error", "code", "message", "fields",
   "state", "destination", "dest", "etaAt", "location", "at", "ageSeconds", "alertsViewer",
   // Street lighting along a route: statuses and shares only (no voters, no counts per person).
-  "lighting", "segments", "coords", "summary", "sources", "lit", "dark", "poles", "unknown", "walkers", "osm",
+  "lighting", "segments", "coords", "summary", "sources", "lit", "dark", "poles", "unknown", "walkers", "osm", "confirmed",
+  // Help Points and route options: places and routes only (class, hours as listed, source, position along the route).
+  "helpPoints", "cls", "open24h", "source", "alongM", "alternatives",
 ]);
 
 describe("privacy red-line audit", () => {
@@ -57,7 +60,7 @@ describe("privacy red-line audit", () => {
   });
 
   it("public map/geo code never touches private tables", () => {
-    const publicFiles = [...files("src/server/know"), ...files("src/server/providers/geo"), ...files("src/app/api/geo"), ...files("src/server/pilot"), "src/server/notes/index.ts"];
+    const publicFiles = [...files("src/server/know"), ...files("src/server/providers/geo"), ...files("src/app/api/geo"), ...files("src/server/pilot"), ...files("src/server/help-points"), "src/server/notes/index.ts"];
     for (const f of publicFiles) expect(readFileSync(f, "utf8"), f).not.toMatch(PRIVATE_TABLES);
     // The only public community source is aggregate_releases.
     expect(readFileSync("src/server/notes/index.ts", "utf8")).toMatch(/FROM aggregate_releases/);
@@ -106,6 +109,7 @@ describe("privacy red-line audit", () => {
     bodies.push(await (await reversePOST(jsonRequest("/api/geo/reverse", from))).json());
     bodies.push(await (await routePOST(jsonRequest("/api/geo/route", { from, to }))).json());
     bodies.push(await (await nearbyPOST(jsonRequest("/api/geo/nearby", from))).json());
+    bodies.push(await (await helpPOST(jsonRequest("/api/geo/help", from))).json());
     bodies.push(await (await liveGET()).json());
     bodies.push(await (await readyGET()).json());
     bodies.push(await (await reportPOST(jsonRequest("/api/reports", { idempotencyKey: randomUUID(), involvement: "witnessed", category: "environment", placeId, recency: "today", timeBand: "late", narrative: "call 9876543210" }))).json());

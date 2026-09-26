@@ -16,9 +16,11 @@ interface DbHandle {
 // Survive Next.js dev hot reloads without leaking connection pools.
 const globalForDb = globalThis as unknown as { __miraDb?: DbHandle };
 
-function createClient(url: string, max: number): Sql {
+function createClient(url: string, max: number, statementTimeoutMs?: number): Sql {
   return postgres(url, {
     max,
+    // The worker caps every statement so a hung query can't wedge the missed-arrival job forever.
+    ...(statementTimeoutMs ? { connection: { statement_timeout: statementTimeoutMs } } : {}),
     idle_timeout: 30,
     connect_timeout: 10,
     // Never log query parameters: they may contain encrypted payloads or hashes.
@@ -41,9 +43,9 @@ function createClient(url: string, max: number): Sql {
  * Drizzle postgres-js driver replaces the client's date serializers with identity
  * functions, which would break Date parameters in raw tagged-template queries.
  */
-export function createDbHandle(url: string, max = 10): DbHandle {
-  const sql = createClient(url, max);
-  const ormClient = createClient(url, Math.max(2, Math.floor(max / 2)));
+export function createDbHandle(url: string, max = 10, opts: { statementTimeoutMs?: number } = {}): DbHandle {
+  const sql = createClient(url, max, opts.statementTimeoutMs);
+  const ormClient = createClient(url, Math.max(2, Math.floor(max / 2)), opts.statementTimeoutMs);
   return { sql, db: drizzle(ormClient, { schema }), url, ormClient };
 }
 

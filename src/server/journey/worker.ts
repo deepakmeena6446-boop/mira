@@ -39,6 +39,11 @@ const joinNames = (names: string[]) => (names.length <= 1 ? (names[0] ?? "") : `
 const liveUrl = (enc: string | null) => (enc ? new URL(`/t/${decryptText(enc, "share_token")}`, getEnv().APP_BASE_URL).toString() : null);
 const errName = (err: unknown) => (err instanceof Error ? err.name : "unknown");
 
+async function notifyAlertUncertain(sql: postgres.Sql, userId: string, who: string) {
+  await sql`INSERT INTO notifications (user_id, kind, title, body, href) VALUES (${userId}, 'trip_alert_failed', 'Your contacts may not have been told',
+    ${`I couldn't confirm the email to ${who} went out. If you need them, call or message them directly.`}, '/trip')`;
+}
+
 /**
  * One worker pass (architecture §6). Each due journey is handled in its own transaction
  * under a row lock (FOR UPDATE SKIP LOCKED), so a racing user action and the worker can't
@@ -50,10 +55,16 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
   const now = clock.now();
   const result: JourneyTickResult = { staleNudged: 0, missed: 0, expired: 0, alertsSent: 0, alertsFailed: 0, alertsUnconfirmed: 0, arrivedNotices: 0, failedJourneys: 0, purged: 0 };
 
-  const stale = await sql`
+  // A claim that never completed (the worker died mid-send): say so to the traveller, never leave "I'm emailing…" standing.
+  const stale = await sql<{ id: string; user_id: string | null }[]>`
     UPDATE journeys SET alert_state = 'unconfirmed'
-    WHERE alert_state = 'claimed' AND alert_claimed_at < ${new Date(now.getTime() - ALERT_UNCONFIRMED_AFTER_MS)}`;
-  result.alertsUnconfirmed += stale.count;
+    WHERE alert_state = 'claimed' AND alert_claimed_at < ${new Date(now.getTime() - ALERT_UNCONFIRMED_AFTER_MS)}
+    RETURNING id, user_id`;
+  result.alertsUnconfirmed += stale.length;
+  for (const j of stale) {
+    if (j.user_id) await notifyAlertUncertain(sql, j.user_id, "your contacts");
+    log("journey.alert", { journey: j.id, outcome: "unconfirmed", recipients: 0 });
+  }
 
   // Only rows with work to do: active past the grace period, or missed and due to expire.
   const due = await sql<{ id: string }[]>`
@@ -139,6 +150,30 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
     }
   }
 
+  // Send the claimed alerts FIRST, before any other work in this pass can throw. Each alert is
+  // isolated: one failing send (or a database error recording it) can't drop anyone else's.
+  for (const a of alerts) {
+    try {
+      const outcomes: Array<"sent" | "failed" | "unconfirmed"> = [];
+      for (const s of a.sends) {
+        const res = await mailer!.send({ to: s.email, ...s.message }).catch(() => ({ ok: false, definite: false }));
+        outcomes.push(res.ok ? "sent" : res.definite ? "failed" : "unconfirmed");
+      }
+      const outcome = outcomes.includes("sent") ? "sent" : outcomes.includes("unconfirmed") ? "unconfirmed" : "failed";
+      await sql`UPDATE journeys SET alert_state = ${outcome} WHERE id = ${a.journeyId} AND alert_state = 'claimed'`;
+      // Correct the earlier "I'm emailing…" so the traveller never believes a message went out when it didn't.
+      if (outcome !== "sent" && a.userId) await notifyAlertUncertain(sql, a.userId, a.who);
+      if (outcome === "sent") result.alertsSent += 1;
+      else if (outcome === "failed") result.alertsFailed += 1;
+      else result.alertsUnconfirmed += 1;
+      log("journey.alert", { journey: a.journeyId, outcome, recipients: a.sends.length });
+    } catch (err) {
+      // Left "claimed": the next pass turns it into "unconfirmed" and tells the traveller.
+      result.failedJourneys += 1;
+      log("journey.alert_failed", { journey: a.journeyId, error: errName(err) });
+    }
+  }
+
   // Live location paused on an active trip (phone locked, GPS off, no signal). One nudge
   // per pause; once the ETA passes, the missed-arrival flow takes over instead.
   const paused = await sql<{ id: string; user_id: string; shared: boolean }[]>`
@@ -153,25 +188,6 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
     log("trip.location_stale", { journey: s.id });
   }
   result.staleNudged = paused.length;
-
-  for (const a of alerts) {
-    const outcomes: Array<"sent" | "failed" | "unconfirmed"> = [];
-    for (const s of a.sends) {
-      const res = await mailer!.send({ to: s.email, ...s.message });
-      outcomes.push(res.ok ? "sent" : res.definite ? "failed" : "unconfirmed");
-    }
-    const outcome = outcomes.includes("sent") ? "sent" : outcomes.includes("unconfirmed") ? "unconfirmed" : "failed";
-    await sql`UPDATE journeys SET alert_state = ${outcome} WHERE id = ${a.journeyId} AND alert_state = 'claimed'`;
-    if (outcome !== "sent" && a.userId) {
-      // Correct the earlier "I'm emailing…" so the traveller never believes a message went out when it didn't.
-      await sql`INSERT INTO notifications (user_id, kind, title, body, href) VALUES (${a.userId}, 'trip_alert_failed', 'Your contacts may not have been told',
-        ${`I couldn't confirm the email to ${a.who} went out. If you need them, call or message them directly.`}, '/trip')`;
-    }
-    if (outcome === "sent") result.alertsSent += 1;
-    else if (outcome === "failed") result.alertsFailed += 1;
-    else result.alertsUnconfirmed += 1;
-    log("journey.alert", { journey: a.journeyId, outcome, recipients: a.sends.length });
-  }
 
   // Contacts who were told "missed" are told once the person checks in, so nobody is left worrying.
   if (mailer) {
