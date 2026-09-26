@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { EMERGENCY_NUMBER, emergencyHref } from "@/domain/emergency";
+import { EmergencyPill } from "@/components/app/EmergencyPill";
 import { useRouter } from "next/navigation";
 import { MiraOrb } from "@/components/app/MiraOrb";
 import { Button } from "@/components/ui/Button";
@@ -92,11 +92,7 @@ export function ReportScreen({ preset }: { preset: Category | null }) {
           Your report is private. A person reviews it, and it only ever shows up as a combined, anonymous note once enough people have seen the same thing.
         </p>
         <p className="mt-2 max-w-sm text-sm text-ink-muted">
-          If you&apos;re in danger right now,{" "}
-          <a href={emergencyHref()} className="font-bold text-ink underline">
-            call {EMERGENCY_NUMBER}
-          </a>{" "}
-          or your local emergency number.
+          If you&apos;re in danger right now, <EmergencyPill variant="link" />.
         </p>
         <div className="mt-8 flex w-full max-w-xs flex-col gap-3">
           <Button variant="hero" size="lg" onClick={() => router.push("/")}>

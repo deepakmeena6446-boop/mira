@@ -7,7 +7,8 @@ import { useOverlay } from "@/lib/use-overlay";
 import { useClock } from "@/lib/location-store";
 import { HELP_CLASSES, SOURCE_NAME, hoursLine, isNight, rankHelpPoints, type HelpClass, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
 import { localTime } from "@/domain/opening-hours";
-import { useLocale } from "@/lib/locale-store";
+import { useCountry } from "@/lib/locale-store";
+import { EmergencyPill } from "@/components/app/EmergencyPill";
 import { Icon } from "@/components/ui/Icon";
 
 export interface UnsafeShareAction {
@@ -67,7 +68,7 @@ export function UnsafeSheet({
 }) {
   useOverlay(open, onClose);
   const now = useClock();
-  const locale = useLocale();
+  const locale = useCountry();
   const night = isNight((now ?? new Date()).getHours());
   const minuteKey = now ? Math.floor(now.getTime() / 60_000) : 0;
   const ranked = useMemo(
@@ -76,7 +77,6 @@ export function UnsafeSheet({
   );
   const [first, ...more] = ranked;
   if (!open) return null;
-  const number = locale.emergency.number;
 
   const sources = [...new Set(ranked.slice(0, 3).map((p) => SOURCE_NAME[p.source]))];
   // Portal: screens are position:fixed (their own stacking context), and this must sit above the tab bar.
@@ -166,9 +166,7 @@ export function UnsafeSheet({
         {/* 3. Call */}
         <div className="mt-3 grid grid-cols-2 gap-3">
           <CallSomeone />
-          <a href={`tel:${number}`} aria-label={`Emergency call, ${number}`} className="flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-ink px-3 text-[0.95rem] font-extrabold text-canvas">
-            <Icon name="phone" className="size-5" /> Emergency {number}
-          </a>
+          <EmergencyPill variant="block" />
         </div>
         {locale.helplines.length ? (
           <ul className="mt-2 space-y-1">
@@ -185,7 +183,6 @@ export function UnsafeSheet({
             ))}
           </ul>
         ) : null}
-        {!locale.confirmed ? <p className="mt-2 text-xs text-ink-muted">Emergency number for this country not confirmed in MIRA yet. {number} works on most mobile networks.</p> : null}
 
         {/* Where she is, in words she can read to a call-taker (shown to her only; never sent). */}
         {me ? <LocationInWords me={me} area={area} landmark={landmark ?? first?.name ?? null} /> : null}

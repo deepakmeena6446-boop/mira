@@ -3,7 +3,6 @@ import Link from "next/link";
 import { providerModes } from "@/server/providers/modes";
 import { MiraOrb } from "@/components/app/MiraOrb";
 import { Icon } from "@/components/ui/Icon";
-import { EMERGENCY_NUMBER } from "@/domain/emergency";
 
 export const metadata: Metadata = { title: "Privacy" };
 
@@ -74,7 +73,7 @@ export default function PrivacyPage() {
           <Item emoji="📞" title="If you feel unsafe">
             <p>
               &ldquo;I feel unsafe&rdquo; and Emergency work on your phone alone: nothing is sent to MIRA or anyone else until you tap an action. Emergency opens your
-              phone&apos;s dialler with {EMERGENCY_NUMBER}; MIRA doesn&apos;t call, dispatch or alert anyone for you. &ldquo;Call someone&rdquo; uses your phone&apos;s
+              phone&apos;s dialler with the emergency number for the country you&apos;re in (from a cited list; where MIRA doesn&apos;t know it, it says so before you call); MIRA doesn&apos;t call, dispatch or alert anyone for you. &ldquo;Call someone&rdquo; uses your phone&apos;s
               contacts or a number you type, and MIRA never sees or keeps it. &ldquo;Tell my people now&rdquo; emails your accepted trusted contacts your live link
               and asks them to check on you — only when you tap it. &ldquo;Your location in words&rdquo; is shown on your screen only.
             </p>

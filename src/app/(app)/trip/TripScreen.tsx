@@ -18,7 +18,7 @@ import { shareLiveLink } from "@/lib/share";
 import { clearTripRoutes, keepTripRoute, tripRoute } from "@/lib/trip-route";
 import { HELP_CLASSES, hoursLine, isNight, rankHelpPoints, type HelpClass, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
 import { localTime } from "@/domain/opening-hours";
-import { setLocale, useLocale, type ClientLocale } from "@/lib/locale-store";
+import { setCountry, type CountryContext } from "@/lib/locale-store";
 import { MISS_GRACE_MS } from "@/domain/journey";
 import type { TripView } from "@/server/trips";
 import type { SafetyNet } from "@/server/health/safety-net";
@@ -63,7 +63,6 @@ export function TripScreen({
   const [focus, setFocus] = useState<RankedHelpPoint | null>(null);
   const [unsafe, setUnsafe] = useState(false);
   const [area, setAreaName] = useState<string | null>(null);
-  const locale = useLocale();
   const exclude = helpExclude as HelpClass[];
   const walking = initial.mode === "walk" && initial.autoArrival;
   const clock = useClock(); // null during server render: times appear after hydration (the server doesn't know your zone)
@@ -122,10 +121,10 @@ export function TripScreen({
   const hasFix = me !== null;
   useEffect(() => {
     if (!hasFix || !me) return;
-    void api<{ label: string | null; locale?: ClientLocale }>("/api/geo/reverse", { body: me }).then((r) => {
+    void api<{ label: string | null; country?: CountryContext }>("/api/geo/reverse", { body: me }).then((r) => {
       if (!r.ok) return;
       setAreaName(r.data.label);
-      setLocale(r.data.locale);
+      setCountry(r.data.country);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasFix]);
@@ -339,11 +338,7 @@ export function TripScreen({
                   : trip.alert === "failed" || trip.alert === "unconfirmed"
                     ? "I tried to reach your contacts but couldn't confirm the message went out."
                     : "Nobody was notified — either no contact on this trip has accepted your invite, or email isn't available right now."}{" "}
-              If you&apos;re in danger,{" "}
-              <a href={`tel:${locale.emergency.number}`} className="font-bold text-ink underline">
-                call {locale.emergency.number}
-              </a>{" "}
-              or your local emergency number.
+              If you&apos;re in danger, <EmergencyPill variant="link" />.
             </p>
           </div>
         ) : null}

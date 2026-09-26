@@ -1,5 +1,74 @@
 # MIRA — Execution Status
 
+## GLOBAL DAY-0 BETA SPRINT (2026-09-26, branch `feat/global-day0-beta`)
+
+Brief: the owner's "Global Day-0 Beta — 12-hour autonomous execution sprint". Source of truth: the five product documents plus `MIRA_LAUNCH_AUDIT.md`. The earlier P0/P1 record is kept below as history.
+
+| Phase | Status |
+|---|---|
+| 0 — Baseline / repo truth | PASS |
+| 1 — Global foundation | in progress |
+| 2 — Product value / Home | pending |
+| 3 — Help / unsafe / emergency | pending |
+| 4 — Journey companion | pending |
+| 5 — Mira intelligence | pending |
+| 6 — Contribute + reputation | pending |
+| 7 — Personalisation foundation | pending |
+| 8 — Global QA | pending |
+| 9 — Production beta | pending |
+| 10 — Final audit | pending |
+
+### Sprint architecture contract (binding for every track)
+
+- **Navigation (locked):** HOME · MIRA · TRIPS · CONTRIBUTE · ME (`src/components/app/TabBar.tsx`). Emergency is never a tab. Circle lives under Me (`/circle`).
+- **Country Context:** one shape, `CountryContext` in `src/domain/country-context.ts`. Server: `countryContext(iso, region)` in `src/server/locale` reads every cited profile in `data/locales/<ISO>.json`. Client: `useCountry()` / `setCountry()` in `src/lib/locale-store.ts`. `/api/geo/reverse` returns `{ label, precise, country }`.
+- **Emergency:** always rendered through `<EmergencyPill variant="pill" | "block" | "link" />`. Known number: one tap dials it. Unknown: it explains first ("MIRA doesn't know the local number"; 112 is connected by most mobile networks, 3GPP TS 22.101), then she chooses. No number is ever hardcoded in a screen, a prompt or an email. No LLM on this path.
+- **Migrations:** `0012_global_day0` (journeys.tz / saved_place_id / start_hour, users.travel_prefs / remember_habits, journey_habits). The Contribute track owns `0013`. Any other schema change goes through the lead. The drizzle migrator applies by journal `when`, so the lead re-orders `when` at merge.
+- **Words:** never Safe / Unsafe / Safest / safety score / "Safe Place". It's "Help Point", "mapped as lit", "not known". Never "reviewed by a person" (nobody is on moderation duty yet). Never "your contacts will be alerted" unless that channel is configured and verified.
+- **AI decides relevance, not truth.** Mira only states facts from tools and context. No LLM on the Emergency or *I feel unsafe* paths.
+- **Privacy:** no passive or background location collection; no location history beyond a journey (journeys are purged ≤ 24 h after closing); coordinates never in URLs, logs or emails; habits are learned only from completed journeys to saved places, and she can see and delete them.
+- **Rewards:** no points, badges, streaks or leaderboards; nothing for incident reports. Impact counts only verified contributions.
+
+### PHASE 0 — BASELINE / REPO TRUTH
+
+PHASE: 0
+STATUS: PASS
+
+COMPLETED:
+- Read the blueprint, the safety context engine, the intelligence & travel doc, the gap analysis, the launch audit, the previous execution status and the implementation audit. Inspected auth/session, the locale layer, Home, Trip, Help Points, the Google provider, Mira (Claude + placeholder), migrations 0000–0011 and the tests.
+- Working today (from code and tests): journeys with live links, auto-arrival and missed-arrival email; route alternatives with lighting ("mapped as lit") and Help Points; *I feel unsafe* sheet (no LLM); Emergency pill; India locale profile; email magic-link sign-in; Web Push; Mira on Claude with a scripted fallback; per-person and global Mira caps; worker watchdog; readiness 503 on a stale worker.
+- Partial or India-only, fixed by this sprint:
+  - `112` hardcoded in 7 places, with the fallback everywhere;
+  - `Asia/Kolkata` as the default time zone for emails and admin;
+  - mode labels "Auto / cab", "Metro / bus";
+  - Hindi/Hinglish-only persona;
+  - police always in Help Point tier 1;
+  - Google hours requested on every Help Point search (Enterprise SKU on every call);
+  - identity = first name + cookie (email link optional);
+  - tabs Home · Circle · Me;
+  - "reviewed by a person" copy with nobody on moderation duty;
+  - no contribution ledger, reputation or MIRA Checks;
+  - no personalisation;
+  - no production host.
+
+TESTS (baseline, before any change): `npm run check` → lint pass, typecheck pass, 30 files / **210/210** unit + integration pass.
+
+REGRESSIONS: none (baseline).
+
+KNOWN RISKS:
+- No Google OAuth client, no Resend key and no production domain exist yet (owner-held credentials).
+- Journeys are purged ≤ 24 h after closing, so "previous journeys" in Trips can only mean the last day.
+- `eta_at ≤ created_at + 4 h` limits long journeys.
+
+FILES: this file.
+
+NEXT: Phase 1 foundation (Country Context, emergency, tabs, migration 0012), then parallel tracks.
+
+---
+
+## HISTORY — P0/P1 execution (before the Day-0 sprint)
+
+
 *Development tracker for executing the approved plan (`MIRA_GLOBAL_PRODUCT_BLUEPRINT.md`, `MIRA_EXECUTION_GAP_ANALYSIS.md`, `MIRA_LAUNCH_AUDIT.md` Part 6). Not a product spec. Branch `feat/execute-approved-plan`, started 2026-09-26 from `2fe07ac`.*
 
 | Phase | Status |

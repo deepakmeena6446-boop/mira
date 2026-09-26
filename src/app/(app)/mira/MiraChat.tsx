@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { useDaypart } from "@/lib/daypart-store";
 import type { Daypart } from "@/domain/daypart";
 import { Icon } from "@/components/ui/Icon";
-import { EMERGENCY_NUMBER, emergencyHref } from "@/domain/emergency";
+import { EmergencyPill } from "@/components/app/EmergencyPill";
 import { useToast } from "@/components/ui/Toast";
 import { cx } from "@/components/ui/cx";
 import { api } from "@/lib/api-client";
@@ -119,10 +119,8 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
     case "sos":
       return (
         <div className="mt-2 rounded-3xl bg-warm-soft p-4">
-          <a href={emergencyHref()} className="flex min-h-13 items-center justify-center gap-2 rounded-full bg-ink px-5 text-lg font-extrabold text-canvas">
-            Call {EMERGENCY_NUMBER}
-          </a>
-          <p className="mt-1 text-center text-xs text-ink-subtle">{EMERGENCY_NUMBER} works from most mobile phones; your local emergency number works too. MIRA doesn&apos;t call anyone for you.</p>
+          <EmergencyPill variant="block" className="w-full" />
+          <p className="mt-1 text-center text-xs text-ink-subtle">Opens your phone&apos;s dialler. MIRA doesn&apos;t call anyone for you.</p>
           <p className="mt-2 text-center text-sm text-ink-muted">
             {card.contacts.length ? `Or share your trip below so ${card.contacts.join(", ")} can see where you are.` : "Add trusted contacts in Circle so I can alert them next time."}
           </p>

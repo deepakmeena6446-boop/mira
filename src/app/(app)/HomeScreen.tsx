@@ -17,7 +17,7 @@ import { EmergencyPill } from "@/components/app/EmergencyPill";
 import { UnsafeSheet, type UnsafeShareAction, type UnsafeTellAction } from "@/components/app/UnsafeSheet";
 import { HelpNearSheet } from "@/components/app/HelpNearSheet";
 import { HELP_CLASSES, dedupeHelpPoints, type HelpClass, type HelpPoint } from "@/domain/help-points";
-import { setLocale, type ClientLocale } from "@/lib/locale-store";
+import { setCountry, type CountryContext } from "@/lib/locale-store";
 import { InstallCard } from "@/components/pwa/InstallCard";
 import { useFlag } from "@/lib/flags";
 import { useOverlay } from "@/lib/use-overlay";
@@ -152,14 +152,14 @@ export function HomeScreen({
     let stop = false;
     (async () => {
       const [r, n, h] = await Promise.all([
-        api<{ label: string | null; locale?: ClientLocale }>("/api/geo/reverse", { body: me }),
+        api<{ label: string | null; country?: CountryContext }>("/api/geo/reverse", { body: me }),
         api<{ places: Place[]; notes: Note[] }>("/api/geo/nearby", { body: me }),
         api<{ helpPoints: HelpPoint[] }>("/api/geo/help", { body: me }),
       ]);
       if (stop) return;
       if (r.ok) {
         setPoiArea(r.data.label);
-        setLocale(r.data.locale); // emergency number + helplines for where she is
+        setCountry(r.data.country); // emergency numbers + helplines for the country she is in
       }
       if (n.ok) setNearby(n.data);
       setNearbyFailed(!n.ok);

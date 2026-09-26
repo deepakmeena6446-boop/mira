@@ -26,6 +26,12 @@ const paths: Record<string, React.ReactNode> = {
     </>
   ),
   arrow: <path d="M5 12h14M13 6l6 6-6 6" />,
+  contribute: (
+    <>
+      <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" />
+      <path d="m13.5 6.5 4 4" />
+    </>
+  ),
   info: (
     <>
       <circle cx="12" cy="12" r="9" />

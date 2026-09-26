@@ -192,11 +192,12 @@ describe("P1: durable accounts, journeys, check-on-me, push, Location Context", 
   it("Location Context: the cited profile gives the emergency number and helplines where they operate", async () => {
     switchJar(newJar());
     const r = await (await reversePOST(jsonRequest("/api/geo/reverse", HOME))).json();
-    expect(r.locale).toMatchObject({ iso: "IN", confirmed: true, emergency: { number: "112" }, timezone: "Asia/Kolkata" });
-    expect(r.locale.helplines.map((h: { number: string }) => h.number)).toContain("181");
+    expect(r.country).toMatchObject({ iso: "IN", emergency: { primary: { number: "112" } }, timezone: "Asia/Kolkata" });
+    expect(r.country.helplines.map((h: { number: string }) => h.number)).toContain("181");
     expect(localeFor("IN", "IN-WB").helplines.map((h) => h.number)).not.toContain("181"); // WCD: not operational in West Bengal
-    expect(localeFor("KE")).toMatchObject({ iso: "KE", confirmed: false, emergency: { number: "112" }, helplines: [] });
-    expect(localeFor(null).confirmed).toBe(false);
+    // No profile for a country: MIRA says it doesn't know the number (never India's 112 by default).
+    expect(localeFor("AQ")).toMatchObject({ iso: "AQ", emergency: { primary: null, also: [], services: [] }, helplines: [] });
+    expect(localeFor(null).emergency.primary).toBeNull();
   });
 
   it("Help Point filters are saved with the account, and inactive durable accounts are eventually deleted", async () => {

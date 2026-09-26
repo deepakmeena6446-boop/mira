@@ -1,37 +1,45 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { EMERGENCY_NUMBER } from "@/domain/emergency";
+import { UNKNOWN_COUNTRY, type CountryContext } from "@/domain/country-context";
 
 /**
- * The Location Context for where she is (from /api/geo/reverse), held in memory only. Until it
- * is known, the emergency number is 112, which works on most mobile networks.
+ * The Country Context for where she is (from /api/geo/reverse), held in memory only. Until it is
+ * known, there is no emergency number: the Emergency control explains that before dialling.
  */
-export interface ClientLocale {
-  iso: string | null;
-  emergency: { number: string; label: string };
-  confirmed: boolean;
-  helplines: Array<{ number: string; name: string; hours: string | null }>;
-  timezone: string | null;
-}
+export type { CountryContext } from "@/domain/country-context";
+/** @deprecated the Country Context; kept as an alias for older imports. */
+export type ClientLocale = CountryContext;
 
-const FALLBACK: ClientLocale = { iso: null, emergency: { number: EMERGENCY_NUMBER, label: "Emergency" }, confirmed: false, helplines: [], timezone: null };
-let state: ClientLocale = FALLBACK;
+let state: CountryContext = UNKNOWN_COUNTRY;
 const listeners = new Set<() => void>();
 
-export function setLocale(next: ClientLocale | null | undefined) {
+export function setCountry(next: CountryContext | null | undefined) {
   if (!next || JSON.stringify(next) === JSON.stringify(state)) return;
   state = next;
   listeners.forEach((l) => l());
 }
+/** @deprecated use setCountry */
+export const setLocale = setCountry;
 
-export function useLocale(): ClientLocale {
+export function useCountry(): CountryContext {
   return useSyncExternalStore(
     (l) => {
       listeners.add(l);
       return () => listeners.delete(l);
     },
     () => state,
-    () => FALLBACK,
+    () => UNKNOWN_COUNTRY,
   );
+}
+/** @deprecated use useCountry */
+export const useLocale = useCountry;
+
+/** The phone's own IANA time zone (phones set it from the network), for "arrive around…" times. */
+export function deviceTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
 }

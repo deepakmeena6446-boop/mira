@@ -85,6 +85,13 @@
       "when": 1790422684319,
       "tag": "0011_p1_accounts_push_modes",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790431849733,
+      "tag": "0012_global_day0",
+      "breakpoints": true
     }
   ]
 }
