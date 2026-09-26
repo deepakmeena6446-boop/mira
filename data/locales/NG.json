@@ -1,0 +1,25 @@
+{
+  "iso": "NG",
+  "name": "Nigeria",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "112",
+      "label": "Emergency (police, fire, road safety and other responders)",
+      "source": {
+        "url": "https://ncc.gov.ng/media-centre/press-releases/covid-19-nccs-112-national-emergency-number-offers-succour-nigerians",
+        "title": "COVID-19: NCC's 112 National Emergency Number Offers Succour to Nigerians | NCC",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "notes": [
+      "112 is the toll-free National Emergency Number run by the Nigerian Communications Commission; calls are handled by Emergency Communication Centres and passed to first responders such as the Police, Fire Service and Federal Road Safety Corps. Source: https://ncc.gov.ng/media-centre/press-releases/covid-19-nccs-112-national-emergency-number-offers-succour-nigerians, retrieved 2026-09-26.",
+      "The National Economic Council approved 112 as the National Emergency Number at all levels (30 April 2026). Source: https://statehouse.gov.ng/nec-moves-to-strengthen-national-emergency-response-okays-112-as-lifeline/ (State House, Abuja), retrieved 2026-09-26.",
+      "Emergency Communication Centres answering 112 have been rolled out state by state: 17 states and the FCT as of April 2020, with expansion to other states ongoing. Source: https://ncc.gov.ng/media-centre/press-releases/covid-19-nccs-112-national-emergency-number-offers-succour-nigerians (NCC, April 2020), retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "en"
+  ],
+  "reviewers": []
+}

@@ -1,0 +1,24 @@
+{
+  "iso": "US",
+  "name": "United States",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "911",
+      "label": "Emergency (police, fire, ambulance)",
+      "source": {
+        "url": "https://www.911.gov/calling-911/",
+        "title": "Calling 911 | 911.gov",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "notes": [
+      "An emergency is any situation that requires immediate assistance from the police, fire department or ambulance; in an emergency dial 911. Source: https://www.911.gov/calling-911/, retrieved 2026-09-26.",
+      "Text-to-911 is only available in certain locations; always make a voice call to 911 if you can. Where texting is not supported, carriers send an automatic bounce-back message. Source: https://www.fcc.gov/consumers/guides/what-you-need-know-about-text-911 (FCC), retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "en"
+  ],
+  "reviewers": []
+}

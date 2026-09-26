@@ -1,0 +1,37 @@
+{
+  "iso": "GB",
+  "name": "United Kingdom",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "999",
+      "label": "Emergency (police, ambulance, fire, coastguard)",
+      "source": {
+        "url": "https://www.gov.uk/guidance/999-and-112-the-uks-national-emergency-numbers",
+        "title": "999 and 112: the UK's national emergency numbers - GOV.UK",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "also": [
+      {
+        "number": "112",
+        "label": "Emergency (works the same as 999)",
+        "source": {
+          "url": "https://www.gov.uk/guidance/999-and-112-the-uks-national-emergency-numbers",
+          "title": "999 and 112: the UK's national emergency numbers - GOV.UK",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "notes": [
+      "999 and 112 calls are answered by a BT call handler who asks \"emergency, which service?\" and transfers the call to the local police, ambulance, fire or coastguard control room. Source: https://www.gov.uk/guidance/999-and-112-the-uks-national-emergency-numbers, retrieved 2026-09-26.",
+      "Phone providers must let any end-user reach the emergency services on 112 and 999 at no charge (Ofcom General Condition A3). Source: https://www.ofcom.org.uk/phones-and-broadband/phone-numbers/cw_996, retrieved 2026-09-26.",
+      "Call 999 if a crime is in progress or someone is in immediate danger; 101 is the police non-emergency number. Calls to 999 and 101 are free. Source: https://www.gov.uk/contact-police, retrieved 2026-09-26.",
+      "Silent Solution: if you need police but cannot speak, dial 999, cough or tap if you can, and press 55 when prompted to be put through to police. Source: https://www.policeconduct.gov.uk/our-work/key-areas-of-work/silent-solution (Independent Office for Police Conduct), retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "en"
+  ],
+  "reviewers": []
+}

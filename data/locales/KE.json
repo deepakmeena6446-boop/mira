@@ -1,0 +1,57 @@
+{
+  "iso": "KE",
+  "name": "Kenya",
+  "version": "2026-09-26",
+  "emergency": {
+    "general": {
+      "number": "999",
+      "label": "Police emergency",
+      "source": {
+        "url": "https://www.kenyapolice.go.ke/",
+        "title": "Home | Kenya Police Service",
+        "retrieved": "2026-09-26"
+      }
+    },
+    "also": [
+      {
+        "number": "112",
+        "label": "Police emergency (also works)",
+        "source": {
+          "url": "https://www.kenyapolice.go.ke/",
+          "title": "Home | Kenya Police Service",
+          "retrieved": "2026-09-26"
+        }
+      },
+      {
+        "number": "911",
+        "label": "Police emergency (also works)",
+        "source": {
+          "url": "https://www.kenyapolice.go.ke/",
+          "title": "Home | Kenya Police Service",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "women_helpline": [
+      {
+        "number": "1195",
+        "name": "National GBV Helpline 1195",
+        "scope": "national",
+        "source": {
+          "url": "https://www.gender.go.ke/resources/news/ps-dig-emphasize-need-accountability-fight-against-gender-based-violence",
+          "title": "PS, DIG emphasize need for accountability in the fight against gender-based violence | State Department For Gender and Affirmative Action",
+          "retrieved": "2026-09-26"
+        }
+      }
+    ],
+    "notes": [
+      "The Kenya Police Service lists its police hotlines as 999 / 112 / 911. Source: https://www.kenyapolice.go.ke/, retrieved 2026-09-26.",
+      "1195 is a toll-free gender-based violence helpline domiciled in the State Department for Gender; GBV can also be reported at the nearest police station. Source: https://www.gender.go.ke/resources/news/ps-dig-emphasize-need-accountability-fight-against-gender-based-violence, retrieved 2026-09-26."
+    ]
+  },
+  "languages": [
+    "en",
+    "sw"
+  ],
+  "reviewers": []
+}
