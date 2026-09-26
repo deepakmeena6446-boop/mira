@@ -7,13 +7,13 @@ Brief: the owner's "Global Day-0 Beta — 12-hour autonomous execution sprint". 
 | Phase | Status |
 |---|---|
 | 0 — Baseline / repo truth | PASS |
-| 1 — Global foundation | in progress |
-| 2 — Product value / Home | pending |
-| 3 — Help / unsafe / emergency | pending |
-| 4 — Journey companion | pending |
-| 5 — Mira intelligence | pending |
-| 6 — Contribute + reputation | pending |
-| 7 — Personalisation foundation | pending |
+| 1 — Global foundation | PASS WITH KNOWN RISK (Google OAuth client not yet created) |
+| 2 — Product value / Home | PASS |
+| 3 — Help / unsafe / emergency | PASS |
+| 4 — Journey companion | PASS WITH KNOWN RISK (email alerts need Resend) |
+| 5 — Mira intelligence | PASS |
+| 6 — Contribute + reputation | PASS WITH KNOWN RISK (no human moderator; public notes off) |
+| 7 — Personalisation foundation | PASS |
 | 8 — Global QA | pending |
 | 9 — Production beta | pending |
 | 10 — Final audit | pending |
@@ -63,6 +63,219 @@ KNOWN RISKS:
 FILES: this file.
 
 NEXT: Phase 1 foundation (Country Context, emergency, tabs, migration 0012), then parallel tracks.
+
+
+### PHASE 1 — GLOBAL FOUNDATION
+
+PHASE: 1
+STATUS: PASS WITH KNOWN RISK
+
+COMPLETED:
+- **Country Context** (`src/domain/country-context.ts`, `src/server/locale`, `useCountry()`):
+  - one shape for ISO country, region, time zone, emergency numbers (primary / also / per service), helplines and source;
+  - every profile in `data/locales/` is loaded and validated at startup.
+- **61 cited country profiles**, all from official government or regulator pages:
+  - Asia/Pacific: IN, JP, SG, TH, MY, ID, PH, LK, NP, BD, VN, KR, HK, AU, NZ;
+  - Africa: KE, ZA, NG, GH, TZ, UG, RW, MA;
+  - Middle East: AE, SA, QA, TR;
+  - Americas: US, CA, BR, MX;
+  - Europe: GB, CH, NO, and the EU 27 (with national police/ambulance/fire numbers and women's helplines where an official page states them; Ireland's primary number is 999).
+  - Left out for lack of a national official source: PK, ET, EG.
+- **Emergency** (`EmergencyPill`, three variants):
+  - a known number is one tap;
+  - an unknown one explains first ("MIRA doesn't know the emergency number for this country yet… mobile phones must treat 112 as an emergency number (3GPP TS 22.101)"), then she chooses;
+  - no hardcoded 112 anywhere in screens, prompts or emails.
+- **Google Sign-In** (OIDC code flow + PKCE, no SDK):
+  - the ID token is RS256-verified against Google's JWKS, and iss / aud / exp / nonce / email_verified are all checked; state is kept in a sealed `__Host-` cookie;
+  - it stores the Google account id, first name, and email only as a keyed hash plus an encrypted copy;
+  - linking order: same Google account, then same verified email, then upgrade the signed-in first-name account in place (keeping places, contacts and trips), else a new account;
+  - the session rotates on every sign-in;
+  - first-name sign-in is a fallback, only when Google isn't configured or `ALLOW_DEMO_SIGNIN=on`;
+  - half a Google client (id without secret, or the reverse) is a startup error.
+- **No auth wall:** Welcome is two steps (the promise, then location) and lands on Home signed out. Sign-in is asked for only at Start with MIRA, saved places, Circle, contributions and Mira chat.
+- **Time zones:** journeys store the phone's IANA zone. Emails, the viewer and the invite show the traveller's local time with its zone label. Nothing defaults to IST.
+- **Tabs:** HOME · MIRA · TRIPS · CONTRIBUTE · ME.
+
+TESTS:
+- Google auth: 22 integration + 33 unit tests (success, reuse, email link, demo upgrade; every failure case, each with its logged reason; replay; deletion cascade; viewer needs no account).
+- Country Context unit tests; time-zone unit tests.
+
+REGRESSIONS: none (full suite green).
+
+KNOWN RISKS:
+- Google sign-in can't be used until the owner creates an OAuth client and sets `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` (the redirect URI is in `.env.example` and `docs/DEPLOY.md`). Until then the fallback is first-name sign-in.
+- Some country profiles have single-service primaries (e.g. JP 110 police, SA 999 police) — correct and labelled, but the profiles need reviewer sign-off (README rule 4).
+
+FILES: `src/domain/country-context.ts`, `src/server/locale/index.ts`, `src/lib/locale-store.ts`, `src/components/app/EmergencyPill.tsx`, `data/locales/*.json`, `src/server/account/google-auth.ts`, `src/app/api/auth/google/**`, `src/app/api/auth/options/route.ts`, `src/components/app/{SignInSheet,SignInNotice,EmailSignIn}.tsx`, `src/app/welcome/Welcome.tsx`, `src/server/session/*`, `db/migrations/0012_global_day0.sql`, `src/components/app/TabBar.tsx`.
+
+### PHASE 2 — PRODUCT VALUE / HOME
+
+PHASE: 2
+STATUS: PASS
+
+COMPLETED:
+- Home hero: **Where are you going?**, a one-line "before you go / on the way" subtitle for newcomers, search, saved-place chips, and one honest circle line. Emergency and *I feel unsafe* are at the top.
+- **Journey context card:**
+  - "18 min walk · 1.6 km · arrive around …";
+  - Lighting row ("71% mapped as lit · 22% not known");
+  - Help row ("4 Help Points along the way · first: …");
+  - unknowns are always shown, with a one-tap "Why not known? · Community can improve this";
+  - then **Start with MIRA**. "Fastest" is the only option label.
+- **Travel modes explicit** (`src/domain/travel-mode.ts`): Walk · Ride / car · Transit.
+  - `/api/geo/route` takes a `mode`. Ride uses Google Routes DRIVE (traffic-unaware, cheapest SKU); transit uses TRANSIT.
+  - Live-checked in London, Dubai and Nairobi.
+  - No provider route → "not known" and she sets her own ETA.
+  - Ride/transit show Help Points where she arrives, and say that lighting is shown for walks.
+- Distances follow the country's units (miles in US/GB).
+- Habit-backed "like usual" suggestion (Phase 7) on Home.
+
+TESTS: `journey-modes` integration (8: walk unchanged, ride/transit placeholder "not known", stubbed DRIVE/TRANSIT parsing, invalid modes 400, Google 429 → not known); travel-mode units; journey-context component test.
+
+REGRESSIONS: none.
+
+KNOWN RISKS: ride/transit routes aren't stored for the trip screen's route line (only walks are).
+
+FILES: `src/app/(app)/HomeScreen.tsx`, `src/components/app/{ContextRow,RouteOptions,LightingSummary,SearchOverlay,HelpPointList}.tsx`, `src/app/api/geo/route/route.ts`, `src/server/providers/geo/{types,google,placeholder}.ts`, `src/domain/travel-mode.ts`.
+
+### PHASE 3 — HELP / UNSAFE / EMERGENCY
+
+PHASE: 3
+STATUS: PASS
+
+COMPLETED:
+- **Help Point classes:** hospital, police, staffed rail/metro, airport, hotel reception, pharmacy, fuel, and 24-hour convenience store (off except where a country weight turns it on: JP, KR, TW, TH).
+- **Situation-aware deterministic ranking** (`route | nearby | unsafe | emergency`):
+  - police is one category, not universally first;
+  - availability counts (open now > listed open > hours unknown; unknown at night is demoted and labelled "may be closed");
+  - places ahead on the route come first;
+  - an `emergency` situation promotes police and hospital;
+  - her exclusions and per-class `prefer` weights are honoured (architecture for later preference UI).
+- **Opening hours: Google primary, OSM fallback, cost-controlled.**
+  - Discovery never asks for hours (Pro SKU).
+  - Only the ≤ 5 shown are enriched via Place Details (`regularOpeningHours`, `currentOpeningHours.openNow`), cached 6 h, gated by `GOOGLE_PLACES_HOURS`, and counted against the Google budget.
+  - Copy distinguishes **Open now · Google** / **Listed 9 AM–9 PM · OpenStreetMap** / **Hours not known**, and never says "staffed".
+- Corroborated community corrections (gone / not this kind of place) remove a place from Help Points.
+- ***I feel unsafe*** is instant, with no LLM and no network wait. Its actions, in order:
+  1. Go to a Help Point (best + 2, "ahead on your way" during a journey);
+  2. Tell my people / send the live link (uses the active journey and Circle; never re-asks);
+  3. Call someone;
+  4. Emergency (country-aware);
+  5. helplines;
+  6. Talk to Mira.
+
+TESTS: ranking per situation (police not first when a closer open place exists; promoted in emergency), hours states, country weights; `help-hours` integration (no hours in discovery mask, ≤ 5 details calls, cache, gate, budget, OSM fallback, Sydney empty state).
+
+REGRESSIONS: none.
+
+KNOWN RISKS: country weights are product defaults, not cited data; Details "open now" is trusted for 20 min on the device.
+
+FILES: `src/domain/{help-points,opening-hours}.ts`, `src/server/help-points/index.ts`, `src/app/api/geo/help/route.ts`, `src/server/providers/geo/{google,osm-live,placeholder}.ts`, `src/components/app/{UnsafeSheet,HelpNearSheet,HelpPointList}.tsx`.
+
+### PHASE 4 — JOURNEY COMPANION
+
+PHASE: 4
+STATUS: PASS WITH KNOWN RISK
+
+COMPLETED:
+- The trip engine is preserved: the state machine, worker, alerts and auto-arrival are unchanged.
+- **Trip screen:** destination, ETA in local time, mode, who's following (honest), Share prominent (native share → WhatsApp), next Help Point ahead, *I feel unsafe*, Emergency, I'm here, +10 min.
+  - Mode-aware copy: "walking" / "by car or taxi" / "by transit".
+- **Trips tab:** the active journey first, then "Earlier today" (journeys closed within the retention window; MIRA says it deletes them within a day). The signed-out state explains.
+- **Shared viewer** (no account, ever): first name, state, ETA with the traveller's zone label, last location with its age, arrival.
+  - After arrival: "Want MIRA with you on your journeys? **Try MIRA**" → `/` (no referral id).
+- **After arrival:** one question at most (the night lighting question, else the journey's MIRA Check).
+- **Honest alerts:** without an email provider or accepted contacts, the copy says nobody is alerted automatically and the share link is the way.
+  - Email now goes through **Resend** (HTTPS API) when `RESEND_API_KEY` + `EMAIL_FROM` are set; SMTP remains for dev/E2E.
+
+TESTS: `companion` integration (tz / saved place / start hour stored; foreign saved place 400; habit on manual + auto arrival; none for ended or non-saved; email shows the journey's zone; viewer with no cookies and allowlisted keys; Trips overview window); Resend unit + integration (sent / failed / not_attempted).
+
+REGRESSIONS: none.
+
+KNOWN RISKS:
+- Automatic missed-arrival email stays off until the owner adds a Resend key and a verified domain; the app says so.
+- Browsers can't track in the background (the screen must be on — existing honest copy).
+- `eta_at ≤ start + 4 h` limits very long journeys.
+
+FILES: `src/server/trips/{index,on-arrival}.ts`, `src/server/journey/*`, `src/app/(app)/{trip,trips}/*`, `src/app/t/**`, `src/server/mail/{index,resend,templates}.ts`, `src/lib/{time,trip-start,share}.ts`, `src/components/app/AfterArrival.tsx`.
+
+### PHASE 5 — MIRA INTELLIGENCE
+
+PHASE: 5
+STATUS: PASS
+
+COMPLETED:
+- **Default model `claude-sonnet-5`** (`MIRA_MODEL` overrides), chosen from a live eval (`docs/MIRA_EVAL.md`): 16 prompts across Delhi, London, Dubai, New York, Nairobi and Tokyo.
+
+  | Model | Full reply p50 / p95 | Tool choice | Languages | Safety checks |
+  |---|---|---|---|---|
+  | Sonnet 5 | 4.0 / 6.0 s | 16/16 | 5/5 | 16/16 |
+  | Opus 5 | 5.2 / 7.7 s | 16/16 | 5/5 | 16/16 |
+  | Haiku 4.5 | 2.5 / 3.8 s | — | — | rejected: it claimed "I'm calling the emergency help now" and used markdown |
+
+- **Global context** each turn (no coordinates): local weekday/time in her zone, area, country, the emergency line (or "not known to MIRA"), saved places, Circle, active journey, and a coverage line saying MIRA has no crime or neighbourhood-safety data.
+- **Tools:** `find_help_points` (ranked, with hours state), `get_local_emergency_info`, mode-aware `propose_trip`, `find_nearby`, `check_trip`, `offer_report`.
+- **Unknowns:** "I don't have enough verified information to make that judgement", then factual context. Verdict words are logged (count only) for measurement.
+- **Emergency never waits on the model:** a multilingual danger regex (15 languages) sends the Emergency card before any model call.
+- **Budget:** 60 messages/person/day, a global daily message cap, and a new global daily token cap (`MIRA_DAILY_TOKEN_MAX`). When a cap is hit, or on any Claude error, the scripted (global, Country-Context-aware) Mira answers.
+- **Mira tab:** a signed-out explanation with example prompts, suggestion chips, and a calm look.
+
+TESTS: companion units (context has country/emergency line and no coordinates; tool routing; token fallback; multilingual regex; no literal 112); `mira-intelligence` integration.
+
+REGRESSIONS: none.
+
+KNOWN RISKS: one extra reverse-geocode per message that has a location; the eval is one run per case.
+
+FILES: `src/server/providers/companion/**`, `src/app/api/mira/route.ts`, `src/app/(app)/mira/MiraChat.tsx`, `scripts/mira-eval.ts`, `docs/MIRA_EVAL.md`.
+
+### PHASE 6 — CONTRIBUTE + REPUTATION FOUNDATION
+
+PHASE: 6
+STATUS: PASS WITH KNOWN RISK
+
+COMPLETED:
+- **CONTRIBUTE tab:** MIRA Checks, Correct something (a structured correction on a searched place), Report something (the private flow), Your impact (verified counts only), and Local Steward status with what's still needed.
+- **MIRA Checks:** generated only from journey evidence — a Help Point the walk passed within 60 m, captured before the trip's points are deleted. One per journey, and it expires in 24 h.
+- **Proof-of-usefulness lifecycle:** contribution → pending → independent corroboration (≥ 2 people, or 1 + agreeing listed hours) → verified → impact.
+  - Contradiction means "reports differ" and nobody is credited.
+  - Diminishing returns: a place and question counts once per 30 days.
+  - **Incident reports create no receipt and no reward.**
+- **Local Steward:** configurable thresholds (25 verified, 10 active days, 3 areas, 80% agreement, a 30-day-old durable account, no anomaly flags). Benefits are non-financial, and Stewards get no power to declare truth.
+- **Privacy design:**
+  - signals are unlinkable (keyed per-person hashes, no user id, no time of day);
+  - her receipts are a separate ledger whose encrypted subject link is deleted when the receipt is decided;
+  - lighting votes are one voice per person per stretch (fixes one person agreeing with themselves across weeks).
+- **Reports:** honest copy ("Submitted privately. Reports may be reviewed before they can contribute to MIRA's information."). Public aggregate releases are OFF unless `PUBLIC_AGGREGATE_RELEASES=on`.
+
+TESTS: contributions integration (11 + the lighting regression); contribution/reputation units (16).
+
+REGRESSIONS: none.
+
+KNOWN RISKS:
+- No designated human moderator, so public notes stay off.
+- Account deletion plus re-creation could add a second voice within a window; account age is enforced only for Steward.
+
+FILES: `db/migrations/0013_contributions.sql`, `src/domain/{contributions,reputation}.ts`, `src/server/contributions/**`, `src/app/api/contribute/**`, `src/app/(app)/contribute/**`, `src/components/app/CheckCard.tsx`, `src/app/(app)/me/ImpactRow.tsx`, `docs/CONTRIBUTIONS.md`, `MODERATION_POLICY.md`.
+
+### PHASE 7 — PERSONALISATION FOUNDATION
+
+PHASE: 7
+STATUS: PASS
+
+COMPLETED:
+- **Explicit preferences** (`users.travel_prefs`: preferred way of travelling), editable in Me.
+- **Journey habits:** learned ONLY on arrival of a journey to one of her saved places. Stored: place, mode, start hour, count, last shared-with — no coordinates or routes.
+- **"Like usual" suggestion** on Home only when ≥ 3 matching finished journeys exist within ±1 h. It names only contacts still accepted, and never fakes memory.
+- **Me → "What MIRA remembers":** lists habits in words, has a switch (off deletes them) and "Forget all". Habits are purged after 400 days unused; account deletion cascades.
+
+TESTS: habit units (threshold, midnight wrap, deleted contacts, modes); integration (arrival upserts; off deletes; cascade; retention).
+
+REGRESSIONS: none.
+
+KNOWN RISKS: `shareByDefault` exists in the schema, but no UI sets it yet.
+
+FILES: `src/domain/{habits,travel-prefs}.ts`, `src/server/account/habits.ts`, `src/app/api/me/{prefs,habits}/**`, `src/app/(app)/me/PersonalSections.tsx`.
+
+**Integration (lead):** the seven tracks were built in parallel worktrees with strict file ownership, then merged and conflicts resolved. Full suite after integration: lint clean, typecheck clean, **48 files / 453 tests pass** (baseline 30 / 210).
 
 ---
 

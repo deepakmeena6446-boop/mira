@@ -36,7 +36,11 @@ test.describe("Mira — the companion (placeholder engine)", () => {
     await page.getByPlaceholder("Message Mira…").fill("someone is following me, I'm scared");
     await page.getByRole("button", { name: "Send" }).click();
     await expect(page.getByRole("log").getByText(/If you're in danger right now/)).toBeVisible();
+    // E2E has no country (placeholder geocoder), so MIRA says it doesn't know the local number before dialling.
+    await page.getByRole("log").getByRole("button", { name: "Emergency" }).click();
+    await expect(page.getByText(/doesn't know which country you're in yet/)).toBeVisible();
     await expect(page.getByRole("link", { name: /Call 112/ })).toHaveAttribute("href", "tel:112");
+    await page.getByRole("button", { name: "Close", exact: true }).click();
     await page.getByPlaceholder("Message Mira…").fill("who are you");
     await page.getByRole("button", { name: "Send" }).click();
     await expect(page.getByRole("log").getByText(/I'm not an emergency service/)).toBeVisible();

@@ -16,8 +16,8 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     const mum = await acceptContactInvite(browser, address);
     await owner.page.reload();
     await expect(owner.page.getByText("Trusted", { exact: true })).toBeVisible();
-    // Navigation is Home · Circle · Me (Mira is a button, not a tab).
-    await expect(owner.page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Home", "Circle", "Me"]);
+    // Navigation is locked: Home · Mira · Trips · Contribute · Me (Emergency is never a tab; Circle lives in Me).
+    await expect(owner.page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Home", "Mira", "Trips", "Contribute", "Me"]);
 
     // Home → "Where are you going?" → one tap on the saved place → context → Start with MIRA.
     await owner.page.goto("/");
@@ -51,7 +51,7 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     const live = await (await mum.page.request.get(`/api/t/${link.split("/t/")[1]}`)).json();
     expect(live).toMatchObject({ state: "active", name: "Priya", destination: "Home" });
     // Only the latest point — no trail, no email, no user id.
-    expect(Object.keys(live).sort()).toEqual(["alertsViewer", "checkRequested", "dest", "destination", "etaAt", "location", "mode", "name", "state"]);
+    expect(Object.keys(live).sort()).toEqual(["alertsViewer", "checkRequested", "dest", "destination", "etaAt", "location", "mode", "name", "state", "tz"]); // tz: her local time zone label for the ETA
     expect(live.alertsViewer).toBe(true); // she's a trusted contact: she'll get the missed-arrival email
     expect(Object.keys(live.location ?? {}).sort()).toEqual(["ageSeconds", "at", "lat", "lon"]);
 

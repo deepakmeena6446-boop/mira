@@ -67,8 +67,8 @@ test.describe("Mobile extras — long-press report, inbox, time of day, installa
     await p2.goto("/mira");
     await hist;
     await expect(p2.locator("html")).toHaveAttribute("data-daypart", "night"); // "Dark" pinned in Me → App
-    await expect(p2.getByRole("button", { name: "Walk me home" })).toBeVisible();
-    await expect(p2.getByRole("log").getByText(/It's late/)).toBeVisible();
+    await expect(p2.getByRole("button", { name: "Take me home" })).toBeVisible();
+    await expect(p2.getByRole("log").getByText(/it's late/i)).toBeVisible();
     await c2.close();
   });
 
