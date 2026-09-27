@@ -15,9 +15,9 @@ Never paste a secret into chat, a commit, CI logs or this file. Read values from
 - [ ] Railway plan active (the trial has expired on the current account — a paid plan is needed before `railway init`).
 - [ ] A domain you control, e.g. `mira.example.org` (plus `staging.mira.example.org`).
 - [ ] Resend account; sending domain added and DNS records (SPF, DKIM, DMARC) published.
-- [ ] Google Cloud project with billing, budget alert and per-API quotas.
-- [ ] Anthropic API key with a monthly spend limit.
-- [ ] Mapillary developer token.
+- [ ] Google Cloud: the existing Maps keys get API + referrer restrictions (step 5), a budget alert and per-API quotas; create the sign-in OAuth client (step 6).
+- [ ] Anthropic: the existing key gets a monthly spend limit.
+- [ ] Mapillary: the existing token.
 
 ## 2. Generate secrets locally
 

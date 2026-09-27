@@ -89,14 +89,14 @@ Browser pass on the final build: 375 × 812, 412 × 915 and desktop 1024 × 768 
 
 ## Deployment prerequisites (owner credentials and accounts only)
 
+Already in hand (in `.env.local`): Google Maps server + browser keys, Anthropic key, Mapillary token. For production, copy them into Railway and add restrictions: server key → Places/Routes/Geocoding only; browser key → Map Tiles only with HTTP referrer = the production origin; Anthropic monthly spend limit; Google Cloud budget alert.
+
+Still needed:
 1. **Railway plan** — the account's trial has expired; a paid plan is needed before `railway init`.
 2. **Domain** for production (and a staging subdomain), with DNS access.
-3. **Resend** — verified sending domain and a sending-only API key.
-4. **Google Cloud** — server Maps key (Places, Routes, Geocoding), browser Maps key (Map Tiles, referrer = production origin), OAuth client with redirect `https://<domain>/api/auth/google/callback`, budget alert and quotas.
-5. **Anthropic** API key with a monthly spend limit.
-6. **Mapillary** token.
-7. **Generated secrets** (session, encryption, admin hash, VAPID) — commands in the checklist.
-8. **Key rotation** — demo keys were previously pasted in chat; issue fresh production keys rather than reusing them.
+3. **Google sign-in OAuth client** (separate from the Maps keys) with redirect `https://<domain>/api/auth/google/callback`.
+4. **Resend** — verified sending domain and a sending-only API key (contact invites and missed-arrival alerts are email today).
+5. **Generated secrets** (session, encryption, admin hash, VAPID) — commands in the checklist.
 
 ## Known limitations
 
