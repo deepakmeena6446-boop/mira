@@ -31,11 +31,13 @@ export function AfterArrival({
   const lit = hour !== null && walked && finished && route !== null && route.length > 2 && isNight(hour);
   const preparation = useJourneyCheck(trip.id, finished && !lit);
   if (!finished) return null;
-  if (hour === null) return <p className="mt-6 text-sm text-ink-muted">You&apos;ve arrived. Checking whether MIRA has one quick question…</p>;
+  // Say what actually happened: only an arrival is "arrived" (not a journey ended early, or sharing she stopped).
+  const done = trip.state === "arrived" && trip.autoArrival ? "You've arrived" : trip.autoArrival ? "Journey ended" : "Sharing stopped";
+  if (hour === null) return <p className="mt-6 text-sm text-ink-muted">{done}. Checking whether MIRA has one quick question…</p>;
   if (lit) return <LitQuestion route={route!} onDone={onDone} />;
   if (preparation.check) return <div className="mt-6 w-full max-w-sm text-left animate-rise"><CheckCard check={preparation.check} /></div>;
   return <div role="status" className="mt-6 w-full max-w-sm rounded-3xl bg-surface px-5 py-4 text-sm text-ink-muted shadow-[var(--shadow-card)]">
-    <p className="font-bold text-ink">You&apos;ve arrived ✓</p>
+    <p className="font-bold text-ink">{done} ✓</p>
     <p className="mt-1">{preparation.state === "none" ? "Nothing needed from you this time." : preparation.state === "later" ? "A question may still become available. You can check later in Contribute." : "MIRA may have one quick question about this journey. Preparing…"}</p>
     {preparation.state === "later" ? <Link href="/contribute" className="mt-2 inline-flex min-h-11 items-center font-bold text-accent">Open Contribute</Link> : null}
   </div>;

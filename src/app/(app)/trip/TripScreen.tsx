@@ -411,12 +411,12 @@ export function TripScreen({
             {alertsOn
               ? `If you haven't ${trip.autoArrival ? "arrived" : "checked in"} ${Math.round(MISS_GRACE_MS / 60_000)} min after ${trip.autoArrival ? "your ETA" : "your sharing time ends"}, MIRA emails ${sharedOk.length === 1 ? "them" : "them all"}.`
               : !emailAlerts
-                ? "Nobody is alerted automatically if you don't arrive — MIRA can't send email alerts yet. Your live link is how people follow you."
+                ? `Nobody is alerted automatically if you don't ${trip.autoArrival ? "arrive" : "check in"} — MIRA can't send email alerts yet. Your live link is how people follow you.`
                 : netDown
                   ? "Nobody is alerted automatically right now — missed-arrival checks are paused."
                   : (
                       <>
-                        Nobody is alerted automatically if you don&apos;t arrive —{" "}
+                        Nobody is alerted automatically if you don&apos;t {trip.autoArrival ? "arrive" : "check in"} —{" "}
                         <Link href="/circle" className="font-bold text-accent">
                           add someone in Circle
                         </Link>{" "}
@@ -494,11 +494,11 @@ export function TripScreen({
                 </Button>
               </div>
             </div>
-          ) : (
+          ) : trip.autoArrival ? (
             <button type="button" onClick={() => setConfirmEnd(true)} className="min-h-11 w-full rounded-full text-sm font-bold text-ink-muted hover:bg-sunken">
               End trip without arriving
             </button>
-          )}
+          ) : null /* sharing where she is: "I'm okay — stop sharing" already ends it */}
         </div>
       </BottomSheet>
 
