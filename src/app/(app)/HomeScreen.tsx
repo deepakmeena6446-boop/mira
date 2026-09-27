@@ -28,6 +28,7 @@ import { cx } from "@/components/ui/cx";
 import { Icon } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api-client";
+import { SafetyUpdatesSection } from "@/components/app/SafetyUpdates";
 import { shareLiveLink } from "@/lib/share";
 import { keepTripRoute } from "@/lib/trip-route";
 import { suggestionQuery, tripStartExtras } from "@/lib/trip-start";
@@ -738,6 +739,7 @@ export function HomeScreen({
                 </ul>
               </section>
             ) : null}
+            <SafetyUpdatesSection point={{ lat: dest.lat, lon: dest.lon }} heading="Safety updates near there" />
             <section className="mt-5">
               <h3 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">Save this place</h3>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -825,6 +827,8 @@ export function HomeScreen({
                 </>
               )}
             </section>
+            {/* Recent women-safety context for her city: a count and a sheet, never a feed or a rating. */}
+            <SafetyUpdatesSection point={me} />
           </div>
         )}
       </BottomSheet>

@@ -94,6 +94,10 @@ const envSchema = z.object({
   // Real providers (optional; placeholders are used until adapters + keys exist).
   ANTHROPIC_API_KEY: optionalNonEmpty,
   MIRA_MODEL: optionalNonEmpty.refine((v) => v === undefined || /^claude-[a-z0-9-]+$/.test(v), "must be a Claude model id"),
+  // Safety updates (Women Safety Intelligence): "gdelt" (default) | "off" | "fixture" (tests/dev only; refused by PUBLIC_BETA_STRICT).
+  SAFETY_UPDATES: optionalNonEmpty.refine((v) => v === undefined || v === "gdelt" || v === "off" || v === "fixture", 'must be "gdelt", "off" or "fixture"'),
+  // Model for the relevance classifier (ambiguous headlines only). Default claude-opus-5 at low effort.
+  SAFETY_CLASSIFIER_MODEL: optionalNonEmpty.refine((v) => v === undefined || /^claude-[a-z0-9-]+$/.test(v), "must be a Claude model id"),
   MAPBOX_TOKEN: optionalNonEmpty,
   // Google Maps Platform: server key (Places API (New), Routes, Geocoding) and browser key (Map Tiles).
   GOOGLE_MAPS_SERVER_KEY: optionalNonEmpty,
@@ -170,6 +174,7 @@ export function parseEnv(source: Record<string, string | undefined>): ServerEnv 
     }
     if (env.GOOGLE_PLACES_HOURS !== "on") issues.push('GOOGLE_PLACES_HOURS: must be "on" for the public beta');
     if (env.PUBLIC_AGGREGATE_RELEASES === "on") issues.push('PUBLIC_AGGREGATE_RELEASES: must stay "off" until moderation release is approved');
+    if (env.SAFETY_UPDATES === "fixture") issues.push('SAFETY_UPDATES: "fixture" shows sample data and is for tests only');
   }
   if (issues.length) throw new EnvValidationError(issues);
   return env;

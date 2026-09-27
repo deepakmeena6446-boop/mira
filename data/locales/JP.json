@@ -2,10 +2,17 @@
   "iso": "JP",
   "name": "Japan",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "110",
       "label": "Police emergency",
+      "covers": [
+        "police"
+      ],
       "source": {
         "url": "https://www.npa.go.jp/goiken_index.html",
         "title": "ご意見、各種相談・情報提供等｜警察庁Webサイト",

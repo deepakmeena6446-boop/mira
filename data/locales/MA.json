@@ -2,10 +2,17 @@
   "iso": "MA",
   "name": "Morocco",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "PARTIALLY_VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "19",
       "label": "Police emergency",
+      "covers": [
+        "police"
+      ],
       "source": {
         "url": "https://www.anrt.ma/infos-pratiques/ce-que-vous-devez-savoir/numerotation",
         "title": "Numérotation | ANRT | Agence Nationale de Réglementation des Télécommunications",

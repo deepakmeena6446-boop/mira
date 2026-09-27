@@ -2,10 +2,19 @@
   "iso": "AU",
   "name": "Australia",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "000",
       "label": "Emergency (police, fire, ambulance)",
+      "covers": [
+        "police",
+        "ambulance",
+        "fire"
+      ],
       "source": {
         "url": "https://www.healthdirect.gov.au/calling-triple-zero",
         "title": "Calling triple zero (000) | healthdirect",
@@ -16,6 +25,8 @@
       {
         "number": "112",
         "label": "Emergency from mobile phones",
+        "covers": [],
+        "limitation": "From mobile phones.",
         "source": {
           "url": "https://www.healthdirect.gov.au/calling-triple-zero",
           "title": "Calling triple zero (000) | healthdirect",

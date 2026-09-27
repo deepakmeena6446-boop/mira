@@ -3,7 +3,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { CATEGORIES } from "@/domain/report/taxonomy";
-import { emergencyActions, emergencyLine, type CountryContext } from "@/domain/country-context";
+import { emergencyActions, emergencyLine, noNumberReason, type CountryContext } from "@/domain/country-context";
 import { contextLine } from "@/domain/context";
 import { companionOutputIssue } from "@/domain/companion-output";
 import { MIRA_PERSONA } from "./persona";
@@ -228,7 +228,9 @@ function emergencyInfo(c: CountryContext) {
     also_works: c.emergency.also.map((a) => `${a.number} — ${a.label}`),
     services: c.emergency.services.map((s) => `${s.number} — ${s.label}`),
     helplines: c.helplines.map((h) => `${h.number} — ${h.name}${h.hours ? ` (${h.hours})` : ""}`),
-    ...(known ? { source: c.emergency.source?.title ?? null } : { not_known: "MIRA could not verify a local emergency number here; the Emergency options control explains this." }),
+    verification: c.emergency.status,
+    limitations: c.emergency.limitations,
+    ...(known ? { source: c.emergency.source?.title ?? null } : { not_known: noNumberReason(c) }),
   };
 }
 

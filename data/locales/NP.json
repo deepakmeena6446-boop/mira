@@ -2,10 +2,17 @@
   "iso": "NP",
   "name": "Nepal",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "100",
       "label": "Police emergency",
+      "covers": [
+        "police"
+      ],
       "source": {
         "url": "https://www.nepalpolice.gov.np/",
         "title": "नेपाल प्रहरी - www.nepalpolice.gov.np",

@@ -116,7 +116,7 @@ test.describe("Degraded states are honest", () => {
     // Country not known (location off): Emergency is still one tap away, without an invented dial number.
     await page.getByRole("button", { name: "Emergency options" }).first().click();
     const options = page.getByRole("dialog", { name: "Emergency call options" });
-    await expect(options.getByText(/could not verify a local emergency number/)).toBeVisible();
+    await expect(options.getByText(/couldn't determine which country you're in/)).toBeVisible();
     await expect(options.locator('a[href^="tel:"]')).toHaveCount(0);
     await page.getByRole("button", { name: "Close", exact: true }).click();
     await page.getByRole("button", { name: "I feel unsafe" }).click();

@@ -17,6 +17,8 @@ import { POST as reversePOST } from "@/app/api/geo/reverse/route";
 import { POST as routePOST } from "@/app/api/geo/route/route";
 import { POST as nearbyPOST } from "@/app/api/geo/nearby/route";
 import { POST as helpPOST } from "@/app/api/geo/help/route";
+import { POST as safetyPOST } from "@/app/api/safety-updates/route";
+import { resetEnvCache } from "@/server/config/env";
 import { GET as liveGET } from "@/app/api/health/live/route";
 import { GET as readyGET } from "@/app/api/health/ready/route";
 import { POST as reportPOST } from "@/app/api/reports/route";
@@ -57,6 +59,13 @@ const PUBLIC_KEYS = new Set([
   "mode", "checkRequested",
   // The traveller's IANA time zone, so the viewer shows the ETA in her local time, labelled (no place, no person).
   "tz",
+  // Country Context verification and coverage: statements about a country's data (no place, no person).
+  "classification", "reviewed", "limitations", "regionOverride", "covers", "coverage", "verification",
+  "capabilities", "routes", "safetyUpdates", "communitySignals",
+  // Safety updates: published headlines with their publisher, link, age and city-level place (no person, no coordinates).
+  "area", "precision", "countryIso", "windowDays", "updates", "translatedTitle", "category", "reporting", "reportedLocation",
+  "locationPrecision", "publishedAt", "eventYear", "publisher", "originalUrl", "sourceType", "sourceCount", "sensitive",
+  "retrievedAt", "counts", "official", "news", "community",
 ]);
 
 describe("privacy red-line audit", () => {
@@ -68,7 +77,7 @@ describe("privacy red-line audit", () => {
   });
 
   it("public map/geo code never touches private tables", () => {
-    const publicFiles = [...files("src/server/know"), ...files("src/server/providers/geo"), ...files("src/app/api/geo"), ...files("src/server/pilot"), ...files("src/server/help-points"), "src/server/notes/index.ts"];
+    const publicFiles = [...files("src/server/know"), ...files("src/server/providers/geo"), ...files("src/app/api/geo"), ...files("src/server/pilot"), ...files("src/server/help-points"), ...files("src/server/safety-intel"), ...files("src/app/api/safety-updates"), "src/server/notes/index.ts"];
     for (const f of publicFiles) expect(readFileSync(f, "utf8"), f).not.toMatch(PRIVATE_TABLES);
     // The only public community source is aggregate_releases.
     expect(readFileSync("src/server/notes/index.ts", "utf8")).toMatch(/FROM aggregate_releases/);
@@ -118,6 +127,20 @@ describe("privacy red-line audit", () => {
     bodies.push(await (await routePOST(jsonRequest("/api/geo/route", { from, to }))).json());
     bodies.push(await (await nearbyPOST(jsonRequest("/api/geo/nearby", from))).json());
     bodies.push(await (await helpPOST(jsonRequest("/api/geo/help", from))).json());
+    const off = await (await safetyPOST(jsonRequest("/api/safety-updates", from))).json();
+    expect(off).toMatchObject({ area: null, evidence: { state: "unavailable" } }); // switched off: no geocoding, no news lookup
+    bodies.push(off);
+    process.env.SAFETY_UPDATES = "fixture";
+    resetEnvCache();
+    const safety = await (await safetyPOST(jsonRequest("/api/safety-updates", from))).json();
+    process.env.SAFETY_UPDATES = "off";
+    resetEnvCache();
+    expect(safety.area).toMatchObject({ name: "Delhi", precision: "city", countryIso: "IN" });
+    expect(safety.evidence.state).toBe("ready");
+    expect(JSON.stringify(safety)).not.toMatch(/28\.69|77\.21/); // the point she sent never comes back
+    const [cached] = await getSql()<{ n: number }[]>`SELECT count(*)::int AS n FROM safety_intel_cache WHERE payload::text ~ '28\.69|77\.21'`;
+    expect(cached.n).toBe(0); // nor is it stored
+    bodies.push(safety);
     bodies.push(await (await liveGET()).json());
     bodies.push(await (await readyGET()).json());
     bodies.push(await (await reportPOST(jsonRequest("/api/reports", { idempotencyKey: randomUUID(), involvement: "witnessed", category: "environment", placeId, recency: "today", timeBand: "late", narrative: "call 9876543210" }))).json());

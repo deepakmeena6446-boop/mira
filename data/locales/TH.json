@@ -2,10 +2,17 @@
   "iso": "TH",
   "name": "Thailand",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "PARTIALLY_VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "191",
       "label": "Police emergency",
+      "covers": [
+        "police"
+      ],
       "source": {
         "url": "https://thailand.prd.go.th/en/content/category/detail/id/2078/iid/447104",
         "title": "Thailand's Tourist Assistance Contact Numbers",
@@ -16,6 +23,9 @@
       {
         "number": "1155",
         "label": "Tourist Police",
+        "covers": [
+          "police"
+        ],
         "source": {
           "url": "https://thailand.prd.go.th/en/content/category/detail/id/2078/iid/447104",
           "title": "Thailand's Tourist Assistance Contact Numbers",

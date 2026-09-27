@@ -2,10 +2,19 @@
   "iso": "BD",
   "name": "Bangladesh",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "999",
       "label": "National Emergency Service (police, fire, ambulance)",
+      "covers": [
+        "police",
+        "ambulance",
+        "fire"
+      ],
       "source": {
         "url": "https://telecom-police.portal.gov.bd/pages/static-pages/695e3b0cc4774958d7b72321",
         "title": "জাতীয় জরুরি সেবা ৯৯৯ | পাতা | পুলিশ টেলিকম সংস্থা",

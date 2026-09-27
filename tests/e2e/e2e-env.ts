@@ -34,5 +34,7 @@ export function e2eServerEnv(): Record<string, string> {
     OVERPASS_URL: "",
     REVERSE_GEOCODER_URL: "",
     MAPILLARY_TOKEN: "",
+    // Safety updates from labelled "[Sample]" data: no live news index in E2E.
+    SAFETY_UPDATES: "fixture",
   };
 }

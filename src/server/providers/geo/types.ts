@@ -23,6 +23,10 @@ export interface Reverse {
   precise: boolean;
   country?: string | null;
   region?: string | null;
+  /** City / town name ("Delhi"), for city-level lookups such as safety updates. Never coordinates. */
+  locality?: string | null;
+  /** State / province name ("Maharashtra"), when known. */
+  regionName?: string | null;
 }
 
 export interface WalkRoute {

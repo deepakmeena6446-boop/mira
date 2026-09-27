@@ -39,7 +39,7 @@ test.describe("Mira — the companion (placeholder engine)", () => {
     // The client has no verified country profile, so its deterministic call action does not invent a number.
     await page.getByRole("log").getByRole("button", { name: "Emergency options" }).click();
     const options = page.getByRole("dialog", { name: "Emergency call options" });
-    await expect(options.getByText(/could not verify a local emergency number/)).toBeVisible();
+    await expect(options.getByText(/couldn't determine which country you're in/)).toBeVisible();
     await expect(options.locator('a[href^="tel:"]')).toHaveCount(0);
     await page.getByRole("button", { name: "Close", exact: true }).click();
     await page.getByPlaceholder("Message Mira…").fill("who are you");

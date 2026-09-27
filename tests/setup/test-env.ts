@@ -38,6 +38,9 @@ export function applyTestEnv(overrides: Record<string, string | undefined> = {})
     AUTH_GOOGLE_ID: undefined,
     AUTH_GOOGLE_SECRET: undefined,
     ALLOW_DEMO_SIGNIN: undefined,
+    // No live news lookups in tests; a test that needs updates switches to "fixture".
+    SAFETY_UPDATES: "off",
+    SAFETY_CLASSIFIER_MODEL: undefined,
     ...overrides,
   };
   for (const [k, v] of Object.entries(base)) {

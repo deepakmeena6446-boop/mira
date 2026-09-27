@@ -1,5 +1,114 @@
 # MIRA — Execution Status
 
+## MAJOR SCOPE UPDATE — GLOBAL COUNTRY COVERAGE + WOMEN SAFETY INTELLIGENCE (2026-09-27, branch `feat/global-day0-beta`)
+
+Brief: the owner's "Major scope update", which supersedes the limited-country and generic-news assumptions. It has two phases:
+- **A:** every one of the 195 sovereign states is in one registry, and fails honestly where it is unverified.
+- **B:** Women Safety Intelligence replaces any notion of a generic news feed.
+
+| Phase | Status |
+|---|---|
+| A — Global country coverage | PASS. 195/195 represented. The emergency data is honest about its gaps (135 not yet verified). |
+| B — Women Safety Intelligence | PASS WITH KNOWN RISK. Built, tested and verified in the browser with sample data. Live GDELT from production egress and live classifier calls are not yet verified. |
+
+### Phase A — what changed
+
+- **One registry.** `data/countries/registry.json` holds all 193 UN members, the Holy See and the State of Palestine, plus Hong Kong as a territory because it already had a profile. Each entry has ISO alpha-2 and alpha-3, a canonical name, aliases, a calling code and a classification, with sources listed in the file. Nothing else in the code keeps a country list.
+- **Emergency data stays in the 61 cited profiles** (`data/locales/<ISO>.json`), migrated rather than duplicated. They now carry:
+  - explicit `covers` (police / ambulance / fire) per number;
+  - `coverage: "regional"` and `limitation` where a number is qualified;
+  - `regional` service gaps;
+  - a declared `status` that tests prove equals what the cited numbers support.
+- **Regional overrides.** `<ISO>-<SUB>.json` files are supported and tested with fixtures. No real override was invented.
+- **Country special cases removed.** The Nigeria special case and the label-regex guess are gone from the code. Labels were fixed where a single-service number named another service or none (ES Guardia Civil, GH 112, CH 112, VN 114). The loader now rejects such labels.
+- **Separate capabilities.** `CountryContext.capabilities` is kept apart from emergency: routes are provider-dependent; lighting, Help Points and safety updates are source-dependent; community signals are unavailable in the beta.
+- **Fallback UX, live in the browser:**
+  - Unknown country: "MIRA couldn't determine which country you're in…"
+  - Known but unverified (Peru): "MIRA knows you're in Peru, but hasn't yet verified its local emergency information." It shows no `tel:` link and no 112 or 911.
+  - Partly verified (Kenya): the three police numbers, labelled as police, plus "MIRA has not verified an ambulance or fire number."
+- **Citation review.** All 75 cited hosts are recorded in `data/locales/sources.json` with their authority and source-hierarchy tier:
+
+  | Tier | Source type | Hosts |
+  |---|---|---|
+  | 1 | National government | 35 |
+  | 2 | Police / fire / health | 30 |
+  | 3 | Telecom regulator | 9 |
+  | 5 | European Commission | 1 |
+
+  No blog, SEO or crowdsourced list is cited. Two provincial sources are noted (VN Dien Bien police, ZA Western Cape). A profile citing an unreviewed host fails the tests.
+- **Found and fixed:** the Emergency options sheet (and the new Safety updates sheet) closed the instant it opened under React's development double-effect. It was mounted already open, so `useOverlay` popped its own history entry. Both sheets now stay mounted and toggle `open`. Production E2E never showed this, but the Emergency control must work everywhere.
+
+### Global Country Coverage
+
+```
+Countries represented: 195 / 195
+
+Emergency:
+Fully verified:      49
+Partially verified:  9   (CA, GH, KE, MA, MX, PH, RW, TH, UG)
+Region-dependent:    2   (NG, ZA)
+Not yet verified:    135
+```
+
+Hong Kong (a territory, not counted) is fully verified. The friends' countries:
+- VERIFIED: IN 112, US 911, GB 999, AE 999 (police; 998/997), JP 110 (119 ambulance/fire), BR 190 (192/193), FR 112, AU 000, SG 999 (995).
+- REGION_DEPENDENT: NG 112 (call centres rolled out state by state), ZA 10111 (fire numbers are per municipality).
+
+Where source quality limits verification:
+- Official sources don't itemise which services the number reaches: CA 911 (and territory coverage is unconfirmed), MX 911, PH 911, RW 112.
+- No official fire and/or ambulance number is cited: GH, KE, MA, TH, UG.
+
+The 135 unverified countries were not researched in this sprint; none was attempted and rejected. They show no number and say so. The full list and every limitation are in `docs/COUNTRY_COVERAGE.md`, which `scripts/country-coverage.ts` generates and `--check` keeps current. **The release must not claim verified emergency coverage in 195 countries.**
+
+### Phase B — Women Safety Intelligence
+
+The design is in `docs/SAFETY_UPDATES.md`. On Home, a restrained **Safety updates** line reads, for example, "2 recent women-safety updates from the past 7 days · Official advisories 1 · News reports 1 · Community reports: not in the beta". A destination card has the same line. A sheet holds the cards. There is no feed, no score and no colouring.
+
+```
+Provider(s):                  GDELT DOC 2.0 (discovery only; publisher + link kept), behind SafetyIntelligenceProvider;
+                              fixture provider for tests/dev; official/police/transport feeds: interface ready, none connected
+Countries technically reachable: all 195 (GDELT indexes worldwide news in ~65 machine-translated languages); depth varies widely
+Languages represented:        deterministic gate: 13 (en es pt fr de it hi ja ko ar id/ms tr zh-Hans/zh-Hant);
+                              any other language → classifier (relevance + translation); without ANTHROPIC_API_KEY, left out
+Default recency:              7 days; the sheet can expand to 30; age always shown
+Classification test cases:    228 (70 tuning, 70 held-out #1, 80 held-out #2, 8 real GDELT headlines)
+Relevant correctly included:  first run on unseen data: held-out #1 15/26, held-out #2 20/30 (+4 routed to the classifier);
+                              after vocabulary-only fixes: 91/91 across all sets (now regression tests, no longer unseen)
+Irrelevant correctly excluded: first run on unseen data: held-out #1 33/34 (1 false positive: "stalking horse bid"),
+                              held-out #2 38/38; now 108/108 across all sets
+Duplicate clusters tested:    a 5-article story (incl. AMP copy + police statement) → 1 update, 4 sources, official lead;
+                              2 distinct same-city stories stay separate; the real GDELT Mukherjee Nagar trio → 1;
+                              the fixture pair in 12 countries
+Provider failure behavior:    failed → "MIRA couldn't check recent updates right now." + Try again; partial → "Some sources
+                              couldn't be checked"; empty → "No recent women-safety updates found from the sources MIRA checked
+                              in this area. This does not mean no incidents occurred."; GDELT rate-limit text = failure, never
+                              "no results"; failures cached 5 min
+Location privacy:             coordinates only in the POST body to MIRA, reverse-geocoded (existing rounding) then discarded;
+                              only the city (or region) name reaches GDELT; not logged, not stored, not in the cache (tested)
+Caching behavior:             per city + window 30 min in Postgres (shared across instances); concurrent requests share one
+                              call; per-article classifier decisions 14 days; client fetches once per ~1 km + window;
+                              classifier only for ambiguous headlines (≤20 per fetch) under Mira's daily token ceiling
+```
+
+**Known limitations (Phase B)**
+- **GDELT throttling.** GDELT throttled this machine's IP hard: the first successful response came after about 9 minutes of spaced retries. Shared hosting egress may see the same, so expect "couldn't check" until a second provider or cache warming exists. This is the main operational risk.
+- **City-level location only.** A match means the article mentions the city, so the UI shows "(city-level)" and never a distance.
+- **Recall depends on the classifier.** Many real headlines omit gender ("DU students stalked") and are routed to the classifier. Without a key they are dropped: precision holds, recall falls.
+- **Classifier not measured live.** Its behaviour is covered only with a stubbed client. The default model is `claude-opus-5` at low effort (`SAFETY_CLASSIFIER_MODEL` overrides it), with server-side fallbacks on.
+- **No generated summaries.** Cards show the publisher's headline.
+- **Clustering.** Cross-language duplicates may show as separate updates. The shared-name rule can merge two incidents in the same neighbourhood within 72 h; each source's own headline stays visible.
+- **"Official" is decided by host pattern only.** For example, `gob.mx` stays "news".
+
+### Tests
+
+- `npm run check`: lint, typecheck, **556/556** unit + integration.
+  - New: `country-registry.test.ts` (17) and `safety-updates.test.ts` (52).
+  - The privacy audit now covers `/api/safety-updates` and the new country keys.
+- E2E (`npm run test:e2e`, production build): **46 passed**, 0 failed, 4 intentional cross-project skips.
+  - New: `i-safety-updates.spec.ts` on mobile and desktop.
+  - The Emergency specs assert the new "couldn't determine which country" copy.
+- Migration `0017_safety_intel_cache` is applied on the dev database.
+
 ## GLOBAL DAY-0 BETA SPRINT (2026-09-26, branch `feat/global-day0-beta`)
 
 Brief: the owner's "Global Day-0 Beta — 12-hour autonomous execution sprint". Source of truth: the five product documents plus `MIRA_LAUNCH_AUDIT.md`. The earlier P0/P1 record is kept below as history.

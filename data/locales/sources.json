@@ -1,0 +1,316 @@
+{
+  "$comment": "Every host cited by a profile in this directory, reviewed once against MIRA's source hierarchy. A profile citing a host not listed here fails tests/unit/country-registry.test.ts.",
+  "reviewed": "2026-09-27",
+  "tiers": {
+    "1": "National government or emergency authority",
+    "2": "Police, fire or health authority",
+    "3": "Telecom regulator",
+    "4": "Official tourism or foreign-affairs authority",
+    "5": "International governmental body",
+    "6": "Other authoritative source (only when necessary; needs a note)"
+  },
+  "hosts": {
+    "112.go.kr": {
+      "authority": "Korean National Police Agency (112)",
+      "tier": 2
+    },
+    "congan.dienbien.gov.vn": {
+      "authority": "Dien Bien Provincial Police, Viet Nam",
+      "tier": 2,
+      "note": "Provincial police site stating the national numbers"
+    },
+    "digital-strategy.ec.europa.eu": {
+      "authority": "European Commission",
+      "tier": 5
+    },
+    "ehotlines.e.gov.ph": {
+      "authority": "Government of the Philippines (e-hotlines)",
+      "tier": 1
+    },
+    "isotita.gr": {
+      "authority": "General Secretariat for Equality, Greece",
+      "tier": 1
+    },
+    "layanan112.komdigi.go.id": {
+      "authority": "Ministry of Communication and Digital Affairs, Indonesia",
+      "tier": 1
+    },
+    "moi.gov.ae": {
+      "authority": "Ministry of Interior, UAE",
+      "tier": 1
+    },
+    "mowca.gov.bd": {
+      "authority": "Ministry of Women and Children Affairs, Bangladesh",
+      "tier": 1
+    },
+    "nas.gov.gh": {
+      "authority": "National Ambulance Service, Ghana",
+      "tier": 2
+    },
+    "ncc.gov.ng": {
+      "authority": "Nigerian Communications Commission",
+      "tier": 3
+    },
+    "nkom.no": {
+      "authority": "Norwegian Communications Authority",
+      "tier": 3
+    },
+    "nmhh.hu": {
+      "authority": "National Media and Infocommunications Authority, Hungary",
+      "tier": 3
+    },
+    "nwc.gov.np": {
+      "authority": "National Women Commission, Nepal",
+      "tier": 1
+    },
+    "police.gov.gh": {
+      "authority": "Ghana Police Service",
+      "tier": 2
+    },
+    "police.public.lu": {
+      "authority": "Grand Ducal Police, Luxembourg",
+      "tier": 2
+    },
+    "policie.gov.cz": {
+      "authority": "Police of the Czech Republic",
+      "tier": 2
+    },
+    "polisi.go.tz": {
+      "authority": "Tanzania Police Force",
+      "tier": 2
+    },
+    "portal.moi.gov.qa": {
+      "authority": "Ministry of Interior, Qatar",
+      "tier": 1
+    },
+    "telecom-police.portal.gov.bd": {
+      "authority": "Bangladesh Police",
+      "tier": 2
+    },
+    "thailand.prd.go.th": {
+      "authority": "Government Public Relations Department, Thailand",
+      "tier": 1
+    },
+    "upf.go.ug": {
+      "authority": "Uganda Police Force",
+      "tier": 2
+    },
+    "violenciagenero.igualdad.gob.es": {
+      "authority": "Ministry of Equality, Spain",
+      "tier": 1
+    },
+    "wcd.gov.in": {
+      "authority": "Ministry of Women and Child Development, India",
+      "tier": 1
+    },
+    "web.guardiacivil.es": {
+      "authority": "Guardia Civil, Spain",
+      "tier": 2
+    },
+    "www.112.be": {
+      "authority": "Belgian 112 emergency service (FPS Home Affairs)",
+      "tier": 1
+    },
+    "www.112.gov.tr": {
+      "authority": "112 Emergency Call Centres, Ministry of Interior, Türkiye",
+      "tier": 1
+    },
+    "www.119.go.kr": {
+      "authority": "National Fire Agency, Korea",
+      "tier": 2
+    },
+    "www.1990.lk": {
+      "authority": "Suwa Seriya, Sri Lanka's state ambulance service",
+      "tier": 2
+    },
+    "www.911.gov": {
+      "authority": "National 911 Program, U.S. Department of Transportation",
+      "tier": 1
+    },
+    "www.aile.gov.tr": {
+      "authority": "Ministry of Family and Social Services, Türkiye",
+      "tier": 1
+    },
+    "www.anrt.ma": {
+      "authority": "National Telecommunications Regulatory Agency, Morocco",
+      "tier": 3
+    },
+    "www.bj.admin.ch": {
+      "authority": "Federal Office of Justice, Switzerland",
+      "tier": 1
+    },
+    "www.bufdir.no": {
+      "authority": "Norwegian Directorate for Children, Youth and Family Affairs",
+      "tier": 1
+    },
+    "www.bundesnetzagentur.de": {
+      "authority": "Federal Network Agency, Germany",
+      "tier": 3
+    },
+    "www.ch.ch": {
+      "authority": "Swiss federal, cantonal and communal portal",
+      "tier": 1
+    },
+    "www.childwomenmin.gov.lk": {
+      "authority": "Ministry of Women and Child Affairs, Sri Lanka",
+      "tier": 1
+    },
+    "www.cst.gov.sa": {
+      "authority": "Communications, Space and Technology Commission, Saudi Arabia",
+      "tier": 3
+    },
+    "www.ekab.gr": {
+      "authority": "National Centre for Emergency Care (EKAB), Greece",
+      "tier": 2
+    },
+    "www.fdma.go.jp": {
+      "authority": "Fire and Disaster Management Agency, Japan",
+      "tier": 2
+    },
+    "www.fireservice.gr": {
+      "authority": "Hellenic Fire Service",
+      "tier": 2
+    },
+    "www.garda.ie": {
+      "authority": "An Garda Síochána, Ireland",
+      "tier": 2
+    },
+    "www.gender.go.ke": {
+      "authority": "State Department for Gender, Kenya",
+      "tier": 1
+    },
+    "www.gob.mx": {
+      "authority": "Government of Mexico",
+      "tier": 1
+    },
+    "www.gov.br": {
+      "authority": "Government of Brazil",
+      "tier": 1
+    },
+    "www.gov.pl": {
+      "authority": "Government of Poland",
+      "tier": 1
+    },
+    "www.gov.rw": {
+      "authority": "Government of Rwanda",
+      "tier": 1
+    },
+    "www.gov.si": {
+      "authority": "Government of Slovenia",
+      "tier": 1
+    },
+    "www.gov.uk": {
+      "authority": "UK Government",
+      "tier": 1
+    },
+    "www.hakom.hr": {
+      "authority": "Croatian Regulatory Authority for Network Industries",
+      "tier": 3
+    },
+    "www.healthdirect.gov.au": {
+      "authority": "Healthdirect Australia (government-funded health service)",
+      "tier": 2
+    },
+    "www.hilfetelefon.de": {
+      "authority": "Violence against Women Support Hotline (Federal Office of Family Affairs), Germany",
+      "tier": 1
+    },
+    "www.kenyapolice.go.ke": {
+      "authority": "National Police Service, Kenya",
+      "tier": 2
+    },
+    "www.malaysia.gov.my": {
+      "authority": "Government of Malaysia official portal",
+      "tier": 1
+    },
+    "www.mha.gov.in": {
+      "authority": "Ministry of Home Affairs, India",
+      "tier": 1
+    },
+    "www.mogef.go.kr": {
+      "authority": "Ministry of Gender Equality and Family, Korea",
+      "tier": 1
+    },
+    "www.nepalpolice.gov.np": {
+      "authority": "Nepal Police",
+      "tier": 2
+    },
+    "www.npa.go.jp": {
+      "authority": "National Police Agency, Japan",
+      "tier": 2
+    },
+    "www.nta.gov.np": {
+      "authority": "Nepal Telecommunications Authority",
+      "tier": 3
+    },
+    "www.oesterreich.gv.at": {
+      "authority": "Austrian government portal",
+      "tier": 1
+    },
+    "www.pib.gov.in": {
+      "authority": "Press Information Bureau, Government of India",
+      "tier": 1
+    },
+    "www.police.gov.hk": {
+      "authority": "Hong Kong Police Force",
+      "tier": 2
+    },
+    "www.police.gov.sg": {
+      "authority": "Singapore Police Force",
+      "tier": 2
+    },
+    "www.police.govt.nz": {
+      "authority": "New Zealand Police",
+      "tier": 2
+    },
+    "www.police.lk": {
+      "authority": "Sri Lanka Police",
+      "tier": 2
+    },
+    "www.poliziadistato.it": {
+      "authority": "Polizia di Stato, Italy",
+      "tier": 2
+    },
+    "www.prd.go.th": {
+      "authority": "Government Public Relations Department, Thailand",
+      "tier": 1
+    },
+    "www.rcmp.ca": {
+      "authority": "Royal Canadian Mounted Police",
+      "tier": 2
+    },
+    "www.salute.gov.it": {
+      "authority": "Ministry of Health, Italy",
+      "tier": 2
+    },
+    "www.saps.gov.za": {
+      "authority": "South African Police Service",
+      "tier": 2
+    },
+    "www.scdf.gov.sg": {
+      "authority": "Singapore Civil Defence Force",
+      "tier": 2
+    },
+    "www.service-public.fr": {
+      "authority": "Service-Public.fr, French government",
+      "tier": 1
+    },
+    "www.trc.gov.lk": {
+      "authority": "Telecommunications Regulatory Commission, Sri Lanka",
+      "tier": 3
+    },
+    "www.vigilfuoco.it": {
+      "authority": "National Fire Corps (Vigili del Fuoco), Italy",
+      "tier": 2
+    },
+    "www.westerncape.gov.za": {
+      "authority": "Western Cape Government (provincial), South Africa",
+      "tier": 1,
+      "note": "Provincial government; used for the national list it publishes and for regional fire information"
+    },
+    "xaydungchinhsach.chinhphu.vn": {
+      "authority": "Government of Viet Nam portal",
+      "tier": 1
+    }
+  }
+}

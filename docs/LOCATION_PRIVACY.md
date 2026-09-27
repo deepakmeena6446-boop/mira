@@ -7,3 +7,9 @@ MIRA browser requests send coordinates in POST bodies, never browser URLs. Serve
 - Google Geocoding v4 also uses GET for reverse geocoding. Migrating versions would not remove this provider-level URL limitation.
 
 This is a provider interface limitation, not a browser URL leak. Revisit provider selection if a strict no-coordinate-in-provider-URL policy becomes a release requirement.
+
+## Safety updates
+
+`POST /api/safety-updates` receives a point in the body: her location on Home, or a destination she picked. MIRA reverse-geocodes it through the same provider path as above, which rounds it. From that answer it keeps only the city name, or the region name when no city is known. Only that name reaches a news provider (GDELT today); the `SafetySearch` interface has no coordinate fields.
+
+The point is not stored or logged. The results cache (`safety_intel_cache`) is keyed by a hash of country, city and window. It holds published headlines, not coordinates or user ids. `tests/integration/security.test.ts` checks that the posted coordinates appear in neither the response nor the cache. The design is in [SAFETY_UPDATES.md](SAFETY_UPDATES.md).

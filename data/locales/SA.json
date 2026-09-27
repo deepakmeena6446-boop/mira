@@ -2,10 +2,17 @@
   "iso": "SA",
   "name": "Saudi Arabia",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "999",
       "label": "Police emergency",
+      "covers": [
+        "police"
+      ],
       "source": {
         "url": "https://www.cst.gov.sa/en/about/Numbering",
         "title": "Numbering",

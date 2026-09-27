@@ -9,7 +9,7 @@ import type { GeoPoint } from "./types";
  * rounded to ~1 km, and cached. Respects Nominatim's 1 request/second policy. Mapbox
  * reverse geocoding replaces this when MAPBOX_TOKEN is set.
  */
-type Area = { name: string | null; country: string | null; region: string | null };
+type Area = { name: string | null; country: string | null; region: string | null; locality: string | null; regionName: string | null };
 const cache = new Map<string, Area>();
 const MAX_CACHE = 1000;
 let lastCall = 0;
@@ -32,6 +32,8 @@ export async function osmArea(p: GeoPoint): Promise<Area | null> {
   let name: string | null = null;
   let country: string | null = null;
   let region: string | null = null;
+  let locality: string | null = null;
+  let regionName: string | null = null;
   let ok = false;
   try {
     const url = coordinateBearingGeoUrl(base, "/reverse", { lat, lon, format: "jsonv2", zoom: "16", addressdetails: "1", "accept-language": "en" });
@@ -42,12 +44,14 @@ export async function osmArea(p: GeoPoint): Promise<Area | null> {
       name = a.neighbourhood ?? a.suburb ?? a.quarter ?? a.city_district ?? a.village ?? a.town ?? a.city ?? null;
       country = a.country_code ? a.country_code.toUpperCase().slice(0, 2) : null;
       region = a["ISO3166-2-lvl4"] ?? a["ISO3166-2-lvl3"] ?? null;
+      locality = a.city ?? a.town ?? a.municipality ?? a.village ?? null;
+      regionName = a.state ?? a.province ?? null;
     }
   } catch {
     name = null; // network/timeout: no label is better than a wrong one
   }
   // Only remember real answers: a timeout or 429 shouldn't hide the area name for good.
-  const area = { name, country, region };
+  const area = { name, country, region, locality, regionName };
   if (name !== null || ok) {
     if (cache.size >= MAX_CACHE) cache.delete(cache.keys().next().value!);
     cache.set(key, area);

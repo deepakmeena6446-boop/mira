@@ -2,10 +2,17 @@
   "iso": "GH",
   "name": "Ghana",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "PARTIALLY_VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "112",
-      "label": "Emergency",
+      "label": "Ambulance (National Ambulance Service)",
+      "covers": [
+        "ambulance"
+      ],
       "source": {
         "url": "https://nas.gov.gh/",
         "title": "National Ambulance Service — Republic of Ghana",

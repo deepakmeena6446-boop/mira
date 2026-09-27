@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 import { useCountry } from "@/lib/locale-store";
 import { useOverlay } from "@/lib/use-overlay";
-import { emergencyActions } from "@/domain/country-context";
+import { emergencyActions, emergencyStatusNote, noNumberReason, type CountryContext } from "@/domain/country-context";
 
 /** Cited country actions only. A direct dial is reserved for a verified all-service number;
  * service-specific and unknown profiles open a deterministic options sheet. No model call.
@@ -30,22 +30,15 @@ export function EmergencyPill({ className, variant = "pill" }: { className?: str
     <button type="button" onClick={() => setExplain(true)} aria-haspopup="dialog" className={cx(styles, className)}>
       {icon}<span>{actions.length === 1 && actions[0].scope === "service" ? `${actions[0].label} ${actions[0].number}` : "Emergency options"}</span>
     </button>
-    {explain ? <EmergencyOptionsSheet onClose={() => setExplain(false)} countryName={country.countryName ?? regionName(country.iso)} actions={actions} /> : null}
+    <EmergencyOptionsSheet open={explain} onClose={() => setExplain(false)} country={country} actions={actions} />
   </>;
 }
 
-/** "Peru" for "PE", from the browser's own region names (no data file needed); null when unknown. */
-function regionName(iso: string | null): string | null {
-  if (!iso) return null;
-  try {
-    return new Intl.DisplayNames(["en"], { type: "region" }).of(iso) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function EmergencyOptionsSheet({ onClose, countryName, actions }: { onClose: () => void; countryName: string | null; actions: ReturnType<typeof emergencyActions> }) {
-  useOverlay(true, onClose);
+/** Stays mounted and flips `open`: mounting already-open made React's dev double-effect pop its own history entry and close it at once. */
+function EmergencyOptionsSheet({ open, onClose, country, actions }: { open: boolean; onClose: () => void; country: CountryContext; actions: ReturnType<typeof emergencyActions> }) {
+  const note = emergencyStatusNote(country);
+  useOverlay(open, onClose);
+  if (!open) return null;
   return createPortal(
     <div role="dialog" aria-modal="true" aria-labelledby="emergency-h" className="fixed inset-0 z-[60] flex items-end justify-center bg-[rgb(10_6_24/0.5)] animate-fade sm:items-center" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-t-[2rem] bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[2rem]">
@@ -56,7 +49,8 @@ function EmergencyOptionsSheet({ onClose, countryName, actions }: { onClose: () 
             <a href={`tel:${n.number}`} className="flex min-h-14 items-center justify-between gap-3 rounded-2xl bg-ink px-4 font-bold text-canvas"><span>{n.label}</span><span>{n.number}</span></a>
             {n.qualification ? <p className="mt-1 text-xs text-ink-muted">{n.qualification}</p> : null}
           </li>)}</ul>
-        </> : <p className="mt-2 text-sm text-ink-muted">{countryName ? `MIRA could not verify a local emergency number for ${countryName}.` : "MIRA could not verify a local emergency number for your location."} If you know the local number, use your phone&apos;s dialler.</p>}
+          {note ? <p className="mt-3 text-xs text-ink-muted">{note}</p> : null}
+        </> : <p className="mt-2 text-sm text-ink-muted">{noNumberReason(country)} If you know the local number, use your phone&apos;s dialler.</p>}
         <button type="button" onClick={onClose} className="mt-3 min-h-11 w-full rounded-full font-bold text-ink-muted hover:bg-sunken">Close</button>
       </div>
     </div>, document.body,

@@ -120,6 +120,13 @@
       "when": 1790432819383,
       "tag": "0016_legacy_receipt_archive",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790450954820,
+      "tag": "0017_safety_intel_cache",
+      "breakpoints": true
     }
   ]
 }

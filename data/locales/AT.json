@@ -2,10 +2,19 @@
   "iso": "AT",
   "name": "Austria",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "112",
       "label": "Emergency (police, ambulance, fire)",
+      "covers": [
+        "police",
+        "ambulance",
+        "fire"
+      ],
       "source": {
         "url": "https://digital-strategy.ec.europa.eu/en/policies/112",
         "title": "112 - the EU's emergency phone number | Shaping Europe’s digital future",

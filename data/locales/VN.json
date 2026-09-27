@@ -2,10 +2,17 @@
   "iso": "VN",
   "name": "Vietnam",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "113",
       "label": "Police emergency",
+      "covers": [
+        "police"
+      ],
       "source": {
         "url": "https://congan.dienbien.gov.vn/Danh-muc-tin-tuc/tong-hop-cac-so-dien-thoai-khan-cap-quoc-gia-ghi-nho-de-bao-ve-minh-va-ho-tro-nguoi-khac-13182.html",
         "title": "Tổng hợp các số điện thoại khẩn cấp quốc gia: ghi nhớ để bảo vệ mình và hỗ trợ người khác Công an tỉnh Điện Biên",
@@ -16,6 +23,7 @@
       {
         "number": "112",
         "label": "National emergency line for incidents, disasters and dangerous situations (linked to 113, 114, 115)",
+        "covers": [],
         "source": {
           "url": "https://xaydungchinhsach.chinhphu.vn/nhung-dieu-can-biet-ve-tong-dai-112-so-dien-thoai-tiep-nhan-thong-tin-va-noi-dung-thong-tin-ve-su-co-tham-hoa-119250714134442873.htm",
           "title": "TỔNG ĐÀI 112 - Số điện thoại tiếp nhận thông tin SỰ CỐ, THIÊN TAI, THẢM HỌA, TÌNH HUỐNG NGUY CẤP",
@@ -37,7 +45,7 @@
       {
         "service": "fire",
         "number": "114",
-        "label": "Fire and rescue police",
+        "label": "Fire and rescue",
         "source": {
           "url": "https://congan.dienbien.gov.vn/Danh-muc-tin-tuc/tong-hop-cac-so-dien-thoai-khan-cap-quoc-gia-ghi-nho-de-bao-ve-minh-va-ho-tro-nguoi-khac-13182.html",
           "title": "Tổng hợp các số điện thoại khẩn cấp quốc gia: ghi nhớ để bảo vệ mình và hỗ trợ người khác Công an tỉnh Điện Biên",

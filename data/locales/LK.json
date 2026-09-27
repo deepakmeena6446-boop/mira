@@ -2,10 +2,17 @@
   "iso": "LK",
   "name": "Sri Lanka",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "119",
       "label": "Police emergency",
+      "covers": [
+        "police"
+      ],
       "source": {
         "url": "https://www.police.lk/",
         "title": "SRI LANKA POLICE",
@@ -16,6 +23,9 @@
       {
         "number": "112",
         "label": "Police emergency hotline",
+        "covers": [
+          "police"
+        ],
         "source": {
           "url": "https://www.trc.gov.lk/content/files/numbering/3-digit%20Short%20Codes.pdf",
           "title": "3-digit and 4 digit Short Codes - Web Update.xlsx",

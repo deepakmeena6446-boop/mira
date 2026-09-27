@@ -2,10 +2,15 @@
   "iso": "RW",
   "name": "Rwanda",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "PARTIALLY_VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "112",
       "label": "Emergency",
+      "covers": [],
       "source": {
         "url": "https://www.gov.rw/emergency",
         "title": "Emergency",

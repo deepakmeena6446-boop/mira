@@ -2,10 +2,17 @@
   "iso": "NO",
   "name": "Norway",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "112",
       "label": "Police emergency",
+      "covers": [
+        "police"
+      ],
       "source": {
         "url": "https://nkom.no/telefoni-og-telefonnummer/informasjon-om-telefoni-for-sluttbruker/n%C3%B8dnummer-og-n%C3%B8danrop",
         "title": "Nødnummer og nødanrop - Nkom",

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { providerModes } from "@/server/providers/modes";
-import { emailConfigured } from "@/server/config/env";
+import { emailConfigured, getEnv } from "@/server/config/env";
 import { MiraOrb } from "@/components/app/MiraOrb";
 import { Icon } from "@/components/ui/Icon";
 
@@ -23,6 +23,7 @@ function Item({ emoji, title, children }: { emoji: string; title: string; childr
 
 export default function PrivacyPage() {
   const canEmailContacts = emailConfigured();
+  const safetyUpdates = getEnv().SAFETY_UPDATES ?? "gdelt";
   return (
     <div className="bg-companion min-h-dvh px-4 pb-32 pt-[max(1.25rem,env(safe-area-inset-top))]">
       <article className="mx-auto max-w-xl">
@@ -53,6 +54,25 @@ export default function PrivacyPage() {
               </p>
             )}
             <p>Some third-party geocoders require rounded coordinates in a server-to-provider request URL. MIRA keeps coordinates out of your browser URL and does not log those provider URLs.</p>
+          </Item>
+          <Item emoji="📰" title="Safety updates">
+            {safetyUpdates === "off" ? (
+              <p>Safety updates are switched off in this version.</p>
+            ) : (
+              <>
+                <p>
+                  Safety updates show recent published news and official advisories about women&apos;s safety in a city: where you are on Home, or a destination you pick.
+                  MIRA&apos;s server works out the city name from that point and sends only the city name to the {safetyUpdates === "fixture" ? "sample data used for testing" : "GDELT news index"} — never your
+                  position, name or account. Results are cached per city for about 30 minutes, with nothing linking them to you.
+                </p>
+                <p>
+                  {providerModes().companion === "claude"
+                    ? "Headlines MIRA can't classify with its own rules are sent to Anthropic's Claude to judge relevance and translate them — the headline and publisher only, nothing about you. "
+                    : ""}
+                  MIRA doesn&apos;t verify news reports: each update links to its source, and none of it is a rating of any area.
+                </p>
+              </>
+            )}
           </Item>
           <Item emoji="💜" title="Trips you share">
             <p>

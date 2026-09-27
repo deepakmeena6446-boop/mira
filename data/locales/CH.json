@@ -2,10 +2,17 @@
   "iso": "CH",
   "name": "Switzerland",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "112",
-      "label": "Emergency (connects to police)",
+      "label": "Police (via 112)",
+      "covers": [
+        "police"
+      ],
       "source": {
         "url": "https://www.ch.ch/en/safety-and-justice/emergencies-and-danger/",
         "title": "Emergencies and danger",

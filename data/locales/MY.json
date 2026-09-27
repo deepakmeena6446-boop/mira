@@ -2,10 +2,19 @@
   "iso": "MY",
   "name": "Malaysia",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "999",
       "label": "Emergency (police, fire, ambulance, civil defence)",
+      "covers": [
+        "police",
+        "ambulance",
+        "fire"
+      ],
       "source": {
         "url": "https://www.malaysia.gov.my/en/categories/safety-and-community/public-safety/mers-999-emergency-line",
         "title": "MERS 999 Emergency Line",

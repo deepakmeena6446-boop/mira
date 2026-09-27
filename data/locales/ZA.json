@@ -2,10 +2,17 @@
   "iso": "ZA",
   "name": "South Africa",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "REGION_DEPENDENT",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "10111",
       "label": "Police emergency (SAPS)",
+      "covers": [
+        "police"
+      ],
       "source": {
         "url": "https://www.saps.gov.za/services/cc_10111.php",
         "title": "Services | SAPS (South African Police Service)",
@@ -16,6 +23,8 @@
       {
         "number": "112",
         "label": "Emergency from a mobile phone (routed by your network)",
+        "covers": [],
+        "limitation": "From mobile phones only; your network routes the call (there is no public 112 centre).",
         "source": {
           "url": "https://www.westerncape.gov.za/know-who-you-can-call-emergency",
           "title": "Know who you can call in an emergency | Western Cape Government",
@@ -49,6 +58,17 @@
       "There is currently no single emergency number in South Africa: police 10111, ambulance 10177, and 112 from mobile phones (MTN, Vodacom, Cell C and Telkom). In the Western Cape, fire and rescue numbers are listed per district municipality. Source: https://www.westerncape.gov.za/know-who-you-can-call-emergency (Western Cape Government), retrieved 2026-09-26.",
       "10111 can be dialled anywhere in the country; calls from a landline are free and calls from a cell phone are charged at normal rates. Source: https://www.saps.gov.za/services/cc_10111.php, retrieved 2026-09-26.",
       "No public 112 Emergency Centre has been established; mobile network licensees route 112 calls through their own centres or an automatic voice response. The government has proposed phasing out 10177, 10111 and 107 so 112 becomes the only national emergency number. Source: https://www.gov.za/sites/default/files/gcis_document/202411/51499gon5502.pdf (Government Gazette No. 51499, Notice 5502, 1 Nov 2024), retrieved 2026-09-26."
+    ],
+    "regional": [
+      {
+        "service": "fire",
+        "note": "Fire and rescue numbers are listed per district municipality; MIRA has no national fire number for South Africa.",
+        "source": {
+          "url": "https://www.westerncape.gov.za/know-who-you-can-call-emergency",
+          "title": "Know who you can call in an emergency | Western Cape Government",
+          "retrieved": "2026-09-26"
+        }
+      }
     ]
   },
   "languages": [

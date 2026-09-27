@@ -7,19 +7,20 @@ import { withFallback } from "@/server/providers/companion";
 import { DANGER, JUDGEMENT, verdictWords } from "@/server/providers/companion/signals";
 import { localClock } from "@/server/providers/companion/clock";
 import { coverageLine, type MiraNow } from "@/server/providers/companion/tools";
-import { UNKNOWN_COUNTRY, type CountryContext } from "@/domain/country-context";
+import { UNKNOWN_COUNTRY, capabilitiesFor, type CountryContext } from "@/domain/country-context";
 import type { MiraCard, MiraEvent, MiraHelpPoint } from "@/server/providers/companion/types";
 import type { MiraTools } from "@/server/providers/companion/tools";
 
 const home = { id: "h", label: "Home", emoji: "🏠", lat: 28.69, lon: 77.21, address: null };
 
 const GB: CountryContext = {
+  ...UNKNOWN_COUNTRY,
   iso: "GB",
   countryName: "United Kingdom",
-  region: null,
+  classification: "un_member",
   timezone: "Europe/London",
-  emergency: { primary: { number: "999", label: "Emergency (police, fire, ambulance)", scope: "all" }, also: [{ number: "112", label: "Emergency" }], services: [], source: { title: "gov.uk", url: "https://www.gov.uk" } },
-  helplines: [],
+  emergency: { ...UNKNOWN_COUNTRY.emergency, status: "VERIFIED", reviewed: "2026-09-26", primary: { number: "999", label: "Emergency (police, fire, ambulance)", scope: "all" }, also: [{ number: "112", label: "Emergency" }], source: { title: "gov.uk", url: "https://www.gov.uk" } },
+  capabilities: capabilitiesFor("VERIFIED"),
 };
 const KE: CountryContext = { ...UNKNOWN_COUNTRY, iso: "KE" };
 
@@ -74,7 +75,7 @@ describe("Mira (scripted engine)", () => {
     expect(r.text).toMatch(/MIRA doesn't know the local number here/);
     expect(r.text).not.toMatch(/\b\d{3}\b/);
     const info = await run("what's the emergency number here?", tools({ getContext: async () => now({ country: KE }) }));
-    expect(info.text).toMatch(/could not verify a local emergency number/);
+    expect(info.text).toMatch(/has not yet been verified by MIRA/);
     expect(info.cards[0].type).toBe("sos");
     const uk = await run("what's the emergency number here?");
     expect(uk.text).toMatch(/United Kingdom, Reviewed call options: 999/);
@@ -277,7 +278,7 @@ describe("Mira on Claude (mocked client)", () => {
     expect(uk.result).toMatch(/999 — Emergency/);
     const ke = await ask(KE);
     expect(ke.result).toMatch(/\\"known\\":false/);
-    expect(ke.result).toMatch(/could not verify a local emergency number/);
+    expect(ke.result).toMatch(/has not yet been verified by MIRA/);
   });
 
   it("danger words show the Emergency card before the model says anything, once", async () => {

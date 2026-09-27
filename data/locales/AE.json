@@ -2,10 +2,17 @@
   "iso": "AE",
   "name": "United Arab Emirates",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "999",
       "label": "Police emergency",
+      "covers": [
+        "police"
+      ],
       "source": {
         "url": "https://moi.gov.ae/en/about-moi/emergency-contacts",
         "title": "Emergency Contact | Ministry of Interior Services",

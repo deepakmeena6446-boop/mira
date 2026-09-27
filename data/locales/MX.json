@@ -2,10 +2,15 @@
   "iso": "MX",
   "name": "Mexico",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "PARTIALLY_VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "911",
       "label": "Emergency (single national number)",
+      "covers": [],
       "source": {
         "url": "https://www.gob.mx/911/articulos/que-es-el-911emergencias?idiom=es",
         "title": "¿Qué es el Número Único de Llamadas de Emergencia 9-1-1? | 911 | Gobierno | gob.mx",

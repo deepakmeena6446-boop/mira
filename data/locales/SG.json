@@ -2,10 +2,17 @@
   "iso": "SG",
   "name": "Singapore",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "999",
       "label": "Police emergency",
+      "covers": [
+        "police"
+      ],
       "source": {
         "url": "https://www.police.gov.sg/contact-us",
         "title": "SPF | Contact Us",

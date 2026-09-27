@@ -2,7 +2,7 @@ import "server-only";
 import type { MiraCard, MiraEvent, MiraTurn } from "./types";
 import type { MiraTools } from "./tools";
 import { daypartFor } from "@/domain/daypart";
-import { emergencyLine, type CountryContext } from "@/domain/country-context";
+import { emergencyLine, noNumberReason, type CountryContext } from "@/domain/country-context";
 import { clock12 } from "./clock";
 import { DANGER, JUDGEMENT } from "./signals";
 
@@ -68,7 +68,7 @@ export function emergencySentence(c: CountryContext): string {
 function emergencyFacts(c: CountryContext): string {
   const p = c.emergency.primary;
   const where = c.countryName ?? "this country";
-  if (!p) return "MIRA could not verify a local emergency number here. Use the Emergency options button for that explanation.";
+  if (!p) return `${noNumberReason(c)} Use the Emergency options button for that explanation.`;
   const help = c.helplines.map((h) => `${h.number} (${h.name})`);
   return `In ${where}, ${emergencyLine(c)}${help.length ? ` Helplines: ${help.join(", ")}.` : ""}`;
 }

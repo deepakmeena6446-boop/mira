@@ -2,10 +2,19 @@
   "iso": "GB",
   "name": "United Kingdom",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "999",
       "label": "Emergency (police, ambulance, fire, coastguard)",
+      "covers": [
+        "police",
+        "ambulance",
+        "fire"
+      ],
       "source": {
         "url": "https://www.gov.uk/guidance/999-and-112-the-uks-national-emergency-numbers",
         "title": "999 and 112: the UK's national emergency numbers - GOV.UK",
@@ -16,6 +25,11 @@
       {
         "number": "112",
         "label": "Emergency (works the same as 999)",
+        "covers": [
+          "police",
+          "ambulance",
+          "fire"
+        ],
         "source": {
           "url": "https://www.gov.uk/guidance/999-and-112-the-uks-national-emergency-numbers",
           "title": "999 and 112: the UK's national emergency numbers - GOV.UK",

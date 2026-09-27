@@ -114,10 +114,17 @@ export function placeholderGeo(sql: postgres.Sql): GeoProvider {
         WHERE name IS NOT NULL AND ST_DWithin(point::geography, ST_SetSRID(ST_MakePoint(${p.lon}, ${p.lat}), 4326)::geography, 500)
         ORDER BY d LIMIT 1`;
       // MIRA's local map snapshot is the DU North Campus pilot (Delhi).
-      const pilot = inBounds(p) ? { country: "IN", region: "IN-DL" } : null;
+      const pilot = inBounds(p) ? { country: "IN", region: "IN-DL", locality: "Delhi", regionName: "Delhi" } : null;
       if (row?.name) return { label: `Near ${row.name}`, precise: true, ...pilot };
       const area = await osmArea(p);
-      return { label: area?.name ?? null, precise: false, country: area?.country ?? pilot?.country ?? null, region: area?.region ?? pilot?.region ?? null };
+      return {
+        label: area?.name ?? null,
+        precise: false,
+        country: area?.country ?? pilot?.country ?? null,
+        region: area?.region ?? pilot?.region ?? null,
+        locality: area?.locality ?? pilot?.locality ?? null,
+        regionName: area?.regionName ?? pilot?.regionName ?? null,
+      };
     },
 
     async walk(a, b): Promise<WalkRoute> {

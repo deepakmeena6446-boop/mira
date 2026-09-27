@@ -2,10 +2,17 @@
   "iso": "ID",
   "name": "Indonesia",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "110",
       "label": "Police emergency",
+      "covers": [
+        "police"
+      ],
       "source": {
         "url": "https://layanan112.komdigi.go.id/tentang",
         "title": "Tentang Layanan Panggilan Darurat 112",
@@ -16,6 +23,13 @@
       {
         "number": "112",
         "label": "Emergency call centre 112 (only where the local government runs it)",
+        "covers": [
+          "police",
+          "ambulance",
+          "fire"
+        ],
+        "coverage": "regional",
+        "limitation": "Run separately by each local government; 112 may not be answered everywhere.",
         "source": {
           "url": "https://layanan112.komdigi.go.id/tentang",
           "title": "Tentang Layanan Panggilan Darurat 112",

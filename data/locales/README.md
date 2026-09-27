@@ -12,8 +12,22 @@ A wrong emergency number is a safety bug.
 4. **Protected-area review.** Changes under `data/locales/` need 2 approvals, at least one from a listed locale reviewer. Reviewers open every cited URL and confirm it still says what the profile says.
 5. **Re-verify** each profile yearly, and whenever a cited source changes or disappears. Bump `version` and each `retrieved` date you re-checked. These dates are shown to reviewers, not users.
 6. **Time zone** is an IANA zone. The app shows the place's local abbreviation and never hardcodes "IST".
-7. **Optional fields.** `emergency.also` lists other numbers that reach the same emergency service (e.g. 112 where 999 is the main number); `emergency.services` lists per-service numbers (`service`: `police` | `ambulance` | `fire`). Each carries its own `source`. Countries with more than one time zone omit `timezone`, and single-zone countries include it only with an official citation; the app falls back to the phone's own time zone.
+7. **Services are explicit.** Every `general` and `also` number has `covers`: the services (`police`, `ambulance`, `fire`) its source says it reaches. An empty list means the source doesn't itemise them. It is never guessed from the label.
+   - `services` lists single-service numbers.
+   - A single-service number's label names its own service and no other ("Police (Guardia Civil)", never "Emergency").
+   - `coverage: "regional"` marks a number that only works in some regions.
+   - `limitation` records a known gap in plain words.
+   - `regional` records a service that has no national number because it is organised by region (e.g. South Africa's fire services). Each entry carries its own `source`.
+8. **Status is declared and checked.** `status.emergency` must equal what the cited numbers support. The tests fail otherwise.
+   - `VERIFIED`: police, ambulance and fire are each on a national number with no recorded limitation.
+   - `REGION_DEPENDENT`: a number or service varies by region.
+   - `PARTIALLY_VERIFIED`: anything less.
+   - `status.reviewed` is the review date.
+9. **Regional overrides.** `<ISO>-<SUB>.json`, named by ISO 3166-2 code, holds a subdivision's cited differences: `general`, `also`, `services` or `regional`, plus `reviewed`. An override's service number replaces the country's number for that service, and fills a `regional` gap for it. An override never applies to another country.
+10. **Time zones and other numbers.** `emergency.also` lists other numbers that reach emergency services (e.g. 112 where 999 is the main number). Countries with more than one time zone omit `timezone`. Single-zone countries include it only with an official citation; otherwise the app uses the phone's own time zone.
+
+The registry of all 195 countries is `data/countries/registry.json` (identity only). The generated status report is `docs/COUNTRY_COVERAGE.md`.
 
 ## Fallback
 
-If a country has no reviewed profile, MIRA does not present a local dial number. The Emergency options control explains that it could not verify one. Service-specific profile numbers are labelled by service; an all-service direct dial action requires explicit evidence of all-service coverage. Nigeria's 112 profile records a national designation but does not establish operational coverage in every area, so MIRA qualifies that call option.
+If a country has no reviewed profile, MIRA does not present a local dial number. If MIRA knows the country, the Emergency options control names it and says its emergency information has not yet been verified. If MIRA can't tell the country, it says that instead. Service-specific profile numbers are labelled by service; an all-service direct dial action requires explicit evidence of all-service coverage. Nigeria's 112 profile records a national designation but does not establish operational coverage in every area. The profile marks it `coverage: "regional"` with a `limitation`, so MIRA qualifies that call option. There is no country special-case in code.

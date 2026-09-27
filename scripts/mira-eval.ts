@@ -24,11 +24,12 @@ import type { MiraNow, MiraTools } from "../src/server/providers/companion/tools
 type City = "delhi" | "london" | "dubai" | "newyork" | "nairobi" | "tokyo";
 
 const cc = (iso: string, name: string, tz: string, primary: string, label: string, extra: Partial<CountryContext["emergency"]> = {}, helplines: CountryContext["helplines"] = []): CountryContext => ({
+  ...UNKNOWN_COUNTRY,
   iso,
   countryName: name,
-  region: null,
+  classification: "un_member",
   timezone: tz,
-  emergency: { primary: { number: primary, label }, also: [], services: [], source: { title: `${name} (eval fixture)`, url: "https://example.org" }, ...extra },
+  emergency: { ...UNKNOWN_COUNTRY.emergency, status: "VERIFIED", reviewed: "2026-09-26", primary: { number: primary, label }, source: { title: `${name} (eval fixture)`, url: "https://example.org" }, ...extra },
   helplines,
 });
 

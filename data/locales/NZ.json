@@ -2,10 +2,19 @@
   "iso": "NZ",
   "name": "New Zealand",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "111",
       "label": "Emergency (police, fire, ambulance)",
+      "covers": [
+        "police",
+        "ambulance",
+        "fire"
+      ],
       "source": {
         "url": "https://www.police.govt.nz/contact-us",
         "title": "Contact us | New Zealand Police",

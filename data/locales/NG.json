@@ -2,10 +2,20 @@
   "iso": "NG",
   "name": "Nigeria",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "REGION_DEPENDENT",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "112",
       "label": "Emergency (police, fire, road safety and other responders)",
+      "covers": [
+        "police",
+        "fire"
+      ],
+      "coverage": "regional",
+      "limitation": "112 is the national emergency number, but its call centres were rolled out state by state; MIRA has not verified that 112 is answered in every area.",
       "source": {
         "url": "https://ncc.gov.ng/media-centre/press-releases/covid-19-nccs-112-national-emergency-number-offers-succour-nigerians",
         "title": "COVID-19: NCC's 112 National Emergency Number Offers Succour to Nigerians | NCC",

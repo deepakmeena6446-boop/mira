@@ -9,7 +9,7 @@ import { HELP_CLASSES, SOURCE_NAME, helpWeightsFor, hoursLine, hoursShort, isNig
 import { localTime } from "@/domain/opening-hours";
 import { useCountry } from "@/lib/locale-store";
 import { EmergencyPill } from "@/components/app/EmergencyPill";
-import { otherEmergencyNumbers } from "@/domain/country-context";
+import { emergencyStatusNote, otherEmergencyNumbers } from "@/domain/country-context";
 import { Icon } from "@/components/ui/Icon";
 
 export interface UnsafeShareAction {
@@ -190,6 +190,8 @@ export function UnsafeSheet({
           <CallSomeone />
           <EmergencyPill variant="block" />
         </div>
+        {/* Partly verified, region-dependent or unverified: say so beside the call options. */}
+        {emergencyStatusNote(locale) ? <p className="mt-2 text-xs text-ink-muted">{emergencyStatusNote(locale)}</p> : null}
         {/* Other official numbers for this country (e.g. Japan: 119 for ambulance and fire), from the same cited profile. */}
         {otherEmergencyNumbers(locale).length ? (
           <ul className="mt-2 space-y-1">

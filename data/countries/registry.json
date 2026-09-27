@@ -1,0 +1,1722 @@
+{
+  "$comment": "MIRA's one country registry. Identity only: emergency information lives in data/locales/<ISO>.json and is never inferred from this file. See data/countries/README.md.",
+  "version": "2026-09-27",
+  "sources": [
+    {
+      "title": "Member States | United Nations",
+      "url": "https://www.un.org/en/about-us/member-states",
+      "retrieved": "2026-09-27",
+      "covers": "the 193 UN member states"
+    },
+    {
+      "title": "Non-member States | United Nations",
+      "url": "https://www.un.org/en/about-us/non-member-states",
+      "retrieved": "2026-09-27",
+      "covers": "Holy See and State of Palestine (permanent observer states)"
+    },
+    {
+      "title": "ISO 3166 Country Codes | ISO",
+      "url": "https://www.iso.org/iso-3166-country-codes.html",
+      "retrieved": "2026-09-27",
+      "covers": "alpha-2 and alpha-3 codes"
+    },
+    {
+      "title": "List of ITU-T Recommendation E.164 assigned country codes | ITU",
+      "url": "https://www.itu.int/pub/T-SP-E.164D",
+      "retrieved": "2026-09-27",
+      "covers": "international calling codes (not emergency numbers)"
+    }
+  ],
+  "countries": [
+    {
+      "iso2": "AD",
+      "iso3": "AND",
+      "name": "Andorra",
+      "aliases": [],
+      "callingCode": "+376",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "AE",
+      "iso3": "ARE",
+      "name": "United Arab Emirates",
+      "aliases": [
+        "UAE"
+      ],
+      "callingCode": "+971",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "AF",
+      "iso3": "AFG",
+      "name": "Afghanistan",
+      "aliases": [],
+      "callingCode": "+93",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "AG",
+      "iso3": "ATG",
+      "name": "Antigua and Barbuda",
+      "aliases": [],
+      "callingCode": "+1-268",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "AL",
+      "iso3": "ALB",
+      "name": "Albania",
+      "aliases": [],
+      "callingCode": "+355",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "AM",
+      "iso3": "ARM",
+      "name": "Armenia",
+      "aliases": [],
+      "callingCode": "+374",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "AO",
+      "iso3": "AGO",
+      "name": "Angola",
+      "aliases": [],
+      "callingCode": "+244",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "AR",
+      "iso3": "ARG",
+      "name": "Argentina",
+      "aliases": [],
+      "callingCode": "+54",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "AT",
+      "iso3": "AUT",
+      "name": "Austria",
+      "aliases": [],
+      "callingCode": "+43",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "AU",
+      "iso3": "AUS",
+      "name": "Australia",
+      "aliases": [],
+      "callingCode": "+61",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "AZ",
+      "iso3": "AZE",
+      "name": "Azerbaijan",
+      "aliases": [],
+      "callingCode": "+994",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BA",
+      "iso3": "BIH",
+      "name": "Bosnia and Herzegovina",
+      "aliases": [
+        "Bosnia"
+      ],
+      "callingCode": "+387",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BB",
+      "iso3": "BRB",
+      "name": "Barbados",
+      "aliases": [],
+      "callingCode": "+1-246",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BD",
+      "iso3": "BGD",
+      "name": "Bangladesh",
+      "aliases": [],
+      "callingCode": "+880",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BE",
+      "iso3": "BEL",
+      "name": "Belgium",
+      "aliases": [],
+      "callingCode": "+32",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BF",
+      "iso3": "BFA",
+      "name": "Burkina Faso",
+      "aliases": [],
+      "callingCode": "+226",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BG",
+      "iso3": "BGR",
+      "name": "Bulgaria",
+      "aliases": [],
+      "callingCode": "+359",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BH",
+      "iso3": "BHR",
+      "name": "Bahrain",
+      "aliases": [],
+      "callingCode": "+973",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BI",
+      "iso3": "BDI",
+      "name": "Burundi",
+      "aliases": [],
+      "callingCode": "+257",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BJ",
+      "iso3": "BEN",
+      "name": "Benin",
+      "aliases": [],
+      "callingCode": "+229",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BN",
+      "iso3": "BRN",
+      "name": "Brunei Darussalam",
+      "aliases": [
+        "Brunei"
+      ],
+      "callingCode": "+673",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BO",
+      "iso3": "BOL",
+      "name": "Bolivia",
+      "aliases": [
+        "Bolivia (Plurinational State of)",
+        "Plurinational State of Bolivia"
+      ],
+      "callingCode": "+591",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BR",
+      "iso3": "BRA",
+      "name": "Brazil",
+      "aliases": [
+        "Brasil"
+      ],
+      "callingCode": "+55",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BS",
+      "iso3": "BHS",
+      "name": "Bahamas",
+      "aliases": [
+        "The Bahamas"
+      ],
+      "callingCode": "+1-242",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BT",
+      "iso3": "BTN",
+      "name": "Bhutan",
+      "aliases": [],
+      "callingCode": "+975",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BW",
+      "iso3": "BWA",
+      "name": "Botswana",
+      "aliases": [],
+      "callingCode": "+267",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BY",
+      "iso3": "BLR",
+      "name": "Belarus",
+      "aliases": [],
+      "callingCode": "+375",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "BZ",
+      "iso3": "BLZ",
+      "name": "Belize",
+      "aliases": [],
+      "callingCode": "+501",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "CA",
+      "iso3": "CAN",
+      "name": "Canada",
+      "aliases": [],
+      "callingCode": "+1",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "CD",
+      "iso3": "COD",
+      "name": "Democratic Republic of the Congo",
+      "aliases": [
+        "DR Congo",
+        "DRC",
+        "Congo-Kinshasa"
+      ],
+      "callingCode": "+243",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "CF",
+      "iso3": "CAF",
+      "name": "Central African Republic",
+      "aliases": [],
+      "callingCode": "+236",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "CG",
+      "iso3": "COG",
+      "name": "Congo",
+      "aliases": [
+        "Republic of the Congo",
+        "Congo-Brazzaville"
+      ],
+      "callingCode": "+242",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "CH",
+      "iso3": "CHE",
+      "name": "Switzerland",
+      "aliases": [],
+      "callingCode": "+41",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "CI",
+      "iso3": "CIV",
+      "name": "Côte d'Ivoire",
+      "aliases": [
+        "Cote d'Ivoire",
+        "Ivory Coast"
+      ],
+      "callingCode": "+225",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "CL",
+      "iso3": "CHL",
+      "name": "Chile",
+      "aliases": [],
+      "callingCode": "+56",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "CM",
+      "iso3": "CMR",
+      "name": "Cameroon",
+      "aliases": [],
+      "callingCode": "+237",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "CN",
+      "iso3": "CHN",
+      "name": "China",
+      "aliases": [
+        "People's Republic of China"
+      ],
+      "callingCode": "+86",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "CO",
+      "iso3": "COL",
+      "name": "Colombia",
+      "aliases": [],
+      "callingCode": "+57",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "CR",
+      "iso3": "CRI",
+      "name": "Costa Rica",
+      "aliases": [],
+      "callingCode": "+506",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "CU",
+      "iso3": "CUB",
+      "name": "Cuba",
+      "aliases": [],
+      "callingCode": "+53",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "CV",
+      "iso3": "CPV",
+      "name": "Cabo Verde",
+      "aliases": [
+        "Cape Verde"
+      ],
+      "callingCode": "+238",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "CY",
+      "iso3": "CYP",
+      "name": "Cyprus",
+      "aliases": [],
+      "callingCode": "+357",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "CZ",
+      "iso3": "CZE",
+      "name": "Czechia",
+      "aliases": [
+        "Czech Republic"
+      ],
+      "callingCode": "+420",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "DE",
+      "iso3": "DEU",
+      "name": "Germany",
+      "aliases": [
+        "Deutschland"
+      ],
+      "callingCode": "+49",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "DJ",
+      "iso3": "DJI",
+      "name": "Djibouti",
+      "aliases": [],
+      "callingCode": "+253",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "DK",
+      "iso3": "DNK",
+      "name": "Denmark",
+      "aliases": [],
+      "callingCode": "+45",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "DM",
+      "iso3": "DMA",
+      "name": "Dominica",
+      "aliases": [],
+      "callingCode": "+1-767",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "DO",
+      "iso3": "DOM",
+      "name": "Dominican Republic",
+      "aliases": [],
+      "callingCode": "+1",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "DZ",
+      "iso3": "DZA",
+      "name": "Algeria",
+      "aliases": [],
+      "callingCode": "+213",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "EC",
+      "iso3": "ECU",
+      "name": "Ecuador",
+      "aliases": [],
+      "callingCode": "+593",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "EE",
+      "iso3": "EST",
+      "name": "Estonia",
+      "aliases": [],
+      "callingCode": "+372",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "EG",
+      "iso3": "EGY",
+      "name": "Egypt",
+      "aliases": [],
+      "callingCode": "+20",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "ER",
+      "iso3": "ERI",
+      "name": "Eritrea",
+      "aliases": [],
+      "callingCode": "+291",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "ES",
+      "iso3": "ESP",
+      "name": "Spain",
+      "aliases": [
+        "España"
+      ],
+      "callingCode": "+34",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "ET",
+      "iso3": "ETH",
+      "name": "Ethiopia",
+      "aliases": [],
+      "callingCode": "+251",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "FI",
+      "iso3": "FIN",
+      "name": "Finland",
+      "aliases": [],
+      "callingCode": "+358",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "FJ",
+      "iso3": "FJI",
+      "name": "Fiji",
+      "aliases": [],
+      "callingCode": "+679",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "FM",
+      "iso3": "FSM",
+      "name": "Micronesia",
+      "aliases": [
+        "Micronesia (Federated States of)",
+        "Federated States of Micronesia"
+      ],
+      "callingCode": "+691",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "FR",
+      "iso3": "FRA",
+      "name": "France",
+      "aliases": [],
+      "callingCode": "+33",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "GA",
+      "iso3": "GAB",
+      "name": "Gabon",
+      "aliases": [],
+      "callingCode": "+241",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "GB",
+      "iso3": "GBR",
+      "name": "United Kingdom",
+      "aliases": [
+        "United Kingdom of Great Britain and Northern Ireland",
+        "UK",
+        "Great Britain",
+        "Britain"
+      ],
+      "callingCode": "+44",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "GD",
+      "iso3": "GRD",
+      "name": "Grenada",
+      "aliases": [],
+      "callingCode": "+1-473",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "GE",
+      "iso3": "GEO",
+      "name": "Georgia",
+      "aliases": [],
+      "callingCode": "+995",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "GH",
+      "iso3": "GHA",
+      "name": "Ghana",
+      "aliases": [],
+      "callingCode": "+233",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "GM",
+      "iso3": "GMB",
+      "name": "Gambia",
+      "aliases": [
+        "The Gambia"
+      ],
+      "callingCode": "+220",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "GN",
+      "iso3": "GIN",
+      "name": "Guinea",
+      "aliases": [],
+      "callingCode": "+224",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "GQ",
+      "iso3": "GNQ",
+      "name": "Equatorial Guinea",
+      "aliases": [],
+      "callingCode": "+240",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "GR",
+      "iso3": "GRC",
+      "name": "Greece",
+      "aliases": [
+        "Hellas"
+      ],
+      "callingCode": "+30",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "GT",
+      "iso3": "GTM",
+      "name": "Guatemala",
+      "aliases": [],
+      "callingCode": "+502",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "GW",
+      "iso3": "GNB",
+      "name": "Guinea-Bissau",
+      "aliases": [],
+      "callingCode": "+245",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "GY",
+      "iso3": "GUY",
+      "name": "Guyana",
+      "aliases": [],
+      "callingCode": "+592",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "HK",
+      "iso3": "HKG",
+      "name": "Hong Kong",
+      "aliases": [
+        "Hong Kong SAR",
+        "Hong Kong Special Administrative Region of China"
+      ],
+      "callingCode": "+852",
+      "classification": "territory",
+      "parent": "CN"
+    },
+    {
+      "iso2": "HN",
+      "iso3": "HND",
+      "name": "Honduras",
+      "aliases": [],
+      "callingCode": "+504",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "HR",
+      "iso3": "HRV",
+      "name": "Croatia",
+      "aliases": [],
+      "callingCode": "+385",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "HT",
+      "iso3": "HTI",
+      "name": "Haiti",
+      "aliases": [],
+      "callingCode": "+509",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "HU",
+      "iso3": "HUN",
+      "name": "Hungary",
+      "aliases": [],
+      "callingCode": "+36",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "ID",
+      "iso3": "IDN",
+      "name": "Indonesia",
+      "aliases": [],
+      "callingCode": "+62",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "IE",
+      "iso3": "IRL",
+      "name": "Ireland",
+      "aliases": [
+        "Éire"
+      ],
+      "callingCode": "+353",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "IL",
+      "iso3": "ISR",
+      "name": "Israel",
+      "aliases": [],
+      "callingCode": "+972",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "IN",
+      "iso3": "IND",
+      "name": "India",
+      "aliases": [
+        "Bharat"
+      ],
+      "callingCode": "+91",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "IQ",
+      "iso3": "IRQ",
+      "name": "Iraq",
+      "aliases": [],
+      "callingCode": "+964",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "IR",
+      "iso3": "IRN",
+      "name": "Iran",
+      "aliases": [
+        "Iran (Islamic Republic of)",
+        "Islamic Republic of Iran"
+      ],
+      "callingCode": "+98",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "IS",
+      "iso3": "ISL",
+      "name": "Iceland",
+      "aliases": [],
+      "callingCode": "+354",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "IT",
+      "iso3": "ITA",
+      "name": "Italy",
+      "aliases": [
+        "Italia"
+      ],
+      "callingCode": "+39",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "JM",
+      "iso3": "JAM",
+      "name": "Jamaica",
+      "aliases": [],
+      "callingCode": "+1-876",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "JO",
+      "iso3": "JOR",
+      "name": "Jordan",
+      "aliases": [],
+      "callingCode": "+962",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "JP",
+      "iso3": "JPN",
+      "name": "Japan",
+      "aliases": [
+        "Nippon"
+      ],
+      "callingCode": "+81",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "KE",
+      "iso3": "KEN",
+      "name": "Kenya",
+      "aliases": [],
+      "callingCode": "+254",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "KG",
+      "iso3": "KGZ",
+      "name": "Kyrgyzstan",
+      "aliases": [
+        "Kyrgyz Republic"
+      ],
+      "callingCode": "+996",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "KH",
+      "iso3": "KHM",
+      "name": "Cambodia",
+      "aliases": [],
+      "callingCode": "+855",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "KI",
+      "iso3": "KIR",
+      "name": "Kiribati",
+      "aliases": [],
+      "callingCode": "+686",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "KM",
+      "iso3": "COM",
+      "name": "Comoros",
+      "aliases": [],
+      "callingCode": "+269",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "KN",
+      "iso3": "KNA",
+      "name": "Saint Kitts and Nevis",
+      "aliases": [
+        "St Kitts and Nevis"
+      ],
+      "callingCode": "+1-869",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "KP",
+      "iso3": "PRK",
+      "name": "Democratic People's Republic of Korea",
+      "aliases": [
+        "North Korea",
+        "DPRK"
+      ],
+      "callingCode": "+850",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "KR",
+      "iso3": "KOR",
+      "name": "Republic of Korea",
+      "aliases": [
+        "South Korea",
+        "Korea"
+      ],
+      "callingCode": "+82",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "KW",
+      "iso3": "KWT",
+      "name": "Kuwait",
+      "aliases": [],
+      "callingCode": "+965",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "KZ",
+      "iso3": "KAZ",
+      "name": "Kazakhstan",
+      "aliases": [],
+      "callingCode": "+7",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "LA",
+      "iso3": "LAO",
+      "name": "Lao People's Democratic Republic",
+      "aliases": [
+        "Laos",
+        "Lao PDR"
+      ],
+      "callingCode": "+856",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "LB",
+      "iso3": "LBN",
+      "name": "Lebanon",
+      "aliases": [],
+      "callingCode": "+961",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "LC",
+      "iso3": "LCA",
+      "name": "Saint Lucia",
+      "aliases": [
+        "St Lucia"
+      ],
+      "callingCode": "+1-758",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "LI",
+      "iso3": "LIE",
+      "name": "Liechtenstein",
+      "aliases": [],
+      "callingCode": "+423",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "LK",
+      "iso3": "LKA",
+      "name": "Sri Lanka",
+      "aliases": [],
+      "callingCode": "+94",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "LR",
+      "iso3": "LBR",
+      "name": "Liberia",
+      "aliases": [],
+      "callingCode": "+231",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "LS",
+      "iso3": "LSO",
+      "name": "Lesotho",
+      "aliases": [],
+      "callingCode": "+266",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "LT",
+      "iso3": "LTU",
+      "name": "Lithuania",
+      "aliases": [],
+      "callingCode": "+370",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "LU",
+      "iso3": "LUX",
+      "name": "Luxembourg",
+      "aliases": [],
+      "callingCode": "+352",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "LV",
+      "iso3": "LVA",
+      "name": "Latvia",
+      "aliases": [],
+      "callingCode": "+371",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "LY",
+      "iso3": "LBY",
+      "name": "Libya",
+      "aliases": [],
+      "callingCode": "+218",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MA",
+      "iso3": "MAR",
+      "name": "Morocco",
+      "aliases": [],
+      "callingCode": "+212",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MC",
+      "iso3": "MCO",
+      "name": "Monaco",
+      "aliases": [],
+      "callingCode": "+377",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MD",
+      "iso3": "MDA",
+      "name": "Republic of Moldova",
+      "aliases": [
+        "Moldova"
+      ],
+      "callingCode": "+373",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "ME",
+      "iso3": "MNE",
+      "name": "Montenegro",
+      "aliases": [],
+      "callingCode": "+382",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MG",
+      "iso3": "MDG",
+      "name": "Madagascar",
+      "aliases": [],
+      "callingCode": "+261",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MH",
+      "iso3": "MHL",
+      "name": "Marshall Islands",
+      "aliases": [],
+      "callingCode": "+692",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MK",
+      "iso3": "MKD",
+      "name": "North Macedonia",
+      "aliases": [
+        "Macedonia"
+      ],
+      "callingCode": "+389",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "ML",
+      "iso3": "MLI",
+      "name": "Mali",
+      "aliases": [],
+      "callingCode": "+223",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MM",
+      "iso3": "MMR",
+      "name": "Myanmar",
+      "aliases": [
+        "Burma"
+      ],
+      "callingCode": "+95",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MN",
+      "iso3": "MNG",
+      "name": "Mongolia",
+      "aliases": [],
+      "callingCode": "+976",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MR",
+      "iso3": "MRT",
+      "name": "Mauritania",
+      "aliases": [],
+      "callingCode": "+222",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MT",
+      "iso3": "MLT",
+      "name": "Malta",
+      "aliases": [],
+      "callingCode": "+356",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MU",
+      "iso3": "MUS",
+      "name": "Mauritius",
+      "aliases": [],
+      "callingCode": "+230",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MV",
+      "iso3": "MDV",
+      "name": "Maldives",
+      "aliases": [],
+      "callingCode": "+960",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MW",
+      "iso3": "MWI",
+      "name": "Malawi",
+      "aliases": [],
+      "callingCode": "+265",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MX",
+      "iso3": "MEX",
+      "name": "Mexico",
+      "aliases": [
+        "México"
+      ],
+      "callingCode": "+52",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MY",
+      "iso3": "MYS",
+      "name": "Malaysia",
+      "aliases": [],
+      "callingCode": "+60",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "MZ",
+      "iso3": "MOZ",
+      "name": "Mozambique",
+      "aliases": [],
+      "callingCode": "+258",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "NA",
+      "iso3": "NAM",
+      "name": "Namibia",
+      "aliases": [],
+      "callingCode": "+264",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "NE",
+      "iso3": "NER",
+      "name": "Niger",
+      "aliases": [],
+      "callingCode": "+227",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "NG",
+      "iso3": "NGA",
+      "name": "Nigeria",
+      "aliases": [],
+      "callingCode": "+234",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "NI",
+      "iso3": "NIC",
+      "name": "Nicaragua",
+      "aliases": [],
+      "callingCode": "+505",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "NL",
+      "iso3": "NLD",
+      "name": "Netherlands",
+      "aliases": [
+        "Kingdom of the Netherlands",
+        "Holland"
+      ],
+      "callingCode": "+31",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "NO",
+      "iso3": "NOR",
+      "name": "Norway",
+      "aliases": [],
+      "callingCode": "+47",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "NP",
+      "iso3": "NPL",
+      "name": "Nepal",
+      "aliases": [],
+      "callingCode": "+977",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "NR",
+      "iso3": "NRU",
+      "name": "Nauru",
+      "aliases": [],
+      "callingCode": "+674",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "NZ",
+      "iso3": "NZL",
+      "name": "New Zealand",
+      "aliases": [
+        "Aotearoa"
+      ],
+      "callingCode": "+64",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "OM",
+      "iso3": "OMN",
+      "name": "Oman",
+      "aliases": [],
+      "callingCode": "+968",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "PA",
+      "iso3": "PAN",
+      "name": "Panama",
+      "aliases": [],
+      "callingCode": "+507",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "PE",
+      "iso3": "PER",
+      "name": "Peru",
+      "aliases": [],
+      "callingCode": "+51",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "PG",
+      "iso3": "PNG",
+      "name": "Papua New Guinea",
+      "aliases": [],
+      "callingCode": "+675",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "PH",
+      "iso3": "PHL",
+      "name": "Philippines",
+      "aliases": [],
+      "callingCode": "+63",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "PK",
+      "iso3": "PAK",
+      "name": "Pakistan",
+      "aliases": [],
+      "callingCode": "+92",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "PL",
+      "iso3": "POL",
+      "name": "Poland",
+      "aliases": [],
+      "callingCode": "+48",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "PS",
+      "iso3": "PSE",
+      "name": "State of Palestine",
+      "aliases": [
+        "Palestine"
+      ],
+      "callingCode": "+970",
+      "classification": "un_observer_state"
+    },
+    {
+      "iso2": "PT",
+      "iso3": "PRT",
+      "name": "Portugal",
+      "aliases": [],
+      "callingCode": "+351",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "PW",
+      "iso3": "PLW",
+      "name": "Palau",
+      "aliases": [],
+      "callingCode": "+680",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "PY",
+      "iso3": "PRY",
+      "name": "Paraguay",
+      "aliases": [],
+      "callingCode": "+595",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "QA",
+      "iso3": "QAT",
+      "name": "Qatar",
+      "aliases": [],
+      "callingCode": "+974",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "RO",
+      "iso3": "ROU",
+      "name": "Romania",
+      "aliases": [],
+      "callingCode": "+40",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "RS",
+      "iso3": "SRB",
+      "name": "Serbia",
+      "aliases": [],
+      "callingCode": "+381",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "RU",
+      "iso3": "RUS",
+      "name": "Russian Federation",
+      "aliases": [
+        "Russia"
+      ],
+      "callingCode": "+7",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "RW",
+      "iso3": "RWA",
+      "name": "Rwanda",
+      "aliases": [],
+      "callingCode": "+250",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SA",
+      "iso3": "SAU",
+      "name": "Saudi Arabia",
+      "aliases": [],
+      "callingCode": "+966",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SB",
+      "iso3": "SLB",
+      "name": "Solomon Islands",
+      "aliases": [],
+      "callingCode": "+677",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SC",
+      "iso3": "SYC",
+      "name": "Seychelles",
+      "aliases": [],
+      "callingCode": "+248",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SD",
+      "iso3": "SDN",
+      "name": "Sudan",
+      "aliases": [],
+      "callingCode": "+249",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SE",
+      "iso3": "SWE",
+      "name": "Sweden",
+      "aliases": [],
+      "callingCode": "+46",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SG",
+      "iso3": "SGP",
+      "name": "Singapore",
+      "aliases": [],
+      "callingCode": "+65",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SI",
+      "iso3": "SVN",
+      "name": "Slovenia",
+      "aliases": [],
+      "callingCode": "+386",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SK",
+      "iso3": "SVK",
+      "name": "Slovakia",
+      "aliases": [
+        "Slovak Republic"
+      ],
+      "callingCode": "+421",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SL",
+      "iso3": "SLE",
+      "name": "Sierra Leone",
+      "aliases": [],
+      "callingCode": "+232",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SM",
+      "iso3": "SMR",
+      "name": "San Marino",
+      "aliases": [],
+      "callingCode": "+378",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SN",
+      "iso3": "SEN",
+      "name": "Senegal",
+      "aliases": [],
+      "callingCode": "+221",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SO",
+      "iso3": "SOM",
+      "name": "Somalia",
+      "aliases": [],
+      "callingCode": "+252",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SR",
+      "iso3": "SUR",
+      "name": "Suriname",
+      "aliases": [],
+      "callingCode": "+597",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SS",
+      "iso3": "SSD",
+      "name": "South Sudan",
+      "aliases": [],
+      "callingCode": "+211",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "ST",
+      "iso3": "STP",
+      "name": "Sao Tome and Principe",
+      "aliases": [
+        "São Tomé and Príncipe"
+      ],
+      "callingCode": "+239",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SV",
+      "iso3": "SLV",
+      "name": "El Salvador",
+      "aliases": [],
+      "callingCode": "+503",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SY",
+      "iso3": "SYR",
+      "name": "Syrian Arab Republic",
+      "aliases": [
+        "Syria"
+      ],
+      "callingCode": "+963",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "SZ",
+      "iso3": "SWZ",
+      "name": "Eswatini",
+      "aliases": [
+        "Swaziland"
+      ],
+      "callingCode": "+268",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "TD",
+      "iso3": "TCD",
+      "name": "Chad",
+      "aliases": [],
+      "callingCode": "+235",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "TG",
+      "iso3": "TGO",
+      "name": "Togo",
+      "aliases": [],
+      "callingCode": "+228",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "TH",
+      "iso3": "THA",
+      "name": "Thailand",
+      "aliases": [],
+      "callingCode": "+66",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "TJ",
+      "iso3": "TJK",
+      "name": "Tajikistan",
+      "aliases": [],
+      "callingCode": "+992",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "TL",
+      "iso3": "TLS",
+      "name": "Timor-Leste",
+      "aliases": [
+        "East Timor"
+      ],
+      "callingCode": "+670",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "TM",
+      "iso3": "TKM",
+      "name": "Turkmenistan",
+      "aliases": [],
+      "callingCode": "+993",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "TN",
+      "iso3": "TUN",
+      "name": "Tunisia",
+      "aliases": [],
+      "callingCode": "+216",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "TO",
+      "iso3": "TON",
+      "name": "Tonga",
+      "aliases": [],
+      "callingCode": "+676",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "TR",
+      "iso3": "TUR",
+      "name": "Türkiye",
+      "aliases": [
+        "Turkey",
+        "Turkiye"
+      ],
+      "callingCode": "+90",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "TT",
+      "iso3": "TTO",
+      "name": "Trinidad and Tobago",
+      "aliases": [],
+      "callingCode": "+1-868",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "TV",
+      "iso3": "TUV",
+      "name": "Tuvalu",
+      "aliases": [],
+      "callingCode": "+688",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "TZ",
+      "iso3": "TZA",
+      "name": "United Republic of Tanzania",
+      "aliases": [
+        "Tanzania"
+      ],
+      "callingCode": "+255",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "UA",
+      "iso3": "UKR",
+      "name": "Ukraine",
+      "aliases": [],
+      "callingCode": "+380",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "UG",
+      "iso3": "UGA",
+      "name": "Uganda",
+      "aliases": [],
+      "callingCode": "+256",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "US",
+      "iso3": "USA",
+      "name": "United States of America",
+      "aliases": [
+        "United States",
+        "USA",
+        "US"
+      ],
+      "callingCode": "+1",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "UY",
+      "iso3": "URY",
+      "name": "Uruguay",
+      "aliases": [],
+      "callingCode": "+598",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "UZ",
+      "iso3": "UZB",
+      "name": "Uzbekistan",
+      "aliases": [],
+      "callingCode": "+998",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "VA",
+      "iso3": "VAT",
+      "name": "Holy See",
+      "aliases": [
+        "Vatican",
+        "Vatican City",
+        "Vatican City State"
+      ],
+      "callingCode": "+379",
+      "classification": "un_observer_state"
+    },
+    {
+      "iso2": "VC",
+      "iso3": "VCT",
+      "name": "Saint Vincent and the Grenadines",
+      "aliases": [
+        "St Vincent and the Grenadines"
+      ],
+      "callingCode": "+1-784",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "VE",
+      "iso3": "VEN",
+      "name": "Venezuela",
+      "aliases": [
+        "Venezuela (Bolivarian Republic of)",
+        "Bolivarian Republic of Venezuela"
+      ],
+      "callingCode": "+58",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "VN",
+      "iso3": "VNM",
+      "name": "Viet Nam",
+      "aliases": [
+        "Vietnam"
+      ],
+      "callingCode": "+84",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "VU",
+      "iso3": "VUT",
+      "name": "Vanuatu",
+      "aliases": [],
+      "callingCode": "+678",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "WS",
+      "iso3": "WSM",
+      "name": "Samoa",
+      "aliases": [],
+      "callingCode": "+685",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "YE",
+      "iso3": "YEM",
+      "name": "Yemen",
+      "aliases": [],
+      "callingCode": "+967",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "ZA",
+      "iso3": "ZAF",
+      "name": "South Africa",
+      "aliases": [],
+      "callingCode": "+27",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "ZM",
+      "iso3": "ZMB",
+      "name": "Zambia",
+      "aliases": [],
+      "callingCode": "+260",
+      "classification": "un_member"
+    },
+    {
+      "iso2": "ZW",
+      "iso3": "ZWE",
+      "name": "Zimbabwe",
+      "aliases": [],
+      "callingCode": "+263",
+      "classification": "un_member"
+    }
+  ]
+}

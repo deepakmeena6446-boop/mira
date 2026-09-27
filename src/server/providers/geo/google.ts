@@ -64,7 +64,7 @@ function cache<T>(max: number, ttlMs: number) {
 }
 const searchCache = cache<PlaceHit[]>(500, 10 * 60_000);
 const nearbyCache = cache<PlaceHit[]>(500, 10 * 60_000);
-const areaCache = cache<{ label: string | null; country: string | null; region: string | null }>(1000, 60 * 60_000);
+const areaCache = cache<{ label: string | null; country: string | null; region: string | null; locality?: string | null; regionName?: string | null }>(1000, 60 * 60_000);
 
 async function places(key: string, method: "searchText" | "searchNearby", body: unknown, fields: string): Promise<GPlace[]> {
   if (!takeGoogleCall()) throw new GoogleBudgetExceeded();
@@ -313,8 +313,10 @@ export function googleGeo(key: string, fallback: GeoProvider): GeoProvider {
         const country = short("country")?.toUpperCase().slice(0, 2) ?? null;
         const state = short("administrative_area_level_1");
         const region = country && state && /^[A-Z0-9]{1,3}$/.test(state) ? `${country}-${state}` : null;
-        areaCache.set(ck, { label, country, region });
-        return { label, precise: false, country, region };
+        const locality = pick("locality") ?? pick("postal_town") ?? pick("administrative_area_level_2") ?? null;
+        const regionName = pick("administrative_area_level_1") ?? null;
+        areaCache.set(ck, { label, country, region, locality, regionName });
+        return { label, precise: false, country, region, locality, regionName };
       } catch (err) {
         warn("reverse", err);
         return fallback.reverse(p);

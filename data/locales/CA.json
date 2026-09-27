@@ -2,10 +2,16 @@
   "iso": "CA",
   "name": "Canada",
   "version": "2026-09-26",
+  "status": {
+    "emergency": "PARTIALLY_VERIFIED",
+    "reviewed": "2026-09-26"
+  },
   "emergency": {
     "general": {
       "number": "911",
       "label": "Emergency",
+      "covers": [],
+      "limitation": "MIRA has not confirmed 9-1-1 coverage in every territory (e.g. Nunavut).",
       "source": {
         "url": "https://www.rcmp.ca/en/contact-rcmp",
         "title": "Contact the Royal Canadian Mounted Police | Royal Canadian Mounted Police",

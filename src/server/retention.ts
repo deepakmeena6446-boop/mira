@@ -26,6 +26,8 @@ export async function purgeExpired(sql: postgres.Sql, now: Date): Promise<Record
   const chat = await sql`DELETE FROM mira_messages WHERE created_at < ${monthAgo}`;
   const inbox = await sql`DELETE FROM notifications WHERE created_at < ${monthAgo}`;
   const userSessions = await sql`DELETE FROM user_sessions WHERE expires_at <= ${now}`;
+  // Safety-updates cache: area results and relevance decisions, never kept past their expiry.
+  const safetyCache = await sql`DELETE FROM safety_intel_cache WHERE expires_at <= ${now}`;
   // Demo accounts can't be signed back into once their session is gone, so they'd be
   // orphaned forever (with contacts' encrypted emails). Remove them the same way as a delete.
   const orphans = await sql<{ id: string }[]>`
@@ -56,6 +58,7 @@ export async function purgeExpired(sql: postgres.Sql, now: Date): Promise<Record
     miraMessages: chat.count,
     notifications: inbox.count,
     userSessions: userSessions.count,
+    safetyCache: safetyCache.count,
     orphanedDemoAccounts: orphans.length,
     inactiveAccounts: inactive.length,
     authLinks,
