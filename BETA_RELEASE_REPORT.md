@@ -2,7 +2,7 @@
 
 **Sprint:** Final beta → deployment sprint, 2026-09-27
 **Branch:** `release/beta-rc` (from `main` at `fc36a95`; nothing pushed — the repository has no remote)
-**Release candidate:** see the last commit on `release/beta-rc` (recorded in the verification table below)
+**Release candidate:** the tip of `release/beta-rc` (commit named in the final hand-off; all checks below ran on it)
 
 ## Release verdict
 
@@ -46,7 +46,7 @@ Deploying is now a configuration task: every remaining step needs an owner crede
 ## What changed in this sprint
 
 - **Truthful failure states:** trip Help Points (failed ≠ none, partial shown); ride/transit arrival Help Points evidence; lighting sources (failed vs not configured, per-source provenance); Safety updates *partial* when headlines went unassessed; missed-arrival alerts name exactly who may not have been told.
-- **Critical path:** "Share where I am, live" from I feel unsafe without a destination; location uploads throttled to ≥ 8 s so fast rides don't trip the rate limit and show a false "can't reach MIRA".
+- **Critical path:** "Share where I am, live" from I feel unsafe without a destination (and that screen no longer says "arrive" or offers a second, confusing end button; a journey ended early or sharing stopped is never called "arrived"); location uploads throttled to ≥ 8 s so fast rides don't trip the rate limit and show a false "can't reach MIRA".
 - **Mira:** see Mira row above.
 - **Deploy blockers fixed:** Google tile session now sends the site referrer (a referrer-restricted browser key otherwise fails silently to OpenFreeMap); worker gets the map keys MIRA Checks need; OSM endpoints configured; strict mode also requires `CLIENT_IP_HEADER`, `OVERPASS_URL`, https and no demo sign-in; missing locale data fails loudly; boot warnings for missing providers.
 - **Security:** "add email" links complete only for the requesting account; push endpoints allowlisted and capped at 5 per person; destination names defused in emails; redirects built from `APP_BASE_URL`; service worker rejects backslash paths.
@@ -63,15 +63,18 @@ Baseline at `fc36a95` (before any change): lint pass, typecheck pass, **556/556*
 |---|---|---|
 | Type generation + TypeScript | `npm run typecheck` | pass |
 | Lint | `npm run lint` | pass (0 errors, 0 warnings) |
-| Unit + integration | `npm test` | UNIT_INTEGRATION_RESULT |
+| Unit + integration | `npm test` | **752/752** passed, 57 files (baseline 556) |
 | Production build (web + worker + migrator bundles) | `npm run build` | pass |
-| End-to-end (Playwright, mobile + desktop projects, production build) | `npm run test:e2e` | E2E_RESULT |
+| Client bundle secret scan | `npm run audit:bundle` | pass — 51 files, 14 patterns, no secrets |
+| End-to-end (Playwright, mobile + desktop projects, production build) | `npm run test:e2e` | **46 passed, 0 failed**, 4 intentional cross-project skips (9.5 min); 0 `request.failed` log lines |
 | Clean-database migration (dev migrator) | `scripts/migrate.ts` on a new database | 19 migrations, PostGIS/pg_trgm/pgcrypto, 36 tables; re-run is a no-op |
 | Clean-database migration (production bundle) | `node dist/migrate.mjs` with only `DATABASE_URL` set | 19 migrations applied |
 | Safety updates eval | `scripts/safety-eval.ts` | tuning, held-out 1, live GDELT sample: precision/recall 1.000/1.000; held-out 2: 1.000 / 0.967 (one item relabelled ambiguous by the tightened rule); 65 audit probes: precision 0.224 → 1.000 |
 | Browser (375 × 812, production build, real providers from `.env.local`) | manual | Landing, Home, route sheet, journey start, live viewer, auto-arrival, Contribute, Trips, Me, I feel unsafe, 13-country emergency data |
 
-A first E2E run on the merged tree found one real regression (lighting provenance showed "from no mapped source yet" instead of naming the sources checked); it was fixed and the full suite re-run for the result above.
+Earlier E2E runs on the merged tree caught one real regression (lighting provenance said "from no mapped source yet" instead of naming the sources checked) and one label that duplicated the page headline; both were fixed and the full suite re-run on the final commit for the result above.
+
+Browser pass on the final build: 375 × 812, 412 × 915 and desktop 1024 × 768 — no horizontal overflow; the landing CTA is visible without scrolling at every size; the glass blur computes to `blur(18px) saturate(1.4)`; "I feel unsafe" → "Share where I am, live" → live sharing screen in one tap; stopping it reads "Sharing stopped", never "arrived".
 
 ## Failure-mode check
 

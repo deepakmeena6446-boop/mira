@@ -16,7 +16,7 @@
 | Gate | Required evidence | Status |
 |---|---|---|
 | Source | Reviewed diff; coherent commit; `git status --short` empty; CI green on that SHA | Pending |
-| Automated checks | `npm run check`, `npm run test:e2e`, `npm run build`, `npm run audit:bundle` pass; only intentional cross-project Playwright skips | Local: 486 unit/integration passed, 44 Playwright passed, 4 intentional cross-project skips, production build and bundle scan passed. Live tests pending |
+| Automated checks | `npm run check`, `npm run test:e2e`, `npm run build`, `npm run audit:bundle` pass; only intentional cross-project Playwright skips | Local on `release/beta-rc` (2026-09-27): 752 unit/integration passed, 46 Playwright passed, 4 intentional cross-project skips, production build passed; clean-database migration verified with `dist/migrate.mjs`. See [BETA_RELEASE_REPORT.md](../BETA_RELEASE_REPORT.md). Live tests pending |
 | Historical receipts | On a production-like database, capture the counts below, apply migration 0016, and show that old place/correction rows remain but are marked and excluded from current impact and Steward; new rows remain eligible | Pending staging |
 | Staging | Separate Railway staging environment, PostGIS volume, secrets and URL; migration, web and worker healthy; `/api/health/ready` is 200 after worker pass | Pending owner credentials |
 | Providers | Restricted Google keys and quota/budget alerts; verified Resend domain and real inbox delivery; Google OAuth; Claude; Mapillary; Web Push. Save dated test results, not keys | Pending owner credentials |
