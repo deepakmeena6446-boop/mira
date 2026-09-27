@@ -285,7 +285,19 @@ export function HomeScreen({
   const firstName = user?.name.split(" ")[0];
   const activeTrip = trip && (trip.state === "active" || trip.state === "missed") ? trip : null;
   const invited = contacts.filter((c) => c.status === "invited");
-  const sharesWithCircle = Boolean(emailAlerts && accepted.length && shareWithCircle);
+  // Her Circle for a journey: accepted email contacts MIRA emails (when email is on), and contacts she sends her link on WhatsApp.
+  const emailed = emailAlerts ? accepted : [];
+  const onWhatsApp = contacts.filter((c) => c.phone && c.isDefault);
+  const circle = [...new Map([...emailed, ...onWhatsApp].map((c) => [c.id, c])).values()];
+  const sharesWithCircle = Boolean(user && circle.length && shareWithCircle);
+  /** Who follows this journey and how, in her words — WhatsApp is a tap she makes; email is an attempt MIRA makes. */
+  const circleStartLine = () =>
+    [
+      onWhatsApp.length ? `After you start, send ${names(onWhatsApp.map((c) => c.name))} your live link on WhatsApp in one tap: your latest spot and ETA, until you arrive.` : null,
+      emailed.length ? `MIRA attempts to email ${names(emailed.map((c) => c.name))} a live link when this journey starts, and an alert if you miss your check-in. Sending can fail.` : "Nobody is alerted automatically if you don't arrive.",
+    ]
+      .filter(Boolean)
+      .join(" ");
 
   /** Start a journey (her tap, always). `to` defaults to the destination on screen. */
   const startTrip = async (to?: { name: string; lat: number; lon: number }) => {
@@ -373,9 +385,10 @@ export function HomeScreen({
   // "Tell my people now": emails her accepted contacts at once. With no journey running, it first
   // starts one that just shares where she is (no destination), so they have a live link to open.
   const tellAction: UnsafeTellAction | null =
-    user && emailAlerts && accepted.length && me
+    user && circle.length && me
       ? {
-          names: accepted.map((c) => c.name),
+          names: circle.map((c) => c.name),
+          email: emailed.length > 0,
           onTell: async () => {
             let tripId = activeTrip?.id ?? null;
             if (!tripId) {
@@ -388,7 +401,7 @@ export function HomeScreen({
               }
             }
             if (!tripId) return { error: "Couldn't start sharing right now. Send your live link or call them." };
-            const t = await api<{ told: string[]; failed: string[] }>(`/api/trips/${tripId}/checkon`, { body: {} });
+            const t = await api<{ told: string[]; failed: string[]; whatsapp: Array<{ name: string; url: string }> }>(`/api/trips/${tripId}/checkon`, { body: {} });
             router.refresh();
             return t.ok ? t.data : { error: t.message };
           },
@@ -399,12 +412,18 @@ export function HomeScreen({
   // One sentence, and only what's true: who follows, and whether anyone is alerted.
   const circleLine = !user ? (
     <>When you start, you can send a live link to anyone you choose.</>
-  ) : !emailAlerts ? (
-    <>Send a live link when you start; email alerts aren&apos;t switched on yet, so nobody is alerted automatically.</>
-  ) : accepted.length ? (
+  ) : circle.length ? (
     <>
       <Icon name="check" className="mr-1 inline size-4 text-mint" />
-      MIRA attempts to email {names(accepted.map((c) => c.name))} a live link when you share. Sending can fail.
+      {circleStartLine()}
+    </>
+  ) : !emailAlerts ? (
+    <>
+      Send a live link when you start, or{" "}
+      <Link href="/circle" className="font-bold text-accent">
+        add someone&apos;s WhatsApp
+      </Link>{" "}
+      to send it in one tap. Nobody is alerted automatically.
     </>
   ) : invited.length ? (
     <>Waiting for {names(invited.map((c) => c.name))} to accept your invite; until then, send a live link yourself.</>
@@ -414,7 +433,7 @@ export function HomeScreen({
       <Link href="/circle" className="font-bold text-accent">
         add someone
       </Link>{" "}
-      so MIRA can attempt an email if you don&apos;t arrive.
+      to send it on WhatsApp in one tap (with their email, MIRA can also attempt an alert if you don&apos;t arrive).
     </>
   );
 
@@ -711,10 +730,10 @@ export function HomeScreen({
               <Button variant="hero" size="lg" onClick={() => void startTrip()} busy={starting} busyLabel="Starting…" disabled={!me || (mode !== "walk" && routeLoading)}>
                 <Icon name={mode === "walk" ? "walk" : "route"} /> Start with MIRA
               </Button>
-              {user && emailAlerts && accepted.length ? (
+              {user && circle.length ? (
                 <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Who follows this journey">
                   {[
-                    [true, `Share with ${names(accepted.map((c) => c.name))}`],
+                    [true, `Share with ${names(circle.map((c) => c.name))}`],
                     [false, "Just me"],
                   ].map(([v, label]) => (
                     <button
@@ -735,8 +754,8 @@ export function HomeScreen({
                 {!user
                   ? "You'll sign in first. Then send a live link to anyone: they see your latest spot and ETA, no account needed, and it stops when you arrive."
                   : sharesWithCircle
-                    ? `MIRA attempts to email ${names(accepted.map((c) => c.name))} a live link (your latest spot and ETA, until you arrive) when this journey starts, and an alert if you miss your check-in. Sending can fail.`
-                    : accepted.length && emailAlerts
+                    ? circleStartLine()
+                    : circle.length
                       ? "Nobody is alerted if you don't arrive. You can still send your live link on the next screen."
                       : "Nobody is alerted automatically. On the next screen, send your live link by message: they see your latest spot and ETA until you arrive."}
               </p>

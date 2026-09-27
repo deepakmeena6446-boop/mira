@@ -20,6 +20,7 @@ export default async function TripPage() {
   const trip = await currentTrip(sql, user.id, systemClock.now());
   if (!trip) redirect("/trips"); // no journey: the Trips tab explains and offers "Where are you going?"
   const contacts = await listContacts(sql, user.id);
-  const canTell = smtpConfigured() && contacts.some((c) => c.status === "accepted" && c.isDefault);
+  // "Tell my people now" can reach someone: an accepted email contact (with email on), or anyone with a WhatsApp number.
+  const canTell = contacts.some((c) => c.isDefault && ((smtpConfigured() && c.status === "accepted") || c.phone));
   return <TripScreen initial={trip} initialNet={await safetyNet(sql, systemClock)} tiles={await tileConfig()} helpExclude={user.helpExclude} canTell={canTell} emailAlerts={smtpConfigured()} />;
 }

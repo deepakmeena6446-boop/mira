@@ -18,10 +18,15 @@ export interface UnsafeShareAction {
   onShare: () => void | Promise<void>;
 }
 
-/** "Tell my people now": emails her accepted trusted contacts, with their live link. */
+/**
+ * "Tell my people now": emails her accepted email contacts with their live link, and prepares a
+ * WhatsApp message for each contact with a number — which she opens and sends herself.
+ */
 export interface UnsafeTellAction {
   names: string[];
-  onTell: () => Promise<{ told: string[]; failed: string[] } | { error: string }>;
+  /** Whether any of them is reached by email (then MIRA sends); otherwise it's WhatsApp only. */
+  email: boolean;
+  onTell: () => Promise<{ told: string[]; failed: string[]; whatsapp?: Array<{ name: string; url: string }> } | { error: string }>;
 }
 
 /**
@@ -309,16 +314,33 @@ function CallSomeone() {
 }
 
 function TellMyPeople({ tell }: { tell: UnsafeTellAction }) {
-  const [state, setState] = useState<{ kind: "idle" | "busy" } | { kind: "done"; told: string[]; failed: string[] } | { kind: "error"; message: string }>({ kind: "idle" });
+  const [state, setState] = useState<{ kind: "idle" | "busy" } | { kind: "done"; told: string[]; failed: string[]; whatsapp: Array<{ name: string; url: string }> } | { kind: "error"; message: string }>({ kind: "idle" });
+  const [opened, setOpened] = useState<string[]>([]);
   const who = tell.names.length <= 2 ? tell.names.join(" and ") : `${tell.names.slice(0, -1).join(", ")} and ${tell.names[tell.names.length - 1]}`;
   if (state.kind === "done") {
     return (
-      <p role="status" className="mt-3 rounded-3xl bg-mint-soft p-4 text-sm">
-        {state.told.length ? <strong>Emailed {state.told.join(" and ")}. </strong> : null}
-        {state.told.length ? "They can see where you are and were asked to check on you. " : ""}
-        {state.failed.length ? `Couldn't reach ${state.failed.join(", ")} — call them, or send your live link. ` : ""}
-        MIRA didn&apos;t contact anyone else.
-      </p>
+      <div role="status" className="mt-3 rounded-3xl bg-mint-soft p-4 text-sm">
+        {state.whatsapp.length ? (
+          <>
+            <p className="font-bold">Ask them on WhatsApp — tap, then press Send:</p>
+            <ul className="mt-2 grid gap-2">
+              {state.whatsapp.map((w) => (
+                <li key={w.url}>
+                  <a href={w.url} target="_blank" rel="noopener noreferrer" onClick={() => setOpened((xs) => [...xs, w.name])} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-surface px-4 font-extrabold text-ink">
+                    <Icon name="send" className="size-4" /> {opened.includes(w.name) ? `Opened WhatsApp for ${w.name} ✓` : `Send to ${w.name} on WhatsApp`}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+        <p className={state.whatsapp.length ? "mt-3" : ""}>
+          {state.told.length ? <strong>Emailed {state.told.join(" and ")}. </strong> : null}
+          {state.told.length ? "They can see where you are and were asked to check on you. " : ""}
+          {state.failed.length ? `Couldn't reach ${state.failed.join(", ")} by email — call them, or send your live link. ` : ""}
+          MIRA didn&apos;t contact anyone else.
+        </p>
+      </div>
     );
   }
   return (
@@ -328,7 +350,7 @@ function TellMyPeople({ tell }: { tell: UnsafeTellAction }) {
       onClick={async () => {
         setState({ kind: "busy" });
         const r = await tell.onTell();
-        setState("error" in r ? { kind: "error", message: r.error } : { kind: "done", ...r });
+        setState("error" in r ? { kind: "error", message: r.error } : { kind: "done", told: r.told, failed: r.failed, whatsapp: r.whatsapp ?? [] });
       }}
       className="mt-3 flex w-full items-center gap-3 rounded-3xl border-2 border-accent/40 p-4 text-left disabled:opacity-60"
     >
@@ -338,7 +360,7 @@ function TellMyPeople({ tell }: { tell: UnsafeTellAction }) {
       <span className="min-w-0 flex-1">
         <span className="block font-extrabold">{state.kind === "busy" ? "Telling them…" : "Tell my people now"}</span>
         <span className="block text-sm text-ink-muted">
-          {state.kind === "error" ? state.message : `Emails ${who} your live location and asks them to check on you.`}
+          {state.kind === "error" ? state.message : tell.email ? `Asks ${who} to check on you, with your live location — by email, and on WhatsApp where you've saved a number.` : `Opens WhatsApp for ${who} with your live location, asking them to check on you.`}
         </span>
       </span>
     </button>

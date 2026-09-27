@@ -88,7 +88,7 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
           <p className="mt-1 text-lg font-extrabold">To {card.destination.name}</p>
           <p className="text-sm text-ink-muted">
             {mode === "walk" ? (card.minutes ? `About ${card.minutes} min walk · ` : "") : `${MODE_LABEL[mode]} · `}
-            {card.contacts.length ? circleSharingLine(card.contacts, card.email) : "Just you: nobody is alerted automatically. Send your live link after you start."}
+            {card.contacts.length || card.whatsapp?.length ? circleSharingLine(card.contacts, card.email, card.whatsapp) : "Just you: nobody is alerted automatically. Send your live link after you start."}
           </p>
           {mode === "walk" ? (
             <TripCardButton label="Start with MIRA" onStart={() => onTrip(card.destination)} />

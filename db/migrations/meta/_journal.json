@@ -134,6 +134,13 @@
       "when": 1790478316093,
       "tag": "0018_retention_purge_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790482311333,
+      "tag": "0019_contact_phone",
+      "breakpoints": true
     }
   ]
 }

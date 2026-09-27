@@ -12,7 +12,7 @@ import { areaFromReverse, safetyProviders, safetyUpdatesFor, type SafetyEvidence
 import type postgres from "postgres";
 import { getGeo, type GeoPoint } from "@/server/providers/geo";
 import { listPlaces } from "@/server/account/places";
-import { shareTargets } from "@/server/account/contacts";
+import { phoneTargets, shareTargets } from "@/server/account/contacts";
 import { currentTrip } from "@/server/trips";
 import type { User } from "@/server/session/user";
 import type { MiraContext, MiraHelpPoint, MiraTripMode } from "./types";
@@ -149,10 +149,10 @@ export function miraTools(sql: postgres.Sql, user: User, ctx: MiraContext) {
       const email = emailConfigured();
       if (mode !== "walk") {
         // Ride / transit: MIRA doesn't estimate those here; Home plans it and asks her for the ETA.
-        const contacts = await shareTargets(sql, user.id);
-        return { destination: dest, minutes: null, contacts: contacts.map((c) => c.name), context: [], mode, email, helpLookupFailed: false };
+        const [contacts, phones] = await Promise.all([shareTargets(sql, user.id), phoneTargets(sql, user.id)]);
+        return { destination: dest, minutes: null, contacts: contacts.map((c) => c.name), whatsapp: phones.map((c) => c.name), context: [], mode, email, helpLookupFailed: false };
       }
-      const [contacts, route] = await Promise.all([shareTargets(sql, user.id), ctx.location ? getGeo().walk(ctx.location, dest) : Promise.resolve(null)]);
+      const [contacts, phones, route] = await Promise.all([shareTargets(sql, user.id), phoneTargets(sql, user.id), ctx.location ? getGeo().walk(ctx.location, dest) : Promise.resolve(null)]);
       // After dark, lighting along the way is worth knowing (only for real street routes).
       const { hour } = await getContext();
       const night = hour >= 18 || hour < 6;
@@ -164,7 +164,7 @@ export function miraTools(sql: postgres.Sql, user: User, ctx: MiraContext) {
       // Evidence as context items (deterministic, sourced). Mira chooses what matters; it never adds facts.
       const context = [...(night ? lightingItems(lighting) : []), ...helpPointItems(help && "data" in help ? help.data : [])];
       const helpLookupFailed = Boolean(street) && (!help || help.state === "failed");
-      return { destination: dest, minutes: route?.minutes ?? null, contacts: contacts.map((c) => c.name), context, mode, email, helpLookupFailed };
+      return { destination: dest, minutes: route?.minutes ?? null, contacts: contacts.map((c) => c.name), whatsapp: phones.map((c) => c.name), context, mode, email, helpLookupFailed };
     },
     tripStatus: () => currentTrip(sql, user.id, new Date()),
     /**
@@ -189,8 +189,10 @@ export function miraTools(sql: postgres.Sql, user: User, ctx: MiraContext) {
       const evidence = await safetyUpdatesFor(sql, area, DEFAULT_WINDOW).catch((): SafetyEvidence => ({ state: "failed", sources: [], retryable: true }));
       return safetyUpdatesSummary(evidence, area.name);
     },
+    /** Everyone in her Circle she can reach on a journey: accepted email contacts and WhatsApp contacts. */
     async trustedContacts() {
-      return (await shareTargets(sql, user.id)).map((c) => c.name);
+      const [byEmail, byPhone] = await Promise.all([shareTargets(sql, user.id), phoneTargets(sql, user.id)]);
+      return [...new Set([...byEmail, ...byPhone].map((c) => c.name))];
     },
   };
 }

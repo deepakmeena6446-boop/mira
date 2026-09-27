@@ -146,7 +146,7 @@ export function loadCountryData(root: string = path.join(process.cwd(), "data"))
     const reg = region && /^[A-Za-z]{2}-[A-Za-z0-9]{1,3}$/.test(region) ? region.toUpperCase() : null;
     if (!iso) return { ...UNKNOWN_COUNTRY, region: reg };
     const entry = byIso.get(iso);
-    const base = { iso, countryName: entry?.name ?? regionName(iso), classification: (entry?.classification ?? null) as CountryClassification | null, region: reg };
+    const base = { iso, countryName: entry?.name ?? regionName(iso), classification: (entry?.classification ?? null) as CountryClassification | null, callingCode: entry?.callingCode.replace("-", "") ?? null, region: reg };
     const p = profiles[iso];
     if (!p) return { ...UNKNOWN_COUNTRY, ...base };
     const o = reg && reg.startsWith(`${iso}-`) ? overrides[reg] : undefined;

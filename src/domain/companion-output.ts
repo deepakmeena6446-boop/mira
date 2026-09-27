@@ -186,13 +186,19 @@ export function companionOutputIssue(text: string, allowedEmergencyNumbers: read
 const listNames = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
 
 /**
- * What starting a shared journey does for her Circle, never promising delivery: contacts only
- * get the live link by email, and only when email is switched on (they're accepted contacts
- * by construction: shareTargets). `email` undefined = a card saved before this was known.
+ * What starting a shared journey does for her Circle, never promising delivery. `names`: accepted
+ * email contacts (shareTargets) — MIRA tries to email them, only when email is switched on.
+ * `whatsapp`: contacts with a number — she sends them her link herself (MIRA opens WhatsApp; it
+ * never sends). `email` undefined = a card saved before this was known.
  */
-export function circleSharingLine(names: string[], email: boolean | undefined): string {
-  if (!names.length) return "";
-  if (email === true) return `MIRA will try to email ${listNames(names)} your live link when you start (sending can fail).`;
-  if (email === false) return "Email isn't switched on, so share your live link yourself after you start.";
-  return `Share your live link with ${listNames(names)} after you start.`;
+export function circleSharingLine(names: string[], email: boolean | undefined, whatsapp: string[] = []): string {
+  const wa = whatsapp.length ? `After you start, send ${listNames(whatsapp)} your live link on WhatsApp in one tap (you press Send).` : "";
+  const byEmail = !names.length
+    ? ""
+    : email === true
+      ? `MIRA will try to email ${listNames(names)} your live link when you start (sending can fail).`
+      : email === false
+        ? wa ? "" : "Email isn't switched on, so share your live link yourself after you start."
+        : `Share your live link with ${listNames(names)} after you start.`;
+  return [wa, byEmail].filter(Boolean).join(" ");
 }

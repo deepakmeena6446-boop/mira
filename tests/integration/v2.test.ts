@@ -103,7 +103,7 @@ describe("MIRA 2.0 accounts, trips, Mira (placeholders)", () => {
     const res = await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" }, share: true }));
     expect(res.status).toBe(201);
     const { trip } = await res.json();
-    expect(trip.sharedWith).toEqual([{ name: "Riya", notified: true }]);
+    expect(trip.sharedWith).toEqual([{ name: "Riya", notified: true, viaEmail: true, whatsapp: null }]); // email contact: MIRA emailed; no WhatsApp number
     expect(trip.shareUrl).toMatch(/\/t\/[A-Za-z0-9_-]+$/); // the traveller's own link
     const shareMail = (await mailsTo(accepted)).find((m) => m.Subject.includes("sharing a trip"));
     expect(shareMail).toBeTruthy();

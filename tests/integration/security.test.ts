@@ -61,6 +61,8 @@ const PUBLIC_KEYS = new Set([
   "tz",
   // Country Context verification and coverage: statements about a country's data (no place, no person).
   "classification", "reviewed", "limitations", "regionOverride", "covers", "coverage", "verification",
+  // The country's international calling code ("+91"), to complete a number she types for a WhatsApp contact (no person).
+  "callingCode",
   "capabilities", "routes", "safetyUpdates", "communitySignals",
   // Safety updates: published headlines with their publisher, link, age and city-level place (no person, no coordinates).
   "area", "precision", "countryIso", "windowDays", "updates", "translatedTitle", "category", "reporting", "reportedLocation",

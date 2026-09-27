@@ -94,6 +94,28 @@ export function TripScreen({
   }, [refresh]);
 
   const sharedOk = trip.sharedWith.filter((c) => c.notified);
+  const onWhatsApp = trip.sharedWith.filter((c) => c.whatsapp);
+  // Which WhatsApp chats she opened on this device (a convenience, per journey): "opened", never "sent".
+  const openedKey = `mira.wa.${trip.id}`;
+  const [openedSaved, setOpened] = useState<string[]>(() => {
+    try {
+      return typeof window === "undefined" ? [] : (JSON.parse(sessionStorage.getItem(openedKey) ?? "[]") as string[]);
+    } catch {
+      return [];
+    }
+  });
+  // Shown only once the device clock exists (null while server-rendering and hydrating), so both renders agree.
+  const opened = clock ? openedSaved : [];
+  const markOpened = (name: string) =>
+    setOpened((xs) => {
+      const next = xs.includes(name) ? xs : [...xs, name];
+      try {
+        sessionStorage.setItem(openedKey, JSON.stringify(next));
+      } catch {
+        /* storage unavailable: the ✓ just won't survive a reload */
+      }
+      return next;
+    });
   const upload = useCallback(
     async (p: { lat: number; lon: number; accuracy: number }) => {
       lastSent.current = { at: Date.now(), lat: p.lat, lon: p.lon };
@@ -336,10 +358,10 @@ export function TripScreen({
             </p>
           </div>
         ) : null}
-        {trip.sharedWith.some((c) => !c.notified) ? (
+        {trip.sharedWith.some((c) => c.viaEmail && !c.notified) ? (
           <div role="status" className="mb-4 rounded-3xl bg-warm-soft p-4">
             <p className="font-extrabold text-warm">
-              Couldn&apos;t email your link to {names(trip.sharedWith.filter((c) => !c.notified).map((c) => c.name))}
+              Couldn&apos;t email your link to {names(trip.sharedWith.filter((c) => c.viaEmail && !c.notified).map((c) => c.name))}
             </p>
             <p className="mt-1 text-sm text-ink-muted">Tap &ldquo;Send my live link&rdquo; to send it yourself.</p>
           </div>
@@ -354,7 +376,9 @@ export function TripScreen({
                   ? "I'm letting your contacts know now…"
                   : trip.alert === "failed" || trip.alert === "unconfirmed"
                     ? "I tried to reach your contacts but couldn't confirm the message went out."
-                    : "Nobody was notified — either no contact on this trip has accepted your invite, or email isn't available right now."}{" "}
+                    : onWhatsApp.length
+                      ? "Nobody was notified automatically — MIRA can't send WhatsApp for you. Use “Send to …” above, or call someone."
+                      : "Nobody was notified — either no contact on this trip has accepted your invite, or email isn't available right now."}{" "}
               If you&apos;re in danger, <EmergencyPill variant="link" />.
             </p>
           </div>
@@ -392,6 +416,29 @@ export function TripScreen({
             <Icon name="share" className="size-5" /> Send my live link
           </Button>
         </div>
+
+        {/* 2b. Her WhatsApp contacts: each one tap, their own link, message ready. MIRA opens WhatsApp; she presses Send. */}
+        {onWhatsApp.length ? (
+          <div className="mt-4 rounded-3xl bg-surface p-4 shadow-[var(--shadow-card)]">
+            <p className="text-sm font-bold">Send your live link on WhatsApp</p>
+            <ul className="mt-2 grid gap-2">
+              {onWhatsApp.map((c) => (
+                <li key={c.name}>
+                  <a
+                    href={c.whatsapp!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => markOpened(c.name)}
+                    className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl px-4 font-extrabold ${opened.includes(c.name) ? "bg-mint-soft text-ink" : "bg-accent text-accent-ink"}`}
+                  >
+                    <Icon name="send" className="size-4" /> {opened.includes(c.name) ? `Opened WhatsApp for ${c.name} ✓` : `Send to ${c.name}`}
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-ink-muted">Each link is theirs alone and stops when you {trip.autoArrival ? "arrive" : "stop sharing"}. MIRA can&apos;t see whether you pressed Send.</p>
+          </div>
+        ) : null}
 
         {/* 3. Who's following, and what happens if she doesn't arrive — plainly. */}
         <div className="mt-4 flex items-start gap-3 rounded-3xl bg-sunken p-4">
@@ -521,12 +568,13 @@ export function TripScreen({
         tell={
           canTell
             ? {
-                names: sharedOk.length ? sharedOk.map((c) => c.name) : ["your trusted contacts"],
+                names: trip.sharedWith.length ? trip.sharedWith.map((c) => c.name) : ["your trusted contacts"],
+                email: emailAlerts && (trip.sharedWith.length ? trip.sharedWith.some((c) => c.viaEmail) : true),
                 onTell: async () => {
-                  const r = await api<{ told: string[]; failed: string[]; trip: TripView }>(`/api/trips/${trip.id}/checkon`, { body: {} });
+                  const r = await api<{ told: string[]; failed: string[]; whatsapp: Array<{ name: string; url: string }>; trip: TripView }>(`/api/trips/${trip.id}/checkon`, { body: {} });
                   if (!r.ok) return { error: r.message };
                   setTrip(r.data.trip);
-                  return { told: r.data.told, failed: r.data.failed };
+                  return { told: r.data.told, failed: r.data.failed, whatsapp: r.data.whatsapp };
                 },
               }
             : null

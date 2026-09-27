@@ -105,7 +105,7 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
                   ? `I'm emailing ${who} to say you haven't checked in. If you're fine, tap "I'm here".`
                   : hasRecipients
                     ? `Email isn't available right now, so nobody was notified. If you've arrived, tap "I'm here".`
-                    : `Nobody was notified — no trusted contact on this trip has accepted your invite. If you've arrived, tap "I'm here".`
+                    : `Nobody was notified — MIRA only emails contacts who accepted an invite, and it can't send WhatsApp for you. If you've arrived, tap "I'm here".`
               }, '/trip')`;
           }
           log("journey.missed", { journey: j.id, alert: canAlert ? "claimed" : "not_attempted" });

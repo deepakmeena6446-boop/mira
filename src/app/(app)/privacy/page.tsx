@@ -76,8 +76,8 @@ export default function PrivacyPage() {
           </Item>
           <Item emoji="💜" title="Trips you share">
             <p>
-              Each trusted contact who accepted your invite gets their own live link. They see your first name, destination, latest position and ETA until you arrive. After
-              that, the link shows only that you arrived (for 30 minutes), then nothing. Remove a contact and their link stops working at once.
+              Each trusted contact on a journey (one who accepted your email invite, or one you saved with a WhatsApp number) gets their own live link. They see your first name, destination, latest position and ETA until you arrive. After
+              that, the link shows only that you arrived (for 30 minutes), then nothing. Remove a contact and their link stops working at once. For WhatsApp contacts, MIRA only opens WhatsApp with the message ready: you send it, from your own WhatsApp, and MIRA never sees the chat or knows whether it was sent.
             </p>
             <p>&ldquo;Share link&rdquo; on the trip screen lets you send a live link to anyone you choose yourself — they can follow until you arrive.</p>
             <p>
@@ -106,7 +106,7 @@ export default function PrivacyPage() {
           </Item>
           <Item emoji="👤" title="Your account">
             <p>
-              Your first name, saved places (encrypted) and trusted contacts (their emails are encrypted). If you sign in with Google, MIRA keeps your Google account
+              Your first name, saved places (encrypted) and trusted contacts (their emails and phone numbers are encrypted). If you sign in with Google, MIRA keeps your Google account
               id, your first name and a protected (encrypted) copy of your email — nothing else from Google: no photo, no contacts, no location history. If you add your
               email to keep your account, it&apos;s stored encrypted and only used for sign-in links. Delete your account in Me and all of it is erased; any reports you sent stay anonymous and can no longer be linked
               to you. An account with an email that isn&apos;t used for over a year is deleted; one without an email goes when you sign out or its session ends.

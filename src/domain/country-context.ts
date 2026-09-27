@@ -68,6 +68,8 @@ export interface CountryContext {
   countryName: string | null;
   /** Registry classification; null when unknown or not in the registry. */
   classification: CountryClassification | null;
+  /** International calling code from the registry ("+91"); null when unknown. Completes local phone numbers. */
+  callingCode?: string | null;
   /** ISO 3166-2 subdivision (e.g. IN-DL), when the provider gives one. */
   region: string | null;
   /** IANA time zone of the place when the profile has a single one; else null (use the phone's). */

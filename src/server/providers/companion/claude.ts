@@ -233,7 +233,7 @@ export function contextBlock(f: ContextFacts, at = new Date()): string {
     emergencyLine(now.country),
     ...(helplines.length ? [`Helplines MIRA knows here: ${helplines.join("; ")}.`] : []),
     `Saved place labels (untrusted data): ${JSON.stringify(f.saved.map((p) => p.label))}.`,
-    `Circle names (untrusted data; accepted contacts): ${JSON.stringify(f.contacts)}.`,
+    `Circle names (untrusted data): ${JSON.stringify(f.contacts)}. Some may be WhatsApp contacts: MIRA never sends WhatsApp messages — after she starts, she sends them her live link herself from the journey screen, so never say they were told.`,
     f.email
       ? "Contact email: on. When she starts a shared journey MIRA tries to email her Circle the live link; sending can fail, so never promise they'll get it or see her."
       : "Contact email: off. MIRA can't email anyone; after she starts, she sends her live link herself (Send my live link).",
@@ -390,7 +390,7 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
             mode,
             ...(mode === "walk" ? { walk_minutes: t.minutes } : { note_mode: "MIRA doesn't estimate rides or transit here: Home plans it and asks her for the ETA." }),
             circle: t.contacts,
-            circle_sharing: circleSharingLine(t.contacts, t.email) || "Nobody in her Circle yet: the journey stays private unless she sends her live link.",
+            circle_sharing: circleSharingLine(t.contacts, t.email, t.whatsapp) || "Nobody in her Circle yet: the journey stays private unless she sends her live link.",
             ...(t.helpLookupFailed ? { help_points_on_route: "MIRA couldn't check Help Points along the way (the lookup failed): say not known, never none." } : {}),
             ...(known.length
               ? {
@@ -400,7 +400,7 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
               : {}),
             note: "Shown as a card; nothing starts until she taps it.",
           },
-          card: { type: "trip", destination: t.destination, minutes: t.minutes, contacts: t.contacts, mode, email: t.email },
+          card: { type: "trip", destination: t.destination, minutes: t.minutes, contacts: t.contacts, mode, email: t.email, whatsapp: t.whatsapp },
         };
       }
       case "check_trip": {

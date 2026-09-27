@@ -4,7 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { CircleScreen } from "@/app/(app)/circle/CircleScreen";
 import type { Contact } from "@/server/account/contacts";
 
-const accepted: Contact = { id: "1", name: "Mum", emailHint: "mu••@example.test", isDefault: true, status: "accepted" };
+const accepted: Contact = { id: "1", name: "Mum", emailHint: "mu••@example.test", phone: null, phoneHint: null, isDefault: true, status: "accepted" };
 const invited: Contact = { ...accepted, id: "2", name: "Friend", status: "invited" };
 const show = (emailAlerts: boolean, contacts: Contact[]) => render(<CircleScreen user={{ name: "Asha" }} contacts={contacts} emailAlerts={emailAlerts} />);
 afterEach(cleanup);

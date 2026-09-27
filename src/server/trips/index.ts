@@ -10,7 +10,8 @@ import { getEnv } from "@/server/config/env";
 import type { Clock } from "@/server/clock";
 import { getGeo } from "@/server/providers/geo";
 import { emailContact } from "@/server/providers/notify";
-import { shareTargets } from "@/server/account/contacts";
+import { phoneTargets, shareTargets } from "@/server/account/contacts";
+import { checkOnMeMessage, journeyMessage, whatsappLink } from "@/domain/phone";
 import { tooMany } from "@/server/http/errors";
 import { checkOnMeEmail, tripSharedEmail } from "@/server/mail/templates";
 import type { User } from "@/server/session/user";
@@ -68,6 +69,17 @@ export function chosenMinutes(fastest: number, chosen: number | undefined): numb
   return Math.min(Math.max(chosen, fastest), Math.ceil(fastest * ROUTE_CHOICE_MAX_STRETCH));
 }
 
+const liveLink = (token: string) => new URL(`/t/${token}`, getEnv().APP_BASE_URL).toString();
+
+/** Everyone in her Circle a journey can reach: accepted email contacts and WhatsApp contacts (one row each). */
+async function circleTargets(sql: postgres.Sql, userId: string): Promise<Array<{ id: string; name: string; email: string | null }>> {
+  const [byEmail, byPhone] = await Promise.all([shareTargets(sql, userId), phoneTargets(sql, userId)]);
+  const out = new Map<string, { id: string; name: string; email: string | null }>();
+  for (const t of byPhone) out.set(t.id, { id: t.id, name: t.name, email: null });
+  for (const t of byEmail) out.set(t.id, { id: t.id, name: t.name, email: t.email });
+  return [...out.values()];
+}
+
 export function tripOwnerHash(userId: string): string {
   return hmacHex("user-actor", userId);
 }
@@ -93,8 +105,12 @@ export interface TripView {
   extended: boolean;
   alert: AlertState;
   shareUrl: string | null;
-  /** notified=false: the link email to this contact failed, so they can't follow along. */
-  sharedWith: Array<{ name: string; notified: boolean }>;
+  /**
+   * Her Circle on this journey. `viaEmail`: MIRA emails them (an accepted email contact); `notified`: that
+   * email was accepted by the provider. `whatsapp`: a wa.me link with their own live link, for her to send
+   * (open journeys only). MIRA can't know whether she pressed Send in WhatsApp, so nothing claims it.
+   */
+  sharedWith: Array<{ name: string; notified: boolean; viaEmail: boolean; whatsapp: string | null }>;
   mode: JourneyMode;
   /** False for "share where I am" journeys (no destination to arrive at). */
   autoArrival: boolean;
@@ -130,8 +146,9 @@ type Row = {
 
 async function toView(sql: postgres.Sql, r: Row, now: Date): Promise<TripView> {
   const [contacts, [loc]] = await Promise.all([
-    sql<{ name: string; notified: boolean }[]>`
-      SELECT c.name, tc.notified_at IS NOT NULL AS notified FROM trip_contacts tc JOIN contacts c ON c.id = tc.contact_id WHERE tc.journey_id = ${r.id} ORDER BY c.name`,
+    sql<{ name: string; notified: boolean; via_email: boolean; phone_enc: string | null; share_token_enc: string | null }[]>`
+      SELECT c.name, tc.notified_at IS NOT NULL AS notified, (c.accepted_at IS NOT NULL AND c.encrypted_email IS NOT NULL) AS via_email, c.phone_enc, tc.share_token_enc
+      FROM trip_contacts tc JOIN contacts c ON c.id = tc.contact_id WHERE tc.journey_id = ${r.id} ORDER BY c.name`,
     sql<{ lat: number; lon: number; at: Date }[]>`SELECT lat, lon, at FROM trip_locations WHERE journey_id = ${r.id} ORDER BY at DESC LIMIT 1`,
   ]);
   const open = r.state === "active" || r.state === "missed";
@@ -145,7 +162,15 @@ async function toView(sql: postgres.Sql, r: Row, now: Date): Promise<TripView> {
     extended: r.extended,
     alert: displayAlertState(r.alert_state, r.alert_claimed_at ? new Date(r.alert_claimed_at) : null, now),
     shareUrl: open && r.share_token_enc ? new URL(`/t/${decryptText(r.share_token_enc, "share_token")}`, getEnv().APP_BASE_URL).toString() : null,
-    sharedWith: contacts,
+    sharedWith: contacts.map((c) => ({
+      name: c.name,
+      notified: c.notified,
+      viaEmail: c.via_email,
+      whatsapp:
+        open && c.phone_enc && c.share_token_enc
+          ? whatsappLink(decryptText(c.phone_enc, "contact_phone"), journeyMessage(liveLink(decryptText(c.share_token_enc, "share_token")), r.auto_arrival ? r.dest_name : null, r.mode))
+          : null,
+    })),
     lastLocation: loc ? { lat: loc.lat, lon: loc.lon, at: new Date(loc.at).toISOString() } : null,
     closedAt: r.closed_at ? new Date(r.closed_at).toISOString() : null,
     purgeAt: r.purge_at ? new Date(r.purge_at).toISOString() : null,
@@ -187,7 +212,7 @@ export async function startTrip(sql: postgres.Sql, user: User, input: z.infer<ty
   const tz = input.tz ?? null;
   const startHour = input.startHour ?? (tz ? hourIn(now, tz) : null);
   const ownerToken = randomToken(24); // the traveller's own "Share link" (they choose who gets it)
-  let created: { row: Row; links: Array<{ contactId: string; name: string; email: string; token: string }> };
+  let created: { row: Row; links: Array<{ contactId: string; name: string; email: string | null; token: string }> };
   try {
     // One transaction: the trip, its first point and every contact link exist together, or not at all.
     created = await sql.begin(async (tx) => {
@@ -200,7 +225,7 @@ export async function startTrip(sql: postgres.Sql, user: User, input: z.infer<ty
                 ${input.mode}, ${Boolean(input.to)}, ${tz}, ${savedPlaceId}, ${startHour})
         RETURNING ${sql.unsafe(COLS)}`;
       await tx`INSERT INTO trip_locations (journey_id, lat, lon, at) VALUES (${row.id}, ${input.from.lat}, ${input.from.lon}, ${now})`;
-      const targets = input.share ? await shareTargets(tx as unknown as postgres.Sql, user.id) : [];
+      const targets = input.share ? await circleTargets(tx as unknown as postgres.Sql, user.id) : [];
       const links = targets.map((t) => ({ contactId: t.id, name: t.name, email: t.email, token: randomToken(24) }));
       for (const l of links) {
         // Each contact gets their own link: removing them from your contacts revokes it immediately.
@@ -219,6 +244,7 @@ export async function startTrip(sql: postgres.Sql, user: User, input: z.infer<ty
   const minutesToEta = Math.round((eta.getTime() - now.getTime()) / 60_000);
   await Promise.all(
     created.links.map(async (l) => {
+      if (!l.email) return; // WhatsApp contact: she sends the link herself from the journey screen
       const mail = tripSharedEmail({ contactName: l.name, ownerName: user.name.split(" ")[0], destination: input.to?.name ?? "where they are", minutesToEta, etaAt: eta, tz, liveUrl: new URL(`/t/${l.token}`, getEnv().APP_BASE_URL).toString(), mode: input.to ? input.mode : "other" });
       const sent = await emailContact(l.email, mail.subject, mail.text).catch(() => ({ ok: false }));
       if (sent.ok) await sql`UPDATE trip_contacts SET notified_at = now() WHERE journey_id = ${created.row.id} AND contact_id = ${l.contactId}`;
@@ -236,17 +262,18 @@ export const CHECK_ON_ME_EVERY_MS = 5 * 60_000;
  * was private, her default accepted contacts are added to it first. Care wording, not SOS,
  * and nothing goes to anyone else. Returns exactly who was and wasn't reached.
  */
-export async function tellMyPeopleNow(sql: postgres.Sql, user: User, id: string, clock: Clock): Promise<{ told: string[]; failed: string[] }> {
+export async function tellMyPeopleNow(sql: postgres.Sql, user: User, id: string, clock: Clock): Promise<{ told: string[]; failed: string[]; whatsapp: Array<{ name: string; url: string }> }> {
   const now = clock.now();
   const [j] = await sql<{ id: string; state: JourneyState; check_requested_at: Date | null }[]>`
     SELECT id, state, check_requested_at FROM journeys WHERE id = ${id} AND user_id = ${user.id}`;
   if (!j) throw notFound("Trip not found.");
   if (j.state !== "active" && j.state !== "missed") throw conflict("trip_closed", "This journey has already ended.");
   if (j.check_requested_at && now.getTime() - new Date(j.check_requested_at).getTime() < CHECK_ON_ME_EVERY_MS) throw tooMany("You asked a moment ago. Try calling them, or send your live link.");
-  const targets = await shareTargets(sql, user.id);
+  const targets = await circleTargets(sql, user.id);
+  const phones = new Map((await phoneTargets(sql, user.id)).map((p) => [p.id, p.phone]));
   const links = await sql.begin(async (tx) => {
     await tx`UPDATE journeys SET check_requested_at = ${now} WHERE id = ${id}`;
-    const out: Array<{ contactId: string; name: string; email: string; token: string }> = [];
+    const out: Array<{ contactId: string; name: string; email: string | null; token: string }> = [];
     for (const t of targets) {
       const [existing] = await tx<{ share_token_enc: string | null }[]>`SELECT share_token_enc FROM trip_contacts WHERE journey_id = ${id} AND contact_id = ${t.id}`;
       let token = existing?.share_token_enc ? decryptText(existing.share_token_enc, "share_token") : null;
@@ -262,8 +289,14 @@ export async function tellMyPeopleNow(sql: postgres.Sql, user: User, id: string,
   });
   const told: string[] = [];
   const failed: string[] = [];
+  // WhatsApp: ready-to-send messages she opens one by one — never counted as "told".
+  const whatsapp = links
+    .filter((l) => phones.has(l.contactId))
+    .map((l) => ({ name: l.name, url: whatsappLink(phones.get(l.contactId)!, checkOnMeMessage(liveLink(l.token))) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
   await Promise.all(
     links.map(async (l) => {
+      if (!l.email) return;
       const mail = checkOnMeEmail({ ownerName: user.name.split(" ")[0], liveUrl: new URL(`/t/${l.token}`, getEnv().APP_BASE_URL).toString() });
       const r = await emailContact(l.email, mail.subject, mail.text).catch(() => ({ ok: false }));
       if (r.ok) {
@@ -272,8 +305,8 @@ export async function tellMyPeopleNow(sql: postgres.Sql, user: User, id: string,
       } else failed.push(l.name);
     }),
   );
-  console.log(JSON.stringify({ t: now.toISOString(), src: "web", event: "trip.check_requested", trip: id, told: told.length, failed: failed.length }));
-  return { told: told.sort(), failed: failed.sort() };
+  console.log(JSON.stringify({ t: now.toISOString(), src: "web", event: "trip.check_requested", trip: id, told: told.length, failed: failed.length, whatsapp: whatsapp.length }));
+  return { told: told.sort(), failed: failed.sort(), whatsapp };
 }
 
 export async function currentTrip(sql: postgres.Sql, userId: string, now: Date): Promise<TripView | null> {
@@ -338,9 +371,10 @@ export async function sharedTrip(sql: postgres.Sql, token: string, now: Date) {
     SELECT j.id, j.state, j.dest_name, j.dest_lat, j.dest_lon, j.eta_at, j.closed_at, u.name, false AS via_contact, j.mode, j.auto_arrival, j.check_requested_at, j.tz
     FROM journeys j JOIN users u ON u.id = j.user_id WHERE j.share_token_hash = ${hash}
     UNION ALL
-    SELECT j.id, j.state, j.dest_name, j.dest_lat, j.dest_lon, j.eta_at, j.closed_at, u.name, true AS via_contact, j.mode, j.auto_arrival, j.check_requested_at, j.tz
+    SELECT j.id, j.state, j.dest_name, j.dest_lat, j.dest_lon, j.eta_at, j.closed_at, u.name, (c.accepted_at IS NOT NULL AND c.encrypted_email IS NOT NULL) AS via_contact, j.mode, j.auto_arrival, j.check_requested_at, j.tz
     FROM trip_contacts tc JOIN journeys j ON j.id = tc.journey_id JOIN users u ON u.id = j.user_id
-    JOIN contacts c ON c.id = tc.contact_id AND c.accepted_at IS NOT NULL
+    -- A contact's own link: an accepted email contact, or one she sends it to on WhatsApp. Removing the contact revokes it.
+    JOIN contacts c ON c.id = tc.contact_id AND (c.accepted_at IS NOT NULL OR c.phone_enc IS NOT NULL)
     WHERE tc.share_token_hash = ${hash}
     LIMIT 1`;
   if (!j) return null;

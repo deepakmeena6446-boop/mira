@@ -4,6 +4,7 @@ import type { MiraTools } from "./tools";
 import { daypartFor } from "@/domain/daypart";
 import { emergencyLine, emergencySentence, noNumberReason, type CountryContext } from "@/domain/country-context";
 import { clock12 } from "./clock";
+import { circleSharingLine } from "@/domain/companion-output";
 import { DANGER, JUDGEMENT } from "./signals";
 
 /**
@@ -51,11 +52,11 @@ const REPORT_CATEGORY: Array<[RegExp, string, string]> = [
   [/light|dark|broken|pothole|footpath/i, "environment", "a street problem"],
 ];
 
-type Proposed = { destination: { name: string; lat: number; lon: number }; minutes: number | null; contacts: string[]; email: boolean };
+type Proposed = { destination: { name: string; lat: number; lon: number }; minutes: number | null; contacts: string[]; email: boolean; whatsapp?: string[] };
 
 /** A trip card carries only what the card shows (no route-derived extras like lighting). */
 function tripCard(t: Proposed): MiraCard {
-  return { type: "trip", destination: t.destination, minutes: t.minutes, contacts: t.contacts, email: t.email };
+  return { type: "trip", destination: t.destination, minutes: t.minutes, contacts: t.contacts, email: t.email, whatsapp: t.whatsapp };
 }
 
 function joinNames(xs: string[]): string {
@@ -66,6 +67,9 @@ function joinNames(xs: string[]): string {
 /** What starting does for her Circle — an attempt by email when it's on, never a promise. */
 function circleLine(t: Proposed, hinglish: boolean): string {
   // No Circle: nobody is alerted, so never imply someone is watching — MIRA only notices arrival.
+  const wa = t.whatsapp ?? [];
+  if (wa.length && !hinglish) return circleSharingLine(t.contacts, t.email, wa);
+  if (wa.length) return `Start karne ke baad ${joinNames(wa)} ko WhatsApp pe apna live link ek tap mein bhejna (Send tum dabaogi).${t.contacts.length && t.email ? ` MIRA ${joinNames(t.contacts)} ko email karne ki koshish bhi karegi.` : ""}`;
   if (!t.contacts.length) return hinglish ? "Koi automatically alert nahi hoga — start ke baad apna live link khud bhejna." : "Nobody is alerted automatically — after you start, send your live link to anyone you choose.";
   if (hinglish) return t.email ? `Start karte hi MIRA ${joinNames(t.contacts)} ko tumhara live link email karne ki koshish karegi (email fail bhi ho sakta hai).` : "Email abhi band hai, toh start karne ke baad apna live link khud bhejna.";
   return t.email ? `MIRA will try to email ${joinNames(t.contacts)} your live link when you start (sending can fail).` : "Email isn't switched on, so share your live link yourself after you start.";
