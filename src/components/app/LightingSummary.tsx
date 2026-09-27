@@ -72,6 +72,22 @@ export function sourceList(l: RouteLighting): string {
 }
 
 /**
+ * Every source, and what it said: with data (and its age), checked but nothing mapped here,
+ * couldn't be checked just now, or not available on this server. Provenance names what was
+ * looked at, not only what had something to show.
+ */
+export function sourceDetails(evidence: EvidenceState<RouteLighting> | undefined, lighting: RouteLighting | null): string {
+  const withData = lighting ? sourceList(lighting) : "";
+  const has = (name: string) =>
+    Boolean(lighting && ((name === "MIRA walkers" && lighting.sources.walkers) || (name === "OpenStreetMap" && lighting.sources.osm) || (name === "Mapillary" && lighting.sources.poles)));
+  const others = (evidence?.sources ?? [])
+    .filter((src) => !has(src.source))
+    .map((src) => `${src.source}: ${src.state === "ready" ? "nothing mapped here yet" : src.state === "failed" ? "couldn't check just now" : "not available here"}`);
+  const text = [withData ? `From ${withData}.` : null, others.length ? `${others.join("; ")}.` : null].filter(Boolean).join(" ");
+  return text || "MIRA could not confirm source coverage.";
+}
+
+/**
  * How much of a route is lit, from walkers' answers, OpenStreetMap and street imagery.
  * Plain facts with their sources — never a "safe/unsafe" judgement.
  */

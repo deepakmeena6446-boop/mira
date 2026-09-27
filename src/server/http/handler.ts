@@ -40,6 +40,10 @@ export function handle<A extends unknown[]>(fn: (...args: A) => Promise<Response
     } catch (err) {
       if (err instanceof ApiError) return errorResponse(err);
       const code = (err as { code?: unknown })?.code;
+      // She navigated away or lost signal mid-request: not a server failure, and logging it would bury real ones.
+      if ((args[0] instanceof Request && args[0].signal.aborted) || code === "ECONNRESET" || errCode(err) === "aborted") {
+        return json({ error: { code: "aborted", message: "The request was cancelled." } }, 499);
+      }
       console.error(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "request.failed", route: routeLabel(args[0]), error: errCode(err), code: typeof code === "string" ? code : null }));
       return json({ error: { code: "server_error", message: "Something went wrong on our side. Please try again." } }, 500);
     }

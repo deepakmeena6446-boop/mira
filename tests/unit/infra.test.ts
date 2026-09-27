@@ -208,3 +208,21 @@ describe("failure logs", () => {
     expect(routeLabel(undefined)).toBeNull();
   });
 });
+
+describe("abandoned requests", () => {
+  it("are not logged as server failures", async () => {
+    const { handle } = await import("@/server/http/handler");
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const aborted = Object.assign(new Error("aborted"), { code: "ECONNRESET" });
+      const res = await handle<[Request]>(async () => { throw aborted; })(new Request("https://mira.test/api/geo/help"));
+      expect(res.status).toBe(499);
+      expect(err).not.toHaveBeenCalled();
+      const real = await handle<[Request]>(async () => { throw new Error("places_500"); })(new Request("https://mira.test/api/geo/help"));
+      expect(real.status).toBe(500);
+      expect(JSON.parse(String(err.mock.calls[0][0]))).toMatchObject({ event: "request.failed", route: "/api/geo/help", error: "places_500" });
+    } finally {
+      err.mockRestore();
+    }
+  });
+});

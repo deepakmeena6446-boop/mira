@@ -10,7 +10,7 @@ import { Chip } from "@/components/app/Chip";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { SearchOverlay, type Destination } from "@/components/app/SearchOverlay";
 import { kindEmoji } from "@/components/app/kinds";
-import { LightingSummary, lightingEvidenceLine, sourceList } from "@/components/app/LightingSummary";
+import { LightingSummary, lightingEvidenceLine, sourceDetails } from "@/components/app/LightingSummary";
 import { HelpPointList, RouteContextLines } from "@/components/app/HelpPointList";
 import { ArrivalContextLines, RouteOptions, type RouteOption } from "@/components/app/RouteOptions";
 import { TRAVEL_MODES, TRAVEL_MODE_INFO, distanceUnits, expectedMinutes, formatDistance, formatMinutes, type TravelMode } from "@/domain/travel-mode";
@@ -701,7 +701,7 @@ export function HomeScreen({
                 <details className="mt-1 text-xs text-ink-muted">
                   <summary className="min-h-8 cursor-pointer font-bold text-accent">Sources and freshness</summary>
                   <p>
-                    {chosen.lighting ? `From ${sourceList(chosen.lighting) || "no mapped source yet"}.` : "MIRA could not confirm source coverage."}
+                    {sourceDetails(chosen.lightingEvidence, chosen.lighting)}
                     {chosen.lighting?.freshness?.osmFrom && new Date().getFullYear() - chosen.lighting.freshness.osmFrom >= 5 ? " Some of this map data is over five years old." : ""} Lights can be out or new ones missing — this is about lighting, not a safety rating.
                   </p>
                 </details>

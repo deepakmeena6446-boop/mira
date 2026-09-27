@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { RouteContextLines, helpPointsLine } from "@/components/app/HelpPointList";
 import { HelpNearSheet } from "@/components/app/HelpNearSheet";
 import { ArrivalContextLines, RouteOptions, type RouteOption } from "@/components/app/RouteOptions";
-import { lightingEvidenceLine, lightingWhy } from "@/components/app/LightingSummary";
+import { lightingEvidenceLine, lightingWhy, sourceDetails } from "@/components/app/LightingSummary";
 import { setCountry } from "@/lib/locale-store";
 import { UNKNOWN_COUNTRY } from "@/domain/country-context";
 import type { RouteLighting } from "@/domain/lighting";
@@ -108,6 +108,16 @@ describe("journey context card", () => {
     expect(lightingEvidenceLine(partial, null)).not.toMatch(/Mapillary/);
     expect(lightingWhy(lighting(0, 100), partial)).toMatch(/couldn't reach OpenStreetMap/);
     expect(lightingWhy(lighting(0, 100), partial)).not.toMatch(/has mapped the street lights here yet/);
+  });
+
+  it("names every lighting source and what it said, not only the ones with data", () => {
+    const sources = [{ source: "MIRA walkers", state: "ready" as const }, { source: "OpenStreetMap", state: "failed" as const, retryable: true }, { source: "Mapillary", state: "unavailable" as const }];
+    const none = { ...lighting(0, 100), sources: { walkers: false, osm: false, poles: false } };
+    expect(sourceDetails({ state: "partial", data: none, sources }, none)).toBe("MIRA walkers: nothing mapped here yet; OpenStreetMap: couldn't check just now; Mapillary: not available here.");
+    const osm = lighting(71, 22); // OpenStreetMap had data
+    const ok = [{ source: "MIRA walkers", state: "ready" as const }, { source: "OpenStreetMap", state: "ready" as const }];
+    expect(sourceDetails({ state: "ready", data: osm, sources: ok }, osm)).toBe("From OpenStreetMap. MIRA walkers: nothing mapped here yet.");
+    expect(sourceDetails(undefined, null)).toBe("MIRA could not confirm source coverage.");
   });
 
   it("for transit with nothing found: says so, and why in one tap", () => {
