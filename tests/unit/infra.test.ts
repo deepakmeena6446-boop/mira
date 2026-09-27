@@ -67,13 +67,21 @@ describe("production validation", () => {
   it("boots without email in production but warns loudly (share-link-only beta)", () => {
     expect(() => parseEnv(prod)).not.toThrow();
     expect(productionWarnings(parseEnv(prod)).join(" ")).toMatch(/No email provider/);
-    expect(productionWarnings(parseEnv({ ...prod, ...RESEND }))).toEqual([]);
+    expect(productionWarnings(parseEnv({ ...prod, ...RESEND })).join(" ")).not.toMatch(/No email provider/);
+    const providers = { GOOGLE_MAPS_SERVER_KEY: "server", OVERPASS_URL: "https://overpass.example/api", MAPILLARY_TOKEN: "mapillary", ANTHROPIC_API_KEY: "claude" };
+    expect(productionWarnings(parseEnv({ ...prod, ...RESEND, ...providers }))).toEqual([]);
+    expect(productionWarnings(parseEnv({ ...prod, ...RESEND, ...providers, OVERPASS_URL: undefined })).join(" ")).toMatch(/OpenStreetMap lighting source/);
     expect(productionWarnings(parseEnv(valid))).toEqual([]); // dev/test: quiet
     const missing = { ...prod, PUBLIC_BETA_STRICT: "on" };
     expect(() => parseEnv(missing)).toThrow(/RESEND_API_KEY/);
-    const live = { ...missing, ...RESEND, GOOGLE_MAPS_SERVER_KEY: "server", GOOGLE_MAPS_BROWSER_KEY: "browser", AUTH_GOOGLE_ID: "id", AUTH_GOOGLE_SECRET: "secret", ANTHROPIC_API_KEY: "claude", MAPILLARY_TOKEN: "mapillary", VAPID_PUBLIC_KEY: "public", VAPID_PRIVATE_KEY: "private", VAPID_SUBJECT: "mailto:alerts@mira.test", GOOGLE_PLACES_HOURS: "on", PUBLIC_AGGREGATE_RELEASES: "off" };
+    const live = { ...missing, ...RESEND, GOOGLE_MAPS_SERVER_KEY: "server", GOOGLE_MAPS_BROWSER_KEY: "browser", AUTH_GOOGLE_ID: "id", AUTH_GOOGLE_SECRET: "secret", ANTHROPIC_API_KEY: "claude", MAPILLARY_TOKEN: "mapillary", VAPID_PUBLIC_KEY: "public", VAPID_PRIVATE_KEY: "private", VAPID_SUBJECT: "mailto:alerts@mira.test", GOOGLE_PLACES_HOURS: "on", PUBLIC_AGGREGATE_RELEASES: "off", OVERPASS_URL: "https://overpass.example/api", CLIENT_IP_HEADER: "x-real-ip" };
     expect(() => parseEnv(live)).not.toThrow();
     expect(() => parseEnv({ ...live, PUBLIC_AGGREGATE_RELEASES: "on" })).toThrow(/PUBLIC_AGGREGATE_RELEASES/);
+    expect(() => parseEnv({ ...live, CLIENT_IP_HEADER: undefined })).toThrow(/CLIENT_IP_HEADER/);
+    expect(() => parseEnv({ ...live, OVERPASS_URL: undefined })).toThrow(/OVERPASS_URL/);
+    expect(() => parseEnv({ ...live, ALLOW_DEMO_SIGNIN: "on" })).toThrow(/ALLOW_DEMO_SIGNIN/);
+    expect(() => parseEnv({ ...live, APP_BASE_URL: "http://localhost:3150" })).toThrow(/https/); // a public beta is never plain http
+    expect(() => parseEnv({ ...prod, APP_BASE_URL: "http://localhost:3150" })).not.toThrow(); // a local production build may be
   });
   it("logs the warning once, as structured JSON, when the env is first read", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -82,8 +90,10 @@ describe("production validation", () => {
       Object.assign(process.env, { NODE_ENV: "production", APP_BASE_URL: "https://mira.example.org" });
       resetEnvCache();
       getEnv();
+      const first = warn.mock.calls.length;
       getEnv();
-      expect(warn).toHaveBeenCalledTimes(1);
+      expect(first).toBeGreaterThan(0);
+      expect(warn).toHaveBeenCalledTimes(first); // once per process, not per read
       expect(JSON.parse(String(warn.mock.calls[0][0]))).toMatchObject({ src: "config", event: "config.warning" });
     } finally {
       for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
@@ -152,5 +162,49 @@ describe("production migrations", () => {
     } finally {
       log.mockRestore();
     }
+  });
+});
+
+describe("push subscriptions", () => {
+  it("accept only the browsers' push services, so the worker never POSTs to a host a user chose", async () => {
+    const { isPushServiceUrl } = await import("@/server/providers/notify/push");
+    expect(isPushServiceUrl("https://fcm.googleapis.com/fcm/send/abc")).toBe(true);
+    expect(isPushServiceUrl("https://updates.push.services.mozilla.com/wpush/v2/abc")).toBe(true);
+    expect(isPushServiceUrl("https://web.push.apple.com/QGx")).toBe(true);
+    expect(isPushServiceUrl("https://wns2-par02p.notify.windows.com/w/?token=x")).toBe(true);
+    expect(isPushServiceUrl("https://evil.example/fcm.googleapis.com")).toBe(false);
+    expect(isPushServiceUrl("https://fcm.googleapis.com.evil.example/x")).toBe(false);
+    expect(isPushServiceUrl("https://fcm.googleapis.com:8443/x")).toBe(false);
+    expect(isPushServiceUrl("http://fcm.googleapis.com/x")).toBe(false);
+    expect(isPushServiceUrl("https://169.254.169.254/latest")).toBe(false);
+  });
+});
+
+describe("destination names in contacts' emails", () => {
+  it("are defused, never refused: a trip must always start", async () => {
+    const { placeLabel } = await import("@/server/http/person-name");
+    const p = placeLabel(80);
+    expect(p.parse("Kamla Nagar Market")).toBe("Kamla Nagar Market");
+    expect(p.parse("Café @ Mall")).toBe("Café @ Mall");
+    expect(p.parse("Visit https://evil.com/login now")).toBe("Visit evil .com/login now");
+    expect(p.parse("www.evil.xyz")).toBe("evil .xyz");
+    expect(p.parse("<b>x</b>\nline")).toBe("b x /b line");
+    expect(p.parse("<>")).toBe("Destination");
+  });
+});
+
+describe("failure logs", () => {
+  it("keep our own error codes, drop anything that could echo a key or a place, and mask tokens in routes", async () => {
+    const { errCode } = await import("@/server/log/err-code");
+    const { routeLabel } = await import("@/server/http/handler");
+    expect(errCode(new Error("places_403"))).toBe("places_403");
+    expect(errCode(new Error("overpass_retry_later"))).toBe("overpass_retry_later");
+    expect(errCode(new Error("GET https://maps.googleapis.com/x?key=AIzaSECRET failed"))).toBe("Error");
+    expect(errCode(new TypeError("fetch failed"))).toBe("TypeError");
+    expect(errCode("nope")).toBe("unknown");
+    expect(routeLabel(new Request("https://mira.test/api/t/iiw1Jl-JjX6nX08LM8N_6mDMEC22zPrC"))).toBe("/api/t/:id");
+    expect(routeLabel(new Request("https://mira.test/api/trips/5f0c8a52-3d7e-4a55-9a3e-1c2d3e4f5a6b/arrive"))).toBe("/api/trips/:id/arrive");
+    expect(routeLabel(new Request("https://mira.test/api/geo/help"))).toBe("/api/geo/help");
+    expect(routeLabel(undefined)).toBeNull();
   });
 });

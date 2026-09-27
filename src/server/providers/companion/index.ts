@@ -8,6 +8,7 @@ import { claudeMira, DEFAULT_MIRA_MODEL } from "./claude";
 import { miraTools } from "./tools";
 import { MIRA_DAILY_TOKEN_DEFAULT, recordTokens, tokenBudgetSpent } from "./budget";
 import type { MiraContext, MiraEvent, MiraTurn } from "./types";
+import { errCode } from "@/server/log/err-code";
 
 export type { MiraCard, MiraContext, MiraEvent, MiraTurn } from "./types";
 export { MIRA_PERSONA } from "./persona";
@@ -66,7 +67,7 @@ export async function* withFallback(primary: AsyncGenerator<MiraEvent>, fallback
     return;
   } catch (err) {
     // Name/status only: error messages can echo request content.
-    log("mira.claude_failed", { error: err instanceof Error ? err.name : "unknown", status: (err as { status?: number })?.status ?? null, spoke });
+    log("mira.claude_failed", { error: errCode(err), status: (err as { status?: number })?.status ?? null, spoke });
   }
   if (spoke) yield { type: "text", delta: " — sorry, I lost my connection for a moment. Here's what I can still do: " };
   let said = "";

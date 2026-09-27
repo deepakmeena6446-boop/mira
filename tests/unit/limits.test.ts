@@ -28,4 +28,24 @@ describe("Google spend ceiling", () => {
     delete process.env.GOOGLE_MAX_CALLS_PER_MIN;
     resetEnvCache();
   });
+
+  it("also stops for the rest of the UTC day at the daily ceiling, then refills the next day", () => {
+    process.env.GOOGLE_MAX_CALLS_PER_MIN = "100";
+    process.env.GOOGLE_MAX_CALLS_PER_DAY = "4";
+    resetEnvCache();
+    resetGoogleBudget();
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+      const noon = Date.parse("2026-09-27T12:00:00Z");
+      const calls = [0, 61_000, 122_000, 183_000, 244_000, 305_000].map((dt) => takeGoogleCall(noon + dt)); // one per minute
+      expect(calls).toEqual([true, true, true, true, false, false]);
+      expect(takeGoogleCall(Date.parse("2026-09-28T00:00:01Z"))).toBe(true);
+    } finally {
+      console.warn = warn;
+      delete process.env.GOOGLE_MAX_CALLS_PER_MIN;
+      delete process.env.GOOGLE_MAX_CALLS_PER_DAY;
+      resetEnvCache();
+    }
+  });
 });

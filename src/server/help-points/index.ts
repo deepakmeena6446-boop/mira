@@ -6,6 +6,7 @@ import { haversineMeters } from "@/domain/pilot";
 import type { GeoPoint, GeoProvider } from "@/server/providers/geo";
 import type { HelpHours } from "@/server/providers/geo/types";
 import { evidenceState, type EvidenceState } from "@/domain/evidence-state";
+import { errCode } from "@/server/log/err-code";
 
 /**
  * Help Points for route sheets and "near me" (rules in src/domain/help-points.ts). The
@@ -32,7 +33,7 @@ const quiet = async <T>(p: Promise<T[]>): Promise<T[]> => {
   try {
     return await p;
   } catch (err) {
-    console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "help_points.failed", error: err instanceof Error ? err.name : "unknown" }));
+    console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "help_points.failed", error: errCode(err) }));
     return [];
   }
 };

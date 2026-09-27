@@ -95,7 +95,7 @@ export function RouteContextLines({ option }: { option: RouteOption }) {
   const first = option.helpPoints[0];
   return (
     <dl className="mt-3" aria-label="What's known about this way">
-      <ContextRow label="Lighting" why={lightingWhy(option.lighting)}>
+      <ContextRow label="Lighting" why={lightingWhy(option.lighting, option.lightingEvidence)}>
         {lightingEvidenceLine(option.lightingEvidence, option.lighting)}
       </ContextRow>
       <ContextRow label="Help" why={first ? undefined : NO_HELP_WHY}>

@@ -26,6 +26,7 @@ export const POST = handle(async (req: Request) => {
   await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "auth:email:ip:h", max: 20, windowMs: 3600_000 }], now);
   await enforce(sql, [dailyKey("global", "signin-mail", now)], [{ bucket: "auth:email:global:h", max: 1000, windowMs: 3600_000 }], now);
   const user = await getUser(sql);
-  await requestSignInLink(sql, email, user && !user.durable ? user.id : null);
+  const { sent } = await requestSignInLink(sql, email, user && !user.durable ? user.id : null);
+  if (!sent) console.warn(JSON.stringify({ t: now.toISOString(), src: "web", event: "auth.email_link_not_sent" })); // the answer stays the same (no enumeration)
   return json({ ok: true });
 });

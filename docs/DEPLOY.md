@@ -1,6 +1,6 @@
 # Deploying MIRA on Railway
 
-> **Public beta profile:** Use `PUBLIC_BETA_STRICT=on` on web for the 18+ worldwide beta. It fails startup/build if Resend, Google Maps, Google sign-in, Claude, Mapillary, Web Push or Google Places hours are unconfigured; keep `PUBLIC_AGGREGATE_RELEASES=off`. The older share-link-only option below is for local previews or a different, explicitly approved release. Complete [the public beta release gates](PUBLIC_BETA_RELEASE.md) before production traffic.
+> **Public beta profile:** Use `PUBLIC_BETA_STRICT=on` on web for the 18+ worldwide beta. It fails **server startup** (not the build) if Resend, Google Maps, Google sign-in, Claude, Mapillary, Web Push, Google Places hours, `OVERPASS_URL` or `CLIENT_IP_HEADER` are unconfigured, if `APP_BASE_URL` isn't `https://`, or if first-name sign-in (`ALLOW_DEMO_SIGNIN=on`) is enabled; keep `PUBLIC_AGGREGATE_RELEASES=off`. A key being present is only a configuration check — the smoke test ([PRODUCTION_SMOKE_TEST.md](../PRODUCTION_SMOKE_TEST.md)) proves each provider works. The exact order is in [DEPLOYMENT_CHECKLIST.md](../DEPLOYMENT_CHECKLIST.md). The older share-link-only option below is for local previews or a different, explicitly approved release. Complete [the public beta release gates](PUBLIC_BETA_RELEASE.md) before production traffic.
 
 
 MIRA runs as **three Railway services** in one project, built from this repository:
@@ -109,6 +109,8 @@ railway variable set PILOT_MANIFEST_PATH=data/pilot/manifest.json $S
 railway variable set 'MAP_TILE_URL=https://tile.openstreetmap.org/{z}/{x}/{y}.png' $S
 railway variable set MAP_STYLE_URL=https://tiles.openfreemap.org/styles/positron $S
 railway variable set CLIENT_IP_HEADER=x-real-ip TRUSTED_PROXY_HOPS=1 $S
+# OpenStreetMap: Overpass is the "mapped as lit" lighting source (required); Photon/Nominatim are fallbacks.
+railway variable set OVERPASS_URL=https://overpass-api.de/api/interpreter PLACE_SEARCH_URL=https://photon.komoot.io REVERSE_GEOCODER_URL=https://nominatim.openstreetmap.org $S
 # Email (Resend; required for this public beta; see step 6).
 railway variable set RESEND_API_KEY --stdin $S
 railway variable set 'EMAIL_FROM=MIRA <alerts@your-domain>' $S
@@ -126,7 +128,8 @@ railway variable set ANTHROPIC_API_KEY --stdin $S
 
 W="--service worker --skip-deploys"
 railway variable set NODE_ENV=production RAILPACK_NODE_VERSION=24 $W
-for k in DATABASE_URL APP_BASE_URL SESSION_SECRET DATA_ENCRYPTION_KEY ADMIN_PASSWORD_HASH PILOT_MANIFEST_PATH MAP_TILE_URL RESEND_API_KEY EMAIL_FROM PUBLIC_AGGREGATE_RELEASES VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT; do
+# The worker also needs the map lookups: its contributions job finds Help Points along finished walks (MIRA Checks).
+for k in DATABASE_URL APP_BASE_URL SESSION_SECRET DATA_ENCRYPTION_KEY ADMIN_PASSWORD_HASH PILOT_MANIFEST_PATH MAP_TILE_URL RESEND_API_KEY EMAIL_FROM PUBLIC_AGGREGATE_RELEASES VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT GOOGLE_MAPS_SERVER_KEY GOOGLE_PLACES_HOURS OVERPASS_URL; do
   railway variable set "$k=\${{web.$k}}" $W
 done
 ```
@@ -134,28 +137,37 @@ done
 | Variable | Service | Required | Notes |
 |---|---|---|---|
 | `DATABASE_URL` | web, worker | yes | Private network URL above. Never enable a public TCP proxy on `postgis`. |
-| `APP_BASE_URL` | web, worker | yes | `https://…`, no trailing slash. Enforced at startup in production. Used in every emailed link. |
+| `APP_BASE_URL` | web, worker | yes | `https://…`, no trailing slash. Enforced at startup in production. Used in every emailed link, the OAuth redirect and the CSRF origin check — **serve the site on exactly this origin** (a POST from `*.up.railway.app` is refused once a custom domain is set here). |
 | `SESSION_SECRET` | web, worker | yes | ≥ 32 random bytes, base64. |
 | `DATA_ENCRYPTION_KEY` | web, worker | yes | Exactly 32 bytes, base64. **Losing it makes contact emails and private report text unreadable.** Keep an offline copy. |
 | `ADMIN_PASSWORD_HASH` | web, worker | yes | `b64:` form from `npm run admin:hash`. |
-| `PILOT_MANIFEST_PATH` | web, worker | yes | `data/pilot/manifest.json` (committed). |
+| `PILOT_MANIFEST_PATH` | web, worker | yes | `data/pilot/manifest.json` (committed). Validated at boot; read only by the optional pilot import. |
 | `MAP_TILE_URL` | web, worker | yes | Raster fallback template. |
 | `NODE_ENV` | web, worker | yes | `production` (Railpack also sets it at runtime). |
 | `PUBLIC_BETA_STRICT` | web | public beta | `on`: require every advertised live provider at startup. |
 | `PUBLIC_AGGREGATE_RELEASES` | web, worker | public beta | `off` until a staffed moderation release is approved. |
 | `PORT` | web | yes | `3000`, matching the domain's target port. |
 | `RAILPACK_NODE_VERSION` | web, worker | recommended | `24` (LTS). Without it Railpack resolves `engines.node` (`>=22.11.0`), which can pick a non-LTS major. |
-| `CLIENT_IP_HEADER` | web | recommended | `x-real-ip`: Railway's edge overwrites it with the connecting address. Rate limits key on it. |
+| `CLIENT_IP_HEADER` | web | public beta | `x-real-ip`: Railway's edge overwrites it with the connecting address. Rate limits key on it; without it they key on a client-influenced `X-Forwarded-For`. |
 | `TRUSTED_PROXY_HOPS` | web | fallback | `1`. Used only when the header above is absent. |
 | `RESEND_API_KEY`, `EMAIL_FROM` | web, worker | public beta | Both or neither. `EMAIL_FROM` = `MIRA <alerts@your-verified-domain>`. |
 | `MAP_STYLE_URL`, `MAP_STYLE_URL_NIGHT` | web | optional | Vector basemap (OpenFreeMap placeholder by default). |
-| `GOOGLE_MAPS_SERVER_KEY`, `GOOGLE_MAPS_BROWSER_KEY`, `GOOGLE_PLACES_HOURS` | web | public beta | See step 7. |
-| `ANTHROPIC_API_KEY`, `MIRA_MODEL` | web | public beta | Mira on Claude; unset = scripted placeholder. |
+| `GOOGLE_MAPS_SERVER_KEY`, `GOOGLE_PLACES_HOURS` | web, worker | public beta | See step 7. The worker uses them to prepare MIRA Checks. |
+| `GOOGLE_MAPS_BROWSER_KEY` | web | public beta | Map Tiles; see step 7. |
+| `ANTHROPIC_API_KEY` | web | public beta | Mira on Claude and the Safety update relevance check; unset = scripted Mira, ambiguous headlines left out. |
+| `MIRA_MODEL` | web | optional | Default `claude-sonnet-5`. Changing it redeploys (no code change needed). |
+| `MIRA_DAILY_TOKEN_MAX` | web | optional | Mira's tokens/day across everyone (default 2,000,000). Over it, the scripted Mira answers until midnight UTC. |
+| `SAFETY_UPDATES` | web | optional | `gdelt` (default) or `off`. `fixture` is refused under strict mode. |
+| `SAFETY_CLASSIFIER_MODEL` | web | optional | Relevance check for ambiguous headlines (default `claude-opus-5`, low effort). |
+| `ALLOW_DEMO_SIGNIN` | web | must be unset/`off` in public beta | First-name accounts; refused under strict mode. |
 | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | web | public beta | **Both or neither** (startup fails otherwise). |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | web, worker | public beta | Web Push to the traveller. |
-| `GOOGLE_MAX_CALLS_PER_MIN`, `MIRA_GLOBAL_DAILY_MAX` | web | optional | Spend ceilings (defaults 600/min per process, 5000/day). |
+| `GOOGLE_MAX_CALLS_PER_MIN`, `GOOGLE_MAX_CALLS_PER_DAY`, `MIRA_GLOBAL_DAILY_MAX` | web | optional | Spend ceilings (defaults 600/min and 20,000/UTC day per process, 5000 Mira messages/day). Over a Google ceiling, maps answer from OpenStreetMap instead of failing. |
 | `MAPILLARY_TOKEN` | web | public beta | Street-lighting layer. |
-| `REVERSE_GEOCODER_URL`, `OVERPASS_URL`, `PLACE_SEARCH_URL` | web | optional | Public OSM services; set only if you accept their usage policies. |
+| `OVERPASS_URL` | web, worker | public beta | The OpenStreetMap lighting source and OSM Help Points. Public server = polite, low-volume use (MIRA queues to ~1 request/s per process). |
+| `REVERSE_GEOCODER_URL`, `PLACE_SEARCH_URL` | web | recommended | Nominatim/Photon fallbacks when Google can't answer. Accept their usage policies or run your own. |
+| `MAP_TILE_ATTRIBUTION`, `STEWARD_*` | web | optional | Tile attribution override; Local Steward thresholds (beta defaults in code). |
+| `MAPBOX_TOKEN` | — | unused | No Mapbox adapter exists; leave unset. |
 
 Set all of these **before the first deploy** (`--skip-deploys` above), because `next build` and the pre-deploy step both run with the service's variables.
 
@@ -214,7 +226,7 @@ How MIRA uses it (`src/server/mail/resend.ts`): `POST https://api.resend.com/ema
 ## 7. Google Maps and sign-in
 
 - **Server key** (`GOOGLE_MAPS_SERVER_KEY`): API restrictions **Places API (New), Routes API, Geocoding API** only. Railway's egress IPs aren't static unless you enable static outbound IPs (Pro), so add an IP application restriction only if you have them. Set per-API **quotas** and a **budget alert** in Google Cloud.
-- **Browser key** (`GOOGLE_MAPS_BROWSER_KEY`): application restriction **HTTP referrers** `https://<your domain>/*`; API restriction **Map Tiles API** only. The CSP already allows `https://tile.googleapis.com` when this key is set.
+- **Browser key** (`GOOGLE_MAPS_BROWSER_KEY`): application restriction **HTTP referrers** `https://<your domain>/*`; API restriction **Map Tiles API** only. The server creates the tile session with `Referer: <APP_BASE_URL>/`, so the referrer restriction must match `APP_BASE_URL` exactly — otherwise every map silently falls back to OpenFreeMap (log: `geo.google_tiles_failed`). Tile sessions use `region: IN` (one shared session, one border convention). The CSP already allows `https://tile.googleapis.com` when this key is set.
 - **Google sign-in** (when enabled): OAuth client type *Web application*, authorised redirect URI **`https://<your domain>/api/auth/google/callback`**, authorised JavaScript origin `https://<your domain>`. The consent screen is a top-level navigation. The CSP adds `https://accounts.google.com` to `form-action` when `AUTH_GOOGLE_ID` is set, in case sign-in starts from a form POST.
 - **Anthropic**: set a monthly spend limit in the console. MIRA also caps Mira at 60 messages per person per day and `MIRA_GLOBAL_DAILY_MAX` overall.
 
@@ -222,7 +234,9 @@ How MIRA uses it (`src/server/mail/resend.ts`): `POST https://api.resend.com/ema
 
 - **Uptime monitor** (UptimeRobot, Better Stack, …) on `https://<your domain>/api/health/ready` every 1–5 min, alerting your phone on any non-200. It's 503 when the database is unreachable or the worker's journeys pass is over 3 minutes old. Rehearse on staging: stop the worker deployment, confirm the page and trip-start refusal, then restart the worker and confirm the monitor turns green. Follow [the incident response guide](INCIDENT_RESPONSE.md).
 - Railway's deploy healthcheck only runs during a deploy ([docs](https://docs.railway.com/guides/healthchecks)); it is not monitoring.
-- Logs are structured JSON: `railway logs --service worker`. Watch for `worker.watchdog_exit`, `journey.failed`, `mail.send_failed`, `health.worker_stale`, `health.contact_alert_delivery_problems`, `config.warning`.
+- Logs are structured JSON (no coordinates, addresses or tokens): `railway logs --service web` / `--service worker`. Errors carry MIRA's own codes (e.g. `places_403`, `overpass_retry_later`) or just a class name. Watch for:
+  - worker: `worker.watchdog_exit`, `worker.heartbeat_failed`, `job.failed`, `journey.failed`, `journey.alert` (with `outcome` and `unconfirmed`), `journey.alert_failed`, `mail.send_failed`
+  - web: `request.failed` (with a masked `route`), `config.warning`, `trip.started` / `trip.arrived` / `trip.ended`, `mail.failed`, `mail.not_configured`, `auth.email_link_*`, `geo.google_failed`, `geo.google_tiles_failed`, `geo.google_daily_budget_reached`, `lighting.layer_failed`, `help_points.failed`, `mira.claude_failed`, `mira.token_budget_spent`, `health.worker_stale`, `health.contact_alert_delivery_problems`
 - Rate limits live in Postgres (`abuse_counters`), so they hold across restarts.
 
 ## 9. Backups, rollback, secrets

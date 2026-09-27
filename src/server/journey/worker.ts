@@ -7,6 +7,7 @@ import type { Mailer } from "@/server/mail";
 import { getEnv } from "@/server/config/env";
 import { recordHeartbeat } from "@/server/health/worker";
 import { missedAlertEmail, tripArrivedEmail, tripMissedEmail } from "@/server/mail/templates";
+import { errCode } from "@/server/log/err-code";
 
 /** No live point for this long on an active trip → tell the owner once (re-armed when points resume). */
 export const STALE_AFTER_MS = 10 * 60_000;
@@ -30,14 +31,14 @@ interface PendingAlert {
   journeyId: string;
   userId: string | null;
   who: string;
-  sends: Array<{ email: string; message: { subject: string; text: string } }>;
+  sends: Array<{ name: string; email: string; message: { subject: string; text: string } }>;
 }
 
 type Log = (e: string, f?: Record<string, string | number | boolean | null>) => void;
 
 const joinNames = (names: string[]) => (names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
 const liveUrl = (enc: string | null) => (enc ? new URL(`/t/${decryptText(enc, "share_token")}`, getEnv().APP_BASE_URL).toString() : null);
-const errName = (err: unknown) => (err instanceof Error ? err.name : "unknown");
+const errName = errCode;
 
 async function notifyAlertUncertain(sql: postgres.Sql, userId: string, who: string) {
   await sql`INSERT INTO notifications (user_id, kind, title, body, href) VALUES (${userId}, 'trip_alert_failed', 'Your contacts may not have been told',
@@ -123,6 +124,7 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
             userId: j.user_id,
             who,
             sends: contacts.map((c) => ({
+              name: c.name,
               email: decryptText(c.encrypted_email, "contact_email"),
               message: j.user_id
                 ? tripMissedEmail({ ownerName: owner, destination: j.dest_name ?? "their destination", minutesLate, liveUrl: liveUrl(c.share_token_enc), etaAt: new Date(j.eta_at), tz: j.tz })
@@ -161,12 +163,14 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
       }
       const outcome = outcomes.includes("sent") ? "sent" : outcomes.includes("unconfirmed") ? "unconfirmed" : "failed";
       await sql`UPDATE journeys SET alert_state = ${outcome} WHERE id = ${a.journeyId} AND alert_state = 'claimed'`;
-      // Correct the earlier "I'm emailing…" so the traveller never believes a message went out when it didn't.
-      if (outcome !== "sent" && a.userId) await notifyAlertUncertain(sql, a.userId, a.who);
+      // Correct the earlier "I'm emailing…" so the traveller never believes a message went out when it didn't —
+      // per person: one accepted send must not stand in for a contact whose email failed.
+      const notConfirmed = a.sends.filter((_, i) => outcomes[i] !== "sent").map((s) => s.name);
+      if (notConfirmed.length && a.userId) await notifyAlertUncertain(sql, a.userId, outcome === "sent" ? joinNames(notConfirmed) : a.who);
       if (outcome === "sent") result.alertsSent += 1;
       else if (outcome === "failed") result.alertsFailed += 1;
       else result.alertsUnconfirmed += 1;
-      log("journey.alert", { journey: a.journeyId, outcome, recipients: a.sends.length });
+      log("journey.alert", { journey: a.journeyId, outcome, recipients: a.sends.length, unconfirmed: notConfirmed.length });
     } catch (err) {
       // Left "claimed": the next pass turns it into "unconfirmed" and tells the traveller.
       result.failedJourneys += 1;

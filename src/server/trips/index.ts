@@ -1,6 +1,7 @@
 import "server-only";
 import type postgres from "postgres";
 import { z } from "zod";
+import { placeLabel } from "@/server/http/person-name";
 import { EXPIRE_AFTER_ETA_MS, MAX_JOURNEY_MS, MIN_ETA_MS, displayAlertState, purgeAt, validateNewEta, type AlertState, type JourneyState } from "@/domain/journey";
 import { haversineMeters } from "@/domain/pilot";
 import { decryptText, encryptText, hashToken, hmacHex, randomToken } from "@/server/crypto";
@@ -32,7 +33,7 @@ export const startTripSchema = z
   .object({
     from: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).strict(),
     /** Omitted = "just share where I am": no destination to arrive at (ends with I'm here / End). */
-    to: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180), name: z.string().trim().min(1).max(80) }).strict().optional(),
+    to: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180), name: placeLabel(80) }).strict().optional(),
     share: z.boolean().default(true),
     /** Walking minutes of the route option she chose, when it isn't the fastest (clamped on the server). */
     routeMinutes: z.number().int().min(1).max(240).optional(),
@@ -316,7 +317,10 @@ export async function addLocation(sql: postgres.Sql, userId: string, id: string,
     await tx`UPDATE journeys SET last_location_at = ${now}, near_dest_since = ${near ? (j.near_dest_since ?? now) : null} WHERE id = ${id}`;
     return { arrived: false };
   });
-  if (result.arrived) await onTripArrived(sql, id, now); // after commit: best-effort, never undoes the arrival
+  if (result.arrived) {
+    console.log(JSON.stringify({ t: now.toISOString(), src: "web", event: "trip.arrived", trip: id, by: "auto" }));
+    await onTripArrived(sql, id, now); // after commit: best-effort, never undoes the arrival
+  }
   return result;
 }
 

@@ -6,6 +6,7 @@ import { haversineMeters } from "@/domain/pilot";
 import { getEnv } from "@/server/config/env";
 import { coordinateBearingGeoUrl } from "./coordinate-url";
 import type { GeoPoint, PlaceHit } from "./types";
+import { overpassSlot } from "./overpass-slot";
 
 /**
  * Placeholder live OpenStreetMap lookups for places outside MIRA's local snapshot:
@@ -33,7 +34,6 @@ function cached<T>(max: number, ttlMs: number) {
 }
 
 const nearbyCache = cached<PlaceHit[]>(500, 60 * 60_000);
-let lastOverpass = 0;
 
 /** Named places around a point, classified exactly like the local import. */
 export async function overpassNearby(p: GeoPoint, radiusM: number, allowed: string[]): Promise<PlaceHit[]> {
@@ -44,8 +44,11 @@ export async function overpassNearby(p: GeoPoint, radiusM: number, allowed: stri
   const key = `${c.lat},${c.lon},${r}`;
   let hits = nearbyCache.get(key);
   if (!hits) {
-    if (Date.now() - lastOverpass < 1000) return [];
-    lastOverpass = Date.now();
+    try {
+      await overpassSlot();
+    } catch {
+      return []; // "around you" is a convenience list; Help Points and lighting report their failures
+    }
     const around = `(around:${r},${c.lat},${c.lon})`;
     const query = `[out:json][timeout:8];(
       nwr${around}[name][amenity];
@@ -111,8 +114,7 @@ export async function overpassHelp(points: GeoPoint[], radiusM: number, opts?: {
   const key = `${pts.map((c) => `${c.lat},${c.lon}`).join(";")}|${r}|${opts?.convenience ? "c" : ""}`;
   const hit = helpCache.get(key);
   if (hit) return hit;
-  if (Date.now() - lastOverpass < 1000) throw new Error("overpass_retry_later");
-  lastOverpass = Date.now();
+  await overpassSlot();
   const around = `(around:${r},${pts.map((c) => `${c.lat},${c.lon}`).join(",")})`;
   const query = `[out:json][timeout:8];(
     nwr${around}[amenity~"^(hospital|police|pharmacy|fuel)$"];

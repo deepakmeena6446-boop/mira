@@ -9,6 +9,7 @@ import { scheduleFromGoogle } from "@/domain/opening-hours";
 import { GOOGLE_HELP_TYPES, helpClassFromGoogle, type HelpClass, type HelpPoint } from "@/domain/help-points";
 import type { TravelMode } from "@/domain/travel-mode";
 import type { GeoPoint, GeoProvider, HelpHours, HelpLookupOptions, ModeRoute, PlaceHit, WalkRoute } from "./types";
+import { errCode } from "@/server/log/err-code";
 
 /**
  * Google Maps Platform provider (Places API (New), Routes API, Geocoding API). Called only
@@ -242,7 +243,7 @@ export function resetGoogleHelpCaches() {
 }
 
 const warn = (op: string, err: unknown) =>
-  console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "geo.google_failed", op, error: err instanceof Error ? err.name : "unknown" }));
+  console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "geo.google_failed", op, error: errCode(err) }));
 
 export function googleGeo(key: string, fallback: GeoProvider): GeoProvider {
   const lookupHelp = async (points: GeoPoint[], radiusM: number, opts?: HelpLookupOptions): Promise<EvidenceState<HelpPoint[]>> => {

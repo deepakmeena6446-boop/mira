@@ -1,6 +1,7 @@
 import "server-only";
 import type postgres from "postgres";
 import { recordArrivalHabit } from "@/server/account/habits";
+import { errCode } from "@/server/log/err-code";
 
 /**
  * The single place that runs after a journey becomes `arrived` — both "I'm here"
@@ -18,6 +19,6 @@ async function step(name: string, run: () => Promise<unknown>): Promise<void> {
   try {
     await run();
   } catch (err) {
-    console.log(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "trip.after_arrival_failed", step: name, error: err instanceof Error ? err.name : "unknown" }));
+    console.log(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "trip.after_arrival_failed", step: name, error: errCode(err) }));
   }
 }

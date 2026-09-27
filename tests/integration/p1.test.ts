@@ -101,6 +101,21 @@ describe("P1: durable accounts, journeys, check-on-me, push, Location Context", 
     expect(again.status).toBe(410);
   });
 
+  it("an 'add this email' link completes only for the account that asked — never files someone's address under a stranger's account", async () => {
+    const email = unique("victim");
+    const attacker = await signIn("Mallory");
+    const { user: before } = await (await meGET()).json();
+    expect((await emailPOST(jsonRequest("/api/auth/email", { email }))).status).toBe(200); // asked from the attacker's account
+    const victim = newJar(); // the owner of the inbox taps it in their own browser
+    const r = await useSignInLink(email, victim);
+    expect(r.status).toBe(409);
+    expect((await r.json()).error.code).toBe("link_other_account");
+    const [row] = await getSql()`SELECT email_hash FROM users WHERE id = ${before.id}`;
+    expect(row.email_hash).toBeNull(); // the address was not attached
+    switchJar(attacker);
+    expect((await (await meGET()).json()).user.durable).toBe(false);
+  });
+
   it("an unknown address gets an honest 'no account' email, and the response doesn't reveal it", async () => {
     const email = unique("nobody");
     switchJar(newJar());

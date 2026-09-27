@@ -43,16 +43,20 @@ export function lightingEvidenceLine(evidence: EvidenceState<RouteLighting> | un
   if (evidence.state === "failed") return "MIRA couldn't check lighting sources right now.";
   if (evidence.state === "unavailable") return "Lighting evidence is unavailable for this route.";
   const prefix = evidence.state === "empty" ? "No mapped lighting evidence from sources checked" : lightingLine("data" in evidence ? evidence.data : lighting);
-  const unavailable = evidence.sources.filter((s) => s.state !== "ready").map((s) => s.source);
-  return unavailable.length ? `${prefix} · Couldn't check ${unavailable.join(" and ")}` : prefix;
+  // Only a source that failed is "couldn't check"; one this server doesn't use (not configured) isn't a gap to report.
+  const failed = evidence.sources.filter((s) => s.state === "failed").map((s) => s.source);
+  return failed.length ? `${prefix} · Couldn't check ${failed.join(" and ")}` : prefix;
 }
 
 /**
  * Why part (or all) of the lighting is "not known", in one short paragraph — null when every
  * stretch is known. Absence of data is never read as "dark" or "lit".
  */
-export function lightingWhy(lighting: RouteLighting | null): string | null {
+export function lightingWhy(lighting: RouteLighting | null, evidence?: EvidenceState<RouteLighting>): string | null {
   const ask = "After a walk at night, MIRA asks “Was the way lit?” — each answer fills in a stretch for the next person.";
+  const failed = evidence?.sources.filter((s) => s.state === "failed").map((s) => s.source) ?? [];
+  // A source that didn't answer may well have data: never describe that as "nobody has mapped it".
+  if (failed.length) return `MIRA couldn't reach ${failed.join(" and ")} just now, so some of what's known may be missing here. Try again in a moment. ${ask}`;
   if (!lighting || lighting.summary.lit + lighting.summary.poles + lighting.summary.dark === 0)
     return `No source MIRA uses (OpenStreetMap, street imagery, MIRA walkers) has mapped the street lights here yet. That says nothing either way about tonight. ${ask}`;
   if (lighting.summary.unknown <= 0) return null;

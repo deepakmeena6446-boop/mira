@@ -8,6 +8,7 @@ import { cellsAlongRoute, notesForCells } from "@/server/notes";
 import { lightingEvidenceForRoutes } from "@/server/lighting";
 import { helpPointsEvidenceForRoutes, withoutCorroboratedGone } from "@/server/help-points";
 import { dedupeHelpPoints, type HelpPoint } from "@/domain/help-points";
+import { evidenceState, type EvidenceState } from "@/domain/evidence-state";
 import { TRAVEL_MODES } from "@/domain/travel-mode";
 import { haversineMeters } from "@/domain/pilot";
 import { ApiError } from "@/server/http/errors";
@@ -25,18 +26,20 @@ export const dynamic = "force-dynamic";
 
 const body = z.object({ from: point, to: point, mode: z.enum(TRAVEL_MODES).default("walk") }).strict();
 
-/** Help Points near the destination (the last walk of a ride or transit journey), nearest first. Failure = none. */
-async function helpAtArrival(geo: GeoProvider, to: GeoPoint): Promise<HelpPoint[]> {
-  try {
-    return dedupeHelpPoints(await geo.helpPlaces([to], ARRIVAL_RADIUS_M))
-      .map((h) => ({ h, d: haversineMeters(to, h) }))
-      .filter(({ d }) => d <= ARRIVAL_RADIUS_M)
-      .sort((a, b) => a.d - b.d)
-      .slice(0, ARRIVAL_MAX)
-      .map(({ h }) => h);
-  } catch {
-    return [];
-  }
+/** Help Points near the destination (the last walk of a ride or transit journey), nearest first, with whether the lookup worked. */
+async function helpAtArrival(geo: GeoProvider, to: GeoPoint): Promise<{ points: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> }> {
+  const failed = { state: "failed" as const, sources: [{ source: "map provider", state: "failed" as const, retryable: true }], retryable: true };
+  const source: EvidenceState<HelpPoint[]> = geo.helpPlacesEvidence
+    ? await geo.helpPlacesEvidence([to], ARRIVAL_RADIUS_M).catch(() => failed)
+    : await geo.helpPlaces([to], ARRIVAL_RADIUS_M).then((data) => evidenceState(data, data.length > 0, [{ source: "map provider", state: "ready" as const }])).catch(() => failed);
+  if (!("data" in source)) return { points: [], evidence: source }; // failed ≠ none near where she arrives
+  const points = dedupeHelpPoints(source.data)
+    .map((h) => ({ h, d: haversineMeters(to, h) }))
+    .filter(({ d }) => d <= ARRIVAL_RADIUS_M)
+    .sort((a, b) => a.d - b.d)
+    .slice(0, ARRIVAL_MAX)
+    .map(({ h }) => h);
+  return { points, evidence: evidenceState(points, points.length > 0, source.sources) };
 }
 
 /**
@@ -50,7 +53,7 @@ async function helpAtArrival(geo: GeoProvider, to: GeoPoint): Promise<HelpPoint[
  * Ride / transit: `{ mode, route, arrivalHelp }`. `route` is the provider's one route (time,
  * distance, line for the map) or null when it has none — "not known", and the app asks her
  * when she expects to arrive. No lighting: street lighting is about walking. `arrivalHelp`:
- * Help Points within a short walk of where she arrives.
+ * Help Points within a short walk of where she arrives; `arrivalEvidence` says whether that lookup worked.
  *
  * Every metric is deterministic; nothing here is a safety verdict.
  */
@@ -63,8 +66,8 @@ export const POST = handle(async (req: Request) => {
 
   if (mode !== "walk") {
     if (haversineMeters(from, to) > MAX_RIDE_M) throw new ApiError(400, "too_far", "That's further than a journey MIRA can follow (up to 4 hours).");
-    const [found, arrivalHelp] = await Promise.all([geo.routes(from, to, mode), helpAtArrival(geo, to)]);
-    return json({ mode, route: found[0] ?? null, arrivalHelp });
+    const [found, arrival] = await Promise.all([geo.routes(from, to, mode), helpAtArrival(geo, to)]);
+    return json({ mode, route: found[0] ?? null, arrivalHelp: arrival.points, arrivalEvidence: arrival.evidence });
   }
 
   // Walking routes only: refuse anything longer than a (long) walk before doing any work.

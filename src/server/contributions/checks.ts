@@ -21,6 +21,7 @@ import { decryptText, encryptText } from "@/server/crypto";
 import { conflict, forbidden, notFound } from "@/server/http/errors";
 import type { GeoProvider } from "@/server/providers/geo";
 import { PLACE_KEY_RE, alreadyContributed, placeSignalsFor, recordPlaceSignal, type ReceiptOutcome } from "./receipts";
+import { errCode } from "@/server/log/err-code";
 
 /**
  * MIRA Checks (blueprint §7 "confirm and correct beats report"; engine doc §11): after a walk
@@ -63,7 +64,7 @@ export async function captureCheckEvidence(tx: postgres.TransactionSql, journeyI
         ON CONFLICT (journey_id) DO NOTHING`;
     });
   } catch (err) {
-    console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "checks.capture_failed", error: err instanceof Error ? err.name : "unknown" }));
+    console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "checks.capture_failed", error: errCode(err) }));
   }
 }
 

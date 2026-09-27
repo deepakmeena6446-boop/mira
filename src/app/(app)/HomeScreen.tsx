@@ -68,6 +68,7 @@ interface ModeInfo {
   mode: Exclude<Mode, "walk">;
   route: (RouteOption["route"] & { provider: string }) | null;
   arrivalHelp: HelpPoint[];
+  arrivalEvidence?: EvidenceState<HelpPoint[]>;
 }
 type Routed = { data: RouteInfo | ModeInfo | null; code?: string };
 
@@ -668,7 +669,7 @@ export function HomeScreen({
                   </p>
                 ) : null}
                 {mode === "transit" && rideRoute?.provider === "google" ? <p className="mt-1 text-xs text-ink-subtle">Transit times from Google; check the operator for service changes.</p> : null}
-                {dest ? <ArrivalContextLines mode={mode} arrivalHelp={arrivalHelp} dest={dest} /> : null}
+                {dest ? <ArrivalContextLines mode={mode} arrivalHelp={arrivalHelp} arrivalEvidence={modeInfo?.arrivalEvidence} dest={dest} /> : null}
               </div>
             )}
 

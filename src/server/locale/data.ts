@@ -121,7 +121,9 @@ export function loadCountryData(root: string = path.join(process.cwd(), "data"))
   const dir = path.join(root, "locales");
   const profiles: Record<string, Profile> = {};
   const overrides: Record<string, RegionOverride> = {};
-  for (const f of existsSync(dir) ? readdirSync(dir) : []) {
+  // Missing profiles would make every country "number not known": a broken deploy, never a quiet degrade.
+  if (!existsSync(dir)) throw new Error(`Country emergency profiles not found at ${dir} (deploy must include data/locales)`);
+  for (const f of readdirSync(dir)) {
     if (/^[A-Z]{2}\.json$/.test(f)) {
       const p = profileSchema.parse(readJson(path.join(dir, f)));
       if (`${p.iso}.json` !== f) throw new Error(`data/locales/${f}: iso ${p.iso} doesn't match the file name`);

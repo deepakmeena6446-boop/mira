@@ -1,5 +1,6 @@
 import "server-only";
 import { getEnv } from "@/server/config/env";
+import { errCode } from "@/server/log/err-code";
 
 /**
  * Basemap config for the browser. With a Google Maps browser key: Google's 2D map tiles
@@ -43,7 +44,10 @@ async function googleSession(key: string, kind: "day" | "night"): Promise<string
   try {
     const res = await fetch(`https://tile.googleapis.com/v1/createSession?key=${encodeURIComponent(key)}`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      // The browser key is restricted to our site's referrer (docs/DEPLOY.md); this call comes from the
+      // server, so it must present that referrer or Google refuses it and every map silently falls back.
+      headers: { "content-type": "application/json", referer: `${new URL(getEnv().APP_BASE_URL).origin}/` },
+      // region: one shared session for everyone, so one border convention. IN is required for users in India.
       body: JSON.stringify({ mapType: "roadmap", language: "en-US", region: "IN", scale: "scaleFactor2x", highDpi: true, styles: kind === "night" ? NIGHT_STYLES : BASE_STYLES }),
       signal: AbortSignal.timeout(5000),
     });
@@ -52,7 +56,7 @@ async function googleSession(key: string, kind: "day" | "night"): Promise<string
     sessions.set(kind, { token: data.session, expiresAt: Number(data.expiry) * 1000 });
     return data.session;
   } catch (err) {
-    console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "geo.google_tiles_failed", kind, error: err instanceof Error ? err.name : "unknown" }));
+    console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "geo.google_tiles_failed", kind, error: errCode(err) }));
     return cached?.token ?? null;
   }
 }

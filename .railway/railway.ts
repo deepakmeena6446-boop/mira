@@ -60,6 +60,12 @@ export default defineRailway(() => {
       PILOT_MANIFEST_PATH: "data/pilot/manifest.json",
       MAP_TILE_URL: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       MAP_STYLE_URL: "https://tiles.openfreemap.org/styles/positron",
+      // OpenStreetMap lookups: Overpass is the "mapped as lit" lighting source (unset = that source is
+      // "unavailable" everywhere); Photon/Nominatim are the fallback when Google can't answer. Public servers
+      // are low-volume, polite-use services: point these at your own instance before any real scale.
+      OVERPASS_URL: "https://overpass-api.de/api/interpreter",
+      PLACE_SEARCH_URL: "https://photon.komoot.io",
+      REVERSE_GEOCODER_URL: "https://nominatim.openstreetmap.org",
       // Railway's edge overwrites X-Real-IP with the connecting address (docs.railway.com,
       // networking/public-networking/specs-and-limits). Rate limits key on it.
       CLIENT_IP_HEADER: "x-real-ip",
@@ -84,10 +90,12 @@ export default defineRailway(() => {
     },
   });
 
-  // Only what the worker reads: database, secrets, email, push. No map or AI keys.
+  // Only what the worker reads: database, secrets, email, push — and the map lookups MIRA Checks need
+  // (the contributions job looks up Help Points along a finished walk; without them every check is dropped).
   const fromWeb = [
     "DATABASE_URL", "APP_BASE_URL", "SESSION_SECRET", "DATA_ENCRYPTION_KEY", "ADMIN_PASSWORD_HASH", "PILOT_MANIFEST_PATH",
     "MAP_TILE_URL", "RESEND_API_KEY", "EMAIL_FROM", "PUBLIC_AGGREGATE_RELEASES", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT",
+    "GOOGLE_MAPS_SERVER_KEY", "GOOGLE_PLACES_HOURS", "GOOGLE_MAX_CALLS_PER_MIN", "OVERPASS_URL",
   ] as const;
 
   const worker = service("worker", {

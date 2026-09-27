@@ -89,10 +89,25 @@ describe("journey context card", () => {
   it("for a ride: no lighting numbers, Help Points near where she arrives", () => {
     render(<ArrivalContextLines mode="ride" arrivalHelp={[pharmacy]} dest={{ lat: 51.5033, lon: -0.1196 }} />);
     const card = screen.getByLabelText("What's known about this journey");
-    expect(card).toHaveTextContent("Street lighting is shown for walks, not rides.");
+    expect(card).toHaveTextContent("Street lighting is shown for walks, not rides: it's mapped street by street for people on foot.");
     expect(card).toHaveTextContent("1 Help Point near where you arrive · nearest: Corner Pharmacy, 1 min walk");
     expect(card.textContent).not.toMatch(/%/);
     expect(card.textContent).not.toMatch(VERDICTS);
+  });
+
+  it("for a ride whose Help Point lookup failed: says it couldn't check, never 'none'", () => {
+    const failed = { state: "failed" as const, sources: [{ source: "Google Places", state: "failed" as const, retryable: true }], retryable: true };
+    render(<ArrivalContextLines mode="ride" arrivalHelp={[]} arrivalEvidence={failed} dest={{ lat: 0, lon: 0 }} />);
+    expect(screen.getByText("MIRA couldn't check Help Points near where you arrive right now.")).toBeInTheDocument();
+    expect(screen.queryByText(/No mapped Help Points/)).not.toBeInTheDocument();
+  });
+
+  it("says a lighting source failed rather than 'nobody has mapped it', and stays quiet about unconfigured ones", () => {
+    const partial = { state: "partial" as const, data: lighting(0, 100), sources: [{ source: "MIRA walkers", state: "ready" as const }, { source: "OpenStreetMap", state: "failed" as const, retryable: true }, { source: "Mapillary", state: "unavailable" as const }] };
+    expect(lightingEvidenceLine(partial, null)).toMatch(/Couldn't check OpenStreetMap$/);
+    expect(lightingEvidenceLine(partial, null)).not.toMatch(/Mapillary/);
+    expect(lightingWhy(lighting(0, 100), partial)).toMatch(/couldn't reach OpenStreetMap/);
+    expect(lightingWhy(lighting(0, 100), partial)).not.toMatch(/has mapped the street lights here yet/);
   });
 
   it("for transit with nothing found: says so, and why in one tap", () => {

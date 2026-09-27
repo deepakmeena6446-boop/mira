@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { ApiError } from "./errors";
+import { errCode } from "@/server/log/err-code";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
 
@@ -13,8 +14,24 @@ export function errorResponse(err: ApiError): Response {
 }
 
 /**
+ * The route for logs, with ids and bearer tokens masked (`/api/t/:id`, `/api/trips/:id/arrive`):
+ * which endpoint failed, never whose trip or which live link.
+ */
+export function routeLabel(req: unknown): string | null {
+  if (!(req instanceof Request)) return null;
+  try {
+    return new URL(req.url).pathname
+      .split("/")
+      .map((seg) => (/^[A-Za-z0-9_-]{16,}$/.test(seg) || /^[0-9a-f-]{32,36}$/i.test(seg) ? ":id" : seg))
+      .join("/");
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Wrap a route handler: ApiErrors become safe JSON; anything else is logged by
- * name only (never message bodies, which could echo user input) and returns 500.
+ * code only (never message bodies, which could echo user input) and returns 500.
  */
 export function handle<A extends unknown[]>(fn: (...args: A) => Promise<Response>) {
   return async (...args: A): Promise<Response> => {
@@ -22,9 +39,8 @@ export function handle<A extends unknown[]>(fn: (...args: A) => Promise<Response
       return await fn(...args);
     } catch (err) {
       if (err instanceof ApiError) return errorResponse(err);
-      const name = err instanceof Error ? err.name : "unknown";
       const code = (err as { code?: unknown })?.code;
-      console.error(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "request.failed", error: name, code: typeof code === "string" ? code : null }));
+      console.error(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "request.failed", route: routeLabel(args[0]), error: errCode(err), code: typeof code === "string" ? code : null }));
       return json({ error: { code: "server_error", message: "Something went wrong on our side. Please try again." } }, 500);
     }
   };

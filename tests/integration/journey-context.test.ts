@@ -10,6 +10,7 @@ import { dailyKey } from "@/server/ratelimit";
 import { chosenMinutes, etaFor } from "@/server/trips";
 import { processJourneys } from "@/server/journey/worker";
 import { systemClock } from "@/server/clock";
+import { encryptText, hmacHex } from "@/server/crypto";
 import { POST as demoPOST } from "@/app/api/auth/demo/route";
 import { GET as meGET } from "@/app/api/me/route";
 import { POST as tripsPOST } from "@/app/api/trips/route";
@@ -121,6 +122,27 @@ describe("journey context: route, Help Points, options, safety net", () => {
     expect(j.alert_state).toBe("unconfirmed");
     const notes = await getSql()`SELECT kind FROM notifications WHERE user_id = ${j.user_id} AND kind = 'trip_alert_failed'`;
     expect(notes).toHaveLength(1);
+  });
+
+  it("a missed-arrival alert that reached only some contacts says who may not have been told", async () => {
+    await beat();
+    await signIn("Partial Alert");
+    const { trip } = await (await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" }, share: false }))).json();
+    const [j] = await getSql()`SELECT user_id FROM journeys WHERE id = ${trip.id}`;
+    const contact = async (name: string, email: string) =>
+      (await getSql()`INSERT INTO contacts (user_id, name, encrypted_email, email_hash, accepted_at) VALUES (${j.user_id}, ${name}, ${encryptText(email, "contact_email")}, ${hmacHex("contact-email", `${name}-${Date.now()}`)}, now()) RETURNING id`)[0].id;
+    for (const [name, email] of [["Priya", "priya@example.test"], ["Ravi", "ravi@example.test"]] as const) {
+      await getSql()`INSERT INTO trip_contacts (journey_id, contact_id) VALUES (${trip.id}, ${await contact(name, email)})`;
+    }
+    await getSql()`UPDATE journeys SET eta_at = now() - interval '20 minutes' WHERE id = ${trip.id}`;
+    const mailer = { send: async (m: { to: string }) => (m.to.startsWith("priya") ? { ok: true as const } : { ok: false as const, definite: true }) };
+    await processJourneys(getSql(), systemClock, mailer as never);
+    const [after] = await getSql()`SELECT alert_state FROM journeys WHERE id = ${trip.id}`;
+    expect(after.alert_state).toBe("sent"); // someone was reached…
+    const notes = await getSql()`SELECT body FROM notifications WHERE user_id = ${j.user_id} AND kind = 'trip_alert_failed'`;
+    expect(notes).toHaveLength(1); // …and the traveller is told exactly who may not have been
+    expect(notes[0].body).toContain("Ravi");
+    expect(notes[0].body).not.toContain("Priya");
   });
 
   it(`Mira is capped at ${MIRA_DAILY_MAX} messages per person per day`, async () => {

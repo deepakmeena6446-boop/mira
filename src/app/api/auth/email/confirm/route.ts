@@ -21,9 +21,16 @@ export const POST = handle(async (req: Request) => {
   const store = await cookies();
   const token = store.get(signInCookieName(isProduction()))?.value;
   store.delete(signInCookieName(isProduction()));
-  const r = token ? await consumeSignInLink(sql, token) : null;
-  if (!r) throw new ApiError(410, "link_invalid", "This sign-in link has expired or was already used. Ask for a new one.");
   const current = await getUser(sql);
+  const r = token ? await consumeSignInLink(sql, token, current?.id ?? null) : null;
+  if (!r) {
+    console.warn(JSON.stringify({ t: now.toISOString(), src: "web", event: "auth.email_link_invalid" }));
+    throw new ApiError(410, "link_invalid", "This sign-in link has expired or was already used. Ask for a new one.");
+  }
+  if ("error" in r) {
+    console.warn(JSON.stringify({ t: now.toISOString(), src: "web", event: "auth.email_link_other_account" }));
+    throw new ApiError(409, "link_other_account", "Open this link in the browser where you asked to add your email, while signed in to MIRA there. Ask for a new link if needed.");
+  }
   if (current?.id !== r.userId) {
     await endSession(sql);
     await startSession(sql, r.userId);

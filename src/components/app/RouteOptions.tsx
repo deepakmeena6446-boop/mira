@@ -59,15 +59,17 @@ export function RouteOptions({ options, selected, onSelect }: { options: RouteOp
  * quiet line instead of a number; Help Points are the ones within a short walk of where she
  * arrives (the last walk), nearest first.
  */
-export function ArrivalContextLines({ mode, arrivalHelp, dest }: { mode: Exclude<TravelMode, "walk">; arrivalHelp: HelpPoint[]; dest: { lat: number; lon: number } }) {
+export function ArrivalContextLines({ mode, arrivalHelp, arrivalEvidence, dest }: { mode: Exclude<TravelMode, "walk">; arrivalHelp: HelpPoint[]; arrivalEvidence?: EvidenceState<HelpPoint[]>; dest: { lat: number; lon: number } }) {
   const first = arrivalHelp[0];
   return (
     <dl className="mt-3" aria-label="What's known about this journey">
       <ContextRow label="Lighting">
-        <span className="text-ink-muted">Street lighting is shown for walks, not {mode === "ride" ? "rides" : "transit"}: it's mapped street by street for people on foot.</span>
+        <span className="text-ink-muted">Street lighting is shown for walks, not {mode === "ride" ? "rides" : "transit"}: it&apos;s mapped street by street for people on foot.</span>
       </ContextRow>
-      <ContextRow label="Help" why={first ? undefined : NO_HELP_WHY}>
-        {first ? (
+      <ContextRow label="Help" why={first || arrivalEvidence?.state === "failed" ? undefined : NO_HELP_WHY}>
+        {arrivalEvidence?.state === "failed" ? (
+          "MIRA couldn't check Help Points near where you arrive right now."
+        ) : first ? (
           <>
             {arrivalHelp.length} Help Point{arrivalHelp.length === 1 ? "" : "s"} near where you arrive
             <span className="text-ink-muted">

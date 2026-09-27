@@ -50,8 +50,11 @@ export async function requestSignInLink(sql: postgres.Sql, email: string, userId
 /**
  * Use a link once. Returns the account to sign in to: the existing account for that email,
  * or (when she asked to add the email) her own account, now durable. Null = invalid/expired/used.
+ * An "add" link completes only in the browser signed in as the account that asked for it
+ * (`currentUserId`): otherwise anyone could send someone a link that files their address — and
+ * their future trips — under an account the sender controls.
  */
-export async function consumeSignInLink(sql: postgres.Sql, token: string): Promise<{ userId: string; added: boolean } | null> {
+export async function consumeSignInLink(sql: postgres.Sql, token: string, currentUserId: string | null = null): Promise<{ userId: string; added: boolean } | { error: "other_account" } | null> {
   if (!/^[A-Za-z0-9_-]{20,128}$/.test(token)) return null;
   return sql.begin(async (tx) => {
     const [link] = await tx<{ id: string; email_hash: string; email_enc: string; user_id: string | null }[]>`
@@ -62,6 +65,7 @@ export async function consumeSignInLink(sql: postgres.Sql, token: string): Promi
     const [owner] = await tx<{ id: string }[]>`SELECT id FROM users WHERE email_hash = ${link.email_hash}`;
     if (owner) return { userId: owner.id, added: false };
     if (!link.user_id) return null;
+    if (link.user_id !== currentUserId) return { error: "other_account" as const };
     const [u] = await tx<{ id: string }[]>`UPDATE users SET email_hash = ${link.email_hash}, email_enc = ${link.email_enc} WHERE id = ${link.user_id} AND email_hash IS NULL RETURNING id`;
     if (!u) return null;
     await tx`INSERT INTO auth_accounts (provider, provider_user_id, user_id) VALUES ('email', ${link.email_hash}, ${u.id}) ON CONFLICT DO NOTHING`;

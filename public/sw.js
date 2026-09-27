@@ -44,7 +44,7 @@ self.addEventListener("push", (e) => {
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
   const raw = e.notification.data && e.notification.data.href;
-  const href = typeof raw === "string" && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/inbox";
+  const href = typeof raw === "string" && raw.startsWith("/") && !raw.startsWith("//") && !raw.includes("\\") ? raw : "/inbox";
   e.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       for (const c of list) if (new URL(c.url).origin === location.origin && "focus" in c) return c.navigate(href).then((w) => (w || c).focus());

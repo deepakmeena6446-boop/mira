@@ -106,6 +106,8 @@ const envSchema = z.object({
   MAPILLARY_TOKEN: optionalNonEmpty,
   // Spend ceilings (public defaults in code; production may override). See src/server/providers/geo/budget.ts, api/mira.
   GOOGLE_MAX_CALLS_PER_MIN: optionalNonEmpty.refine((v) => v === undefined || /^\d{1,6}$/.test(v), "must be a whole number"),
+  // Per process and UTC day (default 20000); over it, maps answer from the OpenStreetMap fallback like the minute cap.
+  GOOGLE_MAX_CALLS_PER_DAY: optionalNonEmpty.refine((v) => v === undefined || /^\d{1,7}$/.test(v), "must be a whole number"),
   // "on" = ask Google for Help Point opening hours (Places Enterprise SKU: higher cost). Default off.
   GOOGLE_PLACES_HOURS: optionalNonEmpty.refine((v) => v === undefined || v === "on" || v === "off", 'must be "on" or "off"'),
   MIRA_GLOBAL_DAILY_MAX: optionalNonEmpty.refine((v) => v === undefined || /^\d{1,7}$/.test(v), "must be a whole number"),
@@ -155,9 +157,11 @@ export function parseEnv(source: Record<string, string | undefined>): ServerEnv 
     throw new EnvValidationError(issues);
   }
   const env = result.data;
+  const strict = env.NODE_ENV === "production" && env.PUBLIC_BETA_STRICT === "on";
   if (env.NODE_ENV === "production" && !env.APP_BASE_URL.startsWith("https://")) {
+    // A local production build (`next start` on this machine) may use http://localhost — never a public beta.
     const local = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/.test(env.APP_BASE_URL);
-    if (!local) {
+    if (!local || strict) {
       throw new EnvValidationError(["APP_BASE_URL: production deployments must use https://"]);
     }
   }
@@ -168,10 +172,14 @@ export function parseEnv(source: Record<string, string | undefined>): ServerEnv 
   if (Boolean(env.AUTH_GOOGLE_ID) !== Boolean(env.AUTH_GOOGLE_SECRET)) {
     issues.push(`${env.AUTH_GOOGLE_ID ? "AUTH_GOOGLE_SECRET" : "AUTH_GOOGLE_ID"}: AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET must be set together`);
   }
-  if (env.NODE_ENV === "production" && env.PUBLIC_BETA_STRICT === "on") {
-    for (const key of ["RESEND_API_KEY", "EMAIL_FROM", "GOOGLE_MAPS_SERVER_KEY", "GOOGLE_MAPS_BROWSER_KEY", "AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET", "ANTHROPIC_API_KEY", "MAPILLARY_TOKEN", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"] as const) {
+  if (strict) {
+    for (const key of ["RESEND_API_KEY", "EMAIL_FROM", "GOOGLE_MAPS_SERVER_KEY", "GOOGLE_MAPS_BROWSER_KEY", "AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET", "ANTHROPIC_API_KEY", "MAPILLARY_TOKEN", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT", "OVERPASS_URL"] as const) {
       if (!env[key]) issues.push(`${key}: required for the public beta`);
     }
+    // Without it, rate limits key on the right-most X-Forwarded-For entry, which a client can influence.
+    if (!env.CLIENT_IP_HEADER) issues.push('CLIENT_IP_HEADER: required for the public beta (Railway: "x-real-ip")');
+    // First-name accounts can't prove an email: with them on, anyone could send invites or link an address they don't own.
+    if (env.ALLOW_DEMO_SIGNIN === "on") issues.push('ALLOW_DEMO_SIGNIN: must be off for the public beta (Google and email sign-in only)');
     if (env.GOOGLE_PLACES_HOURS !== "on") issues.push('GOOGLE_PLACES_HOURS: must be "on" for the public beta');
     if (env.PUBLIC_AGGREGATE_RELEASES === "on") issues.push('PUBLIC_AGGREGATE_RELEASES: must stay "off" until moderation release is approved');
     if (env.SAFETY_UPDATES === "fixture") issues.push('SAFETY_UPDATES: "fixture" shows sample data and is for tests only');
@@ -192,6 +200,11 @@ export function productionWarnings(env: ServerEnv): string[] {
       "No email provider (RESEND_API_KEY + EMAIL_FROM, or SMTP_*): contact invites, missed-arrival emails and email sign-in are OFF; share links still work.",
     );
   }
+  // Each degrades honestly on screen (the source reads "unavailable"), but an operator should know at boot.
+  if (!env.GOOGLE_MAPS_SERVER_KEY) warnings.push("No GOOGLE_MAPS_SERVER_KEY: search, routes and Help Points use the OpenStreetMap fallback (thin outside mapped areas).");
+  if (!env.OVERPASS_URL) warnings.push("No OVERPASS_URL: the OpenStreetMap lighting source and OSM Help Points are unavailable.");
+  if (!env.MAPILLARY_TOKEN) warnings.push("No MAPILLARY_TOKEN: the street-imagery lighting source is unavailable.");
+  if (!env.ANTHROPIC_API_KEY) warnings.push("No ANTHROPIC_API_KEY: Mira answers with the scripted companion; ambiguous Safety update headlines are left out.");
   return warnings;
 }
 

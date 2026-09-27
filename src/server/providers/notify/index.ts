@@ -9,8 +9,13 @@ import { getMailer } from "@/server/mail";
  */
 export async function emailContact(to: string, subject: string, text: string): Promise<{ ok: boolean; definite?: boolean }> {
   const mailer = getMailer();
-  if (!mailer) return { ok: false, definite: true };
+  if (!mailer) {
+    console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "mail.not_configured" }));
+    return { ok: false, definite: true };
+  }
   const r = await mailer.send({ to, subject, text });
+  // Never the address or the text: only that a send failed, and whether the provider definitely refused it.
+  if (!r.ok) console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "mail.failed", definite: Boolean(r.definite) }));
   return r.ok ? { ok: true } : { ok: false, definite: r.definite };
 }
 

@@ -30,5 +30,6 @@ export const POST = handle(async (req: Request, ctx: RouteContext<"/api/trips/[i
   } else {
     await userAction(sql, owner, id, action === "arrive" ? "arrive" : "end", systemClock);
   }
+  console.log(JSON.stringify({ t: systemClock.now().toISOString(), src: "web", event: `trip.${action === "arrive" ? "arrived" : action === "end" ? "ended" : "extended"}`, trip: id, by: "user" }));
   return json({ trip: await tripById(sql, user.id, id, systemClock.now()) });
 });

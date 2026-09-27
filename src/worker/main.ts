@@ -13,6 +13,7 @@ import { systemClock } from "@/server/clock";
 import { WORKER_STALE_MS, recordHeartbeat } from "@/server/health/worker";
 import { JOBS } from "./jobs";
 import { workerLog } from "./runner";
+import { errCode } from "@/server/log/err-code";
 
 const HEARTBEAT_MS = 30_000;
 /** Consecutive heartbeat failures (~5 min) after which the process exits for its supervisor to restart it. */
@@ -48,7 +49,7 @@ async function main() {
       .then(() => (beatFailures = 0))
       .catch((err) => {
         beatFailures += 1;
-        workerLog("worker.heartbeat_failed", { error: err instanceof Error ? err.name : "unknown", consecutive: beatFailures });
+        workerLog("worker.heartbeat_failed", { error: errCode(err), consecutive: beatFailures });
         if (beatFailures >= MAX_HEARTBEAT_FAILURES) watchdogExit("heartbeat_failing");
       });
     if (Date.now() - (lastCompleted.get("journeys") ?? startedAt.getTime()) > WORKER_STALE_MS) watchdogExit("journeys_stalled");
@@ -67,7 +68,7 @@ async function main() {
       } catch (err) {
         // Name/code only: error messages can embed query details.
         const code = (err as { code?: unknown })?.code;
-        workerLog("job.failed", { job: job.name, error: err instanceof Error ? err.name : "unknown", code: typeof code === "string" ? code : null });
+        workerLog("job.failed", { job: job.name, error: errCode(err), code: typeof code === "string" ? code : null });
       } finally {
         running.delete(job.name);
       }
@@ -87,7 +88,7 @@ async function main() {
     process.exit(0);
   };
   const fatal = (kind: string) => (err: unknown) => {
-    workerLog("worker.fatal", { kind, error: err instanceof Error ? err.name : "unknown" });
+    workerLog("worker.fatal", { kind, error: errCode(err) });
     process.exit(1);
   };
   process.on("uncaughtException", fatal("uncaught_exception"));

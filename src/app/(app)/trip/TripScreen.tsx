@@ -22,6 +22,7 @@ import { localTime } from "@/domain/opening-hours";
 import { setCountry, useCountry, type CountryContext } from "@/lib/locale-store";
 import { MISS_GRACE_MS } from "@/domain/journey";
 import { journeyNoun, modeWords } from "@/domain/travel-prefs";
+import type { EvidenceState } from "@/domain/evidence-state";
 import type { TripView } from "@/server/trips";
 import type { SafetyNet } from "@/server/health/safety-net";
 
@@ -61,7 +62,7 @@ export function TripScreen({
   const [me, setMe] = useState(initial.lastLocation ? { lat: initial.lastLocation.lat, lon: initial.lastLocation.lon } : null);
   // The planned route lives on this device only (kept when the journey was started from the route sheet).
   const [route, setRoute] = useState<Array<[number, number]> | null>(() => (typeof window === "undefined" ? null : tripRoute(initial.id)));
-  const [help, setHelp] = useState<{ at: { lat: number; lon: number }; points: HelpPoint[]; failed?: boolean } | null>(null);
+  const [help, setHelp] = useState<{ at: { lat: number; lon: number }; points: HelpPoint[]; failed?: boolean; partial?: boolean } | null>(null);
   const countryIso = useCountry().iso;
   const helpInFlight = useRef(false);
   const [focus, setFocus] = useState<RankedHelpPoint | null>(null);
@@ -139,9 +140,11 @@ export function TripScreen({
     if (help && !help.failed && haversine(help.at, me) < HELP_REFETCH_M) return; // a failed lookup retries on the next fix
     helpInFlight.current = true;
     const at = me;
-    void api<{ helpPoints: HelpPoint[] }>("/api/geo/help", { body: { ...at, ...(countryIso ? { country: countryIso } : {}) } }).then((r) => {
+    void api<{ helpPoints: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> }>("/api/geo/help", { body: { ...at, ...(countryIso ? { country: countryIso } : {}) } }).then((r) => {
       helpInFlight.current = false;
-      setHelp((cur) => (r.ok ? { at, points: r.data.helpPoints } : (cur ?? { at, points: [], failed: true })));
+      // The API answers 200 with evidence "failed" when the providers didn't respond: that's a failed lookup, not "none nearby".
+      const failed = !r.ok || r.data.evidence?.state === "failed";
+      setHelp((cur) => (failed ? (cur && !cur.failed ? cur : { at, points: [], failed: true }) : { at, points: r.data.helpPoints, partial: r.data.evidence?.state === "partial" }));
     });
   }, [open, me, help, countryIso]);
   const night = isNight((clock ?? new Date()).getHours());
@@ -161,7 +164,10 @@ export function TripScreen({
       setMe({ lat: p.lat, lon: p.lon });
       setLocation(p);
       const last = lastSent.current;
-      if (last && Date.now() - last.at < 20_000 && haversine(last, p) < 50) return;
+      // Every 20 s, or sooner after 50 m — but never more than every 8 s: in a fast ride 50 m passes in
+      // 2 s, which would hit the server's 30/min limit and show "Can't reach MIRA" for nothing.
+      const since = last ? Date.now() - last.at : Infinity;
+      if (last && (since < 8_000 || (since < 20_000 && haversine(last, p) < 50))) return;
       void upload(p);
     };
     const onError = (e: GeolocationPositionError) => {
@@ -503,6 +509,7 @@ export function TripScreen({
         helpPoints={help?.points ?? []}
         helpLoading={!help}
         helpFailed={Boolean(help?.failed)}
+        helpPartial={Boolean(help?.partial)}
         route={route}
         onGoHelpPoint={(p) => {
           setUnsafe(false);

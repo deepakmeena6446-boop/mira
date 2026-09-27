@@ -12,9 +12,25 @@ import { getEnv } from "@/server/config/env";
  * each one once. Payloads carry a title, a sentence and a path — never a location. The
  * subscription is a capability URL, so it's stored encrypted.
  */
+/**
+ * The browsers' own push services. The worker POSTs to whatever endpoint is saved, so an
+ * arbitrary https URL would let anyone make MIRA's server call hosts of their choosing.
+ */
+const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /^([a-z0-9-]+\.)*push\.services\.mozilla\.com$/, /^([a-z0-9-]+\.)*push\.apple\.com$/, /^([a-z0-9-]+\.)*notify\.windows\.com$/];
+export function isPushServiceUrl(u: string): boolean {
+  try {
+    const url = new URL(u);
+    return url.protocol === "https:" && !url.port && PUSH_HOSTS.some((h) => h.test(url.hostname));
+  } catch {
+    return false;
+  }
+}
+/** Phones, tablets, laptops: a handful per person is plenty; older ones are dropped first. */
+export const MAX_SUBSCRIPTIONS_PER_USER = 5;
+
 export const subscriptionSchema = z
   .object({
-    endpoint: z.url().max(1000).refine((u) => u.startsWith("https://"), "must be https"),
+    endpoint: z.url().max(1000).refine(isPushServiceUrl, "must be a browser push service URL"),
     expirationTime: z.number().nullable().optional(),
     keys: z.object({ p256dh: z.string().min(10).max(200), auth: z.string().min(4).max(100) }).strict(),
   })
@@ -34,6 +50,9 @@ export async function saveSubscription(sql: postgres.Sql, userId: string, sub: P
   await sql`
     INSERT INTO push_subscriptions (user_id, endpoint_hash, subscription_enc) VALUES (${userId}, ${hash}, ${encryptText(JSON.stringify(sub), "push_subscription")})
     ON CONFLICT (endpoint_hash) DO UPDATE SET user_id = EXCLUDED.user_id, subscription_enc = EXCLUDED.subscription_enc`;
+  await sql`
+    DELETE FROM push_subscriptions WHERE user_id = ${userId} AND id NOT IN (
+      SELECT id FROM push_subscriptions WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT ${MAX_SUBSCRIPTIONS_PER_USER})`;
 }
 
 export async function removeSubscription(sql: postgres.Sql, userId: string, endpoint: string): Promise<void> {

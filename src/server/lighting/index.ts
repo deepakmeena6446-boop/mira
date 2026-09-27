@@ -6,6 +6,8 @@ import { PbfReader } from "pbf";
 import { hmacHex } from "@/server/crypto";
 import { getEnv } from "@/server/config/env";
 import { evidenceState, type EvidenceState, type SourceState } from "@/domain/evidence-state";
+import { overpassSlot } from "@/server/providers/geo/overpass-slot";
+import { errCode } from "@/server/log/err-code";
 
 /**
  * Street lighting along routes (see src/domain/lighting.ts for the layers and rules).
@@ -42,7 +44,6 @@ function ttlCache<T>(max: number, ttlMs: number) {
   };
 }
 const waysCache = ttlCache<LitWay[]>(300, 6 * 3600_000);
-let lastOverpass = 0;
 
 /** Streets tagged lit=yes/no in OpenStreetMap inside the box. */
 async function osmLitWays(b: Box): Promise<LitWay[]> {
@@ -51,8 +52,7 @@ async function osmLitWays(b: Box): Promise<LitWay[]> {
   const key = boxKey(b);
   const hit = waysCache.get(key);
   if (hit) return hit;
-  if (Date.now() - lastOverpass < 1000) throw new Error("lighting_osm_retry_later"); // polite rate; report unknown source state
-  lastOverpass = Date.now();
+  await overpassSlot(); // polite rate, shared with Help Points; past a short wait this source reports "failed"
   // `meta` adds each way's last-edit timestamp: old map data is shown as old.
   const query = `[out:json][timeout:8];way[highway][lit~"^(yes|no)$"](${b.s},${b.w},${b.n},${b.e});out tags geom meta 400;`;
   const res = await fetch(base, {
@@ -132,7 +132,7 @@ async function source<T>(name: string, request: () => Promise<T>, empty: T, conf
   if (!configured) return { data: empty, status: { source: name, state: "unavailable" } };
   try { return { data: await request(), status: { source: name, state: "ready" } }; }
   catch (err) {
-    console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "lighting.layer_failed", layer: name, error: err instanceof Error ? err.name : "unknown" }));
+    console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "lighting.layer_failed", layer: name, error: errCode(err) }));
     return { data: empty, status: { source: name, state: "failed", retryable: true } };
   }
 }

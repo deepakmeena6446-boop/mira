@@ -72,7 +72,8 @@ describe("journeys by mode: walk, ride / car, transit", () => {
     expect(r.status).toBe(200);
     expect(r.body.mode).toBe(mode);
     expect(r.body.route).toBeNull();
-    expect(Object.keys(r.body).sort()).toEqual(["arrivalHelp", "mode", "route"]);
+    expect(Object.keys(r.body).sort()).toEqual(["arrivalEvidence", "arrivalHelp", "mode", "route"]);
+    expect(["ready", "partial"]).toContain(r.body.arrivalEvidence.state); // a completed lookup, distinct from "failed"
     const names = r.body.arrivalHelp.map((p: { name: string }) => p.name);
     expect(names[0]).toBe("Fixture Pharmacy"); // nearest to the destination first
     expect(names).not.toContain("Fixture Toiletries"); // a chemist shop isn't a Help Point
