@@ -159,6 +159,7 @@ done
 | `MIRA_DAILY_TOKEN_MAX` | web | optional | Mira's tokens/day across everyone (default 2,000,000). Over it, the scripted Mira answers until midnight UTC. |
 | `SAFETY_UPDATES` | web | optional | `gdelt` (default) or `off`. `fixture` is refused under strict mode. |
 | `SAFETY_CLASSIFIER_MODEL` | web | optional | Relevance check for ambiguous headlines (default `claude-opus-5`, low effort). |
+| `SAFETY_CLASSIFIER_DAILY_TOKEN_MAX` | web | optional | The relevance check's own daily token budget (default 300,000), separate from Mira's. Over it, results read "partial", never "none". |
 | `ALLOW_DEMO_SIGNIN` | web | must be unset/`off` in public beta | First-name accounts; refused under strict mode. |
 | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | web | public beta | **Both or neither** (startup fails otherwise). |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | web, worker | public beta | Web Push to the traveller. |
