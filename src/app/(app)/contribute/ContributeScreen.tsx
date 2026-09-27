@@ -191,14 +191,15 @@ function ImpactSection({ impact }: { impact: ImpactView }) {
               You&apos;re a Local Steward, so you can join beta local verification tasks. Your answers still need someone else to agree, like everyone&apos;s.
             </p>
           ) : (
-            <>
-              <p className="mt-1 text-ink-muted">For people whose answers others have confirmed over time and in different places. Still needed:</p>
-              <ul className="mt-2 list-disc pl-5 text-ink-muted">
+            // A status that comes with time, not a target: the list is there if she asks, never a checklist to chase.
+            <details className="mt-1 text-ink-muted">
+              <summary className="min-h-8 cursor-pointer">For people whose answers others have confirmed over time and in different places. <span className="font-semibold text-accent">What it takes</span></summary>
+              <ul className="mt-2 list-disc pl-5">
                 {impact.steward.needs.map((n) => (
                   <li key={n}>{n}</li>
                 ))}
               </ul>
-            </>
+            </details>
           )}
         </div>
         <p className="text-xs text-ink-subtle">No points, streaks or leaderboards. MIRA counts only what someone else confirmed, and a place you&apos;ve already confirmed counts once a month.</p>

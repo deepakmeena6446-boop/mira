@@ -84,7 +84,7 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
 
   const total = steps.length;
   return (
-    <main id="main" className="bg-companion flex min-h-dvh flex-col px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
+    <main id="main" className="bg-companion flex min-h-dvh flex-col px-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
       <div className="flex items-center justify-between">
         <div className="flex gap-1.5" aria-label={`Step ${step + 1} of ${total}`}>
           {Array.from({ length: total }, (_, i) => (
@@ -95,19 +95,22 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
           Skip
         </button>
       </div>
-      <div className="flex flex-1 items-center justify-center py-8">
+      <div className="flex flex-1 items-center justify-center py-6">
         <div key={step} className="w-full max-w-sm animate-rise">
           {steps[step]}
         </div>
       </div>
-      <Button variant="hero" size="lg" onClick={next} busy={busy} busyLabel="Asking…" className="mx-auto max-w-sm">
-        {step === 0 ? "Start with MIRA" : "Use my location"}
-      </Button>
-      {step === 0 && !signedIn ? (
-        <button type="button" onClick={() => setSignIn(true)} className="mx-auto mt-2 min-h-11 px-3 text-sm font-bold text-ink-muted">
-          Already use MIRA? Sign in
-        </button>
-      ) : null}
+      {/* Always on screen: on a small phone the story scrolls under the action instead of pushing it off. */}
+      <div className="sticky bottom-0 -mx-6 flex flex-col bg-gradient-to-t from-canvas via-canvas to-transparent px-6 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-6">
+        <Button variant="hero" size="lg" onClick={next} busy={busy} busyLabel="Asking…" className="mx-auto max-w-sm">
+          {step === 0 ? "Start with MIRA" : "Use my location"}
+        </Button>
+        {step === 0 && !signedIn ? (
+          <button type="button" onClick={() => setSignIn(true)} className="mx-auto mt-1 min-h-11 px-3 text-sm font-bold text-ink-muted">
+            Already use MIRA? Sign in
+          </button>
+        ) : null}
+      </div>
       <SignInSheet open={signIn} reason="Welcome back" onClose={() => setSignIn(false)} />
     </main>
   );

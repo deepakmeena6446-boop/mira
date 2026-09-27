@@ -355,7 +355,21 @@ export function HomeScreen({
               void startTrip(dest ? undefined : { name: home!.label, lat: home!.lat, lon: home!.lon });
             },
           }
-        : { label: "Share my journey live", detail: "Choose where you're going, then send a live link to anyone.", onShare: () => (setUnsafe(false), setSearchOpen(true)) };
+        : me
+          ? {
+              // No destination to ask for in this moment: share where she is, now, and send the link from the journey screen.
+              label: "Share where I am, live",
+              detail: "Starts sharing your location now. Then send the link to anyone you choose; it stops when you say you're okay.",
+              onShare: async () => {
+                setUnsafe(false);
+                const r = await api<{ trip: TripView }>("/api/trips", { body: { from: me, share: sharesWithCircle, etaMinutes: 30 } });
+                if (r.ok || r.code === "trip_active") {
+                  router.push("/trip");
+                  router.refresh();
+                } else toast(r.message, "error");
+              },
+            }
+          : { label: "Share my journey live", detail: "Turn on location, then send a live link to anyone.", onShare: () => (setUnsafe(false), void loc.request()) };
   // "Tell my people now": emails her accepted contacts at once. With no journey running, it first
   // starts one that just shares where she is (no destination), so they have a live link to open.
   const tellAction: UnsafeTellAction | null =
@@ -719,12 +733,12 @@ export function HomeScreen({
               {/* Who follows and whether anyone is alerted: stated before she starts, never implied. */}
               <p className="mt-2 text-center text-xs text-ink-muted">
                 {!user
-                  ? "You'll sign in first. Then send a live link to anyone; it stops by itself when you arrive."
+                  ? "You'll sign in first. Then send a live link to anyone: they see your latest spot and ETA, no account needed, and it stops when you arrive."
                   : sharesWithCircle
-                    ? `MIRA attempts to email ${names(accepted.map((c) => c.name))} a live link when this journey starts and an alert if you miss your check-in. Sending can fail.`
+                    ? `MIRA attempts to email ${names(accepted.map((c) => c.name))} a live link (your latest spot and ETA, until you arrive) when this journey starts, and an alert if you miss your check-in. Sending can fail.`
                     : accepted.length && emailAlerts
                       ? "Nobody is alerted if you don't arrive. You can still send your live link on the next screen."
-                      : "Nobody is alerted automatically. On the next screen, send your live link by message — it stops when you arrive."}
+                      : "Nobody is alerted automatically. On the next screen, send your live link by message: they see your latest spot and ETA until you arrive."}
               </p>
             </div>
 
