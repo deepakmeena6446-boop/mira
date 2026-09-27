@@ -17,6 +17,9 @@
  * Client-safe: pure functions and types only.
  */
 
+import { companionOutputIssue } from "@/domain/companion-output";
+import type { SourceState } from "@/domain/evidence-state";
+
 export type SafetyCategory =
   | "sexual_violence"
   | "harassment_stalking"
@@ -40,8 +43,11 @@ export const CATEGORY_LABEL: Record<SafetyCategory, string> = {
   institutional_advisory: "Official advisory",
 };
 
-/** How precisely the source places the story. Distance is only ever shown for "exact" / "neighbourhood". */
-export type LocationPrecision = "exact" | "neighbourhood" | "city" | "district" | "region" | "country";
+/**
+ * How precisely the source places the story. Distance is only ever shown for "exact" / "neighbourhood".
+ * "mentioned": the article mentions the searched area, but its headline doesn't place the story there.
+ */
+export type LocationPrecision = "exact" | "neighbourhood" | "city" | "district" | "region" | "country" | "mentioned";
 
 /** Who published it: an official body (police, government, transport authority) or a news outlet. */
 export type SourceType = "official" | "news";
@@ -63,7 +69,10 @@ export const REPORTING_NOTE: Record<ReportingStatus, string> = {
 export interface SafetySourceResult {
   url: string;
   title: string;
-  /** ISO timestamp the provider says it was published/seen. */
+  /**
+   * ISO timestamp the provider gives. For GDELT this is when its index first saw the article,
+   * not the publisher's own publication time: the UI says "first indexed", never "published".
+   */
   publishedAt: string;
   /** Publisher's host, e.g. "thehindu.com". */
   publisher: string;
@@ -96,13 +105,18 @@ export interface SafetyUpdate {
   reporting: ReportingStatus;
   reportedLocation: string | null;
   locationPrecision: LocationPrecision;
+  /** The latest time the index first saw any article in the cluster (see SafetySourceResult.publishedAt). */
   publishedAt: string;
   /** Year the event happened when the headline states one; null otherwise (never guessed). */
   eventYear: number | null;
   publisher: string;
   originalUrl: string;
   sourceType: SourceType;
-  /** Distinct publishers in the cluster (not a count of incidents). */
+  /**
+   * Independent reports in the cluster (not a count of incidents): distinct publishers, with
+   * copies of one wire story (Reuters, AP, PTI, ANI, IANS, AFP) or near-identical headlines
+   * counted once. `sources` still lists every outlet.
+   */
   sourceCount: number;
   sources: SafetyUpdateSource[];
   /** Active missing-person or similar: show the source only, no summary. */
@@ -164,18 +178,18 @@ const any = (text: string, res: RegExp[]) => res.some((r) => r.test(text));
 
 /** Words that make a story about women or girls (not just mentioning one). */
 const TARGET = [
-  W("women|woman|girls?|female|females|lady|ladies|schoolgirls?|mujer|mujeres|niñas?|chicas?|mulher|mulheres|meninas?|garotas?|femmes?|filles?|jeune femme|passag[eè]res?|voyageuses?|[ée]tudiantes?|frau|frauen|mädchen|schülerin|studentin\\p{L}*|passagierin\\p{L}*|donna|donne|ragazze?|wanita|perempuan|gadis|kadın\\p{L}*|kızlar\\p{L}*|genç kız\\p{L}*"),
+  W("women|woman|girls?|female|females|lady|ladies|schoolgirls?|mujer|mujeres|niñas?|chicas?|mulher|mulheres|meninas?|garotas?|femmes?|filles?|jeune femme|passag[eè]res?|voyageuses?|[ée]tudiantes?|frau|frauen|mädchen|schülerin|studentin\\p{L}*|passagierin\\p{L}*|donna|donne|ragazze?|studentess[ae]|passeggera|wanita|perempuan|gadis|kadın\\p{L}*|kızlar\\p{L}*|genç kız\\p{L}*"),
   S("महिला|लड़की|लड़कियों|युवती|छात्रा|女性|女子|少女|女児|女乘客|女學生|女学生|여성|여학생|امرأة|نساء|فتاة|فتيات|سيدة|妇女|女孩"),
 ];
 
 const SEXUAL = [
-  W("rape[ds]?|raping|rapists?|gang-?raped?|sexual(?:ly)? (?:assault\\p{L}*|abus\\p{L}*|harass\\p{L}*)|molest\\p{L}*|grop\\p{L}*|indecent(?:ly)? assault\\p{L}*|indecent exposure|flashers?|upskirt\\p{L}*|voyeur\\p{L}*|outrag\\p{L}* (?:of |the )?modesty"),
+  W("rape[ds]?|raping|rapists?|gang-?raped?|sexual(?:ly)? (?:assault\\p{L}*|abus\\p{L}*|harass\\p{L}*)|molest\\p{L}*|grop\\p{L}*|indecent(?:ly)? assault\\p{L}*|indecent exposure|expos(?:ing|ed|es) (?:himself|his genitals|his private parts)|flashers?|upskirt\\p{L}*|voyeur\\p{L}*|outrag\\p{L}* (?:of |the )?modesty"),
   W("agresi[oó]n sexual|abuso sexual|tocamientos|estupro|estuprad[ao]s?|importuna[cç][aã]o sexual|ass[eé]dio sexual|viol|viols|viol[ée]e|agressions? sexuelles?|agress[ée]e?s? sexuellement|attouchements|(?:agredid|aggredit|abusad|molestad|atacad|violentad)[ao]s? (?:sexualmente|sessualmente)|sexuell (?:belästigt|missbraucht|genötigt|bedrängt)|vergewaltig\\p{L}*|sexuelle[rn]? (?:übergriff|belästigung)\\p{L}*|stupro|violenza sessuale|pemerkosaan|pelecehan seksual|tecavüz|cinsel saldırı"),
   S("बलात्कार|दुष्कर्म|यौन उत्पीड़न|छेड़छाड़|छेड़खानी|性的暴行|強制性交|不同意性交|強制わいせつ|不同意わいせつ|痴漢|盗撮|성폭행|성추행|몰카|불법촬영|불법 촬영|اغتصاب|تحرش جنسي|性侵|强奸|強姦|猥亵|猥褻|偷拍|非禮|非礼"),
 ];
 
 const HARASSMENT = [
-  W("#?metoo|harass\\p{L}*|stalk(?:er|ers|ing|ed)?|being followed|followed (?:home|from|off|into)|follow(?:s|ing)? (?:women|a woman|girls?) (?:home|from|to)|suit (?:des |une )?femmes?|verfolgt|eve[- ]teas\\p{L}*|catcall\\p{L}*|lewd|acos[oa]\\p{L}*|ass[eé]dio|persegui[cç][aã]o|harc[eè]l\\p{L}*|belästig\\p{L}*|nachstell\\p{L}*|stalking|molestie|pelecehan|penguntitan|taciz|ısrarlı takip"),
+  W("#?metoo|harass\\p{L}*|misbehav\\p{L}* with|stalk(?:er|ers|ing|ed)?|being followed|followed (?:home|from|off|into)|follow(?:s|ing)? (?:women|a woman|girls?) (?:home|from|to)|suit (?:des |une )?femmes?|verfolgt|eve[- ]teas\\p{L}*|catcall\\p{L}*|lewd|acos[oa]\\p{L}*|ass[eé]dio|persegui[cç][aã]o|harc[eè]l\\p{L}*|belästig\\p{L}*|nachstell\\p{L}*|stalking|molestie|pelecehan|penguntitan|taciz|ısrarlı takip"),
   S("पीछा|つきまとい|つけ回|ストーカー|스토킹|미행|تحرش|مطاردة|骚扰|騷擾|跟踪|跟蹤|尾随|尾隨"),
 ];
 
@@ -185,13 +199,24 @@ const ABDUCTION = [
 ];
 
 /** An attempted-abduction construction names its victim: "tried to drag her into an SUV". */
-const ATTEMPTED_ABDUCTION = [W("(?:tried|attempted|trying) to (?:drag|pull|force|push|bundle|lure) (?:her|a woman|women|a girl|girls|a student) into|(?:dragged|pulled|forced|bundled) (?:her|a woman|a girl) into (?:a |an |the |his )?(?:car|suv|van|vehicle|auto|cab|taxi)")];
+const ATTEMPTED_ABDUCTION = [W("(?:tried|attempted|trying) to (?:drag|pull|force|push|bundle|lure) (?:her|(?:a |the )?(?:woman|girl|student|teen)|women|girls) into|(?:dragged|pulled|forced|bundled) (?:her|a woman|a girl) into (?:a |an |the |his )?(?:car|suv|van|vehicle|auto|cab|taxi)")];
+/** "Tries to abduct", "kidnap bid": an attempt, whose victim another condition must still establish. */
+const ABDUCTION_ATTEMPT = [W("(?:tri(?:es|ed)|attempt(?:s|ed)?|trying) to (?:abduct|kidnap)|attempted (?:abduction|kidnapping)|(?:abduction|kidnap(?:ping)?) (?:bid|attempt)")];
 
 /** A missing-person appeal ("last seen", "appeal to find") about a woman or girl. */
 const MISSING_APPEAL = [W("last seen|appeal to (?:find|trace|locate)|missing person appeal")];
 const MISSING_WORD = [W("missing")];
-/** "she" as the subject names a woman or girl ("…missing for 4 days; family says she left…"). */
+/** "she" can mean a woman, a girl, a pet or a ship: never enough on its own. */
 const SHE = [W("she")];
+const ANIMAL = [W("dogs?|cats?|pets?|pupp(?:y|ies)|kittens?|horses?|cows?|parrots?|birds?|tigress|elephants?|ships?|boats?|vessels?")];
+/** Sexual-violence headlines whose only named victims are male ("abuse of boys", "molesting minor boy"). */
+const MALE_VICTIM = [W("boys?|schoolboys?|sons?|nephews?|male (?:students?|child|children|victims?|colleagues?|passengers?)|seminarians?")];
+/** "Woman arrested for stalking ex-boyfriend": the woman or girl named first is the accused, not the victim. */
+const ACCUSED_WOMAN = /(?:^|[:;|–—]\s*)(?:a |an |the )?(?:woman|women|girl|lady|female)(?:,? \d{1,2},?)?(?: \p{L}+)? (?:arrested|booked|held|nabbed|detained|charged|accused|jailed) (?:for|of|over)(?![\p{L}\p{N}])/giu;
+/** Impostor drivers: "fake cab drivers", "men posing as taxi drivers". */
+const FAKE_DRIVER = [W("fake|bogus|unlicen[cs]ed|unregistered|impostors?|posing as|pretending to be")];
+/** "Police station", "petrol station" are not transport. */
+const NOT_TRANSPORT = /(?:police|fire|petrol|gas|power|radio|tv|polling) stations?/giu;
 
 const TRAFFICKING = [W("traffick\\p{L}*|traffic (?:girls|women|children|minors|people|persons)|forced prostitution|flesh trade|sex ring|trata de (?:personas|mujeres|blancas)|redes? de trata|explotaci[oó]n sexual|tr[aá]fico de (?:pessoas|mulheres)|explora[cç][aã]o sexual|traite (?:des (?:êtres humains|femmes)|de femmes)|prox[eé]n[eé]tisme|exploitation sexuelle|menschenhandel|zwangsprostitution|tratta|perdagangan orang|insan ticareti"), S("मानव तस्करी|देह व्यापार|人身取引|人身売買|인신매매|الاتجار بالبشر|人口贩卖|拐卖妇女")];
 /** Words that mean rape only when the headline is about a woman or girl ("violación" is also a rights/data "violation"). */
@@ -237,12 +262,36 @@ const WARNING = [W("warns?|warning|advisory|alerts?|urges? (?:caution|vigilance|
 const POLICE = [W("police|polic[ií]a|polizei|polizia|polisi|gendarmerie|garda|sheriff"), S("पुलिस|警察|警方|경찰|الشرطة|شرطة")];
 const TARGETING = [W("targets?|targeting|targeted|preying|preys|approach(?:es|ing)? (?:lone |young )?(?:women|girls)|lone women|women travell?ers|solo women")];
 
+/** Not a place she moves through: online abuse, trolling, deepfakes, cyber-crime. */
+const ONLINE = [W("(?:harass\\p{L}*|abus\\p{L}*|threaten\\p{L}*|stalk\\p{L}*|bull(?:y|ied|ying)|trolled|targeted) online|online (?:harassment|abuse|trolling|stalking|threats?|bullying|hate)|cyber\\p{L}*|trolls?|trolled|trolling|deepfakes?|morphed|sextortion|social media|obscene (?:messages?|posts?|comments?|calls?)|(?:stalk|harass|abus|threat)\\p{L}* (?:\\p{L}+ ){0,3}on (?:instagram|facebook|whatsapp|twitter|snapchat|telegram)")];
+
+/**
+ * Court procedure (bail, hearings, trials, verdicts, sentences) is a past incident's legal
+ * process, not present context: excluded unless an official source issues it as an advisory.
+ */
+const COURT = [
+  W("bail|bailed|hearings?|hear (?:a |the )?pleas?|pleas?|trials?(?! rooms?)|verdicts?|jailed|jail terms?|sentenc\\p{L}*|acquit\\p{L}*|convict\\p{L}*|found guilty|pleads? guilty|life imprisonment|rigorous imprisonment|years in (?:jail|prison)|(?<!food )courts?|hc|high court|supreme court|condenad[oa]s?|absuelt[oa]s?|juicio|julgamento|condamn[ée]e?s?|procès|verurteilt|prozess|vonis|sidang"),
+  S("जमानत|अदालत|कोर्ट|判決|懲役|裁判|선고|징역|재판|法院|判决|محكمة"),
+];
+
+/** A protest, march or outrage. Excluded when it comes before the incident: then the story is the protest. */
+const PROTEST = [W("protests?|protesters?|protested|protesting|(?:women|students|residents|activists|people|villagers|locals|hundreds|thousands|families|parents) (?:march\\p{L}*|hold (?:a )?(?:protest|march|vigil)|stage (?:a )?protest)|candle-?(?:light)? march\\p{L}*|march(?:es)? against|demand\\p{L}* justice|seek\\p{L}* justice|justice for|outrage (?:over|after|as|at|against)|sparks? outrage|public outrage|draws? outrage|dharna|sit-in|agitation|bandh|vigils?")];
+const INCIDENT = [...SEXUAL, ...SEXUAL_WITH_TARGET, ...HARASSMENT, ...ABDUCTION, ...GBV, ...TRAFFICKING, ...SPIKING];
+
+/** Where the first match of any pattern starts (Infinity when none matches). */
+function firstIndex(text: string, res: RegExp[]): number {
+  return Math.min(...res.map((r) => r.exec(text)?.index ?? Infinity));
+}
+
 /** Topics that disqualify a headline outright (the brief's exclusion list). Checked first. */
 const EXCLUDE_TOPICS: Array<[string, RegExp[]]> = [
-  ["historical", [W("anniversary|years after|decades after|years ago|decades ago|cold case|looking back|remember(?:ing|s)|throwback|in the (?:19|20)\\d0s")]],
+  ["historical", [W("anniversary|years after|decades after|years ago|decades ago|years on|years since|decades? on|decades since|a year since|cold case|looking back|remember(?:ing|s)|throwback|in the (?:19|20)\\d0s")]],
   ["opinion", [W("opinion|op-?ed|editorial|column|essay|blog|podcast|explainer|analysis|in an interview|exclusive interview|book review|why we must|it'?s time|we need to talk|perspective")]],
   ["roundup", [W("round-?up|top (?:news|stories)|news (?:highlights|wrap|bulletin)|live updates?|(?:morning|evening|daily|news) briefing|headlines|digest|what happened today|crime news today|news in brief")]],
-  ["politics_policy", [W("elections?|electoral|polls? (?:campaign|body)|campaign(?:ing|s)? (?:trail|rally)|manifesto|promises?|pledges?|vows?|rally|rallies|opposition|minister (?:says|said|announces?|slams|lauds)|parliament|assembly (?:session|polls)|lok sabha|rajya sabha|bill|legislation|amendment|ordinance|scheme|yojana|policy|budget|allocat\\p{L}*|lawmakers?|mp says|mla says|senator|congressman|governor says|president says|prime minister")]],
+  ["politics_policy", [W("elections?|electoral|polls? (?:campaign|body)|campaign(?:ing|s)? (?:trail|rally)|manifesto|promises?|pledges?|vows?|rally|rallies|opposition|minister (?:says|said|announces?|slams|lauds)|parliament|assembly (?:session|polls)|lok sabha|rajya sabha|bill|legislation|amendment|ordinance|scheme|yojana|policy|budget|allocat\\p{L}*|lawmakers?|mp says|mla says|senator|congressman|governor says|president says|prime minister|new law|laws? (?:to|on|against)|guidelines|initiative|visits|visited|condemn\\p{L}*|condol\\p{L}*|(?:commission|panel) (?:chief|chairperson|head)|launch(?:es|ed)? (?:a |new )?(?:\\p{L}+ ){0,2}(?:programme|program|app|portal)")]],
+  ["awareness_event", [W("awareness|sensiti[sz]ation|self-?defen[cs]e|workshops?|seminars?|symposium|panel discussion|training (?:session|programme|program|camp)")]],
+  ["statistics_ranking", [W("surveys?|surveyed|rank(?:s|ed|ing|ings)|index|safest|least safe|most unsafe|ncrb|statistics|(?:study|report|figures) (?:finds|found|shows|showed|reveals)|per ?cent of women|\\d+ in \\d+ women")]],
+  ["media_award", [W("film (?:on|about|based on|wins|screened|screening)|films? (?:on|about)|documentar\\p{L}*|docu-?series|books? (?:on|about)|book (?:launch\\p{L}*|release\\p{L}*)|novel|memoir|short film|exhibition|awards?|awarded|honou?red (?:for|with)|felicitat\\p{L}*|prizes?")]],
   ["business", [W("stalking horse|entrepreneurs?|entrepreneurship|founders?|start-?ups?|funding|investors?|conference|summit|expo|award (?:ceremony|winners?)|ceo|ipo|stock market|startup|women in (?:tech|business|leadership)|leadership|empowerment|hackathon|webinar")]],
   ["sport", [W("champions?|championship|medals?|tournament|olympi\\p{L}*|world cup|grand slam|cricket(?:er)?s?|football(?:er)?s?|soccer|tennis|athletes?|athletics|marathon|wins? (?:gold|silver|bronze|title|the)|league|match(?:es)? (?:report|preview)|t20|odi|ipl|wpl")]],
   ["entertainment", [W("(?:new|upcoming|debut) film|film (?:release|festival|review|premiere|shoot)|movies?|trailer|box office|actress(?:es)?|actors?|celebrit\\p{L}*|bollywood|hollywood|tollywood|netflix|web series|ott|albums?|singers?|premiere|red carpet|divorce[ds]?|dating rumou?rs?|wedding|reality (?:show|tv)|biopic|star kids?|influencer|pel[ií]cula|actriz|estreno|atriz|novela|estreia|actrice|schauspielerin")]],
@@ -275,27 +324,45 @@ export function screenHeadline(item: Pick<SafetySourceResult, "title" | "languag
   if (old !== null) return { decision: "exclude", reason: `historical (${old})` };
   for (const [topic, res] of EXCLUDE_TOPICS) if (any(text, res)) return { decision: "exclude", reason: topic };
 
-  const target = any(text, TARGET);
-  const transport = any(text, TRANSPORT);
   const official = sourceTypeOf(item.publisher) === "official";
   const advisory = any(text, ADVISORY);
+  const officialAdvisory = official && advisory;
+  if (any(text, COURT) && !officialAdvisory) return { decision: "exclude", reason: "court procedure" };
+  if (firstIndex(text, PROTEST) < firstIndex(text, INCIDENT)) return { decision: "exclude", reason: "protest / reaction, not the incident" };
+
+  // A woman named only as the accused ("Woman arrested for stalking ex-boyfriend") is not a victim word.
+  const accusedWoman = text.search(ACCUSED_WOMAN) >= 0;
+  const target = any(text.replace(ACCUSED_WOMAN, " "), TARGET);
+  const transport = any(text.replace(NOT_TRANSPORT, " "), TRANSPORT);
+  const policeWarning = any(text, POLICE) && any(text, WARNING);
 
   if (any(text, GBV)) return { decision: "include", category: "gender_based_violence", reason: "gender-based violence term" };
   if (any(text, TRAFFICKING) && !any(text, NON_HUMAN_TRAFFICKING) && (target || any(text, TRAFFICKING_HUMAN))) return { decision: "include", category: "trafficking", reason: "human trafficking" };
   if (any(text, LURE) && any(text, ABROAD) && (target || advisory)) return { decision: "include", category: "trafficking", reason: "trafficking lure pattern" };
   if (any(text, SPIKING)) return { decision: "include", category: "spiking_nightlife", reason: "drink/needle spiking" };
-  if (any(text, SEXUAL) || (target && any(text, SEXUAL_WITH_TARGET))) return { decision: "include", category: transport ? "transport" : "sexual_violence", reason: "sexual violence term" };
+  if (any(text, ONLINE)) return { decision: "exclude", reason: "online, not a place she moves through" };
+  if (accusedWoman && !target) return { decision: "exclude", reason: "the woman named is the accused" };
+  if (any(text, SEXUAL) || (target && any(text, SEXUAL_WITH_TARGET))) {
+    // A woman/girl victim, a public-transport setting, or a police/official warning; never on the crime word alone.
+    if (target || transport || policeWarning || officialAdvisory) return { decision: "include", category: transport ? "transport" : "sexual_violence", reason: "sexual violence term" };
+    if (any(text, MALE_VICTIM)) return { decision: "exclude", reason: "sexual violence, victims named are male" };
+    return { decision: "ambiguous", reason: "sexual violence term without a woman/girl word" };
+  }
   if (target && any(text, MISSING_APPEAL)) return { decision: "include", category: "missing_abduction", reason: "missing woman/girl appeal" };
-  if (any(text, MISSING_WORD) && any(text, SHE)) return { decision: "include", category: "missing_abduction", reason: "missing, and the headline says she" };
+  if (any(text, MISSING_WORD) && any(text, SHE) && !any(text, ANIMAL)) {
+    return target ? { decision: "include", category: "missing_abduction", reason: "missing woman/girl" } : { decision: "ambiguous", reason: "missing, 'she' without a woman/girl word" };
+  }
   if (any(text, ATTEMPTED_ABDUCTION)) return { decision: "include", category: "missing_abduction", reason: "attempted abduction of a woman/girl" };
   if (any(text, ABDUCTION) && target) return { decision: "include", category: "missing_abduction", reason: "abduction/missing + woman/girl" };
+  if (any(text, ABDUCTION_ATTEMPT) && any(text, TRANSPORT_SERVICE)) return { decision: "include", category: "transport", reason: "attempted abduction by a transport driver" };
   if (any(text, HARASSMENT) && target) return { decision: "include", category: transport ? "transport" : "harassment_stalking", reason: "harassment/stalking + woman/girl" };
   if (any(text, DOMESTIC)) {
     // A private case is not a location story; only a public advisory is.
     return advisory || official ? { decision: "include", category: "domestic_violence_advisory", reason: "domestic violence advisory" } : { decision: "exclude", reason: "private domestic case" };
   }
-  if (target && any(text, TARGETING) && any(text, WARNING) && any(text, POLICE)) return { decision: "include", category: "institutional_advisory", reason: "police warning about someone targeting women" };
-  if (target && any(text, VIOLENCE_GENERIC) && any(text, WARNING) && any(text, POLICE)) return { decision: "include", category: "institutional_advisory", reason: "police advisory about violence against women" };
+  if (any(text, FAKE_DRIVER) && any(text, TRANSPORT_SERVICE) && (policeWarning || officialAdvisory)) return { decision: "include", category: "transport", reason: "warning about impostor drivers" };
+  if (target && any(text, TARGETING) && policeWarning) return { decision: "include", category: "institutional_advisory", reason: "police warning about someone targeting women" };
+  if (target && any(text, VIOLENCE_GENERIC) && policeWarning) return { decision: "include", category: "institutional_advisory", reason: "police advisory about violence against women" };
   if (target && any(text, VIOLENCE_GENERIC) && any(text, TRANSPORT_SERVICE)) return { decision: "include", category: "transport", reason: "attack on a woman by/among transport service" };
   // Safety words without a gendered word ("stalking DU students"): the classifier decides; never included on keywords alone.
   if (any(text, HARASSMENT) || any(text, ABDUCTION)) return { decision: "ambiguous", reason: "harassment/abduction term without a woman/girl word" };
@@ -442,18 +509,121 @@ export function clusterCandidates(items: Candidate[], areaName = ""): Candidate[
   return clusters.map((c) => c.items);
 }
 
+/** Only http(s) links are ever shown or opened: a javascript:, data: or relative URL is never a source. */
+export function isHttpUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" || u.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+const foldText = (s: string) => s.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** "Delhi man", "Delhi-based", "Delhi-born": the city is someone's origin, not where it happened. */
+const ORIGIN_AFTER = /^(?:-(?:based|born|origin)|\s+(?:man|men|woman|women|girl|boy|youth|resident|residents|native|couple|family|businessman|student|techie|doctor|teacher)(?![\p{L}\p{N}]))/u;
+const ORIGIN_BEFORE = /(?:from|native of|hails from|resident of|residents of)\s+$/u;
+
+/**
+ * How a headline places the story relative to the searched area. GDELT matches the name anywhere
+ * in an article, so only the headline's own words can place it there:
+ * "named" (the headline names the area), "incidental" (only as someone's origin: "Delhi man",
+ * "from Delhi"), or "absent".
+ */
+export function areaMention(title: string, areaName: string): "named" | "incidental" | "absent" {
+  const area = foldText(areaName).trim();
+  if (area.length < 2) return "absent";
+  const t = foldText(title);
+  const hits = [...t.matchAll(new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(area).replace(/\s+/g, "\\s+")}(?![\\p{L}\\p{N}])`, "gu"))];
+  if (!hits.length) return "absent";
+  return hits.some((m) => !ORIGIN_AFTER.test(t.slice(m.index + m[0].length)) && !ORIGIN_BEFORE.test(t.slice(0, m.index))) ? "named" : "incidental";
+}
+
 /**
  * Which article represents a story cluster on the card: its headline, publisher and link
  * are what she sees first. Called with at least one item.
  */
-export function pickLead(items: Candidate[]): Candidate {
+export function pickLead(items: Candidate[], areaName = ""): Candidate {
   const byTime = [...items].sort((a, b) => Date.parse(a.publishedAt) - Date.parse(b.publishedAt));
   // An official source always leads: an advisory outranks coverage of it (fixed rule, tested).
   const official = byTime.find((c) => sourceTypeOf(c.publisher) === "official");
   if (official) return official;
-  // TODO(human): choose which NEWS report leads when no official source exists.
-  // `byTime` is oldest first; each item has title, publisher, publishedAt, language, translatedTitle.
-  return byTime[0];
+  // Among news reports: the earliest one whose headline itself names the area, so the card's
+  // place is supported by the words she reads; otherwise the earliest report (the original
+  // reporting, not a later rewrite or follow-up). Never the most alarming or most recent.
+  const placed = areaName ? byTime.find((c) => areaMention(c.translatedTitle ? `${c.title} ${c.translatedTitle}` : c.title, areaName) === "named") : undefined;
+  return placed ?? byTime[0];
+}
+
+// ── Independent reporting ("Reported by N sources") ──────────────────────────────────────────
+
+const WIRE_HOSTS: Array<[RegExp, string]> = [
+  [/(^|\.)reuters\.com$/, "reuters"], [/(^|\.)(apnews\.com|ap\.org)$/, "ap"], [/(^|\.)(ptinews\.com|pti\.in)$/, "pti"],
+  [/(^|\.)(aninews\.in|ani\.in)$/, "ani"], [/(^|\.)(ians\.in|ianslive\.in)$/, "ians"], [/(^|\.)afp\.com$/, "afp"],
+];
+/** A headline crediting a wire: "(PTI)", "| Reuters", "IANS:". Case-sensitive: these are agency names. */
+const WIRE_CREDIT: Array<[RegExp, string]> = [
+  [/\bReuters\b/, "reuters"], [/\(AP\)|\bAssociated Press\b/, "ap"], [/\bPTI\b/, "pti"], [/\bANI\b/, "ani"], [/\bIANS\b/, "ians"], [/\bAFP\b/, "afp"],
+];
+const CREDIT_STRIP = /\s*[|–—-]\s*(?:PTI|ANI|IANS|Reuters|AFP|AP)\s*$|\((?:PTI|ANI|IANS|Reuters|AFP|AP)\)|^(?:PTI|ANI|IANS|Reuters|AFP)\s*[:|–—-]\s*/g;
+
+/** The wire a copy came from, by the publisher's host or a credit in the headline; null for original reporting. */
+export function wireOf(publisher: string, title: string): string | null {
+  const host = publisher.toLowerCase().replace(/^www\./, "");
+  return WIRE_HOSTS.find(([r]) => r.test(host))?.[1] ?? WIRE_CREDIT.find(([r]) => r.test(title))?.[1] ?? null;
+}
+
+function orderedTokens(title: string): string[] {
+  return foldText(title.replace(CREDIT_STRIP, " ")).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+/** Same words in the same order (≥ 90% by longest common subsequence): a syndicated or lightly edited copy. */
+export function nearIdenticalTitles(a: string, b: string): boolean {
+  const x = orderedTokens(a);
+  const y = orderedTokens(b);
+  if (!x.length || !y.length) return false;
+  if (x.join("") === y.join("")) return true; // spacing / hyphenation only: "night clubs" = "nightclubs"
+  const row = new Array<number>(y.length + 1).fill(0);
+  for (let i = 1; i <= x.length; i++) {
+    let prev = 0;
+    for (let j = 1; j <= y.length; j++) {
+      const tmp = row[j];
+      row[j] = x[i - 1] === y[j - 1] ? prev + 1 : Math.max(row[j], row[j - 1]);
+      prev = tmp;
+    }
+  }
+  return (2 * row[y.length]) / (x.length + y.length) >= 0.9;
+}
+
+/**
+ * How many independent reports a set of outlets represents: copies of one wire story (the wire's
+ * own host, a wire credit, or a near-identical headline) count once. Never more than the outlets.
+ */
+export function independentReports(sources: Array<Pick<SafetyUpdateSource, "publisher" | "title">>): number {
+  const parent = sources.map((_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const wires = sources.map((s) => wireOf(s.publisher, s.title));
+  for (let i = 0; i < sources.length; i++) {
+    for (let j = i + 1; j < sources.length; j++) {
+      if ((wires[i] && wires[i] === wires[j]) || nearIdenticalTitles(sources[i].title, sources[j].title)) parent[find(j)] = find(i);
+    }
+  }
+  return new Set(sources.map((_, i) => find(i))).size;
+}
+
+/**
+ * The classifier's English translation, only when it adds something: never for an English
+ * headline, never a copy of the original, and never with a verdict word ("safe", "dangerous")
+ * the source didn't write (the same deterministic check as Mira's replies).
+ */
+export function cleanTranslation(original: string, translation: string | null | undefined, language: string | null): string | null {
+  const t = translation?.replace(/\s+/g, " ").trim();
+  if (!t || languageCode(language) === "en") return null;
+  const norm = (s: string) => s.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
+  if (norm(t) === norm(original)) return null;
+  if (companionOutputIssue(t, []) === "safety_verdict") return null;
+  return t;
 }
 
 /** Small stable hash for ids (client-safe; not for security). */
@@ -465,26 +635,30 @@ function fnv(s: string): string {
 
 /** One structured update per cluster. Nothing is invented: absent fields stay null. */
 export function toUpdate(cluster: Candidate[], area: SafetyArea, retrievedAt: string): SafetyUpdate {
-  const lead = pickLead(cluster);
-  const sources = [...new Map(cluster.map((c) => [c.publisher.toLowerCase().replace(/^www\./, ""), c])).values()]
+  // Defense in depth: providers already drop non-http(s) links, and a link is never shown without one.
+  const linked = cluster.filter((c) => isHttpUrl(c.url));
+  const lead = pickLead(linked.length ? linked : cluster, area.name);
+  const sources = [...new Map(linked.map((c) => [c.publisher.toLowerCase().replace(/^www\./, ""), c])).values()]
     .map((c) => ({ title: c.title, publisher: c.publisher.replace(/^www\./, ""), url: c.url, publishedAt: c.publishedAt, sourceType: sourceTypeOf(c.publisher) }));
   const sourceType = sourceTypeOf(lead.publisher);
   const latest = cluster.reduce((m, c) => (Date.parse(c.publishedAt) > Date.parse(m) ? c.publishedAt : m), lead.publishedAt);
+  // Only a headline that names the area places the story there; otherwise the article merely mentions it.
+  const named = cluster.some((c) => areaMention(c.title, area.name) === "named" || (c.translatedTitle ? areaMention(c.translatedTitle, area.name) === "named" : false));
   return {
     id: fnv(canonicalUrl(lead.url)),
     title: lead.title,
-    translatedTitle: lead.translatedTitle ?? null,
+    translatedTitle: cleanTranslation(lead.title, lead.translatedTitle, lead.language),
     summary: null,
     category: lead.category,
     reporting: reportingStatusOf(lead.title, sourceType),
     reportedLocation: area.name,
-    locationPrecision: area.precision,
+    locationPrecision: named ? area.precision : "mentioned",
     publishedAt: latest,
     eventYear: eventYearOf(lead.title),
     publisher: lead.publisher.replace(/^www\./, ""),
-    originalUrl: lead.url,
+    originalUrl: isHttpUrl(lead.url) ? lead.url : "",
     sourceType,
-    sourceCount: sources.length,
+    sourceCount: independentReports(sources),
     sources,
     sensitive: lead.category === "missing_abduction",
     retrievedAt,
@@ -502,8 +676,22 @@ export function withinWindow(publishedAt: string, windowDays: number, now: Date)
 export const EMPTY_LINE = "No recent women-safety updates found from the sources MIRA checked in this area.";
 export const EMPTY_CAVEAT = "This does not mean no incidents occurred.";
 export const FAILED_LINE = "MIRA couldn't check recent updates right now.";
-export const PARTIAL_LINE = "Some sources couldn't be checked. Showing what was available.";
+const SOURCES_PARTIAL = "Some sources couldn't be checked.";
+export const PARTIAL_LINE = `${SOURCES_PARTIAL} Showing what was available.`;
+export const RELEVANCE_PARTIAL_LINE = "Some reports couldn't be checked for relevance.";
+/** Said instead of EMPTY_LINE when nothing was shown but not everything could be checked. */
+export const PARTIAL_EMPTY_LINE = "MIRA can't say there are no recent updates.";
 export const NOT_A_RATING = "Recent reports as published: not a rating of the area, and not proof that something did or didn't happen.";
+/** The evidence source that stands for the relevance classifier (unassessed headlines make a result partial). */
+export const RELEVANCE_SOURCE = "relevance-check";
+
+/** Why a result is partial, in her words: sources not reached, reports not checked for relevance, or both. */
+export function partialLine(sources: SourceState[], empty: boolean): string {
+  const relevance = sources.some((s) => s.source === RELEVANCE_SOURCE && s.state !== "ready");
+  const provider = sources.some((s) => s.source !== RELEVANCE_SOURCE && s.state !== "ready") || !relevance;
+  const why = [provider ? SOURCES_PARTIAL : null, relevance ? RELEVANCE_PARTIAL_LINE : null].filter(Boolean).join(" ");
+  return `${why} ${empty ? PARTIAL_EMPTY_LINE : "Showing what was available."}`;
+}
 
 /** "2 days ago", "5 hours ago": the age is always shown. */
 export function ageLabel(iso: string, now: Date = new Date()): string {
@@ -515,9 +703,25 @@ export function ageLabel(iso: string, now: Date = new Date()): string {
   return `${d} day${d === 1 ? "" : "s"} ago`;
 }
 
-/** Where the source places it, never closer than it supports: "Delhi (city-level)". */
+const MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
+
+/**
+ * The provider's date is when its index first saw the article (GDELT's "seendate"), not the
+ * publisher's own publication time: "First indexed 2 days ago (25 Sep)".
+ */
+export function indexedLabel(iso: string, now: Date = new Date()): string {
+  const d = new Date(iso);
+  const day = Number.isFinite(d.getTime()) ? ` (${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]})` : "";
+  return `First indexed ${ageLabel(iso, now).toLowerCase()}${day}`;
+}
+
+/**
+ * Where the source places it, never closer than it supports: "Delhi (city-level)" when the
+ * headline names the city; "Mentions Delhi" when only the article does.
+ */
 export function locationLabel(u: Pick<SafetyUpdate, "reportedLocation" | "locationPrecision">): string | null {
   if (!u.reportedLocation) return null;
+  if (u.locationPrecision === "mentioned") return `Mentions ${u.reportedLocation}`;
   return u.locationPrecision === "exact" || u.locationPrecision === "neighbourhood" ? u.reportedLocation : `${u.reportedLocation} (${u.locationPrecision}-level)`;
 }
 

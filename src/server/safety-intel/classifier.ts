@@ -1,7 +1,7 @@
 // Deliberately not "server-only": tests drive it with a stubbed client. It holds no secret.
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { CATEGORY_LABEL, type SafetyCategory } from "@/domain/safety-updates";
+import { CATEGORY_LABEL, cleanTranslation, type SafetyCategory } from "@/domain/safety-updates";
 
 /**
  * The small relevance classifier for headlines the deterministic gate can't decide
@@ -64,6 +64,16 @@ export interface ClassifyOutput {
   translatedTitle: string | null;
 }
 
+/**
+ * Thrown by a classify function that won't run right now (its daily token budget is spent):
+ * the headlines are "unassessed", and the result says some reports couldn't be checked.
+ */
+export class ClassifierUnavailable extends Error {
+  constructor(message = "relevance classifier unavailable") {
+    super(message);
+  }
+}
+
 /** The subset of the SDK the classifier uses, so tests can stub it. */
 export type ClassifierClient = Pick<Anthropic, "beta">;
 
@@ -96,10 +106,12 @@ export async function classifyHeadlines(
     }
   })());
   if (!parsed.success) return { results, tokens };
-  const known = new Set(batch.map((b) => b.id));
+  const known = new Map(batch.map((b) => [b.id, b]));
   for (const r of parsed.data.results) {
-    if (!known.has(r.id)) continue;
-    results.set(r.id, { relevant: r.relevant && r.category !== null, category: r.relevant ? r.category : null, translatedTitle: r.translation?.trim() || null });
+    const input = known.get(r.id);
+    if (!input) continue;
+    // A translation of an English headline, a copy of the original, or one with a verdict word is dropped.
+    results.set(r.id, { relevant: r.relevant && r.category !== null, category: r.relevant ? r.category : null, translatedTitle: cleanTranslation(input.title, r.translation, input.language) });
   }
   return { results, tokens };
 }

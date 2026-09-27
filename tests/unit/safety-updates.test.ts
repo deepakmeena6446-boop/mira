@@ -5,10 +5,21 @@ import {
   EMPTY_LINE,
   FAILED_LINE,
   NOT_A_RATING,
+  PARTIAL_EMPTY_LINE,
   PARTIAL_LINE,
+  RELEVANCE_PARTIAL_LINE,
+  RELEVANCE_SOURCE,
+  areaMention,
   canonicalUrl,
+  cleanTranslation,
   clusterCandidates,
+  indexedLabel,
+  independentReports,
+  isHttpUrl,
   locationLabel,
+  nearIdenticalTitles,
+  partialLine,
+  pickLead,
   reportingStatusOf,
   screenHeadline,
   sourceTypeOf,
@@ -21,9 +32,10 @@ import {
 import { DISTINCT_STORIES, DUPLICATE_STORY, EVAL_CASES, EVAL_NOW, LIVE_SAMPLE_LABELS } from "../fixtures/safety-updates-eval";
 import { HELDOUT_CASES } from "../fixtures/safety-updates-heldout";
 import { HELDOUT_2_CASES } from "../fixtures/safety-updates-heldout-2";
+import { AUDIT_CASES } from "../fixtures/safety-updates-audit";
 import { clearInflight, runPipeline, safetyUpdates, FAILED_TTL_MS, RESULT_TTL_MS, type PipelineDeps, type SafetyCache } from "@/server/safety-intel/pipeline";
 import { ProviderError, fixtureProvider, gdeltProvider, gdeltQuery, resetGdeltSpacing, type SafetyIntelligenceProvider, type SafetySearch } from "@/server/safety-intel/providers";
-import { classifyHeadlines, CLASSIFIER_SYSTEM, type ClassifierClient } from "@/server/safety-intel/classifier";
+import { ClassifierUnavailable, classifyHeadlines, CLASSIFIER_SYSTEM, type ClassifierClient } from "@/server/safety-intel/classifier";
 import * as domain from "@/domain/safety-updates";
 
 type Case = { title: string; language: string; publisher: string; expect: "include" | "exclude" | "ambiguous" };
@@ -36,6 +48,7 @@ describe("relevance gate: evaluation sets (brief B20)", () => {
     ["tuning set", EVAL_CASES as Case[]],
     ["held-out set 1", HELDOUT_CASES as Case[]],
     ["held-out set 2", HELDOUT_2_CASES as Case[]],
+    ["audit probes", AUDIT_CASES as Case[]],
     ["live GDELT sample", liveCases],
   ])("%s: nothing irrelevant or ambiguous is included on keywords alone (precision)", (_name, cases) => {
     const failures = run(cases).filter((r) => r.d.decision === "include" && r.c.expect !== "include").map((r) => r.c.title);
@@ -46,6 +59,7 @@ describe("relevance gate: evaluation sets (brief B20)", () => {
     ["tuning set", EVAL_CASES as Case[]],
     ["held-out set 1", HELDOUT_CASES as Case[]],
     ["held-out set 2", HELDOUT_2_CASES as Case[]],
+    ["audit probes", AUDIT_CASES as Case[]],
     ["live GDELT sample", liveCases],
   ])("%s: clearly relevant headlines are included", (_name, cases) => {
     const missed = run(cases).filter((r) => r.c.expect === "include" && r.d.decision !== "include").map((r) => r.c.title);
@@ -56,6 +70,7 @@ describe("relevance gate: evaluation sets (brief B20)", () => {
     ["tuning set", EVAL_CASES as Case[]],
     ["held-out set 1", HELDOUT_CASES as Case[]],
     ["held-out set 2", HELDOUT_2_CASES as Case[]],
+    ["audit probes", AUDIT_CASES as Case[]],
     ["live GDELT sample", liveCases],
   ])("%s: borderline headlines reach the classifier rather than being dropped", (_name, cases) => {
     const dropped = run(cases).filter((r) => r.c.expect === "ambiguous" && r.d.decision !== "ambiguous").map((r) => `${r.c.title} → ${r.d.decision}`);
@@ -132,7 +147,7 @@ describe("structure", () => {
   });
 
   it("invents nothing: no summary, no event date unless the headline states one, no closer location than the source", () => {
-    const u = toUpdate([cand({ title: "Woman harassed on metro", publisher: "x.com", url: "https://x.com/a", at: "2026-09-26T10:00:00Z" })], area, EVAL_NOW.toISOString());
+    const u = toUpdate([cand({ title: "Woman harassed on Delhi metro", publisher: "x.com", url: "https://x.com/a", at: "2026-09-26T10:00:00Z" })], area, EVAL_NOW.toISOString());
     expect(u.summary).toBeNull();
     expect(u.eventYear).toBeNull();
     expect(u.locationPrecision).toBe("city");
@@ -248,16 +263,23 @@ describe("pipeline", () => {
     expect(classify).toHaveBeenCalledTimes(1);
     expect(classify.mock.calls[0][0]).toHaveLength(20);
     expect(classify.mock.calls[0][0].some((x: { id: string }) => x.id.includes("metro"))).toBe(false);
-    expect(first.evidence.state === "ready" && first.evidence.data.updates.find((u) => u.translatedTitle)?.translatedTitle).toBe("Woman attacked in the city centre");
+    // 5 headlines over the cap went unassessed this fetch: partial, never a silent "ready".
+    expect(first.evidence.state).toBe("partial");
+    expect(first.stats.unassessed).toBe(5);
+    expect(first.evidence.state === "partial" && first.evidence.data.updates.find((u) => u.translatedTitle)?.translatedTitle).toBe("Woman attacked in the city centre");
     classify.mockClear();
     await runPipeline(d, DELHI, 7);
     expect(classify.mock.calls[0]?.[0] ?? []).toHaveLength(5); // the 20 decided ones are cached
   });
 
-  it("no classifier → ambiguous headlines are left out, not guessed in", async () => {
+  it("no classifier → ambiguous headlines are left out, not guessed in, and the result says they weren't checked", async () => {
     const { evidence, stats } = await runPipeline(deps({ providers: [stubProvider([result("Kvinna överfallen", { language: "Swedish" })])] }), DELHI, 7);
-    expect(evidence.state).toBe("empty");
+    expect(evidence.state).toBe("partial"); // not "empty": an unchecked report is not "no updates"
     expect(stats.ambiguous).toBe(1);
+    expect(stats.unassessed).toBe(1);
+    if (evidence.state !== "partial") return;
+    expect(evidence.data.updates).toEqual([]);
+    expect(evidence.sources).toContainEqual({ source: RELEVANCE_SOURCE, state: "unavailable", retryable: false });
   });
 
   it("a classifier failure is reported as partial", async () => {
@@ -390,5 +412,221 @@ describe("classifier", () => {
     expect(refused.results.size).toBe(0);
     const junk = await classifyHeadlines(client({ stop_reason: "end_turn", content: [{ type: "text", text: "not json" }], usage: { input_tokens: 5, output_tokens: 5 } }), "m", items);
     expect(junk.results.size).toBe(0);
+  });
+});
+
+// ── Pre-launch audit (2026-09-27) ───────────────────────────────────────────────────────────
+
+describe("audit: relevance gate", () => {
+  const gate = (title: string, publisher = "news.example.com") => screenHeadline({ title, language: "English", publisher }, EVAL_NOW);
+
+  it.each([
+    "Protest over rape case turns violent",
+    "Stalker jailed after following woman for months",
+    "Missing dog found; she was hungry",
+    "Priest arrested for sexual abuse of boys",
+    "Man arrested for molesting minor boy",
+    "Film on acid attack survivor wins award",
+    "Women protest against harassment in Delhi university",
+    "Rape accused MLA granted bail",
+    "Woman journalist harassed online by trolls",
+  ])("excludes a headline the audit found wrongly included: %s", (title) => {
+    expect(gate(title).decision).toBe("exclude");
+  });
+
+  it.each(["Police warn of drink spiking at Soho bars", "Cab driver arrested for molesting passenger", "Man held for harassing women on metro"])("still includes: %s", (title) => {
+    expect(gate(title).decision).toBe("include");
+  });
+
+  it.each([
+    "Woman CEO opens new office in Mumbai",
+    "Actress attends film premiere in Delhi",
+    "Minister says women's safety is top priority",
+    "Man arrested for theft in Bengaluru",
+    "Woman killed in road accident",
+    "Woman among 5 injured in bus crash",
+    "Women's cricket team wins series",
+  ])("still excludes: %s", (title) => {
+    expect(gate(title).decision).toBe("exclude");
+  });
+
+  it.each([
+    ["Woman groped on bus in Bengaluru", "transport"],
+    ["Auto driver tries to abduct student in Hyderabad", "transport"],
+    ["Police issue advisory on fake cab drivers at airport", "transport"],
+    ["Police warn women about man exposing himself near park", "sexual_violence"],
+  ])("includes a likely false negative: %s", (title, category) => {
+    expect(gate(title)).toMatchObject({ decision: "include", category });
+  });
+
+  it("court procedure is excluded, unless an official source issues it as an advisory", () => {
+    expect(gate("Man convicted of stalking woman sentenced to three years").reason).toBe("court procedure");
+    expect(gate("Police alert women after man accused of stalking granted bail", "delhipolice.gov.in").decision).toBe("include");
+    expect(gate("Man caught filming women in mall trial room").reason).not.toBe("court procedure"); // "trial room" is a changing room
+  });
+
+  it("a protest is excluded when it leads; an incident that prompts one is not", () => {
+    expect(gate("Protest over rape case turns violent").reason).toMatch(/protest/);
+    expect(gate("Femicide in São Paulo suburb prompts protest").decision).toBe("include");
+  });
+
+  it("sexual violence needs a woman/girl word, a transport setting or a police warning; otherwise the classifier decides", () => {
+    expect(gate("Man held for sexual assault in Delhi hotel").decision).toBe("ambiguous");
+    expect(gate("Man held for sexually abusing nephew").decision).toBe("exclude");
+    expect(gate("Taxi driver charged with rape of passenger in Johannesburg").decision).toBe("include");
+    expect(gate("Police warn of serial groper near university").decision).toBe("include");
+  });
+
+  it("'she' alone is not a woman/girl word; a woman named only as the accused is not a victim", () => {
+    expect(gate("Missing cat found safe; she had been trapped in a shed").decision).toBe("exclude");
+    expect(gate("Student, 19, missing for 4 days; family says she left for coaching").decision).toBe("ambiguous");
+    expect(gate("Woman arrested for stalking ex-boyfriend").decision).toBe("exclude");
+    expect(gate("Woman arrested for trafficking girls to Gulf on fake job offers")).toMatchObject({ decision: "include", category: "trafficking" });
+  });
+});
+
+describe("audit: provenance", () => {
+  const cand = (title: string, publisher: string, url: string, at = "2026-09-25T08:00:00Z", over: Partial<Candidate> = {}): Candidate => ({ title, publisher, url, publishedAt: at, language: "English", sourceCountry: "India", via: "test", category: "transport", ...over });
+  const delhi: SafetyArea = { name: "Delhi", precision: "city", countryIso: "IN", countryName: "India" };
+  const mumbai: SafetyArea = { name: "Mumbai", precision: "city", countryIso: "IN", countryName: "India" };
+
+  it("labels the place 'Mentions Delhi' when no headline places the story there", () => {
+    const u = toUpdate([cand("Woman harassed on metro, accused arrested", "x.com", "https://x.com/a")], delhi, EVAL_NOW.toISOString());
+    expect(u.locationPrecision).toBe("mentioned");
+    expect(locationLabel(u)).toBe("Mentions Delhi");
+    // Named as someone's origin only ("Delhi man"): still only a mention.
+    expect(toUpdate([cand("Delhi man held for molesting woman on London bus", "x.com", "https://x.com/b")], delhi, EVAL_NOW.toISOString()).locationPrecision).toBe("mentioned");
+    // Any source in the cluster that names the city places it at city level.
+    const named = toUpdate([cand("Woman harassed on metro", "x.com", "https://x.com/c"), cand("New Delhi: woman harassed on metro", "y.com", "https://y.com/c")], delhi, EVAL_NOW.toISOString());
+    expect(locationLabel(named)).toBe("Delhi (city-level)");
+    expect(areaMention("São Paulo: mulher assediada no metrô", "Sao Paulo")).toBe("named");
+    expect(areaMention("Delhi-based techie held for stalking woman in Pune", "Delhi")).toBe("incidental");
+  });
+
+  it("never shows a translation of an English headline, a copy of the original, or one with a verdict word", () => {
+    expect(cleanTranslation("Woman harassed on metro", "Woman harassed on metro", "English")).toBeNull();
+    expect(cleanTranslation("Kvinna överfallen", "Woman attacked", "English")).toBeNull();
+    expect(cleanTranslation("Frau in S-Bahn belästigt", "  frau in s-bahn   BELÄSTIGT ", "German")).toBeNull();
+    expect(cleanTranslation("Kvinna överfallen i centrum", "Woman attacked in the centre; area unsafe", "Swedish")).toBeNull();
+    expect(cleanTranslation("Kvinna överfallen i centrum", "Woman attacked in the centre", "Swedish")).toBe("Woman attacked in the centre");
+    const u = toUpdate([cand("Woman harassed on Delhi metro", "x.com", "https://x.com/t", undefined, { translatedTitle: "Woman harassed on Delhi metro" })], delhi, EVAL_NOW.toISOString());
+    expect(u.translatedTitle).toBeNull();
+  });
+
+  it("only http(s) links are ever a source (defense in depth, not only in the provider)", () => {
+    expect(isHttpUrl("https://x.com/a")).toBe(true);
+    expect(isHttpUrl("javascript:alert(1)")).toBe(false);
+    expect(isHttpUrl("data:text/html,hi")).toBe(false);
+    expect(isHttpUrl("/relative")).toBe(false);
+    const u = toUpdate([cand("Woman harassed on Delhi metro", "evil.example", "javascript:alert(1)"), cand("Delhi metro: woman harassed", "x.com", "https://x.com/ok", "2026-09-25T09:00:00Z")], delhi, EVAL_NOW.toISOString());
+    expect(u.originalUrl).toBe("https://x.com/ok");
+    expect(u.sources.map((s) => s.url)).toEqual(["https://x.com/ok"]);
+  });
+
+  it("one incident, four publishers with different headlines → one update, four independent sources", () => {
+    const four = [
+      cand("Cab driver arrested for molesting woman passenger in Bandra", "mid-day.com", "https://www.mid-day.com/a", "2026-09-25T08:00:00Z"),
+      cand("Bandra: Woman passenger molested by cab driver, accused held", "hindustantimes.com", "https://www.hindustantimes.com/b", "2026-09-25T09:00:00Z"),
+      cand("Mumbai cab driver held after woman passenger alleges molestation near Bandra", "indianexpress.com", "https://indianexpress.com/c", "2026-09-25T11:00:00Z"),
+      cand("Woman passenger molested by cab driver near Bandra, driver arrested", "ndtv.com", "https://www.ndtv.com/d", "2026-09-25T13:00:00Z"),
+    ];
+    const clusters = clusterCandidates(four, "Mumbai");
+    expect(clusters).toHaveLength(1);
+    const u = toUpdate(clusters[0], mumbai, EVAL_NOW.toISOString());
+    expect(u.sources).toHaveLength(4);
+    expect(u.sourceCount).toBe(4);
+  });
+
+  it("copies of one wire story count once: 'Reported by N' reflects independent reporting", () => {
+    const sources = [
+      { publisher: "reuters.com", title: "Paris police warn of needle spiking at nightclubs" },
+      { publisher: "usnews.com", title: "Paris police warn of needle spiking at nightclubs - Reuters" },
+      { publisher: "theprint.in", title: "Paris police warn of needle-spiking at night clubs" },
+      { publisher: "france24.com", title: "Needle spiking: Paris police issue warning after nightclub reports" },
+    ];
+    expect(independentReports(sources)).toBe(2);
+    expect(independentReports([{ publisher: "a.com", title: "Woman molested on bus (PTI)" }, { publisher: "b.com", title: "Bus conductor held for molesting woman | PTI" }])).toBe(1);
+    // Two outlets rewording one incident are two reports (the fixture pair), never merged as copies.
+    expect(nearIdenticalTitles("Woman harassed on Delhi metro, accused arrested", "Delhi metro: woman harassed, accused arrested by police")).toBe(false);
+    // "AP" in a headline is not the wire (Andhra Pradesh): only the host counts for AP.
+    expect(independentReports([{ publisher: "a.com", title: "AP: Woman stalked near bus stand" }, { publisher: "b.com", title: "Stalker held in AP after woman complains" }])).toBe(2);
+  });
+
+  it("the lead news report is the earliest one whose headline names the area, else the earliest", () => {
+    const early = cand("Woman harassed on metro, accused arrested", "a.com", "https://a.com/1", "2026-09-25T08:00:00Z");
+    const named = cand("Delhi metro: woman harassed, accused arrested", "b.com", "https://b.com/1", "2026-09-25T09:00:00Z");
+    const later = cand("Delhi Metro harassment: accused sent to custody", "c.com", "https://c.com/1", "2026-09-25T12:00:00Z");
+    expect(pickLead([later, named, early], "Delhi").publisher).toBe("b.com");
+    expect(pickLead([later, early], "Mumbai").publisher).toBe("a.com");
+    const official = cand("Police arrest man for harassing woman on metro", "delhipolice.gov.in", "https://delhipolice.gov.in/1", "2026-09-25T15:00:00Z");
+    expect(pickLead([named, official], "Delhi").publisher).toBe("delhipolice.gov.in");
+  });
+
+  it("the provider's date is labelled as when the index first saw it, never as 'published'", () => {
+    expect(indexedLabel("2026-09-25T09:15:00Z", EVAL_NOW)).toBe("First indexed 2 days ago (25 Sep)");
+    expect(indexedLabel("2026-09-25T09:15:00Z", EVAL_NOW)).not.toMatch(/publish/i);
+  });
+});
+
+describe("audit: unassessed headlines are never 'no updates'", () => {
+  beforeEach(() => clearInflight());
+  const swedish = () => stubProvider([result("Kvinna överfallen", { language: "Swedish" })]);
+
+  it("the partial copy says what couldn't be checked, and never says no updates were found", () => {
+    const relevanceOnly = partialLine([{ source: "gdelt", state: "ready" }, { source: RELEVANCE_SOURCE, state: "unavailable" }], true);
+    expect(relevanceOnly).toContain(RELEVANCE_PARTIAL_LINE);
+    expect(relevanceOnly).toContain(PARTIAL_EMPTY_LINE);
+    expect(relevanceOnly).not.toContain(EMPTY_LINE);
+    expect(relevanceOnly).not.toMatch(/No recent/);
+    expect(partialLine([{ source: "a", state: "ready" }, { source: "b", state: "failed" }], false)).toBe(PARTIAL_LINE);
+    for (const line of [RELEVANCE_PARTIAL_LINE, PARTIAL_EMPTY_LINE, relevanceOnly]) expect(line).not.toMatch(/\b(safe|unsafe|dangerous|danger)\b/i);
+  });
+
+  it("over the classifier's own daily budget → partial (relevance check unavailable), never empty", async () => {
+    const classify = vi.fn(async () => {
+      throw new ClassifierUnavailable("daily token budget spent");
+    });
+    const { evidence, stats } = await runPipeline(deps({ providers: [swedish()], classify }), DELHI, 7);
+    expect(evidence.state).toBe("partial");
+    expect(stats.unassessed).toBe(1);
+    expect(evidence.sources).toContainEqual({ source: RELEVANCE_SOURCE, state: "unavailable", retryable: true });
+  });
+
+  it("a classifier answer that leaves headlines out (refusal, truncation) → partial, failed relevance check", async () => {
+    const { evidence, stats } = await runPipeline(deps({ providers: [swedish()], classify: async () => new Map() }), DELHI, 7);
+    expect(evidence.state).toBe("partial");
+    expect(stats.unassessed).toBe(1);
+    expect(evidence.sources).toContainEqual({ source: RELEVANCE_SOURCE, state: "failed", retryable: true });
+  });
+
+  it("everything judged → no relevance-check source, and 'empty' is honest", async () => {
+    const classify = async (items: Array<{ id: string }>) => new Map(items.map((it) => [it.id, { relevant: false, category: null, translatedTitle: null }]));
+    const { evidence, stats } = await runPipeline(deps({ providers: [swedish()], classify }), DELHI, 7);
+    expect(evidence.state).toBe("empty");
+    expect(stats.unassessed).toBe(0);
+    expect(evidence.sources.some((s) => s.source === RELEVANCE_SOURCE)).toBe(false);
+  });
+
+  it("a partial result is cached for the short failure TTL, not 30 minutes", async () => {
+    const cache = memCache();
+    await safetyUpdates(deps({ providers: [swedish()], cache }), DELHI, 7);
+    expect([...cache.store.values()].find((x) => (x.v as { state?: string }).state === "partial")?.ttl).toBe(FAILED_TTL_MS);
+  });
+
+  it("a result without an http(s) link never becomes an update", async () => {
+    const { evidence } = await runPipeline(deps({ providers: [stubProvider([result("Woman harassed on Delhi metro, accused arrested", { url: "javascript:alert(1)" })])] }), DELHI, 7);
+    expect(evidence.state).toBe("empty");
+  });
+
+  it("the classifier drops a translation of an English headline or one with a verdict word", async () => {
+    const text = JSON.stringify({ results: [{ id: "en", relevant: true, category: "transport", translation: "Woman harassed on metro" }, { id: "sv", relevant: true, category: "transport", translation: "Woman attacked; the station is dangerous" }] });
+    const stub = { beta: { messages: { create: async () => ({ stop_reason: "end_turn", content: [{ type: "text", text }], usage: { input_tokens: 1, output_tokens: 1 } }) } } } as unknown as ClassifierClient;
+    const { results } = await classifyHeadlines(stub, "m", [
+      { id: "en", title: "Woman harassed on metro", language: "English", publisher: "x" },
+      { id: "sv", title: "Kvinna överfallen vid stationen", language: "Swedish", publisher: "y" },
+    ]);
+    expect(results.get("en")?.translatedTitle).toBeNull();
+    expect(results.get("sv")?.translatedTitle).toBeNull();
+    expect(results.get("sv")?.relevant).toBe(true);
   });
 });

@@ -2,8 +2,10 @@
 // classifier, so tests run it without a network or a database.
 import { evidenceState, type EvidenceState, type SourceState } from "@/domain/evidence-state";
 import {
+  RELEVANCE_SOURCE,
   canonicalUrl,
   clusterCandidates,
+  isHttpUrl,
   screenHeadline,
   toUpdate,
   withinWindow,
@@ -13,7 +15,7 @@ import {
   type SafetyUpdatesData,
   type SafetyWindow,
 } from "@/domain/safety-updates";
-import { MAX_CLASSIFY, type ClassifyInput, type ClassifyOutput } from "./classifier";
+import { ClassifierUnavailable, MAX_CLASSIFY, type ClassifyInput, type ClassifyOutput } from "./classifier";
 import { ProviderError, type SafetyIntelligenceProvider } from "./providers";
 
 /**
@@ -29,7 +31,11 @@ export interface SafetyCache {
 export interface PipelineDeps {
   providers: SafetyIntelligenceProvider[];
   cache: SafetyCache;
-  /** Relevance for ambiguous headlines, or null when no classifier is configured / budget is spent. */
+  /**
+   * Relevance for ambiguous headlines, or null when no classifier is configured. Throws
+   * ClassifierUnavailable when it won't run now (budget spent). Either way, and for any headline
+   * it leaves out of its answer, the headline is "unassessed" and the result is partial.
+   */
   classify: ((items: ClassifyInput[]) => Promise<Map<string, ClassifyOutput>>) | null;
   /** Registry lookup for a provider's country name ("United Kingdom" → "GB"). */
   countryOf: (name: string) => string | null;
@@ -37,7 +43,10 @@ export interface PipelineDeps {
 }
 
 export const RESULT_TTL_MS = 30 * 60_000;
-/** A failed check is remembered briefly so a flaky provider isn't hammered on every visit. */
+/**
+ * A failed, unavailable or partial check is remembered briefly, so a flaky provider isn't
+ * hammered on every visit and a partial answer isn't served for the full 30 minutes.
+ */
 export const FAILED_TTL_MS = 5 * 60_000;
 export const CLASSIFICATION_TTL_MS = 14 * 86_400_000;
 const MAX_UPDATES = 20;
@@ -50,6 +59,8 @@ export interface PipelineStats {
   included: number;
   ambiguous: number;
   classified: number;
+  /** Ambiguous headlines nobody judged (no classifier, budget spent, over the per-fetch cap, or failed). */
+  unassessed: number;
   excluded: number;
   clusters: number;
 }
@@ -78,7 +89,8 @@ export async function safetyUpdates(deps: PipelineDeps, area: SafetyArea, window
   if (!run) {
     run = (async () => {
       const result = await runPipeline(deps, area, windowDays);
-      await deps.cache.set(key, result.evidence, result.evidence.state === "failed" || result.evidence.state === "unavailable" ? FAILED_TTL_MS : RESULT_TTL_MS).catch(() => undefined);
+      const settled = result.evidence.state === "ready" || result.evidence.state === "empty";
+      await deps.cache.set(key, result.evidence, settled ? RESULT_TTL_MS : FAILED_TTL_MS).catch(() => undefined);
       return result;
     })().finally(() => inflight.delete(key));
     inflight.set(key, run);
@@ -101,11 +113,11 @@ export async function runPipeline(deps: PipelineDeps, area: SafetyArea, windowDa
     }
   }
 
-  // Location + recency, then one row per article URL.
+  // Location + recency, then one row per article URL. A result without an http(s) link is never shown.
   const seen = new Set<string>();
   const fresh = raw.filter((r) => {
     const k = canonicalUrl(r.url);
-    if (seen.has(k) || !withinWindow(r.publishedAt, windowDays, now) || !plausiblyHere(r, area, deps.countryOf)) return false;
+    if (!isHttpUrl(r.url) || seen.has(k) || !withinWindow(r.publishedAt, windowDays, now) || !plausiblyHere(r, area, deps.countryOf)) return false;
     seen.add(k);
     return true;
   });
@@ -121,7 +133,11 @@ export async function runPipeline(deps: PipelineDeps, area: SafetyArea, windowDa
   }
 
   // The classifier sees only what the cheap gate couldn't decide, and each article once (cached).
+  // Anything it doesn't judge is "unassessed": left out, never guessed in, and never silently
+  // turned into "no updates" — the result is partial and says some reports weren't checked.
   let classified = 0;
+  let unassessed = 0;
+  let relevance: SourceState | null = null;
   if (ambiguous.length) {
     const pending: typeof ambiguous = [];
     for (const a of ambiguous) {
@@ -131,22 +147,36 @@ export async function runPipeline(deps: PipelineDeps, area: SafetyArea, windowDa
         if (c.relevant && c.category) candidates.push({ ...a.r, category: c.category, translatedTitle: c.translatedTitle });
       } else pending.push(a);
     }
-    if (pending.length && deps.classify) {
+    if (pending.length && !deps.classify) {
+      unassessed = pending.length;
+      relevance = { source: RELEVANCE_SOURCE, state: "unavailable", retryable: false };
+    } else if (pending.length && deps.classify) {
+      const batch = pending.slice(0, MAX_CLASSIFY);
+      // Over the per-fetch cap: judged on a later fetch (partial results are cached briefly).
+      unassessed = pending.length - batch.length;
       try {
-        const batch = pending.slice(0, MAX_CLASSIFY);
         const out = await deps.classify(batch.map((a) => ({ id: a.id, title: a.r.title, language: a.r.language, publisher: a.r.publisher })));
+        let missing = 0;
         for (const a of batch) {
           const c = out.get(a.id);
-          if (!c) continue; // not assessed: left out, never guessed in
+          if (!c) {
+            missing++; // refused, truncated or unparseable: not assessed
+            continue;
+          }
           classified++;
           await deps.cache.set(`cls:${a.id}`, c, CLASSIFICATION_TTL_MS).catch(() => undefined);
           if (c.relevant && c.category) candidates.push({ ...a.r, category: c.category, translatedTitle: c.translatedTitle });
         }
-      } catch {
-        sources.push({ source: "relevance-check", state: "failed", retryable: true });
+        unassessed += missing;
+        if (missing) relevance = { source: RELEVANCE_SOURCE, state: "failed", retryable: true };
+        else if (unassessed) relevance = { source: RELEVANCE_SOURCE, state: "unavailable", retryable: true };
+      } catch (err) {
+        unassessed += batch.length;
+        relevance = err instanceof ClassifierUnavailable ? { source: RELEVANCE_SOURCE, state: "unavailable", retryable: true } : { source: RELEVANCE_SOURCE, state: "failed", retryable: true };
       }
     }
   }
+  if (relevance) sources.push(relevance);
 
   const clusters = clusterCandidates(candidates, area.name);
   const retrievedAt = now.toISOString();
@@ -162,7 +192,7 @@ export async function runPipeline(deps: PipelineDeps, area: SafetyArea, windowDa
     community: "unavailable_in_beta",
     checkedAt: retrievedAt,
   };
-  const stats: PipelineStats = { retrieved: raw.length, inWindow: fresh.length, included: candidates.length, ambiguous: ambiguous.length, classified, excluded, clusters: clusters.length };
+  const stats: PipelineStats = { retrieved: raw.length, inWindow: fresh.length, included: candidates.length, ambiguous: ambiguous.length, classified, unassessed, excluded, clusters: clusters.length };
   return { evidence: evidenceState(data, updates.length > 0, sources.length ? sources : [{ source: "none", state: "unavailable" }]), stats };
 }
 
