@@ -64,8 +64,8 @@ export async function newUser(browser: Browser, name: string): Promise<{ ctx: Br
   const page = await ctx.newPage();
   await page.goto("/");
   await page.waitForURL("**/welcome");
-  await expect(page.getByRole("heading", { name: "Walk home. Your people will know." })).toBeVisible();
-  await page.getByRole("button", { name: "Let's go" }).click();
+  await expect(page.getByRole("heading", { name: "With you until you arrive." })).toBeVisible();
+  await page.getByRole("button", { name: "Start with MIRA" }).click();
   await page.getByRole("button", { name: "Use my location" }).click();
   await page.waitForURL((u) => u.pathname === "/"); // Home, signed out
   await page.goto("/me");

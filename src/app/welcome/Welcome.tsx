@@ -48,13 +48,14 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
   const steps = [
     <div key="promise" className="flex flex-col items-center text-center">
       <MiraOrb size={72} />
-      <h1 className="mt-7 text-4xl font-extrabold tracking-tight">Walk home. Your people will know.</h1>
-      <p className="mt-3 max-w-xs text-lg text-ink-muted">Google Maps tells you how to get somewhere. MIRA tells you what to know before you go, stays with you on the way, and helps if something feels wrong — anywhere.</p>
-      <ul className="mt-8 w-full max-w-xs space-y-3 text-left">
+      <h1 className="mt-7 text-4xl font-extrabold tracking-tight">With you until you arrive.</h1>
+      <p className="mt-3 max-w-xs text-lg text-ink-muted">MIRA helps you understand the way, lets your people follow until you arrive, and puts help one tap away if something feels wrong.</p>
+      <p className="mt-2 max-w-xs text-sm text-ink-subtle">Designed around the realities women face moving through cities. Useful to anyone.</p>
+      <ul className="mt-7 w-full max-w-xs space-y-3 text-left">
         {[
-          ["🧭", "Before you go", "How much of the way is mapped as lit, and the Help Points along it"],
-          ["📍", "On the way", "The people you choose see you live until you arrive — then it switches off"],
-          ["📞", "If something feels wrong", "The nearest Help Point, your people, and a local emergency number where verified — one tap each"],
+          ["🧭", "Before you go", "Lighting evidence and Help Points along the way, recent relevant updates — and what isn't known, said plainly"],
+          ["📍", "On the way", "The people you choose follow a live link until you arrive, then it switches off. They don't need an account"],
+          ["📞", "If something feels wrong", "The nearest Help Point, your people, your location in words, and the local emergency number where it's been reviewed"],
         ].map(([e, t, d]) => (
           <li key={t} className="flex items-start gap-3 rounded-2xl bg-surface/80 px-4 py-3 shadow-[var(--shadow-card)]">
             <span aria-hidden className="text-2xl">
@@ -67,6 +68,9 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
           </li>
         ))}
       </ul>
+      <p className="mt-5 max-w-xs text-sm text-ink-muted">
+        <strong className="text-ink">Mira</strong>, your companion, can do any of this with you — and all of it works without her. Your live location is shared only during a journey you start, and MIRA keeps no history of where you&apos;ve been.
+      </p>
     </div>,
     <div key="loc" className="flex flex-col items-center text-center">
       <div className="grid size-28 place-items-center rounded-full bg-accent-soft text-accent">
@@ -97,7 +101,7 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
         </div>
       </div>
       <Button variant="hero" size="lg" onClick={next} busy={busy} busyLabel="Asking…" className="mx-auto max-w-sm">
-        {step === 0 ? "Let's go" : "Use my location"}
+        {step === 0 ? "Start with MIRA" : "Use my location"}
       </Button>
       {step === 0 && !signedIn ? (
         <button type="button" onClick={() => setSignIn(true)} className="mx-auto mt-2 min-h-11 px-3 text-sm font-bold text-ink-muted">

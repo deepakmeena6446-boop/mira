@@ -673,15 +673,25 @@ export function HomeScreen({
             )}
 
             {mode === "walk" && chosen && !chosen.route.approximate ? (
+              // The one place the walk's lighting is drawn (the line above states it in words): before Start, never below it.
               <section className="mt-4 rounded-2xl border border-line-strong bg-surface px-4 py-3" aria-label="Lighting evidence before starting">
-                <h3 className="text-sm font-extrabold">Lighting evidence on this walk</h3>
-                <p className="mt-1 text-sm text-ink-muted">{lightingEvidenceLine(chosen.lightingEvidence, chosen.lighting)}</p>
+                {chosen.lighting ? (
+                  <LightingSummary lighting={chosen.lighting} compact />
+                ) : (
+                  <>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">Lighting on the way</h3>
+                    <p className="mt-1 text-sm text-ink-muted">{lightingEvidenceLine(chosen.lightingEvidence, chosen.lighting)}</p>
+                  </>
+                )}
                 <details className="mt-1 text-xs text-ink-muted">
                   <summary className="min-h-8 cursor-pointer font-bold text-accent">Sources and freshness</summary>
-                  <p>{chosen.lighting ? sourceList(chosen.lighting) || "No mapped source returned evidence." : "MIRA could not confirm source coverage."} Lighting evidence does not establish whether a route is safe.</p>
+                  <p>
+                    {chosen.lighting ? `From ${sourceList(chosen.lighting) || "no mapped source yet"}.` : "MIRA could not confirm source coverage."}
+                    {chosen.lighting?.freshness?.osmFrom && new Date().getFullYear() - chosen.lighting.freshness.osmFrom >= 5 ? " Some of this map data is over five years old." : ""} Lights can be out or new ones missing — this is about lighting, not a safety rating.
+                  </p>
                 </details>
               </section>
-            ) : mode !== "walk" ? <p className="mt-3 text-xs text-ink-muted">Lighting evidence is available for mapped walking routes.</p> : null}
+            ) : null}
             <div className="mt-4">
               <Button variant="hero" size="lg" onClick={() => void startTrip()} busy={starting} busyLabel="Starting…" disabled={!me || (mode !== "walk" && routeLoading)}>
                 <Icon name={mode === "walk" ? "walk" : "route"} /> Start with MIRA
@@ -718,10 +728,7 @@ export function HomeScreen({
             </div>
 
             {mode === "walk" && chosen && !chosen.route.approximate ? (
-              <>
-                {chosen.lighting ? <LightingSummary lighting={chosen.lighting} /> : null}
-                <HelpPointList points={chosen.helpPoints} evidence={chosen.helpEvidence} defaultOpen onPick={(p) => pick({ name: p.name, lat: p.lat, lon: p.lon, kind: HELP_CLASSES[p.cls].label })} />
-              </>
+              <HelpPointList points={chosen.helpPoints} evidence={chosen.helpEvidence} defaultOpen onPick={(p) => pick({ name: p.name, lat: p.lat, lon: p.lon, kind: HELP_CLASSES[p.cls].label })} />
             ) : null}
             {mode === "walk" && info?.notes.length ? (
               <section className="mt-5">

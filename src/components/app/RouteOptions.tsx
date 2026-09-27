@@ -64,7 +64,7 @@ export function ArrivalContextLines({ mode, arrivalHelp, dest }: { mode: Exclude
   return (
     <dl className="mt-3" aria-label="What's known about this journey">
       <ContextRow label="Lighting">
-        <span className="text-ink-muted">Street lighting is shown for walks, not {mode === "ride" ? "rides" : "transit"}.</span>
+        <span className="text-ink-muted">Street lighting is shown for walks, not {mode === "ride" ? "rides" : "transit"}: it's mapped street by street for people on foot.</span>
       </ContextRow>
       <ContextRow label="Help" why={first ? undefined : NO_HELP_WHY}>
         {first ? (

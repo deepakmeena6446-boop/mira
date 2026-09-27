@@ -359,7 +359,8 @@ export function TripScreen({
           <p className="text-sm font-bold uppercase tracking-wider text-ink-subtle">{trip.autoArrival ? (left > 0 ? "Expected in" : "Expected") : "Sharing for"}</p>
           <p className="text-4xl font-extrabold tabular-nums">{!clock ? "…" : left > 0 ? span : mins < 1 ? "now" : `${span} ago`}</p>
           <p className="text-ink-muted">
-            {trip.autoArrival ? (clock ? `ETA ${time(trip.etaAt)}` : "ETA") : clock ? `Until ${time(trip.etaAt)}` : ""}
+            {/* The ETA is the check-in time: the route's time plus spare time (etaFor), so it's later than the walk Home showed. */}
+            {trip.autoArrival ? (clock ? `ETA ${time(trip.etaAt)}, with time to spare` : "ETA") : clock ? `Until ${time(trip.etaAt)}` : ""}
             {distance !== null && trip.autoArrival ? ` · ${distance < 1000 ? `${Math.round(distance / 10) * 10} m` : `${(distance / 1000).toFixed(1)} km`} to go` : ""}
           </p>
           {walking && route ? (
@@ -407,7 +408,15 @@ export function TripScreen({
                 ? "Nobody is alerted automatically if you don't arrive — MIRA can't send email alerts yet. Your live link is how people follow you."
                 : netDown
                   ? "Nobody is alerted automatically right now — missed-arrival checks are paused."
-                  : "Nobody is alerted automatically if you don't arrive — add someone in Circle for that."}
+                  : (
+                      <>
+                        Nobody is alerted automatically if you don&apos;t arrive —{" "}
+                        <Link href="/circle" className="font-bold text-accent">
+                          add someone in Circle
+                        </Link>{" "}
+                        for that.
+                      </>
+                    )}
           </p>
         </div>
 

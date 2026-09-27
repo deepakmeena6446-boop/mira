@@ -1,4 +1,4 @@
-# MIRA — walk home, your people will know
+# MIRA — with you until you arrive
 
 An installable, mobile-first web app (PWA) for adults 18 or older. It helps a woman understand the way before she goes, keeps the people she chooses with her until she arrives, and puts help one tap away. It never says a route, place or person is safe; it shows what's known, where it's from, and what isn't known.
 

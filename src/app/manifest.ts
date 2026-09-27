@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "MIRA",
     short_name: "MIRA",
-    description: "Lighting and Help Points on your route, your journey shared live in one tap, and help close at hand.",
+    description: "Understand the way before you go, let your people follow until you arrive, and keep help one tap away if something feels wrong.",
     start_url: "/",
     display: "standalone",
     orientation: "portrait",

@@ -203,8 +203,9 @@
 
 @utility glass {
   background: var(--glass-bg);
-  backdrop-filter: blur(18px) saturate(1.4);
+  /* Prefixed first: Lightning CSS keeps only the LAST of the pair, and Chrome ignores the -webkit- one. */
   -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
 }
 
 @utility skeleton {

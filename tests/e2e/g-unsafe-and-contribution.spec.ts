@@ -109,7 +109,7 @@ test.describe("Degraded states are honest", () => {
     const page = await ctx.newPage();
     await page.goto("/");
     await page.waitForURL("**/welcome");
-    await page.getByRole("button", { name: "Let's go" }).click();
+    await page.getByRole("button", { name: "Start with MIRA" }).click();
     await page.getByRole("button", { name: "Use my location" }).click();
     await page.waitForURL((u) => u.pathname === "/"); // no account needed to look around
     await expect(page.getByText(/Location is off for MIRA/)).toBeVisible();
