@@ -9,6 +9,7 @@ import { screenHeadline } from "../src/domain/safety-updates";
 import { EVAL_CASES, EVAL_NOW } from "../tests/fixtures/safety-updates-eval";
 import { HELDOUT_CASES } from "../tests/fixtures/safety-updates-heldout";
 import { HELDOUT_2_CASES } from "../tests/fixtures/safety-updates-heldout-2";
+import { AUDIT_CASES } from "../tests/fixtures/safety-updates-audit";
 
 type Case = { title: string; language: string; publisher: string; expect: "include" | "exclude" | "ambiguous" };
 
@@ -36,6 +37,9 @@ report("Tuning set", EVAL_CASES);
 //   set 1: precision 0.938 (1 false positive), recall 15/26; set 2: precision 1.000, recall 20/30 (+4 to classifier).
 report("Held-out set 1 (vocabulary fixed after its first run)", HELDOUT_CASES);
 report("Held-out set 2 (vocabulary fixed after its first run)", HELDOUT_2_CASES);
+// Pre-launch audit probes (2026-09-27), labelled before the gate change. First run: precision 0.224, recall 11/15;
+// the 24 fresh probes written after it, first run: precision 0.875, recall 7/10 (+2 to the classifier).
+report("Audit probes (pre-launch)", AUDIT_CASES);
 
 import { readFileSync } from "node:fs";
 import { LIVE_SAMPLE_LABELS } from "../tests/fixtures/safety-updates-eval";

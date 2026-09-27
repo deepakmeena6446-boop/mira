@@ -4,10 +4,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import type postgres from "postgres";
 import { getEnv } from "@/server/config/env";
 import { findCountry, countryContext } from "@/server/locale";
-import { MIRA_DAILY_TOKEN_DEFAULT, recordTokens, tokenBudgetSpent } from "@/server/providers/companion/budget";
+import { dailyTokensSpent, recordDailyTokens, SAFETY_CLASSIFIER_BUCKET, SAFETY_CLASSIFIER_DAILY_TOKEN_DEFAULT } from "@/server/ratelimit/daily-tokens";
 import type { Reverse } from "@/server/providers/geo/types";
 import type { SafetyArea, SafetyWindow } from "@/domain/safety-updates";
-import { classifyHeadlines, DEFAULT_SAFETY_CLASSIFIER_MODEL } from "./classifier";
+import { ClassifierUnavailable, classifyHeadlines, DEFAULT_SAFETY_CLASSIFIER_MODEL } from "./classifier";
 import { safetyUpdates, type SafetyCache, type SafetyEvidence } from "./pipeline";
 import { fixtureProvider, gdeltProvider, type SafetyIntelligenceProvider } from "./providers";
 
@@ -59,7 +59,7 @@ export async function safetyUpdatesFor(sql: postgres.Sql, area: SafetyArea, wind
   const env = getEnv();
   const apiKey = env.ANTHROPIC_API_KEY;
   const model = env.SAFETY_CLASSIFIER_MODEL ?? DEFAULT_SAFETY_CLASSIFIER_MODEL;
-  const max = Number(env.MIRA_DAILY_TOKEN_MAX ?? MIRA_DAILY_TOKEN_DEFAULT);
+  const max = Number(env.SAFETY_CLASSIFIER_DAILY_TOKEN_MAX ?? SAFETY_CLASSIFIER_DAILY_TOKEN_DEFAULT);
   const client = apiKey ? new Anthropic({ apiKey, timeout: 20_000, maxRetries: 1 }) : null;
 
   const { evidence, stats, cached } = await safetyUpdates(
@@ -68,10 +68,11 @@ export async function safetyUpdatesFor(sql: postgres.Sql, area: SafetyArea, wind
       cache: dbCache(sql),
       classify: client
         ? async (items) => {
-            // The classifier shares Mira's daily token ceiling; over it, ambiguous headlines are simply left out.
-            if (await tokenBudgetSpent(sql, max, new Date()).catch(() => true)) return new Map();
+            // Its own daily token bucket, never Mira's: public traffic across many cities can't spend
+            // Mira's budget. Over it (or unable to tell), headlines go unassessed → a partial result.
+            if (await dailyTokensSpent(sql, SAFETY_CLASSIFIER_BUCKET, max, new Date()).catch(() => true)) throw new ClassifierUnavailable("daily token budget spent");
             const { results, tokens } = await classifyHeadlines(client, model, items);
-            if (tokens) await recordTokens(sql, tokens, new Date()).catch(() => undefined);
+            if (tokens) await recordDailyTokens(sql, SAFETY_CLASSIFIER_BUCKET, tokens, new Date()).catch(() => undefined);
             return results;
           }
         : null,

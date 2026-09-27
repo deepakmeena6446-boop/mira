@@ -214,8 +214,10 @@ export const HELDOUT_2_CASES: HeldOutCase[] = [
     title: "DU student, 19, missing for 4 days ; family says she left hostel for tuition",
     language: "English",
     publisher: "thedailystar.net",
-    expect: "include",
-    why: "missing young woman",
+    // Relabelled include → ambiguous by the 2026-09-27 audit: "she" alone also matched "Missing dog found; she was hungry",
+    // so the gate now needs a woman/girl word to include; this headline goes to the classifier instead.
+    expect: "ambiguous",
+    why: "missing young woman, named only by 'she'",
   },
 
   // ───────────────────────────── EXCLUDE (38) ─────────────────────────────

@@ -98,6 +98,8 @@ const envSchema = z.object({
   SAFETY_UPDATES: optionalNonEmpty.refine((v) => v === undefined || v === "gdelt" || v === "off" || v === "fixture", 'must be "gdelt", "off" or "fixture"'),
   // Model for the relevance classifier (ambiguous headlines only). Default claude-opus-5 at low effort.
   SAFETY_CLASSIFIER_MODEL: optionalNonEmpty.refine((v) => v === undefined || /^claude-[a-z0-9-]+$/.test(v), "must be a Claude model id"),
+  // The relevance classifier's own daily token ceiling (separate from Mira's). Default 300,000.
+  SAFETY_CLASSIFIER_DAILY_TOKEN_MAX: optionalNonEmpty.refine((v) => v === undefined || /^\d{1,10}$/.test(v), "must be a whole number"),
   MAPBOX_TOKEN: optionalNonEmpty,
   // Google Maps Platform: server key (Places API (New), Routes, Geocoding) and browser key (Map Tiles).
   GOOGLE_MAPS_SERVER_KEY: optionalNonEmpty,
