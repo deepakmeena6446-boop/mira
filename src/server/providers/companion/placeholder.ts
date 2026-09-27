@@ -65,7 +65,8 @@ function joinNames(xs: string[]): string {
 
 /** What starting does for her Circle — an attempt by email when it's on, never a promise. */
 function circleLine(t: Proposed, hinglish: boolean): string {
-  if (!t.contacts.length) return hinglish ? "" : "I'll check you arrive.";
+  // No Circle: nobody is alerted, so never imply someone is watching — MIRA only notices arrival.
+  if (!t.contacts.length) return hinglish ? "Koi automatically alert nahi hoga — start ke baad apna live link khud bhejna." : "Nobody is alerted automatically — after you start, send your live link to anyone you choose.";
   if (hinglish) return t.email ? `Start karte hi MIRA ${joinNames(t.contacts)} ko tumhara live link email karne ki koshish karegi (email fail bhi ho sakta hai).` : "Email abhi band hai, toh start karne ke baad apna live link khud bhejna.";
   return t.email ? `MIRA will try to email ${joinNames(t.contacts)} your live link when you start (sending can fail).` : "Email isn't switched on, so share your live link yourself after you start.";
 }
