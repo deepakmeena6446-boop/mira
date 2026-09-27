@@ -4,6 +4,8 @@
 **Branch:** `release/beta-rc` (from `main` at `fc36a95`; nothing pushed — the repository has no remote)
 **Release candidate:** the tip of `release/beta-rc` (commit named in the final hand-off; all checks below ran on it)
 
+> **Code freeze:** the frozen revision, gate results, known risks and blockers (none) are recorded in [docs/PUBLIC_BETA_FREEZE.md](docs/PUBLIC_BETA_FREEZE.md).
+
 ## Release verdict
 
 # READY TO DEPLOY
