@@ -16,6 +16,7 @@ import { cx } from "@/components/ui/cx";
 import { api } from "@/lib/api-client";
 import { freshLocation, setPendingDestination, useLocation } from "@/lib/location-store";
 import type { MiraCard } from "@/server/providers/companion/types";
+import { circleSharingLine } from "@/domain/companion-output";
 
 interface Msg {
   id: string;
@@ -87,7 +88,7 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
           <p className="mt-1 text-lg font-extrabold">To {card.destination.name}</p>
           <p className="text-sm text-ink-muted">
             {mode === "walk" ? (card.minutes ? `About ${card.minutes} min walk · ` : "") : `${MODE_LABEL[mode]} · `}
-            {card.contacts.length ? `${card.contacts.join(", ")} can follow live` : "Private — I'll check you arrive"}
+            {card.contacts.length ? circleSharingLine(card.contacts, card.email) : "Private — I'll check you arrive"}
           </p>
           {mode === "walk" ? (
             <TripCardButton label="Start with MIRA" onStart={() => onTrip(card.destination)} />

@@ -40,7 +40,7 @@ type Stored = { text: string; cards?: MiraCard[] };
  */
 function storableCard(card: MiraCard): MiraCard | null {
   if (card.type === "places" || card.type === "help_points") return null;
-  if (card.type === "trip") return { type: "trip", destination: card.destination, minutes: null, contacts: card.contacts, ...(card.mode ? { mode: card.mode } : {}) };
+  if (card.type === "trip") return { type: "trip", destination: card.destination, minutes: null, contacts: card.contacts, ...(card.mode ? { mode: card.mode } : {}), ...(card.email !== undefined ? { email: card.email } : {}) };
   return card;
 }
 
@@ -68,11 +68,14 @@ export const POST = handle(async (req: Request) => {
   const sql = getSql();
   const user = await requireUser(sql);
   const now = new Date();
-  await enforce(sql, [dailyKey("actor", user.id, now)], [{ bucket: "mira:m", max: 20, windowMs: 60_000 }, { bucket: "mira:d", max: MIRA_DAILY_MAX, windowMs: 86_400_000 }], now);
+  const actor = dailyKey("actor", user.id, now);
+  // Burst limits (abuse protection) reject outright.
+  await enforce(sql, [actor], [{ bucket: "mira:m", max: 20, windowMs: 60_000 }], now);
   await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "mira:ip:m", max: 300, windowMs: 60_000 }], now);
-  // Shared model-cost ceiling: past it the scripted engine still answers. Per-user and IP
-  // abuse limits above continue to reject excess requests.
-  const modelAllowed = await consume(sql, dailyKey("global", "mira", now), { bucket: "mira:global:d", max: Number(getEnv().MIRA_GLOBAL_DAILY_MAX ?? MIRA_GLOBAL_DAILY_DEFAULT), windowMs: 86_400_000 }, now);
+  // The per-person daily cap and the shared ceiling bound model cost, not access: past either,
+  // the scripted engine answers (no model call), so a danger message still gets the Emergency card.
+  const withinDaily = await consume(sql, actor, { bucket: "mira:d", max: MIRA_DAILY_MAX, windowMs: 86_400_000 }, now);
+  const modelAllowed = withinDaily && (await consume(sql, dailyKey("global", "mira", now), { bucket: "mira:global:d", max: Number(getEnv().MIRA_GLOBAL_DAILY_MAX ?? MIRA_GLOBAL_DAILY_DEFAULT), windowMs: 86_400_000 }, now));
   const { message, context } = await readJson(req, body, 8192);
   const recent = await sql<{ role: "user" | "assistant"; content: Stored }[]>`
     SELECT role, content FROM (SELECT * FROM mira_messages WHERE user_id = ${user.id} ORDER BY id DESC LIMIT 12) m ORDER BY id`;

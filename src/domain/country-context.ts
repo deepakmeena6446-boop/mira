@@ -202,3 +202,15 @@ export function otherEmergencyNumbers(ctx: CountryContext): EmergencyNumber[] {
   }
   return [...out.values()];
 }
+
+/**
+ * What to say about emergency help, from the Country Context only (never a hardcoded number):
+ * a direct "call N now" only for a reviewed all-service number. Shared by both Mira engines and
+ * the output guard's replacement line, so a rejected model reply never loses the number.
+ */
+export function emergencySentence(c: CountryContext): string {
+  const p = c.emergency.primary;
+  if (p?.scope === "all") return `call ${p.number} now`;
+  if (p) return "open Emergency options and choose the service you need";
+  return "use the Emergency button now — MIRA doesn't know the local number here, and it explains what to dial";
+}

@@ -6,10 +6,11 @@ import { claudeMira, contextBlock, safeArea, TOOL_GUIDE, TOOLS, DEFAULT_MIRA_MOD
 import { withFallback } from "@/server/providers/companion";
 import { DANGER, JUDGEMENT, verdictWords } from "@/server/providers/companion/signals";
 import { localClock } from "@/server/providers/companion/clock";
-import { coverageLine, type MiraNow } from "@/server/providers/companion/tools";
+import { coverageLine, safetyUpdatesSummary, type MiraNow } from "@/server/providers/companion/tools";
 import { UNKNOWN_COUNTRY, capabilitiesFor, type CountryContext } from "@/domain/country-context";
 import type { MiraCard, MiraEvent, MiraHelpPoint } from "@/server/providers/companion/types";
 import type { MiraTools } from "@/server/providers/companion/tools";
+import type { SafetyUpdate } from "@/domain/safety-updates";
 
 const home = { id: "h", label: "Home", emoji: "🏠", lat: 28.69, lon: 77.21, address: null };
 
@@ -33,11 +34,14 @@ function now(over: Partial<MiraNow> = {}): MiraNow {
 function tools(over: Partial<Record<keyof MiraTools, unknown>> = {}): MiraTools {
   return {
     getContext: async () => now(),
-    coverage: () => coverageLine(true),
+    coverage: () => coverageLine(true, true),
+    emailOn: () => true,
+    safetyUpdatesOn: () => true,
+    safetyUpdates: async () => ({ status: "couldnt_check", area: "London" }),
     listSavedPlaces: async () => [home],
-    findNearby: async (kinds?: string[]) => (kinds?.includes("pharmacy") ? [{ id: "p", name: "Apollo Pharmacy", kind: "Pharmacy", lat: 28.69, lon: 77.21, distanceM: 120 }] : []),
-    findHelpPoints: async () => HELP,
-    proposeTrip: async (d: { name: string; lat: number; lon: number }, mode = "walk") => ({ destination: d, minutes: mode === "walk" ? 12 : null, contacts: ["Mum"], context: [], mode }),
+    findNearby: async (kinds?: string[]) => (kinds?.includes("pharmacy") ? [{ id: "p", name: "Apollo Pharmacy", kind: "Pharmacy", lat: 28.69, lon: 77.21, distanceM: 120, openNow: "not_known" }] : []),
+    findHelpPoints: async () => ({ points: HELP, failed: false }),
+    proposeTrip: async (d: { name: string; lat: number; lon: number }, mode = "walk") => ({ destination: d, minutes: mode === "walk" ? 12 : null, contacts: ["Mum"], context: [], mode, email: true, helpLookupFailed: false }),
     tripStatus: async () => null,
     trustedContacts: async () => ["Mum"],
     ...over,
@@ -194,13 +198,20 @@ describe("Her local time", () => {
 });
 
 describe("Mira's context block", () => {
-  const facts = (n: MiraNow) => ({ firstName: "Amara", now: n, saved: [{ label: "Home" }], contacts: ["Mum"], trip: null, coverage: coverageLine(false) });
+  const facts = (n: MiraNow, email = true) => ({ firstName: "Amara", email, now: n, saved: [{ label: "Home" }], contacts: ["Mum"], trip: null, coverage: coverageLine(false, true) });
   it("carries her time, country and the local emergency line, and never coordinates", () => {
     const block = contextBlock(facts(now({ area: "28.6927, 77.2131" })));
     expect(block).toMatch(/Friday, 10:05 pm \(night\), time zone Europe\/London/);
     expect(block).toMatch(/country: United Kingdom \(GB\)/);
     expect(block).toMatch(/Reviewed call options: 999/);
-    expect(block).toMatch(/no crime, incident or neighbourhood-safety data/);
+    // Truthful beside Safety updates: no crime scores or ratings, and news reports are never a verdict.
+    expect(block).toMatch(/no crime scores, crime maps or neighbourhood safety ratings anywhere/);
+    expect(block).toMatch(/Safety updates: recent news reports .* never a verdict/);
+    expect(block).not.toMatch(/no crime, incident or neighbourhood-safety data/);
+    expect(coverageLine(false, false)).toMatch(/Safety updates .* are switched off/);
+    expect(block).toMatch(/Contact email: on\. .*tries to email .*sending can fail/);
+    expect(contextBlock(facts(now(), false))).toMatch(/Contact email: off\. MIRA can't email anyone/);
+    expect(block).not.toMatch(/would follow/);
     expect(block).not.toMatch(/\d+\.\d{3,}/); // no coordinates, even when the device sent them as an "area"
     expect(safeArea("Near Gate 3")).toBe("Near Gate 3");
   });
@@ -293,7 +304,7 @@ describe("Mira on Claude (mocked client)", () => {
     const { client } = mockClient([{ text: "That area is safe." }]);
     const r = await collect(claudeMira({ client, message: "is Soho safe?", history: [], tools: tools(), firstName: "A" }));
     expect(r.text).not.toContain("That area is safe");
-    expect(r.text).toContain("I can't verify");
+    expect(r.text).toBe("I don't have enough verified information to make that judgement. The cards here show what MIRA can check.");
     const line = warn.mock.calls.map((c) => String(c[0])).find((l) => l.includes("mira.output_rejected"));
     expect(JSON.parse(line!)).toMatchObject({ event: "mira.output_rejected", reason: "safety_verdict" });
     expect(line).not.toMatch(/That area|Soho/);
@@ -321,5 +332,183 @@ describe("Failure never leaves her without a reply", () => {
     const hist = r.events.find((e) => e.type === "history");
     expect(hist).toMatchObject({ type: "history" });
     expect((hist as { text: string }).text).not.toMatch(/Gate 3|12-minute/);
+  });
+});
+
+const RUNNING = { destination: { name: "Home", lat: 28.69, lon: 77.21 }, state: "active", etaAt: new Date(Date.now() + 10 * 60_000).toISOString(), mode: "walk" };
+
+describe("Scripted Mira: asks that must work (hardening)", () => {
+  it("take me home: no glued text, and Circle wording that never promises delivery", async () => {
+    const r = await run("Take me home");
+    expect(r.text).toBe("Let's get you to Home — about a 12-minute walk. MIRA will try to email Mum your live link when you start (sending can fail).");
+    expect(r.cards[0]).toMatchObject({ type: "trip", email: true });
+    const off = await run("take me home", tools({ proposeTrip: async (d: { name: string }) => ({ destination: d, minutes: 12, contacts: ["Mum"], context: [], mode: "walk", email: false, helpLookupFailed: false }) }));
+    expect(off.text).toMatch(/Email isn't switched on, so share your live link yourself after you start\./);
+    expect(off.text).not.toMatch(/follow along live|can follow live|will be able to/);
+    expect(off.cards[0]).toMatchObject({ type: "trip", email: false });
+  });
+
+  it("what do we know about this walk: answers from the running trip, never proposes another", async () => {
+    const proposeTrip = vi.fn();
+    const r = await run("What do we know about this walk?", tools({ tripStatus: async () => RUNNING, proposeTrip }));
+    expect(r.text).toMatch(/^You're on your way to Home, ETA in about (9|10) min\. Lighting and Help Points along the way are on the route sheet/);
+    expect(r.cards.map((c) => c.type)).toEqual(["trip_status"]);
+    expect(proposeTrip).not.toHaveBeenCalled();
+    // Late at night, an unrelated question doesn't add an unrequested Home trip while one is running.
+    const late = await run("what's the capital of France?", tools({ tripStatus: async () => RUNNING, proposeTrip }));
+    expect(late.cards).toEqual([]);
+    expect(proposeTrip).not.toHaveBeenCalled();
+  });
+
+  it("a pharmacy near her destination searches around the destination, and says hours only as listed", async () => {
+    const findNearby = vi.fn(async () => [{ id: "p", name: "Night Chemist", kind: "Pharmacy", lat: 28.7, lon: 77.2, distanceM: 200, openNow: "open" }]);
+    const r = await run("Is there a pharmacy open near my destination?", tools({ tripStatus: async () => RUNNING, findNearby }));
+    expect(findNearby).toHaveBeenCalledWith(["pharmacy"], RUNNING.destination);
+    expect(r.text).toMatch(/closest pharmacies near Home\. Listed as open now: Night Chemist\./);
+    expect(r.cards[0]).toMatchObject({ type: "places", title: "Near Home" });
+    const unknownHours = await run("pharmacy near my destination", tools({ tripStatus: async () => RUNNING, findNearby: async () => [{ id: "p", name: "Apollo", kind: "Pharmacy", lat: 1, lon: 1, openNow: "not_known" }] }));
+    expect(unknownHours.text).toMatch(/hours aren't known/);
+    expect(unknownHours.text).not.toMatch(/open now/i);
+    // No trip running: it doesn't pass off places around her as the answer.
+    const none = vi.fn();
+    const noTrip = await run("Is there a pharmacy open near my destination?", tools({ findNearby: none }));
+    expect(none).not.toHaveBeenCalled();
+    expect(noTrip.text).toMatch(/don't know where you're headed/);
+    expect(noTrip.cards).toEqual([]);
+  });
+
+  it("judgement answers never present a service-only number as the emergency number", async () => {
+    const JP: CountryContext = { ...GB, iso: "JP", countryName: "Japan", emergency: { ...GB.emergency, status: "VERIFIED", primary: { number: "110", label: "Police", service: "police", scope: "service" }, also: [] } };
+    const r = await run("Is this neighbourhood safe?", tools({ getContext: async () => now({ country: JP }) }));
+    expect(r.text).not.toMatch(/\b110\b/);
+    expect(r.text).toMatch(/Emergency options/);
+    expect((await run("Is this neighbourhood safe?")).text).toMatch(/emergency number here is 999/);
+  });
+
+  it("share this trip: explains where sharing lives and never claims to have shared", async () => {
+    const r = await run("Share this trip with my people", tools({ tripStatus: async () => RUNNING }));
+    expect(r.text).toMatch(/can't send anything myself.*"Send my live link"/);
+    expect(r.cards.map((c) => c.type)).toEqual(["trip_status"]);
+    expect(r.text).not.toMatch(/I(?:'ve| have)? shared|notified|sent it/);
+    const none = await run("Share this trip with my people");
+    expect(none.text).toMatch(/don't have a journey running/);
+    expect(none.cards).toEqual([]);
+  });
+
+  it("recent safety updates point to Home, deterministically; reports accept 'something'; failed Help Point lookups say so", async () => {
+    const r = await run("Any recent safety updates here?");
+    expect(r.text).toMatch(/Safety updates section on Home/);
+    expect(r.text).toMatch(/not a verdict/);
+    expect((await run("Any recent safety updates here?", tools({ safetyUpdatesOn: () => false }))).text).toMatch(/aren't switched on/);
+    expect((await run("I want to report something")).cards[0]).toMatchObject({ type: "report", category: "other" });
+    const failed = await run("Find somewhere staffed nearby", tools({ findHelpPoints: async () => ({ points: [], failed: true }) }));
+    expect(failed.text).toMatch(/couldn't check Help Points/);
+    expect(failed.text).not.toMatch(/no Help Point|none/i);
+  });
+
+  it("in danger, no promise about the Circle — the number from the Country Context first", async () => {
+    const r = await run("someone is following me");
+    expect(r.text).toMatch(/^If you're in danger right now, call 999 now\./);
+    expect(r.text).not.toMatch(/straight away|will|can see/);
+  });
+});
+
+describe("Mira on Claude: hardened tools and the output guard", () => {
+  it("a rejected reply in a danger turn keeps the emergency number (and the Emergency card)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { client } = mockClient([{ text: "Call 911 now and stay safe." }]);
+    const r = await collect(claudeMira({ client, message: "someone is following me", history: [], tools: tools(), firstName: "A" }));
+    expect(r.text).toBe("If you may be in danger, call 999 now. The Emergency card is on your screen.");
+    expect(r.cards.filter((c) => c.type === "sos")).toHaveLength(1);
+    // Where MIRA knows no number, the replacement says so instead of inventing one.
+    const { client: c2 } = mockClient([{ text: "Call 911 now." }]);
+    const ke = await collect(claudeMira({ client: c2, message: "help me!", history: [], tools: tools({ getContext: async () => now({ country: KE }) }), firstName: "A" }));
+    expect(ke.text).toMatch(/use the Emergency button now — MIRA doesn't know the local number here/);
+    expect(ke.text).not.toMatch(/911/);
+  });
+
+  it("a claim split across tool rounds is still caught on the whole reply", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { client } = mockClient([{ text: "Priya", tools: [{ name: "check_trip", input: {} }] }, { text: "has been notified." }]);
+    const r = await collect(claudeMira({ client, message: "did you tell Priya?", history: [], tools: tools({ tripStatus: async () => RUNNING }), firstName: "A" }));
+    expect(r.text).not.toMatch(/has been notified/);
+    expect(r.text).toMatch(/I can't verify that from MIRA's information/);
+  });
+
+  it("allows the emergency number with 'somewhere with people around' in a danger turn", async () => {
+    const { client } = mockClient([{ text: "Call 999 now and get somewhere with people around." }]);
+    const r = await collect(claudeMira({ client, message: "I'm scared", history: [], tools: tools(), firstName: "A" }));
+    expect(r.text).toBe("Call 999 now and get somewhere with people around.");
+  });
+
+  it("propose_trip gives circle_sharing as an attempt (email on) or a do-it-yourself (email off); the card carries it", async () => {
+    const ask = async (email: boolean) => {
+      const { client, calls } = mockClient([{ tools: [{ name: "propose_trip", input: { saved_place: "Home" } }] }, { text: "ok" }]);
+      const r = await collect(claudeMira({ client, message: "take me home", history: [], tools: tools({ proposeTrip: async (d: { name: string }) => ({ destination: d, minutes: 12, contacts: ["Mum"], context: [], mode: "walk", email, helpLookupFailed: !email }) }), firstName: "A" }));
+      return { card: r.cards[0], result: JSON.stringify((calls[1].messages as unknown[]).at(-1)) };
+    };
+    const on = await ask(true);
+    expect(on.result).toMatch(/MIRA will try to email Mum your live link when you start \(sending can fail\)/);
+    expect(on.result).not.toMatch(/would_follow|follow along live/);
+    expect(on.card).toMatchObject({ type: "trip", email: true });
+    const off = await ask(false);
+    expect(off.result).toMatch(/Email isn't switched on, so share your live link yourself after you start/);
+    expect(off.result).toMatch(/couldn't check Help Points along the way/);
+    expect(TOOL_GUIDE).not.toMatch(/Mention who in her Circle would follow along live/);
+  });
+
+  it("find_help_points reports a failed lookup as couldn't check, never none", async () => {
+    const { client, calls } = mockClient([{ tools: [{ name: "find_help_points", input: { situation: "nearby" } }] }, { text: "ok" }]);
+    const r = await collect(claudeMira({ client, message: "help points near me", history: [], tools: tools({ findHelpPoints: async () => ({ points: [], failed: true }) }), firstName: "A" }));
+    expect(JSON.stringify((calls[1].messages as unknown[]).at(-1))).toMatch(/lookup_failed.*couldn't check/);
+    expect(r.cards).toEqual([]);
+  });
+
+  it("find_nearby near the destination searches around the running trip's destination, with open_now from listed hours", async () => {
+    const findNearby = vi.fn(async () => [{ id: "p", name: "Night Chemist", kind: "Pharmacy", lat: 28.7, lon: 77.2, distanceM: 200, hours: "Mo-Su 00:00-24:00", openNow: "open" }]);
+    const { client, calls } = mockClient([{ tools: [{ name: "find_nearby", input: { kinds: ["pharmacy"], near: "destination" } }] }, { text: "ok" }]);
+    const r = await collect(claudeMira({ client, message: "pharmacy open near my destination?", history: [], tools: tools({ tripStatus: async () => RUNNING, findNearby }), firstName: "A" }));
+    expect(findNearby).toHaveBeenCalledWith(["pharmacy"], RUNNING.destination);
+    const result = JSON.stringify((calls[1].messages as unknown[]).at(-1));
+    expect(result).toMatch(/her destination \(Home\), not where she is/);
+    expect(result).toMatch(/open_now\\":\\"open/);
+    expect(r.cards[0]).toMatchObject({ type: "places", title: "Near Home" });
+    // Nothing running and no saved place: an error, not places around her.
+    const none = vi.fn();
+    const { client: c2, calls: calls2 } = mockClient([{ tools: [{ name: "find_nearby", input: { near: "destination" } }] }, { text: "ok" }]);
+    await collect(claudeMira({ client: c2, message: "pharmacy near my destination?", history: [], tools: tools({ findNearby: none }), firstName: "A" }));
+    expect(none).not.toHaveBeenCalled();
+    expect(JSON.stringify((calls2[1].messages as unknown[]).at(-1))).toMatch(/no destination to search around/);
+  });
+
+  it("get_safety_updates is read-only context: couldn't check stays couldn't check", async () => {
+    const { client, calls } = mockClient([{ tools: [{ name: "get_safety_updates", input: {} }] }, { text: "ok" }]);
+    const r = await collect(claudeMira({ client, message: "any recent safety updates here?", history: [], tools: tools(), firstName: "A" }));
+    expect(r.cards).toEqual([]);
+    const result = JSON.stringify((calls[1].messages as unknown[]).at(-1));
+    expect(result).toMatch(/couldnt_check/);
+    expect(result).toMatch(/never say there are none/);
+    expect(TOOLS.map((t) => t.name)).toContain("get_safety_updates");
+  });
+
+  it("check_trip points to the route sheet; offer_report accepts 'other'", async () => {
+    const { client, calls } = mockClient([{ tools: [{ name: "check_trip", input: {} }, { name: "offer_report", input: { category: "other", label: "something that happened" } }] }, { text: "ok" }]);
+    const r = await collect(claudeMira({ client, message: "what do we know about this walk? also I want to report something", history: [], tools: tools({ tripStatus: async () => RUNNING }), firstName: "A" }));
+    expect(r.cards.map((c) => c.type)).toEqual(["trip_status", "report"]);
+    const result = JSON.stringify((calls[1].messages as unknown[]).at(-1));
+    expect(result).toMatch(/route sheet/);
+    expect(result).not.toMatch(/Invalid input/);
+  });
+});
+
+describe("Safety updates summary (pure)", () => {
+  it("a failed or unavailable check is couldn't check, never none; a ready check gives counts, categories, publisher and age", () => {
+    expect(safetyUpdatesSummary({ state: "failed", sources: [], retryable: true }, "Delhi")).toEqual({ status: "couldnt_check", area: "Delhi" });
+    expect(safetyUpdatesSummary({ state: "unavailable", sources: [], retryable: false }, null)).toEqual({ status: "couldnt_check", area: null });
+    const at = new Date("2026-09-27T12:00:00Z");
+    const update: SafetyUpdate = { id: "u1", title: "t", translatedTitle: null, summary: null, category: "transport", reporting: "arrest_reported", reportedLocation: null, locationPrecision: "city", publishedAt: "2026-09-25T09:00:00Z", eventYear: null, publisher: "thehindu.com", originalUrl: "https://x", sourceType: "news", sourceCount: 2, sources: [], sensitive: false, retrievedAt: "2026-09-27T00:00:00Z" };
+    const r = safetyUpdatesSummary({ state: "ready", sources: [{ source: "gdelt", state: "ready" }], data: { area: { name: "Delhi", precision: "city", countryIso: "IN", countryName: "India" }, windowDays: 7, updates: [update], counts: { official: 0, news: 1 }, community: "unavailable_in_beta", checkedAt: at.toISOString() } }, "Delhi", at);
+    expect(r).toMatchObject({ status: "checked", area: "Delhi", count: 1, partial: false, categories: [{ category: "Transport", updates: 1 }], latest: [{ publisher: "thehindu.com", age_days: 2, reporting: "Arrest reported, not a conviction", sources: 2, official: false }] });
+    expect(JSON.stringify(r)).not.toMatch(/"title"|https:/); // no headlines or links go to the model
   });
 });
