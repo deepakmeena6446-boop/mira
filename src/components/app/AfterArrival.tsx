@@ -31,8 +31,8 @@ export function AfterArrival({
   const lit = hour !== null && walked && finished && route !== null && route.length > 2 && isNight(hour);
   const preparation = useJourneyCheck(trip.id, finished && !lit);
   if (!finished) return null;
-  // Say what actually happened: only an arrival is "arrived" (not a journey ended early, or sharing she stopped).
-  const done = trip.state === "arrived" && trip.autoArrival ? "You've arrived" : trip.autoArrival ? "Journey ended" : "Sharing stopped";
+  // Only an arrival is "arrived" — not a journey ended early or sharing she stopped (the headline above already names those).
+  const done = trip.state === "arrived" && trip.autoArrival ? "You've arrived" : "All done";
   if (hour === null) return <p className="mt-6 text-sm text-ink-muted">{done}. Checking whether MIRA has one quick question…</p>;
   if (lit) return <LitQuestion route={route!} onDone={onDone} />;
   if (preparation.check) return <div className="mt-6 w-full max-w-sm text-left animate-rise"><CheckCard check={preparation.check} /></div>;
