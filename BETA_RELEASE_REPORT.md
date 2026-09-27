@@ -34,7 +34,7 @@ Deploying is now a configuration task: every remaining step needs an owner crede
 | Home | **PASS** | New hero/landing copy; lighting stated once as text and once as a bar, above Start; glass sheet blur fixed for Chrome/Android (Lightning CSS was dropping `backdrop-filter`, so map labels bled through text). |
 | Route context | **PASS** | Duration, alternatives ("Fastest" is the only label), lighting with the unknown share, per-source provenance (with data / nothing mapped / couldn't check / not available), Help Points. Rides and transit explain why lighting is walk-only. A shared Overpass queue turned a Delhi route from "92% not known · couldn't check OpenStreetMap" into "85% mapped as lit · 7% not known". |
 | Journey | **PASS** | Start states who follows, what they see (latest spot and ETA), when it stops, and whether anyone is alerted. Trip ETA is labelled "with time to spare" (it's the buffered check-in time). Live location uploads never exceed the server limit on fast rides. |
-| Circle | **PASS** | Copy depends on the actual email provider state; Mira's cards say "will try to email… sending can fail" or "email isn't on, send your link". Trip screen links straight to Circle. |
+| Circle | **PASS** | **Phone-first (owner decision, 2026-09-27):** a contact can be saved with just a WhatsApp number (typed the local way; completed with her country's calling code; stored encrypted). On a shared journey each contact gets their own revocable live link and a **Send to <name>** button that opens WhatsApp with the message ready — she presses Send, and MIRA says "Opened WhatsApp ✓", never "sent". "Tell my people now" does the same with a check-on-me message. Email is optional and adds invites plus the *automatic* missed-arrival alert; all copy depends on which of the two a contact has. |
 | Arrival | **PASS** | Verified live: auto-arrival after the 45 s dwell, sharing stops, viewer sees only "arrived", journey details purge within a day. |
 | Emergency | **PASS** | Verified for IN, US, GB, AE, JP, BR, NG, FR, AU, SG, ZA, NP and MN: correct detection; service-specific numbers labelled (AE/JP/SG "Police", BR "Military Police"); NG/ZA region-dependent; unreviewed MN has no guessed number. |
 | I feel unsafe | **PASS** | Instant and deterministic; with no destination, "Share where I am, live" now starts sharing immediately instead of asking her to pick a destination; a failed Help Point lookup during a trip now says "couldn't load", never "none". |
@@ -46,6 +46,8 @@ Deploying is now a configuration task: every remaining step needs an owner crede
 ## What changed in this sprint
 
 - **Truthful failure states:** trip Help Points (failed ≠ none, partial shown); ride/transit arrival Help Points evidence; lighting sources (failed vs not configured, per-source provenance); Safety updates *partial* when headlines went unassessed; missed-arrival alerts name exactly who may not have been told.
+- **WhatsApp Circle:** phone numbers in Circle (migration `0019`, additive), per-contact WhatsApp links on journeys and in Tell my people now, viewer links work for WhatsApp contacts and are revoked on removal, Mira's cards and context describe WhatsApp honestly, privacy page updated. Automatic WhatsApp/SMS sending (no tap) is deferred until a provider (Twilio / MSG91 / Gupshup) and its verification are set up.
+- **Email optional:** strict mode no longer requires Resend; without it, boot warns and every screen says nobody is alerted automatically.
 - **Critical path:** "Share where I am, live" from I feel unsafe without a destination (and that screen no longer says "arrive" or offers a second, confusing end button; a journey ended early or sharing stopped is never called "arrived"); location uploads throttled to ≥ 8 s so fast rides don't trip the rate limit and show a false "can't reach MIRA".
 - **Mira:** see Mira row above.
 - **Deploy blockers fixed:** Google tile session now sends the site referrer (a referrer-restricted browser key otherwise fails silently to OpenFreeMap); worker gets the map keys MIRA Checks need; OSM endpoints configured; strict mode also requires `CLIENT_IP_HEADER`, `OVERPASS_URL`, https and no demo sign-in; missing locale data fails loudly; boot warnings for missing providers.
@@ -63,12 +65,12 @@ Baseline at `fc36a95` (before any change): lint pass, typecheck pass, **556/556*
 |---|---|---|
 | Type generation + TypeScript | `npm run typecheck` | pass |
 | Lint | `npm run lint` | pass (0 errors, 0 warnings) |
-| Unit + integration | `npm test` | **752/752** passed, 57 files (baseline 556) |
+| Unit + integration | `npm test` | **764/764** passed, 59 files (baseline 556) |
 | Production build (web + worker + migrator bundles) | `npm run build` | pass |
 | Client bundle secret scan | `npm run audit:bundle` | pass — 51 files, 14 patterns, no secrets |
-| End-to-end (Playwright, mobile + desktop projects, production build) | `npm run test:e2e` | **46 passed, 0 failed**, 4 intentional cross-project skips (9.5 min); 0 `request.failed` log lines |
-| Clean-database migration (dev migrator) | `scripts/migrate.ts` on a new database | 19 migrations, PostGIS/pg_trgm/pgcrypto, 36 tables; re-run is a no-op |
-| Clean-database migration (production bundle) | `node dist/migrate.mjs` with only `DATABASE_URL` set | 19 migrations applied |
+| End-to-end (Playwright, mobile + desktop projects, production build) | `npm run test:e2e` | **47 passed, 0 failed**, 5 intentional cross-project skips (8.5 min), including the new WhatsApp Circle journey test |
+| Clean-database migration (dev migrator) | `scripts/migrate.ts` on a new database | 20 migrations (incl. `0019_contact_phone`), PostGIS/pg_trgm/pgcrypto, 36 tables; re-run is a no-op |
+| Clean-database migration (production bundle) | `node dist/migrate.mjs` with only `DATABASE_URL` set | 20 migrations applied |
 | Safety updates eval | `scripts/safety-eval.ts` | tuning, held-out 1, live GDELT sample: precision/recall 1.000/1.000; held-out 2: 1.000 / 0.967 (one item relabelled ambiguous by the tightened rule); 65 audit probes: precision 0.224 → 1.000 |
 | Browser (375 × 812, production build, real providers from `.env.local`) | manual | Landing, Home, route sheet, journey start, live viewer, auto-arrival, Contribute, Trips, Me, I feel unsafe, 13-country emergency data |
 
@@ -84,7 +86,7 @@ Browser pass on the final build: 375 × 812, 412 × 915 and desktop 1024 × 768 
 | Mapillary | That lighting source reads "couldn't check just now"; OSM and walker evidence stay visible. |
 | OSM / Overpass | "Couldn't check OpenStreetMap"; Google Help Points and other lighting sources stay visible. |
 | GDELT | "MIRA couldn't check recent updates right now. Try again" — never "no updates". |
-| Email | Home, trip and Mira say nobody is alerted automatically; the live link still works; alerts are recorded `not_attempted`/`failed`, never `sent`. |
+| Email | WhatsApp contacts and the live link work unchanged; Home, trip and Mira say nobody is alerted automatically; alerts are recorded `not_attempted`/`failed`, never `sent`. |
 | AI | Scripted Mira answers (emergency, trips, reports, updates pointer); ambiguous news headlines are left out and the result is marked partial. Emergency and I feel unsafe never touch AI. |
 
 ## Deployment prerequisites (owner credentials and accounts only)
@@ -95,7 +97,7 @@ Still needed:
 1. **Railway plan** — the account's trial has expired; a paid plan is needed before `railway init`.
 2. **Domain** for production (and a staging subdomain), with DNS access.
 3. **Google sign-in OAuth client** (separate from the Maps keys) with redirect `https://<domain>/api/auth/google/callback`.
-4. **Resend** — verified sending domain and a sending-only API key (contact invites and missed-arrival alerts are email today).
+4. **Optional: Resend** — verified sending domain and a sending-only API key. Only needed for email invites and the automatic missed-arrival email; WhatsApp contacts need nothing.
 5. **Generated secrets** (session, encryption, admin hash, VAPID) — commands in the checklist.
 
 ## Known limitations
@@ -107,4 +109,5 @@ Still needed:
 - **Coverage:** 195 countries are recognised; reviewed emergency profiles exist for 60 (49 verified, 9 partial, 2 region-dependent); 135 have no reviewed number and say so. Lighting and Help Point evidence varies by source and area. Google tile sessions use one border convention (`region: IN`).
 - **Cost guards are per process:** the Google minute/day ceilings reset on restart; Google Cloud quotas and budget alerts remain the hard backstop. Per-IP geo limits are deliberately generous (carrier-grade NAT); abuse from many IPs is bounded by the ceilings, not per-IP limits.
 - **Help Points "unavailable":** with no map provider at all, a few sheets still say "no mapped Help Points from the sources checked" rather than "unavailable"; this cannot happen with the production configuration.
+- **WhatsApp is tap-to-send:** MIRA can't message anyone by itself on WhatsApp/SMS, so a WhatsApp-only contact gets **no automatic alert** if she doesn't arrive — the app says so. Numbers are completed with the country code of where she is now; a local number typed while abroad needs a `+` code.
 - **Accounts:** Mira and starting a journey need an account (one tap with Google); following a journey, route context and all emergency features don't.

@@ -14,7 +14,7 @@ Never paste a secret into chat, a commit, CI logs or this file. Read values from
 
 - [ ] Railway plan active (the trial has expired on the current account — a paid plan is needed before `railway init`).
 - [ ] A domain you control, e.g. `mira.example.org` (plus `staging.mira.example.org`).
-- [ ] Resend account; sending domain added and DNS records (SPF, DKIM, DMARC) published.
+- [ ] Optional: Resend account with a verified sending domain (SPF, DKIM, DMARC) — only for invites and the automatic missed-arrival email. WhatsApp contacts need nothing.
 - [ ] Google Cloud: the existing Maps keys get API + referrer restrictions (step 5), a budget alert and per-API quotas; create the sign-in OAuth client (step 6).
 - [ ] Anthropic: the existing key gets a monthly spend limit.
 - [ ] Mapillary: the existing token.
@@ -69,7 +69,6 @@ Set on **web** (all before the first deploy, with `--skip-deploys`), then refere
 | `PUBLIC_BETA_STRICT` | `on` (web only) |
 | `PUBLIC_AGGREGATE_RELEASES` | `off` (web and worker) |
 | `CLIENT_IP_HEADER` / `TRUSTED_PROXY_HOPS` | `x-real-ip` / `1` |
-| `RESEND_API_KEY`, `EMAIL_FROM` | `MIRA <alerts@your-verified-domain>` |
 | `GOOGLE_MAPS_SERVER_KEY` | Places API (New), Routes API, Geocoding API only |
 | `GOOGLE_MAPS_BROWSER_KEY` | Map Tiles API only; HTTP referrer `https://<your domain>/*` (must match `APP_BASE_URL`) |
 | `GOOGLE_PLACES_HOURS` | `on` |
@@ -92,6 +91,7 @@ Set on **web** (all before the first deploy, with `--skip-deploys`), then refere
 | `MIRA_MODEL` | `claude-sonnet-5` | |
 | `SAFETY_UPDATES` | `gdelt` | `off` hides the section honestly |
 | `SAFETY_CLASSIFIER_MODEL` | `claude-opus-5` | |
+| `RESEND_API_KEY`, `EMAIL_FROM` | unset | `MIRA <alerts@your-verified-domain>`; adds invites + automatic missed-arrival email |
 | `SAFETY_CLASSIFIER_DAILY_TOKEN_MAX` | 300000 | separate from Mira's budget; over → updates marked partial, never "none" |
 
 **Development only — never in production:** `SMTP_*` (Mailpit), `ALLOW_DEMO_SIGNIN=on`, `SAFETY_UPDATES=fixture`, `MAPBOX_TOKEN` (unused).
@@ -106,7 +106,7 @@ Set on **web** (all before the first deploy, with `--skip-deploys`), then refere
 - [ ] Consent screen scopes: `openid`, `userinfo.email`, `userinfo.profile`. Publish the app (or add testers).
 - [ ] Staging gets its own client/redirect URI.
 
-## 7. Email (Resend)
+## 7. Email (Resend) — optional
 
 - [ ] Domain shows *Verified* in Resend.
 - [ ] API key with *Sending access* for that domain only.

@@ -73,10 +73,11 @@ describe("production validation", () => {
     expect(productionWarnings(parseEnv({ ...prod, ...RESEND, ...providers, OVERPASS_URL: undefined })).join(" ")).toMatch(/OpenStreetMap lighting source/);
     expect(productionWarnings(parseEnv(valid))).toEqual([]); // dev/test: quiet
     const missing = { ...prod, PUBLIC_BETA_STRICT: "on" };
-    expect(() => parseEnv(missing)).toThrow(/RESEND_API_KEY/);
+    expect(() => parseEnv(missing)).toThrow(/GOOGLE_MAPS_SERVER_KEY/);
     const live = { ...missing, ...RESEND, GOOGLE_MAPS_SERVER_KEY: "server", GOOGLE_MAPS_BROWSER_KEY: "browser", AUTH_GOOGLE_ID: "id", AUTH_GOOGLE_SECRET: "secret", ANTHROPIC_API_KEY: "claude", MAPILLARY_TOKEN: "mapillary", VAPID_PUBLIC_KEY: "public", VAPID_PRIVATE_KEY: "private", VAPID_SUBJECT: "mailto:alerts@mira.test", GOOGLE_PLACES_HOURS: "on", PUBLIC_AGGREGATE_RELEASES: "off", OVERPASS_URL: "https://overpass.example/api", CLIENT_IP_HEADER: "x-real-ip" };
     expect(() => parseEnv(live)).not.toThrow();
     expect(() => parseEnv({ ...live, PUBLIC_AGGREGATE_RELEASES: "on" })).toThrow(/PUBLIC_AGGREGATE_RELEASES/);
+    expect(() => parseEnv({ ...live, RESEND_API_KEY: undefined, EMAIL_FROM: undefined })).not.toThrow(); // email is optional: WhatsApp from her phone is the main path
     expect(() => parseEnv({ ...live, CLIENT_IP_HEADER: undefined })).toThrow(/CLIENT_IP_HEADER/);
     expect(() => parseEnv({ ...live, OVERPASS_URL: undefined })).toThrow(/OVERPASS_URL/);
     expect(() => parseEnv({ ...live, ALLOW_DEMO_SIGNIN: "on" })).toThrow(/ALLOW_DEMO_SIGNIN/);

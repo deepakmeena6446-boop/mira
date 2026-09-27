@@ -175,7 +175,9 @@ export function parseEnv(source: Record<string, string | undefined>): ServerEnv 
     issues.push(`${env.AUTH_GOOGLE_ID ? "AUTH_GOOGLE_SECRET" : "AUTH_GOOGLE_ID"}: AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET must be set together`);
   }
   if (strict) {
-    for (const key of ["RESEND_API_KEY", "EMAIL_FROM", "GOOGLE_MAPS_SERVER_KEY", "GOOGLE_MAPS_BROWSER_KEY", "AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET", "ANTHROPIC_API_KEY", "MAPILLARY_TOKEN", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT", "OVERPASS_URL"] as const) {
+    // Email is optional: contacts get the live link on WhatsApp from her phone; email only adds the automatic
+    // missed-arrival alert, and without it every screen says nobody is alerted automatically (boot warning below).
+    for (const key of ["GOOGLE_MAPS_SERVER_KEY", "GOOGLE_MAPS_BROWSER_KEY", "AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET", "ANTHROPIC_API_KEY", "MAPILLARY_TOKEN", "VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT", "OVERPASS_URL"] as const) {
       if (!env[key]) issues.push(`${key}: required for the public beta`);
     }
     // Without it, rate limits key on the right-most X-Forwarded-For entry, which a client can influence.
@@ -199,7 +201,7 @@ export function productionWarnings(env: ServerEnv): string[] {
   const warnings: string[] = [];
   if (emailProvider(env) === "none") {
     warnings.push(
-      "No email provider (RESEND_API_KEY + EMAIL_FROM, or SMTP_*): contact invites, missed-arrival emails and email sign-in are OFF; share links still work.",
+      "No email provider (RESEND_API_KEY + EMAIL_FROM, or SMTP_*): contact invites, missed-arrival emails and email sign-in are OFF; WhatsApp contacts and share links still work.",
     );
   }
   // Each degrades honestly on screen (the source reads "unavailable"), but an operator should know at boot.

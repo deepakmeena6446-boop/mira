@@ -7,7 +7,7 @@ Never paste live links or screenshots with coordinates into shared channels.
 ## Before you start (1 min)
 
 - [ ] `curl -s https://<domain>/api/health/ready` → `{"status":"ready"}`.
-- [ ] The traveller has one **accepted** Circle contact whose inbox you can see (you, on another address), or add one in step 6.
+- [ ] The follower phone has WhatsApp (and, if email is configured, an inbox you can see).
 
 ## 1. Landing (1 min) — traveller phone, private window
 
@@ -37,18 +37,18 @@ Never paste live links or screenshots with coordinates into shared channels.
 
 ## 6. Circle (2 min)
 
-- [ ] Me → Your circle → add the follower's email address → the invite email arrives in that inbox (check spam).
-- [ ] Open the invite on the follower phone and accept. The traveller's Circle shows the contact as accepted.
+- [ ] Me → Your circle → **+ Add** → name + the follower's WhatsApp number typed the local way (e.g. `98765 43210` in India) → **Save**. The list shows "WhatsApp +91 •••• ••3210" and a WhatsApp badge.
+- [ ] Optional (email configured): add an email too → the invite arrives (check spam) → accept on the follower phone → the contact shows "Trusted".
 
 ## 7. Start with MIRA + share link (2 min)
 
-- [ ] Pick the destination again → the line under Start says MIRA will *attempt* to email your contact a live link and that sending can fail.
-- [ ] **Start with MIRA** → journey screen: "Sharing live", ETA "with time to spare", your contact's name under who can follow.
-- [ ] The contact's inbox receives the live link. Tap **Send my live link** too: the phone's share sheet opens (or "copied").
+- [ ] Pick the destination again → the line under Start says you'll send your contact the live link on WhatsApp in one tap (and, with email, that MIRA *attempts* an email that can fail).
+- [ ] **Start with MIRA** → journey screen: ETA "with time to spare" and **Send to <name>**. Tap it → WhatsApp opens with "I'm walking to … Follow along live on MIRA until I arrive: <link>" → press Send. Back in MIRA it says "Opened WhatsApp for <name> ✓" (never "sent").
+- [ ] With email configured: the contact's inbox also receives the live link. **Send my live link** still opens the share sheet.
 
 ## 8. Active trip — follower view (2 min)
 
-- [ ] Follower phone, **not signed in**, opens the link: first name, destination, "Expected by … <time zone>", "updated just now", one dot. No history trail.
+- [ ] Follower phone, **not signed in**, opens the link from WhatsApp: first name, destination, "Expected by … <time zone>", "updated just now", one dot. No history trail.
 - [ ] Walk 50–100 m: the dot moves within ~30 s.
 
 ## 9. Arrival (1 min)
@@ -60,7 +60,7 @@ Never paste live links or screenshots with coordinates into shared channels.
 ## 10. I feel unsafe (1 min) — during a second short trip, or from Home
 
 - [ ] Opens instantly, even in airplane mode after the page has loaded: the best Help Point, the reviewed emergency number, helplines where reviewed, "your location in words" with a Copy button.
-- [ ] **Tell my people now** (only shown with an accepted contact and email on): the result names who was emailed; the contact receives it.
+- [ ] **Tell my people now**: shows **Send to <name> on WhatsApp** with a "Can you check on me?" message (and, with email, who was emailed). Send it; the follower receives it.
 - [ ] End the trip.
 
 ## 11. Emergency (30 s)
@@ -80,7 +80,7 @@ Never paste live links or screenshots with coordinates into shared channels.
 
 ## 14. Missed check-in (optional, 25 min — run on staging if time is short)
 
-- [ ] Start a ride with a 10-minute ETA and don't arrive. ~10 minutes after the ETA (the grace period, plus up to 20 s for the worker) the traveller sees "Are you okay?" and the contact receives **exactly one** "hasn't checked in" email with the live link.
+- [ ] Email configured only: start a ride with a 10-minute ETA and don't arrive. ~10 minutes after the ETA (the grace period, plus up to 20 s for the worker) the traveller sees "Are you okay?" and the contact receives **exactly one** "hasn't checked in" email with the live link.
 
 ## 15. Sign out (30 s)
 

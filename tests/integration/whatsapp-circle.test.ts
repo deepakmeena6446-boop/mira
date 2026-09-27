@@ -41,6 +41,7 @@ describe("Circle on WhatsApp: she sends her link in one tap; MIRA never claims i
   });
   beforeEach(async () => {
     await getSql()`DELETE FROM abuse_counters`;
+    await recordHeartbeat(getSql(), "wa-worker", new Date(), "test", new Date()); // trips start only while the worker is up
     await recordHeartbeat(getSql(), "job:journeys", new Date(), "test", new Date());
   });
 

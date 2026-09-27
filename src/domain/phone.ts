@@ -16,10 +16,29 @@ export const E164 = /^\+[1-9]\d{7,14}$/;
  * "(020) 7946 0958" in the UK, "+44 (0)20 7946 0958".
  */
 export function normalizePhone(raw: string, callingCode: string | null): string | null {
-  // TODO(human)
-  void raw;
-  void callingCode;
-  return null;
+  // Only what people type in a number: digits, one leading "+", spaces, brackets, dashes, dots, slashes.
+  // Anything else (letters, "call me") is refused rather than guessed: a wrong number opens a stranger's chat.
+  const typed = raw.trim();
+  if (!typed || /[^\d\s+()\-./]/.test(typed)) return null;
+  // "+44 (0)20 …": the bracketed trunk 0 is a local habit written inside an international number.
+  let rest = typed.replace(/\(0\)/g, "");
+  let international = rest.startsWith("+");
+  if (international) rest = rest.slice(1);
+  if (rest.includes("+")) return null;
+  let digits = rest.replace(/[\s()\-./]/g, "");
+  if (!/^\d+$/.test(digits)) return null;
+  // "00" is the international prefix in most of the world: 0091 98765 43210 = +91 98765 43210.
+  if (!international && digits.startsWith("00")) {
+    international = true;
+    digits = digits.slice(2);
+  }
+  if (international) return E164.test(`+${digits}`) ? `+${digits}` : null;
+  // A local number needs her country's code; without it, a guess could reach someone else.
+  if (!callingCode) return null;
+  // The national trunk 0 (098765…, 020 7946…) is dropped once the country code is added. WhatsApp numbers are
+  // mobiles, so countries that keep a 0 after the code (Italian landlines) don't arise in practice.
+  const e164 = `${callingCode.replace(/[^\d+]/g, "")}${digits.replace(/^0/, "")}`;
+  return E164.test(e164) ? e164 : null;
 }
 
 /** "+91 •••• ••3210": enough for her to recognise the number, not enough to read it off a screen. */

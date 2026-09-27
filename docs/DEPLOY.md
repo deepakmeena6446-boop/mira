@@ -1,6 +1,6 @@
 # Deploying MIRA on Railway
 
-> **Public beta profile:** Use `PUBLIC_BETA_STRICT=on` on web for the 18+ worldwide beta. It fails **server startup** (not the build) if Resend, Google Maps, Google sign-in, Claude, Mapillary, Web Push, Google Places hours, `OVERPASS_URL` or `CLIENT_IP_HEADER` are unconfigured, if `APP_BASE_URL` isn't `https://`, or if first-name sign-in (`ALLOW_DEMO_SIGNIN=on`) is enabled; keep `PUBLIC_AGGREGATE_RELEASES=off`. A key being present is only a configuration check — the smoke test ([PRODUCTION_SMOKE_TEST.md](../PRODUCTION_SMOKE_TEST.md)) proves each provider works. The exact order is in [DEPLOYMENT_CHECKLIST.md](../DEPLOYMENT_CHECKLIST.md). The older share-link-only option below is for local previews or a different, explicitly approved release. Complete [the public beta release gates](PUBLIC_BETA_RELEASE.md) before production traffic.
+> **Public beta profile:** Use `PUBLIC_BETA_STRICT=on` on web for the 18+ worldwide beta. It fails **server startup** (not the build) if Google Maps, Google sign-in, Claude, Mapillary, Web Push, Google Places hours, `OVERPASS_URL` or `CLIENT_IP_HEADER` are unconfigured, if `APP_BASE_URL` isn't `https://`, or if first-name sign-in (`ALLOW_DEMO_SIGNIN=on`) is enabled; keep `PUBLIC_AGGREGATE_RELEASES=off`. A key being present is only a configuration check — the smoke test ([PRODUCTION_SMOKE_TEST.md](../PRODUCTION_SMOKE_TEST.md)) proves each provider works. The exact order is in [DEPLOYMENT_CHECKLIST.md](../DEPLOYMENT_CHECKLIST.md). The older share-link-only option below is for local previews or a different, explicitly approved release. Complete [the public beta release gates](PUBLIC_BETA_RELEASE.md) before production traffic.
 
 
 MIRA runs as **three Railway services** in one project, built from this repository:
@@ -15,7 +15,7 @@ The worker is not optional: it sends missed-arrival alerts, purges journeys and 
 
 The desired declarative topology is recorded in [`.railway/railway.ts`](../.railway/railway.ts). The installed Railway CLI 4.57.3 does not expose `railway config`, so use the verified CLI path below and compare it with this topology. Railway's older Config as Code (`railway.json` / `railway.toml`) is deprecated, **new services can't opt into it**, and it stops being read on 2026‑12‑01, so this repo has no `railway.json` ([docs](https://docs.railway.com/config-as-code)).
 
-> **Email is required for this public beta.** A non-strict local or private preview can still boot without it and honestly offer share links only. With `PUBLIC_BETA_STRICT=on`, missing Resend configuration blocks startup.
+> **Email is optional.** Trusted contacts get the live link on WhatsApp from her phone (MIRA opens WhatsApp; she presses Send). Resend adds contact invites and the *automatic* missed-arrival email; without it every screen says nobody is alerted automatically, and boot logs a `config.warning`.
 
 ---
 
@@ -150,7 +150,7 @@ done
 | `RAILPACK_NODE_VERSION` | web, worker | recommended | `24` (LTS). Without it Railpack resolves `engines.node` (`>=22.11.0`), which can pick a non-LTS major. |
 | `CLIENT_IP_HEADER` | web | public beta | `x-real-ip`: Railway's edge overwrites it with the connecting address. Rate limits key on it; without it they key on a client-influenced `X-Forwarded-For`. |
 | `TRUSTED_PROXY_HOPS` | web | fallback | `1`. Used only when the header above is absent. |
-| `RESEND_API_KEY`, `EMAIL_FROM` | web, worker | public beta | Both or neither. `EMAIL_FROM` = `MIRA <alerts@your-verified-domain>`. |
+| `RESEND_API_KEY`, `EMAIL_FROM` | web, worker | optional (recommended) | Both or neither. `EMAIL_FROM` = `MIRA <alerts@your-verified-domain>`. |
 | `MAP_STYLE_URL`, `MAP_STYLE_URL_NIGHT` | web | optional | Vector basemap (OpenFreeMap placeholder by default). |
 | `GOOGLE_MAPS_SERVER_KEY`, `GOOGLE_PLACES_HOURS` | web, worker | public beta | See step 7. The worker uses them to prepare MIRA Checks. |
 | `GOOGLE_MAPS_BROWSER_KEY` | web | public beta | Map Tiles; see step 7. |
