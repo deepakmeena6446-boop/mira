@@ -3,18 +3,19 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { CATEGORIES } from "@/domain/report/taxonomy";
-import { emergencyActions, emergencyLine, noNumberReason, type CountryContext } from "@/domain/country-context";
+import { emergencyLine, emergencySentence, noNumberReason, type CountryContext } from "@/domain/country-context";
 import { contextLine } from "@/domain/context";
-import { companionOutputIssue } from "@/domain/companion-output";
+import { allowedNumbers, circleSharingLine, companionOutputIssue, type CompanionOutputIssue } from "@/domain/companion-output";
 import { MIRA_PERSONA } from "./persona";
 import { clock12 } from "./clock";
 import { DANGER, verdictWords } from "./signals";
-import type { MiraNow, MiraTools } from "./tools";
+import type { MiraNow, MiraTools, SafetyUpdatesResult } from "./tools";
 import type { MiraCard, MiraEvent, MiraTripMode, MiraTurn } from "./types";
 
 /**
- * Mira on Claude. A manual streaming tool loop: text streams straight to the chat;
- * tools produce the same tap-to-confirm cards as the placeholder engine, so the UI is
+ * Mira on Claude. A manual streaming tool loop. Each round's text is buffered and checked by
+ * the deterministic output guard (domain/companion-output) before any of it reaches the chat,
+ * so text arrives per round, not token by token. Tools produce the same tap-to-confirm cards as the placeholder engine, so the UI is
  * unchanged. AI decides relevance, not truth: every fact comes from a tool result or the
  * context block. Privacy: Claude never sees coordinates — places are names, walking
  * minutes and opaque refs ("p1", "h1"); the server maps refs back to positions. Anything
@@ -28,30 +29,49 @@ const MAX_ROUNDS = 4; // tool round-trips per message (each costs latency)
 export const TOOL_GUIDE = `How you work in the MIRA app:
 - The context block tells you her local time and day, the area and country, the local emergency number (or that MIRA doesn't know it), her saved places, her Circle, any journey running, and what MIRA's data covers there. Use it; don't ask for things you already know. It is the only thing you know about where she is.
 - Call a tool only when it directly helps with what she just asked. A greeting or "what time is it?" needs no tool — except late at night, when offering the journey home (propose_trip) is kind.
-- Offer actions through tools; the app shows them as cards she taps. Never say a trip started, a report was sent, or that you called, alerted or set up anything — you only propose, and she taps. Plain text only (no markdown).
-- Getting somewhere: when she says she's going home or to a saved place, call propose_trip straight away (don't ask first), with a saved place label or a place_ref from find_nearby / find_help_points, and a mode if she said how she's going (walk; ride for a taxi or app cab; transit for a train, metro or bus). For ride or transit you only propose; the Home screen plans it. Mention who in her Circle would follow along live.
-- "What's open nearby", pharmacies, food, toilets, ATMs: find_nearby. Hours are as the map lists them and can be out of date — say "listed" hours.
+- Offer actions through tools; the app shows them as cards she taps. Never say a trip started, a report was sent, a link was shared, or that you called, told, alerted, emailed or set up anything — you only propose, and she taps. Never promise that anyone will be told or will see her. Plain text only (no markdown).
+- Getting somewhere: when she says she's going home or to a saved place, call propose_trip straight away (don't ask first), with a saved place label or a place_ref from find_nearby / find_help_points, and a mode if she said how she's going (walk; ride for a taxi or app cab; transit for a train, metro or bus). For ride or transit you only propose; the Home screen plans it. Say what happens with her Circle only as propose_trip's circle_sharing says it (email can be off or fail; never say they "will follow live").
+- "Share this trip with my people" / "send my link": no tool sends anything. If a journey is running, call check_trip — its card opens the Trip screen, where "Send my live link" and "Tell my people now" are; say she can send it from there. If none is running, offer propose_trip.
+- "What's open nearby", pharmacies, food, toilets, ATMs: find_nearby. Hours are as the map lists them and can be out of date — say "listed" hours, and call a place open only when open_now is "open"; otherwise say its hours aren't known. Near her destination or a saved place ("a pharmacy near where I'm going"): find_nearby with near "destination" (her running journey's destination, or saved_place); never answer a destination question with places around her.
 - "Somewhere staffed", "somewhere with people", a Help Point, or she feels uneasy: find_help_points (situation "unsafe" when she's uneasy, "nearby" otherwise). Help Points are places where help is usually available (hospital, police, station, pharmacy, hotel reception, fuel); say their hours exactly as the tool gives them.
 - Uneasy or uncomfortable (not in immediate danger): don't ask a question first. Call find_help_points with situation "unsafe" and, if she has a saved home, propose_trip to it. Then one short, warm line. The app's "I feel unsafe" button shows the nearest Help Point and Emergency instantly; you can mention it.
 - Followed, threatened, attacked or in danger: call show_emergency_help first (and find_help_points with situation "emergency" if her location is on), then keep it to one or two practical lines: the local emergency number from the context, or that MIRA doesn't know it and the Emergency button explains what to dial.
 - "What's the emergency number / police number here?": get_local_emergency_info, then say the number exactly as it returns it, or that MIRA doesn't know it.
 - Travel planning ("I'm landing in London at 11 PM"): say what you can do from what you have — the local emergency number if MIRA knows it (from the context, or get_local_emergency_info if she's asking about somewhere else, which you only know when she's there), sharing her journey with her Circle, Help Points and open places once she's there. Don't invent airport, taxi, transit or area advice.
+- "Recent safety updates", "what's been happening in this city", news: get_safety_updates (where "here", or "destination" for her running journey's destination). They are news reports, not a verdict: give the count, categories, publisher and how many days ago, as reported; "couldnt_check" means MIRA couldn't check (never say "none"); zero updates proves nothing about an area. The full list is in Safety updates on Home.
+- "What do we know about this walk / route?" with a journey running: check_trip, then say its destination and ETA; lighting and Help Points along the way are on the route sheet (the card opens it).
+- If she needs to move, say "somewhere with people around" or "somewhere open and lit", never "somewhere safe". No sign-offs like "stay safe" or "safe trip".
 - Questions MIRA has no verified data for — is an area, street, city, route, taxi or transport safe or dangerous, crime, "should I avoid…": start with "I don't have enough verified information to make that judgement." (in her language), then offer factual context from tools: Help Points near her and their hours (find_help_points), lighting mapped along a route if she proposes one (propose_trip after dark gives it), the local emergency number, sharing her journey. Never label anything safe, unsafe or dangerous; never estimate risk; never cite crime or statistics.
 - propose_trip may return "known_about_the_way" (lighting, Help Points on the route). These are the only facts you have about the way; mention at most one or two that matter, with the source and what isn't known.
-- Something happened to her: offer_report, so she can report it privately (only ever shared as combined, anonymous notes).
+- Something happened to her, or she wants to report something: offer_report (category "other" when it's unclear), so she can report it privately (only ever shared as combined, anonymous notes).
 - No saved home and she wants to go home: suggest_saving_home.
 - Never output coordinates, and don't guess addresses, hours, numbers or facts the tools and context didn't give you.`;
 
-const REPORT_CATEGORIES = CATEGORIES.filter((c) => c !== "other") as unknown as [string, ...string[]];
+const REPORT_CATEGORIES = [...CATEGORIES] as unknown as [string, ...string[]];
 const KINDS = ["pharmacy", "health", "police", "metro", "bus", "food", "shop", "toilets", "finance"] as const;
 const MODES = ["walk", "ride", "transit"] as const;
 const SITUATIONS = ["nearby", "unsafe", "emergency"] as const;
+const NEAR = ["me", "destination"] as const;
+const WHERE = ["here", "destination"] as const;
 
 export const TOOLS: Anthropic.Tool[] = [
   {
     name: "find_nearby",
-    description: "Find ordinary places near her right now (pharmacies, metro, cafés, toilets, ATMs). Shows a list she can tap to go to. Returns names, kinds, walking distance, listed hours and a place_ref for propose_trip.",
-    input_schema: { type: "object", properties: { kinds: { type: "array", items: { type: "string", enum: [...KINDS] }, description: "Kinds to look for; omit for anything around her." } } },
+    description: "Find ordinary places (pharmacies, metro, cafés, toilets, ATMs) near her right now, or near her destination. Shows a list she can tap to go to. Returns names, kinds, distance from the point searched, listed hours, open_now (open / closed / not_known, from listed hours only) and a place_ref for propose_trip.",
+    input_schema: {
+      type: "object",
+      properties: {
+        kinds: { type: "array", items: { type: "string", enum: [...KINDS] }, description: "Kinds to look for; omit for anything." },
+        near: { type: "string", enum: [...NEAR], description: '"destination": around her running journey\'s destination (or saved_place when given). Default "me".' },
+        saved_place: { type: "string", description: 'With near "destination": a saved place label to search around instead.' },
+      },
+    },
+    eager_input_streaming: true,
+  },
+  {
+    name: "get_safety_updates",
+    description: "Recent Safety updates for a whole city: news reports about women's safety (the same as Safety updates on Home), for where she is or her running journey's destination. Returns the count, categories, and publisher and age of the latest, or that MIRA couldn't check. Reported context only — never a verdict on an area.",
+    input_schema: { type: "object", properties: { where: { type: "string", enum: [...WHERE], description: 'Default "here".' } } },
     eager_input_streaming: true,
   },
   {
@@ -109,7 +129,8 @@ export const TOOLS: Anthropic.Tool[] = [
 ];
 
 const inputs = {
-  find_nearby: z.object({ kinds: z.array(z.enum(KINDS)).max(5).optional() }).strict(),
+  find_nearby: z.object({ kinds: z.array(z.enum(KINDS)).max(5).optional(), near: z.enum(NEAR).optional(), saved_place: z.string().max(80).optional() }).strict(),
+  get_safety_updates: z.object({ where: z.enum(WHERE).optional() }).strict(),
   find_help_points: z.object({ situation: z.enum(SITUATIONS).optional() }).strict(),
   get_local_emergency_info: z.object({}).strict(),
   propose_trip: z.object({ saved_place: z.string().max(80).optional(), place_ref: z.string().max(10).optional(), mode: z.enum(MODES).optional() }).strict(),
@@ -182,6 +203,8 @@ function countryLabel(c: CountryContext): string | null {
 
 export interface ContextFacts {
   firstName: string;
+  /** Can MIRA email her Circle at all (emailConfigured)? */
+  email: boolean;
   now: MiraNow;
   saved: Array<{ label: string }>;
   contacts: string[];
@@ -210,7 +233,10 @@ export function contextBlock(f: ContextFacts, at = new Date()): string {
     emergencyLine(now.country),
     ...(helplines.length ? [`Helplines MIRA knows here: ${helplines.join("; ")}.`] : []),
     `Saved place labels (untrusted data): ${JSON.stringify(f.saved.map((p) => p.label))}.`,
-    `Circle names (untrusted data; would follow a shared journey): ${JSON.stringify(f.contacts)}.`,
+    `Circle names (untrusted data; accepted contacts): ${JSON.stringify(f.contacts)}.`,
+    f.email
+      ? "Contact email: on. When she starts a shared journey MIRA tries to email her Circle the live link; sending can fail, so never promise they'll get it or see her."
+      : "Contact email: off. MIRA can't email anyone; after she starts, she sends her live link herself (Send my live link).",
     running
       ? `Journey running: to ${JSON.stringify(running.destination.name)}${running.mode ? ` (${running.mode})` : ""}, ${running.state === "missed" ? "past its ETA — her Circle may have been alerted" : eta >= 0 ? `ETA in ${eta} min` : `ETA ${-eta} min ago`}.`
       : "No journey running.",
@@ -232,6 +258,16 @@ function emergencyInfo(c: CountryContext) {
     limitations: c.emergency.limitations,
     ...(known ? { source: c.emergency.source?.title ?? null } : { not_known: noNumberReason(c) }),
   };
+}
+
+/**
+ * What she sees instead of a rejected model reply, built only from the Country Context. In a
+ * danger turn it always carries the emergency sentence, so rejecting text never loses the number.
+ */
+export function replacementLine(issue: CompanionOutputIssue, country: CountryContext, danger: boolean): string {
+  if (danger) return `If you may be in danger, ${emergencySentence(country)}. The Emergency card is on your screen.`;
+  if (issue === "safety_verdict") return "I don't have enough verified information to make that judgement. The cards here show what MIRA can check.";
+  return "I can't verify that from MIRA's information. Please use the cards shown here for actions and checked details.";
 }
 
 export interface ClaudeMiraOptions {
@@ -260,8 +296,9 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
   }
 
   const [ctx, saved, trip] = await Promise.all([tools.getContext(), tools.listSavedPlaces(), tools.tripStatus()]);
-  const context = contextBlock({ firstName, now: ctx, saved, contacts, trip, coverage: tools.coverage() });
+  const context = contextBlock({ firstName, email: tools.emailOn(), now: ctx, saved, contacts, trip, coverage: tools.coverage() });
 
+  const allowed = allowedNumbers(ctx.country);
   const refs = new Map<string, { name: string; lat: number; lon: number }>();
   let lookedAround = false; // a place list ran: the reply describes what's around her
   const sensitive: string[] = [];
@@ -278,23 +315,37 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
     const input = parsed.data as Record<string, unknown>;
     switch (name) {
       case "find_nearby": {
-        if (!ctx.hasLocation) return { result: { error: "Location is off, so I can't look around her." } };
-        const found = await tools.findNearby(input.kinds as string[] | undefined);
+        let around: { name: string; lat: number; lon: number } | undefined;
+        if (input.near === "destination") {
+          const label = typeof input.saved_place === "string" ? input.saved_place.toLowerCase() : null;
+          const place = label ? saved.find((p) => p.label.toLowerCase() === label) : undefined;
+          const t = place ? null : await tools.tripStatus();
+          around = place ? { name: place.label, lat: place.lat, lon: place.lon } : t && (t.state === "active" || t.state === "missed") ? t.destination : undefined;
+          if (!around) return { result: { error: "No journey is running and no saved place matched, so MIRA has no destination to search around. Ask where she means; don't offer places around her instead." } };
+        } else if (!ctx.hasLocation) return { result: { error: "Location is off, so I can't look around her." } };
+        const found = await tools.findNearby(input.kinds as string[] | undefined, around);
         lookedAround = true;
+        if (around) sensitive.push(around.name);
         const list = found.map((p) => {
           const ref = `p${refs.size + 1}`;
           refs.set(ref, { name: p.name, lat: p.lat, lon: p.lon });
           sensitive.push(p.name);
-          return { place_ref: ref, name: p.name, kind: p.kind, walking_distance_m: p.distanceM ?? null, listed_hours: p.hours ?? "not listed" };
+          return { place_ref: ref, name: p.name, kind: p.kind, distance_m: p.distanceM ?? null, listed_hours: p.hours ?? "hours not known", open_now: p.openNow };
         });
-        const card: MiraCard | undefined = found.length ? { type: "places", title: "Close by", places: found.map((p) => ({ name: p.name, kind: p.kind, distanceM: p.distanceM, lat: p.lat, lon: p.lon })) } : undefined;
-        return { result: list.length ? { places: list, note: "Hours are as the map lists them; they can be out of date." } : { none: "No such places in the map data MIRA has for this area." }, card };
+        const card: MiraCard | undefined = found.length ? { type: "places", title: around ? `Near ${around.name}` : "Close by", places: found.map((p) => ({ name: p.name, kind: p.kind, distanceM: p.distanceM, lat: p.lat, lon: p.lon })) } : undefined;
+        return {
+          result: list.length
+            ? { searched_around: around ? `her destination (${around.name}), not where she is` : "where she is", places: list, note: 'Hours are as the map lists them; they can be out of date. Say open only when open_now is "open".' }
+            : { none: "The map lookup returned no such places. That doesn't prove there are none; say so." },
+          card,
+        };
       }
       case "find_help_points": {
         if (!ctx.hasLocation) return { result: { error: "Location is off, so MIRA can't look for Help Points around her. The app's Emergency button still works." } };
         const situation = (input.situation as (typeof SITUATIONS)[number] | undefined) ?? "nearby";
-        const found = await tools.findHelpPoints(situation);
+        const { points: found, failed } = await tools.findHelpPoints(situation);
         lookedAround = true;
+        if (failed) return { result: { lookup_failed: "MIRA couldn't check Help Points just now (the map lookup failed). Say you couldn't check — never that there are none. The Emergency button still works." } };
         const list = found.map((p) => {
           const ref = `h${refs.size + 1}`;
           refs.set(ref, { name: p.name, lat: p.lat, lon: p.lon });
@@ -313,6 +364,19 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
         const card: MiraCard | undefined = hasSos() ? undefined : { type: "sos", contacts };
         return { result: { ...emergencyInfo(ctx.country), note: "The Emergency card is on her screen now." }, card };
       }
+      case "get_safety_updates": {
+        const r: SafetyUpdatesResult = await tools.safetyUpdates((input.where as (typeof WHERE)[number] | undefined) ?? "here");
+        if ((r.status === "checked" || r.status === "couldnt_check") && r.area) sensitive.push(r.area);
+        const note =
+          r.status === "checked"
+            ? "News reports as published, for the whole city: never a verdict, rating or comparison, and zero updates proves nothing. The list and sources are in Safety updates on Home."
+            : r.status === "couldnt_check"
+              ? "MIRA couldn't check Safety updates just now. Say that; never say there are none."
+              : r.status === "off"
+                ? "Safety updates are switched off in this deployment."
+                : "Say this plainly.";
+        return { result: { ...r, note } };
+      }
       case "propose_trip": {
         const savedPlace = typeof input.saved_place === "string" ? saved.find((p) => p.label.toLowerCase() === (input.saved_place as string).toLowerCase()) : undefined;
         const ref = typeof input.place_ref === "string" ? refs.get(input.place_ref) : undefined;
@@ -325,7 +389,9 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
             destination: dest.name,
             mode,
             ...(mode === "walk" ? { walk_minutes: t.minutes } : { note_mode: "MIRA doesn't estimate rides or transit here: Home plans it and asks her for the ETA." }),
-            circle_who_would_follow: t.contacts,
+            circle: t.contacts,
+            circle_sharing: circleSharingLine(t.contacts, t.email) || "Nobody in her Circle yet: the journey stays private unless she sends her live link.",
+            ...(t.helpLookupFailed ? { help_points_on_route: "MIRA couldn't check Help Points along the way (the lookup failed): say not known, never none." } : {}),
             ...(known.length
               ? {
                   known_about_the_way: known.map((c) => ({ line: contextLine(c), source: c.source.name, confidence: c.confidence, not_known: c.unknowns })),
@@ -334,14 +400,24 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
               : {}),
             note: "Shown as a card; nothing starts until she taps it.",
           },
-          card: { type: "trip", destination: t.destination, minutes: t.minutes, contacts: t.contacts, mode },
+          card: { type: "trip", destination: t.destination, minutes: t.minutes, contacts: t.contacts, mode, email: t.email },
         };
       }
       case "check_trip": {
         const t = await tools.tripStatus();
         if (!t || (t.state !== "active" && t.state !== "missed")) return { result: { trip: "none running" } };
         const minutesLeft = Math.round((new Date(t.etaAt).getTime() - Date.now()) / 60_000);
-        return { result: { destination: t.destination.name, mode: t.mode, state: t.state, minutes_until_eta: minutesLeft }, card: { type: "trip_status", destination: t.destination.name, etaAt: t.etaAt, state: t.state } };
+        return {
+          result: {
+            destination: t.destination.name,
+            mode: t.mode,
+            state: t.state,
+            minutes_until_eta: minutesLeft,
+            route_details: "Lighting and Help Points along the way are on the route sheet (the card opens the Trip screen); MIRA hasn't re-checked them here.",
+            sharing: '"Send my live link" and "Tell my people now" are on the Trip screen; nothing is sent from this chat.',
+          },
+          card: { type: "trip_status", destination: t.destination.name, etaAt: t.etaAt, state: t.state },
+        };
       }
       case "offer_report":
         return { result: { shown: true }, card: { type: "report", category: input.category as string, label: input.label as string } };
@@ -369,10 +445,17 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
     for await (const ev of stream) {
       if (ev.type === "content_block_delta" && ev.delta.type === "text_delta" && ev.delta.text) roundText += ev.delta.text;
     }
-    const issue = companionOutputIssue(roundText, emergencyActions(ctx.country).map((n) => n.number));
+    // The round alone, then the whole reply so far (a claim can straddle rounds; earlier rounds already passed).
+    const issue = roundText ? (companionOutputIssue(roundText, allowed) ?? companionOutputIssue(spoken + roundText, allowed)) : null;
     if (issue) {
       console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "mira.output_rejected", reason: issue }));
-      roundText = "I can't verify that from MIRA's information. Please use the cards shown here for actions and checked details.";
+      const danger = hasSos() || DANGER.test(opts.message);
+      roundText = replacementLine(issue, ctx.country, danger);
+      if (danger && !hasSos()) {
+        const card: MiraCard = { type: "sos", contacts };
+        cards.push(card);
+        yield { type: "card", card };
+      }
     }
     if (roundText) { spoken += roundText; yield { type: "text", delta: roundText }; }
     const msg = await stream.finalMessage();

@@ -21,6 +21,7 @@ import { GET as sharedGET } from "@/app/api/t/[token]/route";
 import { GET as prefsGET, PATCH as prefsPATCH } from "@/app/api/me/prefs/route";
 import { GET as habitsGET, DELETE as habitsDELETE } from "@/app/api/me/habits/route";
 import { GET as suggestionGET } from "@/app/api/me/habits/suggestion/route";
+import { POST as miraPOST } from "@/app/api/mira/route";
 import { applyTestEnv } from "../setup/test-env";
 import { newJar, switchJar, type Jar } from "../helpers/cookie-jar";
 import { allKeys, getRequest, jsonRequest } from "../helpers/http";
@@ -274,6 +275,37 @@ describe("Journey companion: time zones, habits, Trips", () => {
     await action(trip.id, "arrive");
     expect(await sharedTrip(getSql(), token, new Date())).toEqual({ state: "arrived", name: "Emma" });
     expect(await sharedTrip(getSql(), token, new Date(Date.now() + 40 * MINUTE))).toBeNull();
+  });
+
+  it("Mira's trip card and reply say what email can do: an attempt when it's on, do-it-yourself when it's off", async () => {
+    const owner = await signIn("Ines");
+    await saveHome();
+    const email = `mira-${randomUUID().slice(0, 6)}@example.test`;
+    await contactsPOST(jsonRequest("/api/me/contacts", { name: "Asha", email }));
+    await acceptInviteFor(email);
+    switchJar(owner);
+    const ask = async () => {
+      const res = await miraPOST(jsonRequest("/api/mira", { message: "take me home", context: { localTime: new Date().toISOString(), tzOffsetMin: 0, location: START } }));
+      expect(res.status).toBe(200);
+      const events = (await res.text()).trim().split("\n").map((l) => JSON.parse(l) as { type: string; delta?: string; card?: { type: string; email?: boolean } });
+      return { text: events.filter((e) => e.type === "text").map((e) => e.delta).join(""), card: events.find((e) => e.card?.type === "trip")?.card };
+    };
+    const on = await ask();
+    expect(on.text).toMatch(/MIRA will try to email Asha your live link when you start \(sending can fail\)\./);
+    expect(on.card).toMatchObject({ type: "trip", contacts: ["Asha"], email: true });
+    const smtp = process.env.SMTP_HOST;
+    try {
+      delete process.env.SMTP_HOST; // no email provider (applyTestEnv would rotate the session secret)
+      resetEnvCache();
+      const off = await ask();
+      expect(off.text).toMatch(/Email isn't switched on, so share your live link yourself after you start\./);
+      expect(off.text).not.toMatch(/follow along live|will be able to/);
+      expect(off.card).toMatchObject({ type: "trip", email: false });
+    } finally {
+      process.env.SMTP_HOST = smtp;
+      resetEnvCache();
+      resetMailer();
+    }
   });
 
   it("Trips lists the open journey first, then journeys finished in the last day only", async () => {

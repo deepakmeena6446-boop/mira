@@ -18,6 +18,7 @@ import { POST as tripActionPOST } from "@/app/api/trips/[id]/[action]/route";
 import { POST as routePOST } from "@/app/api/geo/route/route";
 import { POST as helpPOST } from "@/app/api/geo/help/route";
 import { POST as miraPOST, MIRA_DAILY_MAX } from "@/app/api/mira/route";
+import { RESTING_NOTE } from "@/server/providers/companion";
 import { applyTestEnv } from "../setup/test-env";
 import { newJar, switchJar } from "../helpers/cookie-jar";
 import { jsonRequest } from "../helpers/http";
@@ -123,7 +124,9 @@ describe("journey context: route, Help Points, options, safety net", () => {
     expect(notes).toHaveLength(1);
   });
 
-  it(`Mira is capped at ${MIRA_DAILY_MAX} messages per person per day`, async () => {
+  // The cap bounds model spend, not access: past it the scripted engine answers (so a danger
+  // message still gets the Emergency card; see mira-intelligence.test.ts). Bursts still get 429.
+  it(`Mira's model is capped at ${MIRA_DAILY_MAX} messages per person per day; past it the scripted Mira answers`, async () => {
     expect(MIRA_DAILY_MAX).toBe(60);
     await signIn("Chatty");
     const { user } = await (await meGET()).json();
@@ -132,6 +135,7 @@ describe("journey context: route, Help Points, options, safety net", () => {
     await getSql()`INSERT INTO abuse_counters (key_hmac, bucket, window_start, count, expires_at)
                    VALUES (${dailyKey("actor", user.id, now)}, 'mira:d', ${windowStart}, ${MIRA_DAILY_MAX}, ${new Date(now.getTime() + 86_400_000)})`;
     const res = await miraPOST(jsonRequest("/api/mira", { message: "hi", context: { localTime: now.toISOString(), tzOffsetMin: 0, location: null } }));
-    expect(res.status).toBe(429);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain(JSON.stringify({ type: "text", delta: RESTING_NOTE }));
   });
 });

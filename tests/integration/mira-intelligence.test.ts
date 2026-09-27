@@ -9,7 +9,9 @@ import { recordTokens, tokensUsedToday } from "@/server/providers/companion/budg
 import { RESTING_NOTE } from "@/server/providers/companion";
 import { POST as demoPOST } from "@/app/api/auth/demo/route";
 import { POST as placesPOST } from "@/app/api/me/places/route";
-import { POST as miraPOST, GET as miraGET } from "@/app/api/mira/route";
+import { POST as miraPOST, GET as miraGET, MIRA_DAILY_MAX } from "@/app/api/mira/route";
+import { miraTools } from "@/server/providers/companion/tools";
+import { requireUser } from "@/server/session/user";
 import { applyTestEnv } from "../setup/test-env";
 import { newJar, switchJar } from "../helpers/cookie-jar";
 import { jsonRequest } from "../helpers/http";
@@ -82,6 +84,58 @@ describe("Mira: global context, budget and caps", () => {
       applyTestEnv();
       resetEnvCache();
     }
+  });
+
+  it("past her daily cap, a danger message still gets the scripted reply and the Emergency card; the burst limit still rejects", async () => {
+    applyTestEnv({ ANTHROPIC_API_KEY: "sk-ant-test-not-a-real-key" });
+    resetEnvCache();
+    const sql = getSql();
+    const now = new Date();
+    try {
+      await signIn("Ubah");
+      const user = await requireUser(sql);
+      const actor = dailyKey("actor", user.id, now);
+      await sql`INSERT INTO abuse_counters (key_hmac, bucket, window_start, count, expires_at)
+                VALUES (${actor}, 'mira:d', ${new Date(Math.floor(now.getTime() / DAY_MS) * DAY_MS)}, ${MIRA_DAILY_MAX}, ${new Date(now.getTime() + DAY_MS)})`;
+      const events = await streamed("someone is following me");
+      expect(events[0]).toEqual({ type: "text", delta: RESTING_NOTE }); // no model call past the cap
+      expect(events.some((e) => e.type === "card" && e.card?.type === "sos")).toBe(true);
+      expect(events.filter((e) => e.type === "text").map((e) => e.delta).join("")).toMatch(/If you're in danger right now/);
+
+      const minute = new Date(Math.floor(now.getTime() / 60_000) * 60_000);
+      await sql`INSERT INTO abuse_counters (key_hmac, bucket, window_start, count, expires_at)
+                VALUES (${actor}, 'mira:m', ${minute}, 20, ${new Date(now.getTime() + DAY_MS)})
+                ON CONFLICT (key_hmac, bucket, window_start) DO UPDATE SET count = 20`;
+      expect((await miraPOST(jsonRequest("/api/mira", { message: "hi", context: ctx() }))).status).toBe(429);
+    } finally {
+      applyTestEnv();
+      resetEnvCache();
+    }
+  });
+
+  it("get_safety_updates reuses the Safety updates pipeline: checked for her city, 'no place' without a trip, off when switched off", async () => {
+    const sql = getSql();
+    await signIn("Tanvi");
+    const user = await requireUser(sql);
+    try {
+      process.env.SAFETY_UPDATES = "fixture";
+      resetEnvCache();
+      const tools = miraTools(sql, user, ctx());
+      const here = await tools.safetyUpdates("here");
+      expect(here).toMatchObject({ status: "checked", area: "Delhi", precision: "city" });
+      if (here.status !== "checked") throw new Error("unreachable");
+      expect(here.count).toBeGreaterThan(0);
+      expect(here.latest[0]).toEqual(expect.objectContaining({ publisher: expect.any(String), age_days: expect.any(Number) }));
+      expect(JSON.stringify(here)).not.toMatch(/\[Sample\]|https?:/); // no headlines or links reach the model
+      expect(tools.coverage()).toMatch(/Safety updates: recent news reports/);
+      expect(await tools.safetyUpdates("destination")).toEqual({ status: "no_place", reason: expect.stringMatching(/No journey is running/) });
+      const text = (await streamed("any recent safety updates here?")).filter((e) => e.type === "text").map((e) => e.delta).join("");
+      expect(text).toMatch(/Safety updates section on Home/);
+    } finally {
+      process.env.SAFETY_UPDATES = "off";
+      resetEnvCache();
+    }
+    expect(await miraTools(sql, user, ctx()).safetyUpdates("here")).toEqual({ status: "off" });
   });
 
   it("the global model cap falls back to scripted Mira", async () => {
