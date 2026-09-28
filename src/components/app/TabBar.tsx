@@ -41,7 +41,7 @@ export function TabBar() {
               >
                 {on ? <span aria-hidden className="absolute inset-x-5 top-0 h-0.5 rounded-b-full bg-accent" /> : null}
                 <Icon name={t.icon} className="size-[22px]" />
-                <span>{t.label}</span>
+                <span className="max-w-full truncate px-0.5">{t.label}</span>
               </Link>
             </li>
           );

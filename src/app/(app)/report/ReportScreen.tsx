@@ -94,7 +94,7 @@ export function ReportScreen({ preset, from = null }: { preset: Category | null;
     return (
       <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-[calc(var(--tabbar-space)+2rem)] text-center">
         <span aria-hidden className="grid size-14 place-items-center rounded-full bg-accent-soft text-accent">
-          <Icon name="check" className="size-7" />
+          <Icon name="check" className="mira-draw size-7" />
         </span>
         <h1 className="mt-5 text-[1.75rem] font-semibold animate-rise">Thank you.</h1>
         <p className="mt-2 max-w-sm text-ink-muted animate-rise">

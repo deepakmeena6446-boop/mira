@@ -22,6 +22,8 @@ import { SEEN_SCOUT_KEY, SEEN_VERIFIED_KEY, journeysStarted, readNumber, recordU
 import type { ImpactView } from "@/server/contributions";
 import type { CheckView } from "@/server/contributions/checks";
 import { useChromeTop } from "@/lib/use-chrome-top";
+import { useWide } from "@/lib/use-wide";
+import { haptic } from "@/lib/haptics";
 import { UnsafeSheet, type UnsafeShareAction, type UnsafeTellAction } from "@/components/app/UnsafeSheet";
 import { HelpNearSheet } from "@/components/app/HelpNearSheet";
 import { HELP_CLASSES, dedupeHelpPoints, type HelpClass, type HelpPoint } from "@/domain/help-points";
@@ -81,6 +83,8 @@ type Routed = { data: RouteInfo | ModeInfo | null; code?: string };
 
 /** The greeting card + help row on top, the sheet below: frame the map in what is visible between. */
 const MAP_PADDING = { top: 170, bottom: 360, left: 40, right: 40 };
+/** Desktop: the side panel (rail 88 + panel 400) covers the left of the map. */
+const MAP_PADDING_WIDE = { top: 40, bottom: 40, left: 88 + 400 + 40, right: 60 };
 const clock = (d: Date) => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 const SECONDARY = "flex min-h-16 flex-col items-center justify-center gap-1 rounded-[var(--radius-card)] border border-line bg-surface px-2 text-center text-[0.82rem] font-medium text-ink hover:bg-sunken";
 const names = (list: string[]) => (list.length <= 2 ? list.join(" and ") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`);
@@ -154,6 +158,7 @@ export function HomeScreen({
   const [habit, setHabit] = useState<HabitSuggestion | null>(null);
   const chromeRef = useRef<HTMLDivElement>(null);
   useChromeTop(chromeRef);
+  const wide = useWide();
 
   // First visit: show the short onboarding once (per-device convenience flag only).
   useEffect(() => {
@@ -349,6 +354,7 @@ export function HomeScreen({
     setStarting(false);
     if (res.ok) {
       recordUsage("journey");
+      haptic("journey-start");
       const line = (to || !walking ? null : chosen?.route.geometry) ?? null;
       if (line && line.length > 2) keepTripRoute(res.data.trip.id, line);
       router.push("/trip");
@@ -555,10 +561,10 @@ export function HomeScreen({
   return (
     <div className="fixed inset-0 overflow-hidden">
       <h1 className="sr-only">Mira — where are you going?</h1>
-      <WorldMap tiles={tiles} me={me} dest={dest} route={mode === "walk" ? (chosen?.route.geometry ?? null) : (rideRoute?.geometry ?? null)} notes={[]} places={mapPlaces} recenter={recenter} lighting={mode === "walk" ? (chosen?.lighting?.segments ?? null) : null} onPlaceClick={onPlaceClick} onLongPress={onLongPress} onMapClick={onMapClick} onArea={setArea} label="Map around your location" padding={MAP_PADDING} />
+      <WorldMap tiles={tiles} me={me} dest={dest} route={mode === "walk" ? (chosen?.route.geometry ?? null) : (rideRoute?.geometry ?? null)} notes={[]} places={mapPlaces} recenter={recenter} lighting={mode === "walk" ? (chosen?.lighting?.segments ?? null) : null} onPlaceClick={onPlaceClick} onLongPress={onLongPress} onMapClick={onMapClick} onArea={setArea} label="Map around your location" padding={wide ? MAP_PADDING_WIDE : MAP_PADDING} />
 
       {/* Top: greeting, and help that's always one tap away */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.9rem,env(safe-area-inset-top))]">
+      <div className="mira-chrome pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.9rem,env(safe-area-inset-top))]">
         <div className="pointer-events-auto mx-auto max-w-xl">
           <div ref={chromeRef}>
           <div className="glass flex items-center gap-3 rounded-[var(--radius-card)] border border-glass-edge px-4 py-2.5 shadow-[var(--shadow-float)]">
@@ -578,7 +584,7 @@ export function HomeScreen({
                   {unread ? <span aria-hidden className="absolute right-1.5 top-1.5 grid min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-4 text-accent-ink">{unread > 9 ? "9+" : unread}</span> : null}
                 </Link>
                 <Link href="/me" aria-label="Your profile">
-                  <Avatar name={user.name} src={user.avatarUrl} size={42} />
+                  <Avatar name={user.name} src={user.avatarUrl} size={44} />
                 </Link>
               </>
             ) : (
@@ -653,7 +659,7 @@ export function HomeScreen({
             setRecenter((n) => n + 1); // fly back to you, even if the fix hasn't changed
             void loc.request();
           }}
-          className="absolute right-4 z-20 grid size-12 place-items-center rounded-full bg-surface text-accent shadow-[var(--shadow-float)]"
+          className="mira-locate absolute right-4 z-10 grid size-12 place-items-center rounded-full bg-surface text-accent shadow-[var(--shadow-float)]"
           style={{ bottom: `calc(${snap === "peek" ? "var(--sheet-peek)" : "var(--sheet-half)"} + var(--tabbar-space) + 1rem)`, visibility: snap === "full" ? "hidden" : undefined }}
         >
           <Icon name="locate" />

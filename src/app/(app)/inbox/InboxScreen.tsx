@@ -3,18 +3,18 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MiraOrb } from "@/components/app/MiraOrb";
+import { MiraPulse } from "@/components/app/MiraPulse";
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 import { api } from "@/lib/api-client";
 import { useClock } from "@/lib/location-store";
 import type { InboxItem } from "@/server/providers/notify";
 
-const EMOJI: Record<string, string> = {
-  welcome: "✨",
-  contact_accepted: "🤝",
-  trip_missed: "⏰",
-  location_paused: "📡",
+const ICON: Record<string, string> = {
+  welcome: "sparkle",
+  contact_accepted: "check-circle",
+  trip_missed: "timer",
+  location_paused: "wifi-off",
 };
 
 function ago(iso: string, now: number): string {
@@ -49,7 +49,7 @@ export function InboxScreen({ signedIn, initial }: { signedIn: boolean; initial:
           <p className="mt-6 text-ink-muted">Sign in to get updates from Mira about your trips and trusted contacts.</p>
         ) : initial.length === 0 ? (
           <div className="mt-16 flex flex-col items-center text-center animate-rise">
-            <MiraOrb size={64} calm />
+            <MiraPulse size={24} />
             <p className="mt-4 text-lg font-semibold">All quiet</p>
             <p className="mt-1 max-w-xs text-ink-muted">I&apos;ll let you know here when a contact accepts, or if something needs your attention on a trip.</p>
           </div>
@@ -58,9 +58,7 @@ export function InboxScreen({ signedIn, initial }: { signedIn: boolean; initial:
             {initial.map((n) => {
               const body = (
                 <div className="flex gap-3">
-                  <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-accent-soft text-xl">
-                    {EMOJI[n.kind] ?? "💬"}
-                  </span>
+                  <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink"><Icon name={ICON[n.kind] ?? "info"} className="size-5" /></span>
                   <div className="min-w-0 flex-1">
                     <p className="flex items-baseline justify-between gap-2">
                       <span className="font-semibold leading-snug">{n.title}</span>

@@ -18,7 +18,7 @@ export function InstallCard({ variant, onDismiss }: { variant: "row" | "card"; o
   if (state.kind === "installed") {
     return (
       <div className="flex min-h-14 items-center gap-3 px-5">
-        <span aria-hidden className="text-xl">📱</span>
+        <Icon name="plus" className="size-5 text-accent" />
         <span className="flex-1 font-semibold">Mira is installed on this device</span>
         <Icon name="check" className="text-mint" />
       </div>
@@ -46,7 +46,7 @@ export function InstallCard({ variant, onDismiss }: { variant: "row" | "card"; o
     return (
       <div className="px-5 py-2">
         <button type="button" onClick={install} className="flex min-h-12 w-full items-center gap-3 text-left">
-          <span aria-hidden className="text-xl">📲</span>
+          <Icon name="plus" className="size-5 text-accent" />
           <span className="flex-1">
             <span className="block font-semibold">Install Mira</span>
             <span className="block text-sm text-ink-muted">Opens in one tap, full screen, like any app</span>
@@ -61,7 +61,7 @@ export function InstallCard({ variant, onDismiss }: { variant: "row" | "card"; o
   return (
     <div className="mt-4 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-card)] animate-rise">
       <div className="flex items-start gap-3">
-        <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-accent-soft text-2xl">📲</span>
+        <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-accent"><Icon name="plus" className="size-5" /></span>
         <div className="min-w-0 flex-1">
           <p className="font-semibold leading-snug">Add Mira to your home screen</p>
           <p className="text-sm text-ink-muted">One tap to open, even when you&apos;re in a hurry.</p>

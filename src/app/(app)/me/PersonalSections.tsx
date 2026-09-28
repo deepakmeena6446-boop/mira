@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
 import { cx } from "@/components/ui/cx";
 import { api } from "@/lib/api-client";
+import { resetLocalPersonalisation } from "@/lib/usage-signal";
 import { MODE_WORDS, TRAVEL_MODES, type TravelMode, type TravelPrefs } from "@/domain/travel-prefs";
 import type { HabitView } from "@/server/account/habits";
 
@@ -19,7 +20,7 @@ export function CircleRow({ accepted, invited }: { accepted: number; invited: nu
         <Icon name="heart" className="size-5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block font-bold">Your circle</span>
+        <span className="block font-semibold">Your circle</span>
         <span className="block text-sm text-ink-muted">
           {accepted ? `${accepted} ${accepted === 1 ? "person follows" : "people follow"} your journeys when you share` : "Add the people who should know you got there"}
           {invited ? ` · ${invited} invited` : ""}
@@ -90,7 +91,7 @@ export function PersonalSections() {
                   aria-checked={on}
                   disabled={!prefs || busy === "mode"}
                   onClick={() => !on && patch({ mode: m }, "mode")}
-                  className={cx("min-h-12 rounded-2xl border-2 px-3 text-left text-sm font-bold disabled:opacity-60", on ? "border-accent bg-accent-soft text-accent-strong" : "border-line text-ink-muted")}
+                  className={cx("min-h-12 rounded-2xl border-2 px-3 text-left text-sm font-semibold disabled:opacity-60", on ? "border-accent bg-accent-soft text-accent-strong" : "border-line text-ink-muted")}
                 >
                   {m ? MODE_WORDS[m].label : "No preference"}
                 </button>
@@ -146,7 +147,7 @@ export function PersonalSections() {
                   </div>
                 </div>
               ) : (
-                <button type="button" onClick={() => setConfirmForget(true)} className="min-h-11 text-sm font-bold text-ink-muted hover:text-ink">
+                <button type="button" onClick={() => setConfirmForget(true)} className="min-h-11 text-sm font-semibold text-ink-muted hover:text-ink">
                   Forget all
                 </button>
               )}
@@ -156,6 +157,20 @@ export function PersonalSections() {
           <p className="border-t border-line px-5 py-4 text-sm text-ink-muted">Nothing yet. After a few journeys to a saved place, you&apos;ll see them here.</p>
         ) : null}
         {failed ? <p className="border-t border-line px-5 py-4 text-sm text-ink-muted">Couldn&apos;t load this right now. Check your connection and open Me again.</p> : null}
+        {/* Device-local only (docs/launch-ux/07 §B): never sent to Mira; cleared here, on sign-out and on delete. */}
+        <div className="border-t border-line px-5 py-4">
+          <p className="text-sm text-ink-muted">On this phone: how you&apos;ve used Mira lately (journeys or contributions, by day only), to arrange Home&apos;s suggestions. Never sent anywhere.</p>
+          <button
+            type="button"
+            onClick={() => {
+              resetLocalPersonalisation();
+              toast("Home is back to its standard layout.");
+            }}
+            className="mt-1 min-h-11 text-sm font-semibold text-accent-strong"
+          >
+            Reset how Mira arranges Home
+          </button>
+        </div>
       </Section>
     </>
   );

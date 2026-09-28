@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MiraOrb } from "@/components/app/MiraOrb";
+import { MiraPulse } from "@/components/app/MiraPulse";
+import { recordUsage, usageMode, type UsageMode } from "@/lib/usage-signal";
 import { SignInSheet } from "@/components/app/SignInSheet";
-import { kindEmoji } from "@/components/app/kinds";
+import { kindIcon } from "@/components/app/kinds";
 import { Button } from "@/components/ui/Button";
 import { useDaypart } from "@/lib/daypart-store";
 import type { Daypart } from "@/domain/daypart";
@@ -31,6 +32,8 @@ interface Msg {
 /** What Mira is good at, as tappable examples (signed out, they open sign-in). */
 const EXAMPLES = ["Take me home", "What's open nearby?", "I'm landing in London at 11 PM", "Find Help Points nearby", "I feel uneasy"];
 /** After dark, the journey home and Help Points come first. */
+/** For people who mostly use Mira to contribute: the everyday observation first. */
+const CONTRIBUTOR_EXAMPLES = ["Report a broken streetlight", "What's open nearby?", "Take me home", "Find Help Points nearby", "I feel uneasy"];
 const NIGHT_EXAMPLES = ["Take me home", "I feel uneasy", "Find somewhere staffed nearby", "What's open nearby?", "I'm landing in London at 11 PM"];
 
 const INTRO: Record<Daypart, (name: string) => string> = {
@@ -59,7 +62,7 @@ function TripCardButton({ label, onStart }: { label: string; onStart: () => Prom
   return (
     <Button
       className="mt-3"
-      variant="hero"
+      variant="primary"
       busy={busy}
       busyLabel="Starting…"
       onClick={async () => {
@@ -83,7 +86,7 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
     case "trip": {
       const mode = card.mode ?? "walk";
       return (
-        <div className="mt-2 rounded-[var(--radius-card)] bg-surface p-4 shadow-[var(--shadow-card)]">
+        <div className="mt-2 rounded-[var(--radius-card)] border border-line bg-surface p-4">
           <p className="text-[13px] font-medium text-ink-subtle">Share journey</p>
           <p className="mt-1 text-lg font-semibold">To {card.destination.name}</p>
           <p className="text-sm text-ink-muted">
@@ -94,7 +97,7 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
             <TripCardButton label="Go with Mira" onStart={() => onTrip(card.destination)} />
           ) : (
             // Home plans rides and public transport, and asks her for the ETA.
-            <Button className="mt-3" variant="hero" onClick={() => goTo(card.destination)}>
+            <Button className="mt-3" variant="primary" onClick={() => goTo(card.destination)}>
               <Icon name="share" className="size-4" /> Plan it on Home
             </Button>
           )}
@@ -103,14 +106,14 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
     }
     case "places":
       return (
-        <div className="mt-2 overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]">
+        <div className="mt-2 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
           <p className="px-4 pt-3 text-[13px] font-medium text-ink-subtle">{card.title}</p>
           <ul className="divide-y divide-line">
             {card.places.map((p) => (
               <li key={`${p.name}-${p.lat}`}>
                 <button type="button" onClick={() => goTo({ name: p.name, lat: p.lat, lon: p.lon, kind: p.kind })} className="flex min-h-13 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-sunken">
-                  <span className="text-xl" aria-hidden>
-                    {kindEmoji(p.kind)}
+                  <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink-muted">
+                    <Icon name={kindIcon(p.kind)} className="size-[18px]" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold text-mixed">{p.name}</span>
@@ -125,14 +128,14 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
       );
     case "help_points":
       return (
-        <div className="mt-2 overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]">
+        <div className="mt-2 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
           <p className="px-4 pt-3 text-[13px] font-medium text-ink-subtle">{card.title}</p>
           <ul className="divide-y divide-line">
             {card.points.map((p) => (
               <li key={`${p.name}-${p.lat}`}>
                 <button type="button" onClick={() => goTo({ name: p.name, lat: p.lat, lon: p.lon, kind: p.label })} className="flex min-h-13 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-sunken">
-                  <span className="text-xl" aria-hidden>
-                    {p.emoji}
+                  <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink-muted">
+                    <Icon name={kindIcon(p.label)} className="size-[18px]" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold text-mixed">{p.name}</span>
@@ -153,8 +156,8 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
       );
     case "report":
       return (
-        <Link href={`/report?c=${card.category}`} className="mt-2 flex items-center gap-3 rounded-[var(--radius-card)] bg-surface p-4 font-bold shadow-[var(--shadow-card)]">
-          <span className="grid size-10 place-items-center rounded-2xl bg-peach-soft text-xl">📝</span>
+        <Link href={`/report?c=${card.category}&from=mira`} className="mt-2 flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 font-semibold">
+          <span aria-hidden className="grid size-10 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink"><Icon name="flag" className="size-5" /></span>
           <span className="flex-1">Report {card.label} privately</span>
           <Icon name="chevron" className="size-4 text-ink-subtle" />
         </Link>
@@ -171,7 +174,7 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
       );
     case "trip_status":
       return (
-        <Link href="/trip" className="mt-2 flex items-center gap-3 rounded-[var(--radius-card)] bg-surface p-4 shadow-[var(--shadow-card)]">
+        <Link href="/trip" className="mt-2 flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4">
           <span className="flex-1">
             <span className="block font-semibold">On the way to {card.destination}</span>
             <span className="block text-sm text-ink-muted">ETA {new Date(card.etaAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
@@ -181,8 +184,8 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
       );
     case "save_place":
       return (
-        <Link href="/me#places" className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-full bg-accent px-5 font-bold text-accent-ink">
-          🏠 Save my home
+        <Link href="/me#places" className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-button)] border border-line-strong bg-surface px-5 font-semibold text-ink">
+          <Icon name="home" className="size-4" /> Save my home
         </Link>
       );
   }
@@ -207,7 +210,7 @@ function SignedOutIntro({ onSignIn }: { onSignIn: () => void }) {
           </li>
         ))}
       </ul>
-      <Button className="mt-4 w-full" variant="hero" onClick={onSignIn}>
+      <Button className="mt-4 w-full" variant="primary" onClick={onSignIn}>
         Sign in to talk to Mira
       </Button>
       <p className="mt-3 text-center text-xs text-ink-subtle">Emergency and &ldquo;I feel unsafe&rdquo; are on Home and never wait for Mira.</p>
@@ -243,6 +246,7 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
     const message = text.trim();
     if (!message || sending) return;
     if (!user) return setSignIn(true);
+    recordUsage("mira");
     setInput("");
     setSending(true);
     const mine: Msg = { id: `u${Date.now()}`, role: "user", text: message, cards: [] };
@@ -297,6 +301,7 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
     const l = await freshLocation();
     if (!l.point) return toast("Turn on location so I can start your trip.", "error");
     const r = await api("/api/trips", { body: { from: { lat: l.point.lat, lon: l.point.lon }, to: dest, share: true } });
+    if (r.ok) recordUsage("journey");
     if (r.ok || r.code === "trip_active") {
       router.push("/trip");
       router.refresh();
@@ -305,15 +310,21 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
 
   const firstName = user?.name.split(" ")[0];
   const part = useDaypart() ?? "day";
-  const chips = part === "night" ? NIGHT_EXAMPLES : EXAMPLES;
+  // Chips follow how she uses Mira (device-local, day-stable); after dark the way home leads for everyone.
+  const [mode, setMode] = useState<UsageMode>("cold");
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- device storage exists only after mount
+    setMode(usageMode());
+  }, []);
+  const chips = part === "night" ? NIGHT_EXAMPLES : mode === "contribute" ? CONTRIBUTOR_EXAMPLES : EXAMPLES;
 
   return (
     <div className="flex h-dvh flex-col bg-canvas">
       <header className="z-10 flex items-center gap-3 border-b border-line bg-canvas px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
-        <MiraOrb size={36} calm />
+        <MiraPulse size={20} state={sending ? "thinking" : "observing"} />
         <div>
           <h1 className="text-xl font-semibold leading-tight">Mira</h1>
-          <p className="text-sm text-ink-muted">Your travel companion · facts from maps and Mira&apos;s country data</p>
+          <p className="text-sm text-ink-muted">Ask about places, your journey, or what Mira knows here.</p>
         </div>
       </header>
 
@@ -326,24 +337,22 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
           {!user && <SignedOutIntro onSignIn={() => setSignIn(true)} />}
           {user && loaded && msgs.length === 0 && (
             <div className="animate-rise">
-              <div className="flex items-end gap-2">
-                <MiraOrb size={30} calm />
-                <div className="max-w-[85%] rounded-[var(--radius-card)] rounded-bl-md bg-surface px-4 py-3 shadow-[var(--shadow-card)]">
-                  <p>{INTRO[part](firstName ? ` ${firstName}` : "")}</p>
-                </div>
+              <div className="flex items-start gap-3">
+                <MiraPulse size={16} className="mt-[5px]" />
+                <p className="max-w-[90%] text-mixed">{INTRO[part](firstName ? ` ${firstName}` : "")}</p>
               </div>
             </div>
           )}
           {msgs.map((m) =>
             m.role === "user" ? (
               <div key={m.id} className="flex justify-end animate-rise">
-                <p className="max-w-[80%] rounded-[var(--radius-card)] rounded-br-md bg-accent-soft px-4 py-2.5 text-ink text-mixed">{m.text}</p>
+                <p className="max-w-[80%] rounded-[var(--radius-card)] rounded-br-md bg-sunken px-4 py-2.5 text-ink text-mixed">{m.text}</p>
               </div>
             ) : (
-              <div key={m.id} className="flex items-end gap-2 animate-rise">
-                <MiraOrb size={30} calm />
-                <div className="min-w-0 max-w-[85%]">
-                  <div className={cx("rounded-[var(--radius-card)] rounded-bl-md px-4 py-3 shadow-[var(--shadow-card)]", m.failed ? "bg-warm-soft text-warm" : "bg-surface")} role={m.failed ? "alert" : undefined}>
+              <div key={m.id} className="flex items-start gap-3 animate-rise">
+                <MiraPulse size={16} state={m.failed ? "attention" : m.streaming && !m.text ? "thinking" : "observing"} className="mt-[5px]" />
+                <div className="min-w-0 max-w-[90%] flex-1">
+                  <div className={cx(m.failed ? "rounded-[var(--radius-card)] bg-warm-soft px-4 py-3 text-warm" : "")} role={m.failed ? "alert" : undefined}>
                     {m.text ? <p className="text-mixed">{m.text}</p> : <span className="inline-flex gap-1" aria-label="Mira is typing"><span className="size-2 animate-bounce rounded-full bg-ink-subtle" /><span className="size-2 animate-bounce rounded-full bg-ink-subtle [animation-delay:120ms]" /><span className="size-2 animate-bounce rounded-full bg-ink-subtle [animation-delay:240ms]" /></span>}
                   </div>
                   {m.cards.map((c, i) => (
@@ -362,7 +371,7 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
           <div className="mx-auto max-w-xl">
             <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
               {chips.map((q) => (
-                <button key={q} type="button" onClick={() => send(q)} disabled={sending} className="min-h-11 shrink-0 rounded-full border border-line bg-surface px-4 text-sm font-semibold shadow-[var(--shadow-card)] hover:border-accent/40">
+                <button key={q} type="button" onClick={() => send(q)} disabled={sending} className="min-h-11 shrink-0 rounded-full border border-line bg-surface px-4 text-sm font-medium hover:border-line-strong">
                   {q}
                 </button>
               ))}
@@ -372,7 +381,7 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
                 e.preventDefault();
                 void send(input);
               }}
-              className="flex items-center gap-2 rounded-full border border-line bg-surface p-1.5 pl-5 shadow-[var(--shadow-float)]"
+              className="flex items-center gap-2 rounded-[var(--radius-card)] border border-line-strong bg-surface p-1.5 pl-4 shadow-[var(--shadow-float)]"
             >
               <label htmlFor="mira-input" className="sr-only">
                 Message Mira

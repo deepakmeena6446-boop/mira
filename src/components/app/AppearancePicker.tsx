@@ -1,14 +1,15 @@
 "use client";
 
 import { cx } from "@/components/ui/cx";
+import { Icon } from "@/components/ui/Icon";
 import { setThemePref, useDaypart, useThemePref } from "@/lib/daypart-store";
 import type { ThemePref } from "@/domain/daypart";
 
 const LABEL = { dawn: "sunrise", day: "daytime", evening: "evening", night: "night" } as const;
-const OPTIONS: Array<{ value: ThemePref; label: string; emoji: string }> = [
-  { value: "auto", label: "Auto", emoji: "🌗" },
-  { value: "light", label: "Light", emoji: "☀️" },
-  { value: "dark", label: "Dark", emoji: "🌙" },
+const OPTIONS: Array<{ value: ThemePref; label: string; icon: string }> = [
+  { value: "auto", label: "Auto", icon: "clock" },
+  { value: "light", label: "Light", icon: "sun" },
+  { value: "dark", label: "Dark", icon: "eye" },
 ];
 
 /** Auto follows the time of day (sunrise → day → evening → night); Light/Dark pin it. */
@@ -33,7 +34,7 @@ export function AppearancePicker() {
             onClick={() => setThemePref(o.value)}
             className={cx("min-h-11 rounded-xl text-sm font-semibold transition-colors", pref === o.value ? "bg-surface text-ink shadow-[var(--shadow-card)]" : "text-ink-muted")}
           >
-            <span aria-hidden>{o.emoji}</span> {o.label}
+            <span className="inline-flex items-center gap-1.5"><Icon name={o.icon} className="size-4" /> {o.label}</span>
           </button>
         ))}
       </div>

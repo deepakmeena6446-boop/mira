@@ -16,6 +16,11 @@ mkdirSync(OUT, { recursive: true });
 const GEO = { latitude: 28.6951, longitude: 77.2143 };
 const ip = () => `10.${1 + Math.floor(Math.random() * 250)}.${1 + Math.floor(Math.random() * 250)}.${1 + Math.floor(Math.random() * 250)}`;
 const log = (...a) => console.log(JSON.stringify(a));
+// The sheet handle exists on phones only (desktop is a side panel).
+const resize = async (page) => {
+  const h = page.getByRole("button", { name: /Resize panel/ });
+  if (await h.isVisible().catch(() => false)) await h.click();
+};
 
 async function ctxFor(browser, kind) {
   const mobile = kind === "mobile";
@@ -69,10 +74,10 @@ for (const kind of process.argv[4] ? process.argv[4].split(",") : ["mobile", "de
   });
   await step("home-signed-out", async () => {
     await shot(page, p("03-home-signedout-peek"), { wait: 6000 });
-    await page.getByRole("button", { name: /Resize panel/ }).click();
-    await page.getByRole("button", { name: /Resize panel/ }).click();
+    await resize(page);
+    await resize(page);
     await shot(page, p("04-home-signedout-full"), { wait: 1500 });
-    await page.getByRole("button", { name: /Resize panel/ }).click();
+    await resize(page);
   });
   await step("unsafe-signed-out", async () => {
     await page.getByRole("button", { name: "I feel unsafe" }).first().click();
@@ -103,7 +108,7 @@ for (const kind of process.argv[4] ? process.argv[4].split(",") : ["mobile", "de
     await shot(page, p("09-search-results"), { wait: 3500 });
     await page.getByRole("dialog", { name: "Where to?" }).getByRole("button").filter({ hasText: /Vishwavidyalaya/ }).first().click();
     await shot(page, p("10-route-sheet-signedout"), { wait: 9000 });
-    await page.getByRole("button", { name: /Resize panel/ }).click();
+    await resize(page);
     await shot(page, p("11-route-sheet-signedout-full"), { wait: 1500 });
     await page.getByRole("region", { name: /Route to/ }).getByRole("button", { name: "Close" }).first().click();
   });
@@ -136,17 +141,17 @@ for (const kind of process.argv[4] ? process.argv[4].split(",") : ["mobile", "de
     await page.waitForTimeout(8000);
     await page.getByRole("button", { name: "🏠 Home" }).click();
     await shot(page, p("15-route-sheet-signedin"), { wait: 2000 });
-    await page.getByRole("button", { name: /Resize panel/ }).click();
+    await resize(page);
     await shot(page, p("16-route-sheet-signedin-full"), { wait: 1500 });
   });
   await step("start-trip", async () => {
     await page.getByRole("button", { name: /Go with Mira/ }).click();
     await page.waitForURL("**/trip", { timeout: 20000 });
     await shot(page, p("17-trip-active-half"), { wait: 6000 });
-    await page.getByRole("button", { name: /Resize panel/ }).click();
+    await resize(page);
     await shot(page, p("18-trip-active-full"), { wait: 1500 });
-    await page.getByRole("button", { name: /Resize panel/ }).click();
-    await page.getByRole("button", { name: /Resize panel/ }).click();
+    await resize(page);
+    await resize(page);
   });
   await step("trip-unsafe", async () => {
     await page.getByRole("button", { name: "I feel unsafe" }).click();

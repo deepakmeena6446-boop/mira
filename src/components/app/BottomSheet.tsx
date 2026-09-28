@@ -70,7 +70,7 @@ export function BottomSheet({
       aria-label={label}
       data-snap={snap}
       className={cx(
-        "fixed inset-x-0 bottom-[var(--tabbar-space)] z-30 mx-auto flex max-w-xl flex-col rounded-t-[var(--radius-lg)] border border-b-0 border-line bg-surface shadow-[var(--shadow-sheet)]",
+        "mira-sheet fixed inset-x-0 bottom-[var(--tabbar-space)] z-30 mx-auto flex max-w-xl flex-col rounded-t-[var(--radius-lg)] border border-b-0 border-line bg-surface shadow-[var(--shadow-sheet)]",
         drag === null && "transition-[height] duration-[var(--dur-sheet)] ease-[var(--ease-sheet)]",
         className,
       )}
@@ -82,7 +82,7 @@ export function BottomSheet({
         onPointerDown={onDown}
         onPointerMove={onMove}
         onClick={() => drag === null && onSnap(next[snap])}
-        className="flex min-h-11 w-full touch-none cursor-grab items-center justify-center rounded-t-[var(--radius-lg)] pt-1"
+        className="mira-sheet-handle flex min-h-11 w-full touch-none cursor-grab items-center justify-center rounded-t-[var(--radius-lg)] pt-1"
       >
         <span className="h-[5px] w-9 rounded-full bg-line-strong" />
       </button>

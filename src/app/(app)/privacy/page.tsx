@@ -2,16 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { providerModes } from "@/server/providers/modes";
 import { emailConfigured, getEnv } from "@/server/config/env";
-import { MiraOrb } from "@/components/app/MiraOrb";
 import { Icon } from "@/components/ui/Icon";
 
 export const metadata: Metadata = { title: "Privacy" };
 
-function Item({ emoji, title, children }: { emoji: string; title: string; children: React.ReactNode }) {
+function Item({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
   return (
-    <li className="flex gap-4 rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--shadow-card)]">
-      <span className="text-3xl" aria-hidden>
-        {emoji}
+    <li className="flex gap-4 rounded-[var(--radius-card)] border border-line bg-surface p-5">
+      <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink">
+        <Icon name={icon} className="size-5" />
       </span>
       <div>
         <h2 className="font-semibold">{title}</h2>
@@ -27,19 +26,16 @@ export default function PrivacyPage() {
   return (
     <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
       <article className="mx-auto max-w-xl">
-        <Link href="/me" className="mb-4 inline-flex min-h-11 items-center gap-1 font-bold text-ink-muted">
+        <Link href="/me" className="mb-4 inline-flex min-h-11 items-center gap-1 font-semibold text-ink-muted">
           <Icon name="back" className="size-5" /> Back
         </Link>
-        <div className="flex items-center gap-3">
-          <MiraOrb size={52} calm />
-          <h1 className="text-3xl font-semibold">Your privacy</h1>
-        </div>
+        <h1 className="text-[1.75rem] font-semibold tracking-tight">Your privacy</h1>
         <p className="mt-3 text-lg text-ink-muted">Plain words about what Mira keeps, who sees it, and when it&apos;s gone.</p>
 
-        <p className="mt-2 text-sm text-ink-muted">Accounts are for adults 18 or older. Mira keeps a signed self-attestation cookie for up to one year, without collecting a birth date. <Link href="/terms" className="font-bold text-accent underline">Read the beta terms</Link>.</p>
+        <p className="mt-2 text-sm text-ink-muted">Accounts are for adults 18 or older. Mira keeps a signed self-attestation cookie for up to one year, without collecting a birth date. <Link href="/terms" className="font-semibold text-accent underline">Read the beta terms</Link>.</p>
 
         <ul className="mt-6 space-y-3">
-          <Item emoji="📍" title="Your location">
+          <Item icon="pin" title="Your location">
             <p>Used to show where you are and what&apos;s around. It isn&apos;t stored unless you&apos;re on a trip you started.</p>
             <p>During a trip, only your last few positions are kept, and they&apos;re deleted the moment the trip ends. There&apos;s no location history.</p>
             {providerModes().maps === "google" ? (
@@ -55,7 +51,7 @@ export default function PrivacyPage() {
             )}
             <p>Some third-party geocoders require rounded coordinates in a server-to-provider request URL. Mira keeps coordinates out of your browser URL and does not log those provider URLs.</p>
           </Item>
-          <Item emoji="📰" title="Safety updates">
+          <Item icon="info" title="Safety updates">
             {safetyUpdates === "off" ? (
               <p>Safety updates are switched off in this version.</p>
             ) : (
@@ -74,7 +70,7 @@ export default function PrivacyPage() {
               </>
             )}
           </Item>
-          <Item emoji="💜" title="Trips you share">
+          <Item icon="share" title="Trips you share">
             <p>
               Each trusted contact on a journey (one who accepted your email invite, or one you saved with a WhatsApp number) gets their own live link. They see your first name, destination, latest position and ETA until you arrive. After
               that, the link shows only that you arrived (for 30 minutes), then nothing. Remove a contact and their link stops working at once. For WhatsApp contacts, Mira only opens WhatsApp with the message ready: you send it, from your own WhatsApp, and Mira never sees the chat or knows whether it was sent.
@@ -90,13 +86,13 @@ export default function PrivacyPage() {
               you&apos;re done.
             </p>
           </Item>
-          <Item emoji="🔔" title="Notifications">
+          <Item icon="bell" title="Notifications">
             <p>
               If you turn them on in Me, your phone&apos;s push service (Google, Apple or Mozilla) delivers Mira&apos;s notifications to you: a missed check-in, someone
               accepting your invite, or your live location pausing. Notifications never contain your location. Turn them off in Me at any time.
             </p>
           </Item>
-          <Item emoji="📞" title="If you feel unsafe">
+          <Item icon="phone" title="If you feel unsafe">
             <p>
               &ldquo;I feel unsafe&rdquo; and Emergency work on your phone alone: nothing is sent to Mira or anyone else until you tap an action. Emergency opens your
               phone&apos;s dialler with the emergency number for the country you&apos;re in (from a cited list; where Mira doesn&apos;t know it, it says so before you call); Mira doesn&apos;t call, dispatch or alert anyone for you. &ldquo;Call someone&rdquo; uses your phone&apos;s
@@ -104,7 +100,7 @@ export default function PrivacyPage() {
             </p>
             <p>Help Points are types of places where help may be available (hospitals, police, stations, pharmacies, fuel, hotels) from map data. Mira can&apos;t confirm they&apos;re open or who&apos;s there.</p>
           </Item>
-          <Item emoji="👤" title="Your account">
+          <Item icon="user" title="Your account">
             <p>
               Your first name, saved places (encrypted) and trusted contacts (their emails and phone numbers are encrypted). If you sign in with Google, Mira keeps your Google account
               id, your first name and a protected (encrypted) copy of your email — nothing else from Google: no photo, no contacts, no location history. If you add your
@@ -112,7 +108,7 @@ export default function PrivacyPage() {
               to you. An account with an email that isn&apos;t used for over a year is deleted; one without an email goes when you sign out or its session ends.
             </p>
           </Item>
-          <Item emoji="🧭" title="What Mira remembers about how you travel">
+          <Item icon="route" title="What Mira remembers about how you travel">
             <p>
               Only what you chose: your preferred way of travelling, and — after a journey to one of <em>your saved places</em> that you finished — a counter of how
               often you go there, by which way, at about which hour, and who you shared it with last time. No routes, no coordinates, no times finer than the hour.
@@ -120,7 +116,14 @@ export default function PrivacyPage() {
               in Me &rarr; What Mira remembers. Mira never records where you go in the background.
             </p>
           </Item>
-          <Item emoji="✨" title="Chatting with Mira">
+          <Item icon="home" title="What Mira keeps on this phone">
+            <p>
+              To arrange Home&apos;s suggestions around how you use Mira, this phone keeps a short list of what you did lately — only the kind (a journey, a report, a
+              check, a correction, a lighting answer, a message to Mira) and the day. No time, no place, no text. It&apos;s never sent to Mira, and it&apos;s cleared
+              after 60 days, when you tap &ldquo;Reset how Mira arranges Home&rdquo; in Me, when you sign out and when you delete your account.
+            </p>
+          </Item>
+          <Item icon="sparkle" title="Chatting with Mira">
             <p>
               Your chat is saved to your account for 30 days so Mira can follow the conversation. Mira&apos;s replies are saved without area names, walking times or
               nearby places. <strong className="text-ink">Your own messages are saved exactly as you typed them</strong>, so don&apos;t type addresses you&apos;d rather not
@@ -132,30 +135,30 @@ export default function PrivacyPage() {
                 : "Mira runs on a built-in script right now. When its AI is connected, messages will be processed by our AI provider to generate replies — never sold, never used for ads."}
             </p>
           </Item>
-          <Item emoji="📝" title="Reports">
+          <Item icon="report" title="Reports">
             <p>Only a rough area (about 1 km), roughly when, and the kind of thing are kept — never your exact spot. Notes are encrypted and read only by a moderator.</p>
             <p>
               Reports are submitted privately. They may be reviewed before they can contribute to Mira&apos;s information, and public notes are currently switched
               off: nothing from reports is shown to anyone during this beta. When switched on, a fixed-wording note appears on a route that passes through the area only when at least five different people have reported something similar nearby, and disappears after five weeks. Reports are deleted within 30 days. How reports are reviewed is in Mira&apos;s moderation policy (MODERATION_POLICY.md in the project).
             </p>
           </Item>
-          <Item emoji="💡" title="Street lighting">
+          <Item icon="bulb" title="Street lighting">
             <p>
               After a walk in the dark, you can tell Mira whether the way was lit. Your answer is saved per short street stretch (about 40 m), with only the day — not
               your name, your account, your trip, or a time — and nothing links one stretch to the next, so it can&apos;t be joined back into your route.
             </p>
             <p>A stretch shows as lit or dark only once at least three different people agree. Answers older than 90 days stop counting and are deleted after 120.</p>
           </Item>
-          <Item emoji="🤝" title="Contributions and your impact">
+          <Item icon="contribute" title="Contributions and your impact">
             <p>
               Answers to Mira Checks (&ldquo;Was this pharmacy open?&rdquo;) and corrections are stored like lighting answers: per place, with the day, and a keyed
               code instead of your name, so they can&apos;t be joined into where you went. So Mira can tell you when someone else confirms your answer, your account
               keeps a private, encrypted note of it until it&apos;s confirmed or expires (30 days for places, 90 for lighting) — then only the outcome stays
-              (&ldquo;verified&rdquo;, with the day and country). Your current impact counts only verifiable, verified answers. Older credited place answers without a recomputation link are retained until normal deletion but excluded from current impact and Local Steward; there are no points, rankings or public profiles, and
+              (&ldquo;verified&rdquo;, with the day and country). Your current impact counts only verifiable, verified answers. Older credited place answers without a recomputation link are retained until normal deletion but excluded from current impact and Mira Scout (formerly Local Steward); there are no points, rankings or public profiles, and
               reports never count towards anything.
             </p>
           </Item>
-          <Item emoji="🚫" title="What Mira never does">
+          <Item icon="close" title="What Mira never does">
             <p>No ads, no selling data, no analytics trackers, no public profiles, no &ldquo;safe/unsafe&rdquo; scores or crime maps, and no tracking you didn&apos;t start.</p>
           </Item>
         </ul>

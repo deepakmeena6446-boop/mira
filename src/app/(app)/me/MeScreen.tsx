@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/app/Avatar";
-import { MiraOrb } from "@/components/app/MiraOrb";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { AppearancePicker } from "@/components/app/AppearancePicker";
 import { InstallCard } from "@/components/pwa/InstallCard";
@@ -14,10 +13,12 @@ import { useToast } from "@/components/ui/Toast";
 import { cx } from "@/components/ui/cx";
 import { api } from "@/lib/api-client";
 import { freshLocation } from "@/lib/location-store";
+import { resetLocalPersonalisation } from "@/lib/usage-signal";
 import type { SavedPlace } from "@/server/account/places";
 import { MAX_SAVED_PLACES } from "@/domain/limits";
 import type { Contact } from "@/server/account/contacts";
 import { HELP_CLASSES, type HelpClass } from "@/domain/help-points";
+import { HELP_ICON } from "@/components/app/kinds";
 import { Section } from "@/components/app/Section";
 import { AccountSection, PushSection } from "./MeSections";
 import { CircleRow, PersonalSections } from "./PersonalSections";
@@ -70,10 +71,9 @@ export function MeScreen({
   if (!user) {
     return (
       <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-[calc(var(--tabbar-space)+2rem)] text-center">
-        <MiraOrb size={80} />
-        <h1 className="mt-6 text-3xl font-semibold">Make Mira yours</h1>
+        <h1 className="text-[1.75rem] font-semibold">Make Mira yours</h1>
         <p className="mt-2 max-w-sm text-ink-muted">Save the places you go and the people you trust, so sharing a trip is one tap.</p>
-        <Button className="mt-7 max-w-xs" variant="hero" size="lg" onClick={() => setSignIn(true)}>
+        <Button className="mt-7 max-w-xs" variant="primary" size="lg" onClick={() => setSignIn(true)}>
           Get started
         </Button>
         <SignInSheet open={signIn} onClose={() => setSignIn(false)} />
@@ -114,10 +114,6 @@ export function MeScreen({
         </header>
 
         <CircleRow accepted={contacts.filter((c) => c.status === "accepted").length} invited={contacts.filter((c) => c.status === "invited").length} />
-        <div className="mt-3 overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]">
-          <ImpactRow />
-        </div>
-
         <Section
           id="places"
           title="Your places"
@@ -127,7 +123,7 @@ export function MeScreen({
                 {MAX_SAVED_PLACES} of {MAX_SAVED_PLACES}
               </span>
             ) : (
-              <button type="button" onClick={() => setAddingPlace((v) => !v)} className="min-h-11 rounded-full px-3 text-sm font-bold text-accent">
+              <button type="button" onClick={() => setAddingPlace((v) => !v)} className="min-h-11 rounded-full px-3 text-sm font-semibold text-accent-strong">
                 {addingPlace ? "Cancel" : "+ Add"}
               </button>
             )
@@ -151,7 +147,7 @@ export function MeScreen({
                   </button>
                 ))}
               </div>
-              <label className="mt-3 block text-sm font-bold" htmlFor="place-label">
+              <label className="mt-3 block text-sm font-semibold" htmlFor="place-label">
                 Name
               </label>
               <input id="place-label" value={placeLabel} maxLength={40} onChange={(e) => setPlaceLabel(e.target.value)} className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
@@ -169,7 +165,7 @@ export function MeScreen({
                 <li key={p.id} className="flex items-center gap-3 px-5 py-3">
                   <span className="grid size-11 place-items-center rounded-2xl bg-accent-soft text-xl">{p.emoji}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block font-bold">{p.label}</span>
+                    <span className="block font-semibold">{p.label}</span>
                     <span className="block truncate text-sm text-ink-muted">{p.address ?? "Pinned on the map"}</span>
                   </span>
                   <button
@@ -193,8 +189,20 @@ export function MeScreen({
           )}
         </Section>
 
-        {switchPreserved ? <p role="alert" className="rounded-2xl bg-warm-soft px-5 py-4 text-sm text-ink">This Google sign-in belongs to another Mira account. Your current account and its places, contacts, and journeys were kept here. To keep this account after signing out, upgrade it with a different Google account or email first; then you can switch accounts. Mira does not merge contribution identities automatically.</p> : null}
-        <AccountSection durable={user.durable} google={user.google} emailHint={user.emailHint} emailAvailable={emailAlerts} googleAvailable={modes.auth === "google"} saved={saved} />
+        <Section id="contributing" title="Contributing">
+          <ul className="divide-y divide-line">
+            <li>
+              <ImpactRow />
+            </li>
+            <li>
+              <Link href="/report?from=me" className="flex min-h-14 items-center gap-3 px-5 hover:bg-sunken">
+                <Icon name="flag" className="text-accent" /> <span className="flex-1 font-semibold">Report something</span> <Icon name="chevron" className="size-4 text-ink-subtle" />
+              </Link>
+            </li>
+          </ul>
+        </Section>
+
+        <PersonalSections />
 
         <Section id="help" title="Help Points">
           <div className="p-5">
@@ -217,9 +225,9 @@ export function MeScreen({
                           toast(r.message, "error");
                         }
                       }}
-                      className={cx("flex min-h-12 w-full items-center gap-2 rounded-2xl border-2 px-3 text-left text-sm font-bold", on ? "border-accent bg-accent-soft text-accent-strong" : "border-line text-ink-muted line-through")}
+                      className={cx("flex min-h-12 w-full items-center gap-2 rounded-[var(--radius-control)] border px-3 text-left text-sm font-medium", on ? "border-accent/40 bg-accent-soft text-ink" : "border-line text-ink-muted line-through")}
                     >
-                      <span aria-hidden>{HELP_CLASSES[c].emoji}</span> {HELP_CLASSES[c].label}
+                      <Icon name={HELP_ICON[c] ?? "pin"} className="size-4" /> {HELP_CLASSES[c].label}
                     </button>
                   </li>
                 );
@@ -228,7 +236,9 @@ export function MeScreen({
           </div>
         </Section>
 
-        <PersonalSections />
+        {switchPreserved ? <p role="alert" className="rounded-2xl bg-warm-soft px-5 py-4 text-sm text-ink">This Google sign-in belongs to another Mira account. Your current account and its places, contacts, and journeys were kept here. To keep this account after signing out, upgrade it with a different Google account or email first; then you can switch accounts. Mira does not merge contribution identities automatically.</p> : null}
+        <AccountSection durable={user.durable} google={user.google} emailHint={user.emailHint} emailAvailable={emailAlerts} googleAvailable={modes.auth === "google"} saved={saved} />
+
 
         <PushSection available={modes.push === "web_push"} />
 
@@ -241,11 +251,6 @@ export function MeScreen({
 
         <Section id="privacy" title="Privacy">
           <ul className="divide-y divide-line">
-            <li>
-              <Link href="/report" className="flex min-h-14 items-center gap-3 px-5 hover:bg-sunken">
-                <Icon name="flag" className="text-accent" /> <span className="flex-1 font-semibold">Report something, privately</span> <Icon name="chevron" className="size-4 text-ink-subtle" />
-              </Link>
-            </li>
             <li>
               <Link href="/privacy" className="flex min-h-14 items-center gap-3 px-5 hover:bg-sunken">
                 <Icon name="shield" className="text-accent" /> <span className="flex-1 font-semibold">How Mira handles your data</span> <Icon name="chevron" className="size-4 text-ink-subtle" />
@@ -280,6 +285,7 @@ export function MeScreen({
                         const r = await api("/api/auth/signout", { body: {} });
                         setBusy(null);
                         if (!r.ok) return toast(r.message, "error");
+                        resetLocalPersonalisation();
                         router.push("/");
                         router.refresh();
                       }}
@@ -310,6 +316,7 @@ export function MeScreen({
                         const r = await api("/api/me", { method: "DELETE" });
                         setBusy(null);
                         if (!r.ok) return toast(`Your account wasn't deleted: ${r.message}`, "error");
+                        resetLocalPersonalisation();
                         router.push("/");
                         router.refresh();
                       }}
@@ -322,7 +329,7 @@ export function MeScreen({
                   </div>
                 </div>
               ) : (
-                <button type="button" onClick={() => setConfirmDelete(true)} className="min-h-11 text-sm font-bold text-ink-muted hover:text-error">
+                <button type="button" onClick={() => setConfirmDelete(true)} className="min-h-11 text-sm font-semibold text-ink-muted hover:text-error">
                   Delete my account
                 </button>
               )}

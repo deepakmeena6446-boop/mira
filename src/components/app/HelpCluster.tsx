@@ -9,7 +9,7 @@ import { EmergencyPill } from "@/components/app/EmergencyPill";
  */
 export function HelpCluster({ onUnsafe }: { onUnsafe: () => void }) {
   return (
-    <div className="flex justify-end gap-2">
+    <div className="flex flex-wrap justify-end gap-2">
       <button type="button" onClick={onUnsafe} className="min-h-11 rounded-full border border-line-strong bg-surface px-4 text-sm font-semibold text-accent-strong shadow-[var(--shadow-float)]">
         I feel unsafe
       </button>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MiraOrb } from "@/components/app/MiraOrb";
+import { MiraPulse } from "@/components/app/MiraPulse";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
@@ -46,20 +46,20 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
   };
 
   const steps = [
-    <div key="promise" className="flex flex-col items-center text-center">
-      <MiraOrb size={72} />
-      <h1 className="mt-7 text-4xl font-semibold tracking-tight">With you until you arrive.</h1>
-      <p className="mt-3 max-w-xs text-lg text-ink-muted">Mira helps you understand the way, lets your people follow until you arrive, and puts help one tap away if something feels wrong.</p>
-      <p className="mt-2 max-w-xs text-sm text-ink-subtle">Designed around the realities women face moving through cities. Useful to anyone.</p>
-      <ul className="mt-7 w-full max-w-xs space-y-3 text-left">
+    <div key="promise" className="flex flex-col">
+      <MiraPulse size={28} />
+      <h1 className="mt-6 text-[2.25rem] font-semibold leading-[1.08] tracking-tight">With you until you arrive.</h1>
+      <p className="mt-3 text-lg text-ink-muted">Mira helps you understand the way, lets the people you choose follow until you arrive, and keeps help one tap away.</p>
+      <ul className="mt-6 space-y-4">
         {[
-          ["🧭", "Before you go", "Lighting evidence and Help Points along the way, recent relevant updates — and what isn't known, said plainly"],
-          ["📍", "On the way", "The people you choose follow a live link until you arrive, then it switches off. They don't need an account"],
-          ["📞", "If something feels wrong", "The nearest Help Point, your people, your location in words, and the local emergency number where it's been reviewed"],
-        ].map(([e, t, d]) => (
-          <li key={t} className="flex items-start gap-3 rounded-2xl bg-surface/80 px-4 py-3 shadow-[var(--shadow-card)]">
-            <span aria-hidden className="text-2xl">
-              {e}
+          ["route", "Before you go", "The way, its lighting and the Help Points on it — and what isn't known, said plainly."],
+          ["eye", "On the way", "Your people follow a live link that switches off when you arrive. No account needed to follow."],
+          ["phone", "If something feels wrong", "Help nearby, your people, and the local emergency number where it's been reviewed."],
+          ["lamp", "For everyone", "See a broken streetlight or a closed entrance? Tell Mira in two taps. It helps the next person."],
+        ].map(([icon, t, d]) => (
+          <li key={t} className="flex items-start gap-3">
+            <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-surface text-accent ring-1 ring-line">
+              <Icon name={icon} className="size-5" />
             </span>
             <span>
               <span className="block font-semibold">{t}</span>
@@ -68,15 +68,13 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
           </li>
         ))}
       </ul>
-      <p className="mt-5 max-w-xs text-sm text-ink-muted">
-        <strong className="text-ink">Mira</strong>, your companion, can do any of this with you — and all of it works without her. Your live location is shared only during a journey you start, and Mira keeps no history of where you&apos;ve been.
-      </p>
+      <p className="mt-6 text-sm text-ink-subtle">Designed around the realities women face moving through cities. Useful to anyone. Mira keeps no history of where you&apos;ve been.</p>
     </div>,
     <div key="loc" className="flex flex-col items-center text-center">
-      <div className="grid size-28 place-items-center rounded-full bg-accent-soft text-accent">
-        <Icon name="locate" className="size-14" />
+      <div className="grid size-20 place-items-center rounded-full bg-accent-soft text-accent">
+        <Icon name="locate" className="size-10" />
       </div>
-      <h1 className="mt-8 text-3xl font-semibold">Where are you?</h1>
+      <h1 className="mt-7 text-[1.75rem] font-semibold">Where are you?</h1>
       <p className="mt-3 max-w-xs text-lg text-ink-muted">Mira uses your location to show the way from here, the Help Points near you, and to share the journeys you choose. It never keeps a history of where you&apos;ve been.</p>
       <p className="mt-3 max-w-xs text-sm text-ink-subtle">No account needed to look around. You can always search for places instead.</p>
     </div>,
@@ -88,7 +86,7 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
       <div className="flex items-center justify-between">
         <div className="flex gap-1.5" aria-label={`Step ${step + 1} of ${total}`}>
           {Array.from({ length: total }, (_, i) => (
-            <span key={i} className={cx("h-1.5 rounded-full transition-all", i === step ? "w-8 bg-accent" : "w-3 bg-line-strong")} />
+            <span key={i} className={cx("h-1.5 rounded-full transition-all", i === step ? "w-7 bg-accent" : "w-3 bg-line-strong")} />
           ))}
         </div>
         <button type="button" onClick={finish} className="min-h-11 rounded-full px-3 text-sm font-semibold text-ink-muted">
@@ -102,7 +100,7 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
       </div>
       {/* Always on screen: on a small phone the story scrolls under the action instead of pushing it off. */}
       <div className="sticky bottom-0 -mx-6 flex flex-col bg-gradient-to-t from-canvas via-canvas to-transparent px-6 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-6">
-        <Button variant="hero" size="lg" onClick={next} busy={busy} busyLabel="Asking…" className="mx-auto max-w-sm">
+        <Button variant="primary" size="lg" onClick={next} busy={busy} busyLabel="Asking…" className="mx-auto max-w-sm">
           {step === 0 ? "Continue" : "Use my location"}
         </Button>
         {step === 0 && !signedIn ? (

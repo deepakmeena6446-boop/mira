@@ -28,6 +28,8 @@ async function anchorsClear(page, where) {
 }
 
 async function snaps(page, where) {
+  // Desktop side panel (≥ 1024 px) has no detents: check the anchors once.
+  if (!(await page.getByRole("button", { name: /Resize panel/ }).isVisible())) return anchorsClear(page, `${where} @panel`);
   for (let i = 0; i < 3; i++) {
     const snap = await page.locator("section[data-snap]").first().getAttribute("data-snap");
     await anchorsClear(page, `${where} @${snap}`);

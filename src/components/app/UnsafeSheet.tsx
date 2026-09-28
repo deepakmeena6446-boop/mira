@@ -11,6 +11,7 @@ import { useCountry } from "@/lib/locale-store";
 import { EmergencyPill } from "@/components/app/EmergencyPill";
 import { emergencyStatusNote, otherEmergencyNumbers } from "@/domain/country-context";
 import { Icon } from "@/components/ui/Icon";
+import { HELP_ICON } from "./kinds";
 
 export interface UnsafeShareAction {
   label: string;
@@ -126,12 +127,17 @@ export function UnsafeSheet({
           </button>
         </div>
 
+        {/* A calm lead: the nearest place with people, in one line (deterministic; no AI, no wait). */}
+        <p className="mt-3 text-[1.0625rem] font-medium leading-snug">
+          {first ? `${first.name} is about ${first.minutes} min away.` : "Here's what you can do right now."}
+        </p>
+
         {/* 1. Go to a Help Point: the best one for right now, and two more */}
-        <div className="mt-4">
+        <div className="mt-3">
           {first ? (
-            <button type="button" onClick={() => onGoHelpPoint(first)} className="flex w-full items-center gap-3 rounded-[var(--radius-card)] bg-accent-soft p-4 text-left">
-              <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-2xl bg-surface text-2xl">
-                {HELP_CLASSES[first.cls].emoji}
+            <button type="button" onClick={() => onGoHelpPoint(first)} className="flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-line-strong bg-surface p-4 text-left hover:bg-sunken">
+              <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink">
+                <Icon name={HELP_ICON[first.cls] ?? "pin"} className="size-5" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold text-accent-strong">Go to a Help Point</span>
@@ -158,9 +164,9 @@ export function UnsafeSheet({
             <ul className="mt-2 space-y-1">
               {more.slice(0, 2).map((p) => (
                 <li key={p.id}>
-                  <button type="button" onClick={() => onGoHelpPoint(p)} className="flex min-h-12 w-full items-center gap-3 rounded-2xl px-3 text-left hover:bg-sunken">
-                    <span aria-hidden className="text-lg">
-                      {HELP_CLASSES[p.cls].emoji}
+                  <button type="button" onClick={() => onGoHelpPoint(p)} className="flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-control)] px-3 text-left hover:bg-sunken">
+                    <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink-muted">
+                      <Icon name={HELP_ICON[p.cls] ?? "pin"} className="size-4" />
                     </span>
                     <span className="min-w-0 flex-1 truncate text-sm">
                       <span className="font-semibold">{p.name}</span>
@@ -180,7 +186,7 @@ export function UnsafeSheet({
         {tell ? <TellMyPeople tell={tell} /> : null}
         {share ? (
           <button type="button" onClick={() => void share.onShare()} className="mt-3 flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-line p-4 text-left">
-            <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-2xl bg-sunken text-accent">
+            <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink">
               <Icon name="share" />
             </span>
             <span className="min-w-0 flex-1">
@@ -202,7 +208,7 @@ export function UnsafeSheet({
           <ul className="mt-2 space-y-1">
             {otherEmergencyNumbers(locale).map((n) => (
               <li key={n.number}>
-                <a href={`tel:${n.number}`} className="flex min-h-11 items-center justify-between rounded-2xl bg-sunken px-4 text-sm">
+                <a href={`tel:${n.number}`} className="flex min-h-11 items-center justify-between rounded-[var(--radius-control)] bg-sunken px-4 text-sm">
                   <span className="font-semibold">{n.label}</span>
                   <span className="font-semibold">{n.number}</span>
                 </a>
@@ -214,7 +220,7 @@ export function UnsafeSheet({
           <ul className="mt-2 space-y-1">
             {locale.helplines.map((h) => (
               <li key={h.number}>
-                <a href={`tel:${h.number}`} className="flex min-h-11 items-center justify-between rounded-2xl bg-sunken px-4 text-sm">
+                <a href={`tel:${h.number}`} className="flex min-h-11 items-center justify-between rounded-[var(--radius-control)] bg-sunken px-4 text-sm">
                   <span className="font-semibold">{h.name}</span>
                   <span className="font-semibold">
                     {h.number}
@@ -230,11 +236,11 @@ export function UnsafeSheet({
         {me ? <LocationInWords me={me} area={area} landmark={landmark ?? first?.name ?? null} /> : null}
 
         {/* 4. Quiet options */}
-        <div className="mt-4 flex items-center justify-between gap-2 text-sm">
-          <Link href="/mira" className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 font-semibold text-accent hover:bg-accent-soft">
+        <div className="mt-4 grid gap-2 text-sm">
+          <Link href="/mira" className="inline-flex min-h-11 items-center gap-1.5 self-start rounded-full px-1 font-semibold text-accent-strong">
             <Icon name="sparkle" className="size-4" /> Talk to Mira
           </Link>
-          <button type="button" onClick={onClose} className="min-h-11 rounded-full px-3 font-semibold text-ink-muted hover:bg-sunken">
+          <button type="button" onClick={onClose} className="min-h-12 w-full rounded-[var(--radius-button)] border border-line-strong bg-surface font-semibold text-ink hover:bg-sunken">
             I&apos;m okay now
           </button>
         </div>
@@ -279,7 +285,7 @@ function CallSomeone() {
   };
   if (!typing) {
     return (
-      <button type="button" onClick={() => void pick()} className="flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-line-strong bg-surface px-3 text-[0.95rem] font-semibold">
+      <button type="button" onClick={() => void pick()} className="flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[0.95rem] font-semibold">
         <Icon name="phone" className="size-5" /> Call someone
       </button>
     );
@@ -304,9 +310,9 @@ function CallSomeone() {
         value={num}
         onChange={(e) => setNum(e.target.value)}
         placeholder="Number to call"
-        className="min-h-14 min-w-0 flex-1 rounded-2xl border border-line bg-sunken px-4 text-lg outline-none focus:border-accent"
+        className="min-h-14 min-w-0 flex-1 rounded-[var(--radius-control)] border border-line bg-sunken px-4 text-lg outline-none focus:border-accent"
       />
-      <button type="submit" disabled={clean.length < 3} className="min-h-14 rounded-2xl bg-accent px-5 font-semibold text-accent-ink disabled:opacity-50">
+      <button type="submit" disabled={clean.length < 3} className="min-h-14 rounded-[var(--radius-control)] bg-accent px-5 font-semibold text-accent-ink disabled:opacity-50">
         Call
       </button>
     </form>
@@ -326,7 +332,7 @@ function TellMyPeople({ tell }: { tell: UnsafeTellAction }) {
             <ul className="mt-2 grid gap-2">
               {state.whatsapp.map((w) => (
                 <li key={w.url}>
-                  <a href={w.url} target="_blank" rel="noopener noreferrer" onClick={() => setOpened((xs) => [...xs, w.name])} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-surface px-4 font-semibold text-ink">
+                  <a href={w.url} target="_blank" rel="noopener noreferrer" onClick={() => setOpened((xs) => [...xs, w.name])} className="flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-surface px-4 font-semibold text-ink">
                     <Icon name="send" className="size-4" /> {opened.includes(w.name) ? `Opened WhatsApp for ${w.name} ✓` : `Send to ${w.name} on WhatsApp`}
                   </a>
                 </li>
@@ -354,7 +360,7 @@ function TellMyPeople({ tell }: { tell: UnsafeTellAction }) {
       }}
       className="mt-3 flex w-full items-center gap-3 rounded-[var(--radius-card)] border-2 border-accent/40 p-4 text-left disabled:opacity-60"
     >
-      <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-2xl bg-accent-soft text-accent-strong">
+      <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-[var(--radius-control)] bg-accent-soft text-accent-strong">
         <Icon name="send" />
       </span>
       <span className="min-w-0 flex-1">
@@ -373,7 +379,7 @@ function LocationInWords({ me, area, landmark }: { me: { lat: number; lon: numbe
   const coords = `${me.lat.toFixed(5)}, ${me.lon.toFixed(5)}`;
   const text = `I'm ${place || "here"}. Coordinates: ${coords}.`;
   return (
-    <div className="mt-3 rounded-2xl bg-sunken px-4 py-3 text-sm">
+    <div className="mt-3 rounded-[var(--radius-control)] bg-sunken px-4 py-3 text-sm">
       <p className="text-[13px] font-medium text-ink-subtle">Your location in words</p>
       <p className="mt-1">
         {place ? <span className="font-semibold">I&apos;m {place}.</span> : null} <span className="text-ink-muted">Coordinates {coords}</span>

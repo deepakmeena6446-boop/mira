@@ -5,7 +5,7 @@ import { SignInNotice } from "@/components/app/SignInNotice";
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <main id="main" tabIndex={-1} className="min-h-dvh outline-none">
+      <main id="main" tabIndex={-1} className="min-h-dvh outline-none lg:pl-[88px]">
         {children}
       </main>
       <TabBar />

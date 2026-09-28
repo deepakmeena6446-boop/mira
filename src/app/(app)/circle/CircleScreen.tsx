@@ -73,17 +73,20 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
     <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex max-w-xl flex-col gap-6">
         <header className="pt-2 animate-rise">
-          <h1 className="text-2xl font-semibold">Your circle</h1>
+          <h1 className="text-[1.75rem] font-semibold tracking-tight">Your circle</h1>
           {onWhatsApp.length ? (
             <p className="mt-1 text-ink-muted">
               <span className="font-semibold text-ink">{list(onWhatsApp)}</span> {onWhatsApp.length === 1 ? "is" : "are"} one tap away on WhatsApp: when you start a journey, send them your live link from the journey screen. Mira opens WhatsApp; you press Send.
             </p>
           ) : null}
-          <p className="mt-1 text-ink-muted">
+          <details className="mt-1 text-sm text-ink-muted">
+            <summary className="min-h-9 cursor-pointer py-1.5 font-medium text-ink-subtle">How Circle works</summary>
+            <p>
             {accepted.length && emailAlerts
               ? `${accepted.map((c) => c.name).join(", ")} ${accepted.length === 1 ? "is" : "are"} eligible for a live-link email when you share a journey and a missed-check-in email. Mira shows sending results on the journey screen.`
               : emailAlerts ? "Automatic email needs an accepted trusted contact on the journey: add their email too, and they'll get an invite." : "Contact email is unavailable right now, so nobody is emailed automatically."}
-          </p>
+            </p>
+          </details>
         </header>
 
         <Section

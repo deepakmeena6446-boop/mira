@@ -3,7 +3,7 @@ import { getUser } from "@/server/session/user";
 import { MiraChat } from "./MiraChat";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Mira" };
+export const metadata: Metadata = { title: "Ask Mira" };
 
 export default async function MiraPage() {
   const user = await getUser();

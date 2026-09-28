@@ -30,6 +30,8 @@ const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: 
 const pt = (p: LngLat, props: Record<string, unknown> = {}): GeoJSON.Feature => ({ type: "Feature", properties: props, geometry: { type: "Point", coordinates: [p.lon, p.lat] } });
 
 const LABELLED_PINS = 5;
+/** Camera moves are instant under reduced motion (docs/launch-ux/05 §2). */
+const motionMs = (ms: number) => (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : ms);
 const MAX_LABELS = 6;
 
 /** Show pin names closest-first, skipping any that would overlap a shown name or another pin. */
@@ -99,6 +101,7 @@ export function WorldMap({
   recenter = 0,
   lighting = null,
   follow = true,
+  presence = false,
   onMapClick,
   onReady,
   onArea,
@@ -121,6 +124,8 @@ export function WorldMap({
   /** Street lighting along the route: lit stretches glow warm, dark ones are dotted. */
   lighting?: Array<{ status: "lit" | "dark" | "poles" | "unknown"; coords: Array<[number, number]> }> | null;
   follow?: boolean;
+  /** An open journey: "Mira has me", drawn as a slow breathing halo around her own dot (docs/launch-ux/05 §3). */
+  presence?: boolean;
   onMapClick?: (p: LngLat) => void;
   onReady?: (ok: boolean) => void;
   /** Nearest locality name from the already-downloaded vector tiles (no extra lookup service). */
@@ -369,27 +374,54 @@ export function WorldMap({
     if (coords.length > 1) {
       const lons = coords.map((c) => c[0]);
       const lats = coords.map((c) => c[1]);
-      map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { maxZoom: 17, duration: 700 });
+      map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { maxZoom: 17, duration: motionMs(700) });
     } else if (dest) {
-      map.easeTo({ center: [dest.lon, dest.lat], zoom: 16, duration: 700 });
+      map.easeTo({ center: [dest.lon, dest.lat], zoom: 16, duration: motionMs(700) });
     } else if (me && follow && places.length) {
       // Frame you + the closest pins, so "around you" is visible on the map, not just in the list.
       const pts = [me, ...places.slice(0, LABELLED_PINS)];
       const lons = pts.map((p) => p.lon);
       const lats = pts.map((p) => p.lat);
-      map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { maxZoom: 16, duration: 700 });
+      map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { maxZoom: 16, duration: motionMs(700) });
     } else if (me && follow) {
-      map.easeTo({ center: [me.lon, me.lat], zoom: Math.max(map.getZoom(), 15), duration: 700 });
+      map.easeTo({ center: [me.lon, me.lat], zoom: Math.max(map.getZoom(), 15), duration: motionMs(700) });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.lat, me?.lon, destKey, route, ready, follow, placesKey]);
+
+  // Presence halo: the one ambient loop, only on an active journey, only while visible, ≤ 30 fps;
+  // static under reduced motion; stopped (not breathing) whenever `presence` is false.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !map.getLayer("me-halo")) return;
+    const css = getComputedStyle(document.documentElement);
+    const accent = css.getPropertyValue("--map-route").trim() || "#1d6b63";
+    const me = css.getPropertyValue("--map-me").trim() || "#2563eb";
+    map.setPaintProperty("me-halo", "circle-color", presence ? accent : me);
+    map.setPaintProperty("me-halo", "circle-radius", 22);
+    map.setPaintProperty("me-halo", "circle-opacity", presence ? 0.2 : 0.22);
+    if (!presence || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    let last = 0;
+    const t0 = performance.now();
+    const tick = (t: number) => {
+      raf = requestAnimationFrame(tick);
+      if (document.visibilityState !== "visible" || t - last < 33) return;
+      last = t;
+      const phase = (Math.sin(((t - t0) / 3200) * 2 * Math.PI) + 1) / 2;
+      map.setPaintProperty("me-halo", "circle-radius", 22 + phase * 6);
+      map.setPaintProperty("me-halo", "circle-opacity", 0.24 - phase * 0.12);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [presence, ready]);
 
   // "Centre on me": always flies back and resumes following, even if the fix hasn't changed.
   useEffect(() => {
     const map = mapRef.current;
     if (!recenter || !map || !ready || !me) return;
     userMovedRef.current = false;
-    map.easeTo({ center: [me.lon, me.lat], zoom: Math.max(map.getZoom(), 15), duration: 600 });
+    map.easeTo({ center: [me.lon, me.lat], zoom: Math.max(map.getZoom(), 15), duration: motionMs(600) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recenter]);
 
@@ -408,7 +440,7 @@ export function WorldMap({
           width={86}
           height={18}
           draggable={false}
-          className="pointer-events-none absolute left-3 z-10 h-[18px] w-auto select-none"
+          className="mira-maplogo pointer-events-none absolute left-3 z-10 h-[18px] w-auto select-none"
           style={{ top: padding.top + 10 }}
         />
       ) : null}

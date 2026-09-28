@@ -8,8 +8,10 @@ import { BottomSheet, type Snap } from "@/components/app/BottomSheet";
 import { EmergencyPill } from "@/components/app/EmergencyPill";
 import { HelpCluster } from "@/components/app/HelpCluster";
 import { useChromeTop } from "@/lib/use-chrome-top";
+import { useWide } from "@/lib/use-wide";
 import { MiraPulse } from "@/components/app/MiraPulse";
 import { journeyNextAction } from "@/lib/trip-actions";
+import { haptic } from "@/lib/haptics";
 import { UnsafeSheet } from "@/components/app/UnsafeSheet";
 import { AfterArrival } from "@/components/app/AfterArrival";
 import { HELP_ICON } from "@/components/app/kinds";
@@ -86,6 +88,7 @@ export function TripScreen({
   const open = trip.state === "active" || trip.state === "missed";
   const chromeRef = useRef<HTMLDivElement>(null);
   useChromeTop(chromeRef);
+  const wide = useWide();
   // Immersive journey mode: no tab bar while the journey is open (globals.css `html[data-journey]`).
   useEffect(() => {
     if (!open) return;
@@ -140,6 +143,7 @@ export function TripScreen({
       }
       setUploadFailing(false);
       if (r.data.arrived) {
+        haptic("arrived");
         toast(sharedOk.length ? "You made it! Live sharing has stopped." : "You made it!");
         void refresh();
       }
@@ -262,6 +266,7 @@ export function TripScreen({
     setConfirmEnd(false);
     if (r.ok) {
       setTrip(r.data.trip);
+      if (action === "arrive") haptic("arrived");
       if (action === "extend") toast("Added 10 minutes. Take your time.");
     } else toast(r.message, "error");
   };
@@ -282,7 +287,7 @@ export function TripScreen({
     return (
       <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-[calc(var(--tabbar-space)+2rem)] text-center">
         <span aria-hidden className={`grid size-14 place-items-center rounded-full ${trip.state === "arrived" ? "bg-accent-soft text-accent" : "bg-sunken text-ink-muted"}`}>
-          <Icon name={trip.state === "arrived" ? "check" : "route"} className="size-7" />
+          <Icon name={trip.state === "arrived" ? "check" : "route"} className={`size-7 ${trip.state === "arrived" ? "mira-draw" : ""}`} />
         </span>
         <h1 className="mt-5 text-[1.75rem] font-semibold animate-rise">
           {!trip.autoArrival && trip.state !== "expired" ? "Sharing stopped" : trip.state === "arrived" ? "You made it." : trip.state === "ended" ? "Journey ended" : "Journey closed"}
@@ -334,9 +339,9 @@ export function TripScreen({
 
   return (
     <div className="fixed inset-0 overflow-hidden">
-      <WorldMap tiles={tiles} me={me} dest={trip.destination} route={route} places={mapPins} follow label={`Live map of your journey to ${trip.destination.name}`} padding={{ top: 170, bottom: 420, left: 40, right: 40 }} />
+      <WorldMap tiles={tiles} me={me} dest={trip.destination} route={route} places={mapPins} follow presence={trip.state === "active" && !unsafe} label={`Live map of your journey to ${trip.destination.name}`} padding={wide ? { top: 40, bottom: 40, left: 88 + 400 + 40, right: 60 } : { top: 170, bottom: 420, left: 40, right: 40 }} />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.9rem,env(safe-area-inset-top))]">
+      <div className="mira-chrome pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.9rem,env(safe-area-inset-top))]">
         <div ref={chromeRef} className="mx-auto max-w-xl">
         <div className="pointer-events-auto glass mx-auto flex max-w-xl items-center gap-3 rounded-[var(--radius-card)] border border-glass-edge px-4 py-2.5 shadow-[var(--shadow-float)]">
           <Link href="/trips" aria-label="Back to your trips" className="grid size-11 shrink-0 place-items-center rounded-full bg-sunken">

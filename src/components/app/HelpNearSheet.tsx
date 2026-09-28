@@ -9,6 +9,7 @@ import { useCountry } from "@/lib/locale-store";
 import { HELP_CLASSES, SOURCE_NAME, helpWeightsFor, hoursLine, isNight, rankHelpPoints, type HelpClass, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
 import { localTime } from "@/domain/opening-hours";
 import { Icon } from "@/components/ui/Icon";
+import { HELP_ICON } from "./kinds";
 
 /** How many places show before "Show more" (the ones the server looked up hours for). */
 const FIRST = 5;
@@ -95,7 +96,7 @@ export function HelpNearSheet({
                     onClick={() => setOnly(c)}
                     className={`min-h-9 shrink-0 whitespace-nowrap rounded-full px-3 text-sm font-semibold ${only === c ? "bg-accent text-accent-ink" : "bg-sunken text-ink-muted"}`}
                   >
-                    {c ? `${HELP_CLASSES[c].emoji} ${HELP_CLASSES[c].label}` : "All"}
+                    {c ? HELP_CLASSES[c].label : "All"}
                   </button>
                 ))}
               </div>
@@ -104,8 +105,8 @@ export function HelpNearSheet({
               {shown.map((p) => (
                 <li key={p.id}>
                   <button type="button" onClick={() => onPick(p)} className="flex min-h-14 w-full items-center gap-3 py-2.5 text-left">
-                    <span aria-hidden className="text-xl">
-                      {HELP_CLASSES[p.cls].emoji}
+                    <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink">
+                      <Icon name={HELP_ICON[p.cls] ?? "pin"} className="size-[18px]" />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold">{p.name}</span>
