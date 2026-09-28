@@ -33,7 +33,7 @@ export function CircleRow({ accepted, invited }: { accepted: number; invited: nu
 type Prefs = { prefs: TravelPrefs; rememberHabits: boolean };
 
 /**
- * Personalisation she can see and undo: her travel preference, and what MIRA remembers from
+ * Personalisation she can see and undo: her travel preference, and what Mira remembers from
  * finished journeys to her saved places (never anything else, never coordinates).
  */
 export function PersonalSections() {
@@ -68,7 +68,7 @@ export function PersonalSections() {
     setConfirmForget(false);
     if (!r.ok) return toast(r.message, "error");
     setHabits([]);
-    toast("Forgotten. MIRA no longer remembers any of your journeys.");
+    toast("Forgotten. Mira no longer remembers any of your journeys.");
   };
 
   const mode = prefs?.prefs.mode ?? null;
@@ -78,7 +78,7 @@ export function PersonalSections() {
     <>
       <Section id="travel" title="Travel preferences">
         <div className="p-5">
-          <p className="text-sm text-ink-muted">How you usually get around. MIRA starts with this when you plan a journey; you can change it each time.</p>
+          <p className="text-sm text-ink-muted">How you usually get around. Mira starts with this when you plan a journey; you can change it each time.</p>
           <div role="radiogroup" aria-label="Preferred way of travelling" className="mt-3 grid grid-cols-2 gap-2">
             {[...TRAVEL_MODES, null].map((m) => {
               const on = mode === m;
@@ -100,10 +100,10 @@ export function PersonalSections() {
         </div>
       </Section>
 
-      <Section id="remembers" title="What MIRA remembers">
+      <Section id="remembers" title="What Mira remembers">
         <div className="p-5">
           <p className="text-sm text-ink-muted">
-            When a journey to one of your saved places ends with you arriving, MIRA counts it: the place, how you travelled, the hour you left and who you shared it with. Nothing about any other journey, and never where you went on the way.
+            When a journey to one of your saved places ends with you arriving, Mira counts it: the place, how you travelled, the hour you left and who you shared it with. Nothing about any other journey, and never where you went on the way.
           </p>
           <button
             type="button"
@@ -118,7 +118,7 @@ export function PersonalSections() {
               <span className={cx("absolute top-1 size-5 rounded-full bg-white shadow transition-all", learning ? "left-6" : "left-1")} />
             </span>
           </button>
-          {prefs && !learning ? <p className="mt-1 text-sm text-ink-subtle">Off. MIRA remembers nothing about your journeys.</p> : null}
+          {prefs && !learning ? <p className="mt-1 text-sm text-ink-subtle">Off. Mira remembers nothing about your journeys.</p> : null}
         </div>
         {habits && habits.length ? (
           <>
@@ -135,7 +135,7 @@ export function PersonalSections() {
             <div className="border-t border-line px-5 py-4">
               {confirmForget ? (
                 <div>
-                  <p className="text-sm font-semibold">Forget all of this? MIRA won&apos;t suggest anything from it again.</p>
+                  <p className="text-sm font-semibold">Forget all of this? Mira won&apos;t suggest anything from it again.</p>
                   <div className="mt-3 flex gap-2">
                     <Button variant="danger" busy={busy === "forget"} onClick={forget}>
                       Forget all

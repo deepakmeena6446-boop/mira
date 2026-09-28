@@ -2,24 +2,28 @@ import { forwardRef, type ButtonHTMLAttributes } from "react";
 import Link from "next/link";
 import { cx } from "./cx";
 
-type Variant = "primary" | "hero" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "hero" | "secondary" | "ghost" | "danger" | "ink";
 type Size = "md" | "lg";
 
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-full font-bold transition-all active:scale-[0.98] " +
-  "disabled:cursor-not-allowed disabled:opacity-60 min-h-12 select-none text-center";
+  "inline-flex items-center justify-center gap-2 rounded-[var(--radius-button)] font-semibold transition-[background-color,border-color,transform] duration-100 active:scale-[0.98] " +
+  "disabled:cursor-not-allowed disabled:opacity-45 min-h-11 select-none text-center";
 const variants: Record<Variant, string> = {
-  primary: "bg-accent text-accent-ink hover:bg-accent-strong shadow-[0_8px_20px_-8px_rgb(106_68_245/0.6)]",
-  hero: "bg-mira text-white shadow-[0_12px_28px_-10px_rgb(106_68_245/0.75)] hover:brightness-105",
-  secondary: "bg-surface text-ink border border-line hover:border-accent/40 shadow-[var(--shadow-card)]",
+  // The one primary action per screen (docs/launch-ux/02 C-11.1).
+  primary: "bg-accent text-accent-ink hover:bg-accent-strong",
+  // Retired gradient "hero": now the same as primary, kept so call sites compile.
+  hero: "bg-accent text-accent-ink hover:bg-accent-strong",
+  secondary: "bg-surface text-ink border border-line-strong hover:bg-sunken",
   ghost: "text-accent hover:bg-accent-soft",
   // Destructive/irreversible actions: strong neutral outline. Red is reserved for
   // validation and delivery failures (UX spec §2).
-  danger: "bg-surface text-ink border-2 border-ink hover:bg-sunken",
+  danger: "bg-surface text-ink border-[1.5px] border-ink hover:bg-sunken",
+  // Emergency only.
+  ink: "bg-ink text-canvas hover:opacity-90",
 };
 const sizes: Record<Size, string> = {
   md: "px-5 py-2.5 text-[0.95rem]",
-  lg: "px-6 py-4 text-[1.05rem] w-full",
+  lg: "min-h-13 px-6 py-3.5 text-base w-full",
 };
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -39,6 +43,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={ref}
       type={type}
       className={cx(base, variants[variant], sizes[size], className)}
+      data-variant={variant === "hero" ? "primary" : variant}
       disabled={disabled || busy}
       aria-busy={busy || undefined}
       {...rest}
@@ -69,7 +74,7 @@ export function ButtonLink({
   children: React.ReactNode;
 }) {
   return (
-    <Link href={href} className={cx(base, variants[variant], sizes[size], className)}>
+    <Link href={href} className={cx(base, variants[variant], sizes[size], className)} data-variant={variant === "hero" ? "primary" : variant}>
       {children}
     </Link>
   );

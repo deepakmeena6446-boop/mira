@@ -21,7 +21,7 @@ describe("Privacy notification claims", () => {
   it("states attempts, failures, and accepted-contact eligibility when configured", () => {
     configured.mockReturnValue(true);
     const html = renderToStaticMarkup(<PrivacyPage />);
-    expect(html).toContain("MIRA attempts an email if you miss your check-in");
+    expect(html).toContain("Mira attempts an email if you miss your check-in");
     expect(html).toContain("Sending can fail");
     expect(html).toContain("Without accepted contacts, nobody is alerted");
   });

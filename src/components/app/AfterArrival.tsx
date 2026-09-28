@@ -10,7 +10,7 @@ import type { CheckView } from "@/server/contributions/checks";
 /**
  * The one factual question after a journey (blueprint §9 "Arrival"): chosen by relevance, or
  * nothing: "Was the way lit?" after a walk in the dark (when this phone still has the route), else
- * the MIRA Check the server prepared from places this journey actually passed. At most one.
+ * the Mira Check the server prepared from places this journey actually passed. At most one.
  */
 export function AfterArrival({
   trip,
@@ -19,7 +19,7 @@ export function AfterArrival({
   onDone,
 }: {
   trip: { id: string; state: string; mode: string; autoArrival: boolean };
-  /** The route line kept on this device for the journey (never stored by MIRA's server). */
+  /** The route line kept on this device for the journey (never stored by Mira's server). */
   route: Array<[number, number]> | null;
   /** Her local hour now, or null before the clock is known (renders nothing on the server). */
   hour: number | null;
@@ -33,12 +33,12 @@ export function AfterArrival({
   if (!finished) return null;
   // Only an arrival is "arrived" — not a journey ended early or sharing she stopped (the headline above already names those).
   const done = trip.state === "arrived" && trip.autoArrival ? "You've arrived" : "All done";
-  if (hour === null) return <p className="mt-6 text-sm text-ink-muted">{done}. Checking whether MIRA has one quick question…</p>;
+  if (hour === null) return <p className="mt-6 text-sm text-ink-muted">{done}. Checking whether Mira has one quick question…</p>;
   if (lit) return <LitQuestion route={route!} onDone={onDone} />;
   if (preparation.check) return <div className="mt-6 w-full max-w-sm text-left animate-rise"><CheckCard check={preparation.check} /></div>;
-  return <div role="status" className="mt-6 w-full max-w-sm rounded-3xl bg-surface px-5 py-4 text-sm text-ink-muted shadow-[var(--shadow-card)]">
+  return <div role="status" className="mt-6 w-full max-w-sm rounded-[var(--radius-card)] bg-surface px-5 py-4 text-sm text-ink-muted shadow-[var(--shadow-card)]">
     <p className="font-bold text-ink">{done} ✓</p>
-    <p className="mt-1">{preparation.state === "none" ? "Nothing needed from you this time." : preparation.state === "later" ? "A question may still become available. You can check later in Contribute." : "MIRA may have one quick question about this journey. Preparing…"}</p>
+    <p className="mt-1">{preparation.state === "none" ? "Nothing needed from you this time." : preparation.state === "later" ? "A question may still become available. You can check later in Contribute." : "Mira may have one quick question about this journey. Preparing…"}</p>
     {preparation.state === "later" ? <Link href="/contribute" className="mt-2 inline-flex min-h-11 items-center font-bold text-accent">Open Contribute</Link> : null}
   </div>;
 }
@@ -77,9 +77,9 @@ function LitQuestion({ route, onDone }: { route: Array<[number, number]>; onDone
     setState(r.ok ? "done" : "failed");
     if (r.ok) onDone();
   };
-  if (state === "done") return <p className="mt-6 max-w-sm rounded-3xl bg-surface px-5 py-4 text-sm text-ink-muted shadow-[var(--shadow-card)] animate-rise">Thank you 💛 That helps the next person walking here at night.</p>;
+  if (state === "done") return <p className="mt-6 max-w-sm rounded-[var(--radius-card)] bg-surface px-5 py-4 text-sm text-ink-muted shadow-[var(--shadow-card)] animate-rise">Thank you 💛 That helps the next person walking here at night.</p>;
   return (
-    <div className="mt-6 w-full max-w-sm rounded-3xl bg-surface p-5 text-left shadow-[var(--shadow-card)] animate-rise">
+    <div className="mt-6 w-full max-w-sm rounded-[var(--radius-card)] bg-surface p-5 text-left shadow-[var(--shadow-card)] animate-rise">
       <p className="font-bold">Was the way lit?</p>
       <div className="mt-3 grid grid-cols-3 gap-2">
         {([["lit", "💡 Lit"], ["partly", "🌗 Partly"], ["dark", "🌑 Not lit"]] as const).map(([v, label]) => (

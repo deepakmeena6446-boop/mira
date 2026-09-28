@@ -1,5 +1,5 @@
 /**
- * Browser fetch helper for MIRA's own API. Always same-origin, always sends the
+ * Browser fetch helper for Mira's own API. Always same-origin, always sends the
  * CSRF header, never puts sensitive values in the URL, and distinguishes a
  * request that never reached the server ("not sent") from a server answer.
  */
@@ -27,7 +27,7 @@ export async function api<T>(path: string, init: { method?: "GET" | "POST" | "PA
       ok: false,
       status: 0,
       code: "network",
-      message: "We couldn't reach MIRA. Check your connection and try again.",
+      message: "We couldn't reach Mira. Check your connection and try again.",
       network: true,
     };
   }

@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/Toast";
 import { promptInstall, useInstallState } from "./install";
 
 /**
- * "Add MIRA to your home screen". `variant="row"` lives in Me → App; `variant="card"`
+ * "Add Mira to your home screen". `variant="row"` lives in Me → App; `variant="card"`
  * is the one-time suggestion on Home (hidden for good once dismissed or installed).
  */
 export function InstallCard({ variant, onDismiss }: { variant: "row" | "card"; onDismiss?: () => void }) {
@@ -19,7 +19,7 @@ export function InstallCard({ variant, onDismiss }: { variant: "row" | "card"; o
     return (
       <div className="flex min-h-14 items-center gap-3 px-5">
         <span aria-hidden className="text-xl">📱</span>
-        <span className="flex-1 font-semibold">MIRA is installed on this device</span>
+        <span className="flex-1 font-semibold">Mira is installed on this device</span>
         <Icon name="check" className="text-mint" />
       </div>
     );
@@ -28,7 +28,7 @@ export function InstallCard({ variant, onDismiss }: { variant: "row" | "card"; o
   const install = async () => {
     if (state.kind === "ios") return setIosHelp((v) => !v);
     const ok = await promptInstall();
-    if (ok) toast("Installed — MIRA is on your home screen");
+    if (ok) toast("Installed — Mira is on your home screen");
   };
 
   const iosSteps = iosHelp ? (
@@ -48,7 +48,7 @@ export function InstallCard({ variant, onDismiss }: { variant: "row" | "card"; o
         <button type="button" onClick={install} className="flex min-h-12 w-full items-center gap-3 text-left">
           <span aria-hidden className="text-xl">📲</span>
           <span className="flex-1">
-            <span className="block font-semibold">Install MIRA</span>
+            <span className="block font-semibold">Install Mira</span>
             <span className="block text-sm text-ink-muted">Opens in one tap, full screen, like any app</span>
           </span>
           <Icon name="chevron" className="size-4 text-ink-subtle" />
@@ -59,11 +59,11 @@ export function InstallCard({ variant, onDismiss }: { variant: "row" | "card"; o
   }
 
   return (
-    <div className="mt-4 rounded-3xl border border-line bg-surface p-4 shadow-[var(--shadow-card)] animate-rise">
+    <div className="mt-4 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-card)] animate-rise">
       <div className="flex items-start gap-3">
         <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-accent-soft text-2xl">📲</span>
         <div className="min-w-0 flex-1">
-          <p className="font-bold leading-snug">Add MIRA to your home screen</p>
+          <p className="font-bold leading-snug">Add Mira to your home screen</p>
           <p className="text-sm text-ink-muted">One tap to open, even when you&apos;re in a hurry.</p>
           {iosSteps}
           <div className="mt-3 flex gap-2">

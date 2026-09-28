@@ -54,7 +54,7 @@ function useSafetyUpdates(point: { lat: number; lon: number } | null, windowDays
 
 /**
  * The restrained Home / destination section: one line, never a wall of headlines. "No updates"
- * is said with its caveat; a failed check says MIRA couldn't check — never "nothing happened";
+ * is said with its caveat; a failed check says Mira couldn't check — never "nothing happened";
  * a partial check with nothing to show says what couldn't be checked — never "no updates".
  */
 export function SafetyUpdatesSection({ point, heading = "Safety updates", className }: { point: { lat: number; lon: number } | null; heading?: string; className?: string }) {
@@ -86,7 +86,7 @@ export function SafetyUpdatesSection({ point, heading = "Safety updates", classN
     );
   } else if (ev?.state === "unavailable") {
     body = ev.sources.some((x) => x.source === "area")
-      ? <p className="mt-2 text-sm text-ink-muted">MIRA couldn&apos;t tell which city this is, so it didn&apos;t check for updates.</p>
+      ? <p className="mt-2 text-sm text-ink-muted">Mira couldn&apos;t tell which city this is, so it didn&apos;t check for updates.</p>
       : <p className="mt-2 text-sm text-ink-muted">Safety updates aren&apos;t available right now.</p>;
   }
   else if (data && !data.updates.length && ev?.state === "partial") {
@@ -115,7 +115,7 @@ export function SafetyUpdatesSection({ point, heading = "Safety updates", classN
     );
   } else if (data) {
     body = (
-      <div className="mt-2 rounded-3xl bg-surface px-4 py-3 shadow-[var(--shadow-card)]">
+      <div className="mt-2 rounded-[var(--radius-card)] bg-surface px-4 py-3 shadow-[var(--shadow-card)]">
         <p className="font-semibold">{summaryLine(data)}</p>
         <p className="mt-0.5 text-xs text-ink-muted">
           Official advisories {data.counts.official} · News reports {data.counts.news} · Community reports: not in the beta
@@ -130,7 +130,7 @@ export function SafetyUpdatesSection({ point, heading = "Safety updates", classN
 
   return (
     <section className={cx("mt-5", className)} aria-label={heading}>
-      <h2 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">
+      <h2 className="text-[13px] font-medium text-ink-subtle">
         {heading}
         <span className="normal-case tracking-normal">{where}</span>
       </h2>
@@ -155,10 +155,10 @@ function SafetyUpdatesSheet({ open, data, updating, partial, windowDays, onWindo
   useOverlay(open, onClose);
   if (!open) return null;
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-labelledby="safety-updates-h" className="fixed inset-0 z-[60] flex items-end justify-center bg-[rgb(10_6_24/0.5)] animate-fade sm:items-center" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="flex max-h-[88vh] w-full max-w-md flex-col rounded-t-[2rem] bg-surface shadow-[var(--shadow-float)] sm:rounded-[2rem]">
+    <div role="dialog" aria-modal="true" aria-labelledby="safety-updates-h" className="fixed inset-0 z-[60] flex items-end justify-center bg-scrim animate-fade sm:items-center" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="flex max-h-[88vh] w-full max-w-md flex-col rounded-t-[var(--radius-lg)] bg-surface shadow-[var(--shadow-float)] sm:rounded-[var(--radius-lg)]">
         <div className="px-5 pt-5">
-          <h2 id="safety-updates-h" className="text-xl font-extrabold">
+          <h2 id="safety-updates-h" className="text-xl font-semibold">
             Safety updates · {data.area.name}
           </h2>
           <p className="mt-1 text-sm text-ink-muted">{NOT_A_RATING}</p>
@@ -177,7 +177,7 @@ function SafetyUpdatesSheet({ open, data, updating, partial, windowDays, onWindo
         </ul>
         <div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2">
           <p className="text-xs leading-relaxed text-ink-subtle">
-            Found through a news index and official sources, then filtered by MIRA for relevance. Headlines are the publisher&apos;s words; MIRA doesn&apos;t verify them. Dates are when the news index first saw a report, which can be later than its publication. Community reports are a separate signal and aren&apos;t shown in the beta. Checked {ageLabel(data.checkedAt).toLowerCase()}.
+            Found through a news index and official sources, then filtered by Mira for relevance. Headlines are the publisher&apos;s words; Mira doesn&apos;t verify them. Dates are when the news index first saw a report, which can be later than its publication. Community reports are a separate signal and aren&apos;t shown in the beta. Checked {ageLabel(data.checkedAt).toLowerCase()}.
           </p>
           <button type="button" onClick={onClose} className="mt-2 min-h-11 w-full rounded-full font-bold text-ink-muted hover:bg-sunken">
             Close
@@ -204,7 +204,7 @@ function UpdateCard({ u }: { u: SafetyUpdate }) {
         : `One report, carried by ${outlets.length} outlets`;
   return (
     <li className="rounded-2xl border border-line p-4">
-      <p className="text-xs font-bold uppercase tracking-wider text-ink-subtle">
+      <p className="text-[13px] font-medium text-ink-subtle">
         <span className={cx("rounded-full px-2 py-0.5", u.sourceType === "official" ? "bg-ink text-canvas" : "bg-sunken text-ink-muted")}>{u.sourceType === "official" ? "Official source" : "News report"}</span>{" "}
         {CATEGORY_LABEL[u.category]}
       </p>

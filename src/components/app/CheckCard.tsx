@@ -14,16 +14,16 @@ export function outcomeMessage(outcome: ContributionOutcome, recorded = true): s
     case "verified":
       return "Thank you. That matches what someone else (or the listed hours) said, so it now helps the next person.";
     case "contradicted":
-      return "Thank you. Others said something different, so MIRA won't show either answer for now.";
+      return "Thank you. Others said something different, so Mira won't show either answer for now.";
     case "duplicate":
-      return "You've already told MIRA about this recently. Thank you.";
+      return "You've already told Mira about this recently. Thank you.";
     default:
-      return "Thank you. It's waiting for someone else to confirm before MIRA uses it.";
+      return "Thank you. It's waiting for someone else to confirm before Mira uses it.";
   }
 }
 
 /**
- * One MIRA Check: a small, objective question about a place she passed on a walk. Always
+ * One Mira Check: a small, objective question about a place she passed on a walk. Always
  * skippable. Rendered on the Contribute tab and (wired by the journey screen) after arrival.
  */
 export function CheckCard({ check, onDone }: { check: Pick<CheckView, "id" | "question" | "options">; onDone?: (outcome: ContributionOutcome) => void }) {
@@ -43,13 +43,13 @@ export function CheckCard({ check, onDone }: { check: Pick<CheckView, "id" | "qu
   };
   if (done) {
     return (
-      <p role="status" className="rounded-3xl bg-surface px-5 py-4 text-sm text-ink-muted shadow-[var(--shadow-card)] animate-rise">
+      <p role="status" className="rounded-[var(--radius-card)] bg-surface px-5 py-4 text-sm text-ink-muted shadow-[var(--shadow-card)] animate-rise">
         {done}
       </p>
     );
   }
   return (
-    <div className="rounded-3xl bg-surface p-5 text-left shadow-[var(--shadow-card)] animate-rise">
+    <div className="rounded-[var(--radius-card)] bg-surface p-5 text-left shadow-[var(--shadow-card)] animate-rise">
       <p className="font-bold">{check.question}</p>
       <div className="mt-3 grid grid-cols-3 gap-2">
         {check.options.map((o) => (

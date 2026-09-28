@@ -14,7 +14,7 @@ export function ConfirmSignIn() {
   return (
     <div className="w-full max-w-sm animate-rise">
       <MiraOrb size={72} />
-      <h1 className="mt-5 text-2xl font-extrabold">Sign in to MIRA</h1>
+      <h1 className="mt-5 text-2xl font-semibold">Sign in to Mira</h1>
       <p className="mt-2 text-ink-muted">You opened a sign-in link from your email.</p>
       {state === "error" ? <p role="alert" className="mt-4 rounded-2xl bg-error-soft px-4 py-3 text-sm font-semibold text-error">{message}</p> : null}
       <Button

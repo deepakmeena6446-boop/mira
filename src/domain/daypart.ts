@@ -15,10 +15,10 @@ export function daypartFor(hour: number): Daypart {
 
 /** Browser-chrome color per daypart (matches `--color-canvas` in globals.css). */
 export const DAYPART_THEME_COLOR: Record<Daypart, string> = {
-  dawn: "#fff6f0",
-  day: "#faf7ff",
-  evening: "#fbf3ee",
-  night: "#120f24",
+  dawn: "#f8f3ec",
+  day: "#f6f5f1",
+  evening: "#f4f0e8",
+  night: "#111312",
 };
 
 export type ThemePref = "auto" | "light" | "dark";

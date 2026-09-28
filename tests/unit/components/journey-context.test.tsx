@@ -50,16 +50,16 @@ describe("journey context card", () => {
   it("shows failed and partial source states without discarding available evidence", () => {
     const failed = [{ source: "OpenStreetMap", state: "failed" as const, retryable: true }];
     const partial = [{ source: "MIRA walkers", state: "ready" as const }, ...failed];
-    expect(lightingEvidenceLine({ state: "failed", sources: failed, retryable: true }, null)).toBe("MIRA couldn't check lighting sources right now.");
+    expect(lightingEvidenceLine({ state: "failed", sources: failed, retryable: true }, null)).toBe("Mira couldn't check lighting sources right now.");
     expect(lightingEvidenceLine({ state: "partial", sources: partial, data: lighting(71, 22) }, null)).toMatch(/71% mapped as lit.*Couldn't check OpenStreetMap/);
-    expect(helpPointsLine([], { state: "failed", sources: failed, retryable: true })).toBe("MIRA couldn't check Help Points right now.");
+    expect(helpPointsLine([], { state: "failed", sources: failed, retryable: true })).toBe("Mira couldn't check Help Points right now.");
     expect(helpPointsLine([pharmacy], { state: "partial", sources: partial, data: [pharmacy] })).toMatch(/1 mapped Help Point.*Some sources couldn't be checked/);
   });
 
   it("offers Retry instead of an empty Help Point claim when lookup failed", () => {
     const retry = vi.fn();
     render(<HelpNearSheet open onClose={() => {}} me={{ lat: 51.5, lon: -0.12 }} points={[]} evidence={{ state: "failed", sources: [{ source: "Google Places", state: "failed", retryable: true }], retryable: true }} loading={false} onRetry={retry} onPick={() => {}} />);
-    expect(screen.getByText("MIRA couldn't check Help Points right now.")).toBeInTheDocument();
+    expect(screen.getByText("Mira couldn't check Help Points right now.")).toBeInTheDocument();
     expect(screen.queryByText(/No mapped Help Points/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(retry).toHaveBeenCalledTimes(1);
@@ -98,7 +98,7 @@ describe("journey context card", () => {
   it("for a ride whose Help Point lookup failed: says it couldn't check, never 'none'", () => {
     const failed = { state: "failed" as const, sources: [{ source: "Google Places", state: "failed" as const, retryable: true }], retryable: true };
     render(<ArrivalContextLines mode="ride" arrivalHelp={[]} arrivalEvidence={failed} dest={{ lat: 0, lon: 0 }} />);
-    expect(screen.getByText("MIRA couldn't check Help Points near where you arrive right now.")).toBeInTheDocument();
+    expect(screen.getByText("Mira couldn't check Help Points near where you arrive right now.")).toBeInTheDocument();
     expect(screen.queryByText(/No mapped Help Points/)).not.toBeInTheDocument();
   });
 
@@ -113,11 +113,11 @@ describe("journey context card", () => {
   it("names every lighting source and what it said, not only the ones with data", () => {
     const sources = [{ source: "MIRA walkers", state: "ready" as const }, { source: "OpenStreetMap", state: "failed" as const, retryable: true }, { source: "Mapillary", state: "unavailable" as const }];
     const none = { ...lighting(0, 100), sources: { walkers: false, osm: false, poles: false } };
-    expect(sourceDetails({ state: "partial", data: none, sources }, none)).toBe("MIRA walkers: nothing mapped here yet; OpenStreetMap: couldn't check just now; Mapillary: not available here.");
+    expect(sourceDetails({ state: "partial", data: none, sources }, none)).toBe("Mira walkers: nothing mapped here yet; OpenStreetMap: couldn't check just now; Mapillary: not available here.");
     const osm = lighting(71, 22); // OpenStreetMap had data
     const ok = [{ source: "MIRA walkers", state: "ready" as const }, { source: "OpenStreetMap", state: "ready" as const }];
-    expect(sourceDetails({ state: "ready", data: osm, sources: ok }, osm)).toBe("From OpenStreetMap. MIRA walkers: nothing mapped here yet.");
-    expect(sourceDetails(undefined, null)).toBe("MIRA could not confirm source coverage.");
+    expect(sourceDetails({ state: "ready", data: osm, sources: ok }, osm)).toBe("From OpenStreetMap. Mira walkers: nothing mapped here yet.");
+    expect(sourceDetails(undefined, null)).toBe("Mira could not confirm source coverage.");
   });
 
   it("for transit with nothing found: says so, and why in one tap", () => {

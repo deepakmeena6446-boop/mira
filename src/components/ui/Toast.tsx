@@ -29,7 +29,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={push}>
       {children}
-      <div aria-live="polite" role="status" className="pointer-events-none fixed inset-x-0 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-50 flex flex-col items-center gap-2 px-4 md:bottom-6">
+      <div aria-live="polite" role="status" className="mira-toasts pointer-events-none fixed inset-x-0 bottom-[calc(var(--tabbar-space)+1rem)] z-50 flex flex-col items-center gap-2 px-4">
         {items.map((t) => (
           <ToastView key={t.id} item={t} onDone={dismiss} />
         ))}
@@ -46,7 +46,7 @@ function ToastView({ item, onDone }: { item: ToastItem; onDone: (id: number) => 
   return (
     <div
       className={cx(
-        "max-w-md rounded-xl px-4 py-3 text-sm font-medium shadow-lg",
+        "max-w-md rounded-[var(--radius-card)] px-4 py-3 text-[0.95rem] font-medium shadow-[var(--shadow-float)] animate-rise",
         item.tone === "error" ? "bg-error text-canvas" : "bg-ink text-canvas",
       )}
     >

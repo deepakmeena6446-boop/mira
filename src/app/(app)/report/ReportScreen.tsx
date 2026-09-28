@@ -85,11 +85,11 @@ export function ReportScreen({ preset }: { preset: Category | null }) {
 
   if (done) {
     return (
-      <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-32 text-center">
+      <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-[calc(var(--tabbar-space)+2rem)] text-center">
         <MiraOrb size={84} />
-        <h1 className="mt-6 text-3xl font-extrabold animate-rise">Thank you 💜</h1>
+        <h1 className="mt-6 text-3xl font-semibold animate-rise">Thank you 💜</h1>
         <p className="mt-2 max-w-sm text-ink-muted animate-rise">
-          Submitted privately. Reports may be reviewed before they can contribute to MIRA&apos;s information. Nothing you send is ever shown on its own.
+          Submitted privately. Reports may be reviewed before they can contribute to Mira&apos;s information. Nothing you send is ever shown on its own.
         </p>
         <p className="mt-2 max-w-sm text-sm text-ink-muted">
           If you&apos;re in danger right now, <EmergencyPill variant="link" />.
@@ -107,11 +107,11 @@ export function ReportScreen({ preset }: { preset: Category | null }) {
   }
 
   return (
-    <div className="bg-companion min-h-dvh px-4 pb-36 pt-[max(1.25rem,env(safe-area-inset-top))]">
+    <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
       <div className="mx-auto max-w-xl">
         {!tile ? (
           <div className="animate-rise">
-            <h1 className="text-3xl font-extrabold">What happened?</h1>
+            <h1 className="text-3xl font-semibold">What happened?</h1>
             <p className="mt-1 text-ink-muted">
               {spot ? `Reporting ${spot.name ? spot.name.replace(/^Near /, "near ") : "the spot you picked on the map"}. ` : ""}Private and anonymous.
             </p>
@@ -121,12 +121,12 @@ export function ReportScreen({ preset }: { preset: Category | null }) {
                   key={t.category}
                   type="button"
                   onClick={() => setCategory(t.category)}
-                  className={cx("flex min-h-32 flex-col items-start justify-between rounded-[1.6rem] bg-gradient-to-br p-4 text-left shadow-[var(--shadow-card)] transition-transform active:scale-[0.97]", t.tone)}
+                  className={cx("flex min-h-32 flex-col items-start justify-between rounded-[var(--radius-card)] bg-gradient-to-br p-4 text-left shadow-[var(--shadow-card)] transition-transform active:scale-[0.97]", t.tone)}
                 >
                   <span className="text-4xl" aria-hidden>
                     {t.emoji}
                   </span>
-                  <span className="text-lg font-extrabold leading-tight">{t.label}</span>
+                  <span className="text-lg font-semibold leading-tight">{t.label}</span>
                 </button>
               ))}
             </div>
@@ -142,7 +142,7 @@ export function ReportScreen({ preset }: { preset: Category | null }) {
             </button>
             <div className="flex items-center gap-3">
               <span className="grid size-14 place-items-center rounded-2xl bg-surface text-3xl shadow-[var(--shadow-card)]">{tile.emoji}</span>
-              <h1 className="text-2xl font-extrabold">{tile.label}</h1>
+              <h1 className="text-2xl font-semibold">{tile.label}</h1>
             </div>
 
             <section className="mt-6 rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--shadow-card)]">
@@ -204,7 +204,7 @@ export function ReportScreen({ preset }: { preset: Category | null }) {
             <Button className="mt-5" variant="hero" size="lg" onClick={send} busy={busy} busyLabel="Sending privately…" disabled={!point && loc.status !== "asking"}>
               Send privately
             </Button>
-            <p className="mt-3 text-center text-xs text-ink-subtle">Submitted privately. Reports may be reviewed before they can contribute to MIRA&apos;s information. Never shown on its own.</p>
+            <p className="mt-3 text-center text-xs text-ink-subtle">Submitted privately. Reports may be reviewed before they can contribute to Mira&apos;s information. Never shown on its own.</p>
             <SearchOverlay
               open={choosing}
               onClose={() => setChoosing(false)}

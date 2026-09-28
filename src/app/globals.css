@@ -1,48 +1,60 @@
 @import "tailwindcss";
 
 /*
- * MIRA 2.0 design tokens: a warm, companion-like consumer app.
- * Soft lavender canvas, violet primary with a peach glow, generous radii, soft
- * elevation. Token names are kept stable so every screen inherits the new look.
+ * Mira design tokens (docs/launch-ux/04): calm intelligence × living city × premium companion.
+ * Warm-neutral paper, one deep lagoon-teal accent (Mira / you / your journey), amber only for
+ * lighting evidence, warm for "needs you", red only for failed operations. Token names are kept
+ * stable so every screen inherits the system.
  */
 @theme {
-  --color-canvas: #faf7ff;
+  --color-canvas: #f6f5f1;
   --color-surface: #ffffff;
-  --color-sunken: #f3effb;
-  --color-ink: #1c1633;
-  --color-ink-muted: #5a546e;
-  --color-ink-subtle: #6c6682;
-  --color-line: #ebe5f6;
-  --color-line-strong: #d4cce6;
+  --color-sunken: #efeee9;
+  --color-ink: #1a1a18;
+  --color-ink-muted: #55534d;
+  --color-ink-subtle: #6b6961;
+  --color-line: #e4e2db;
+  --color-line-strong: #cfccc3;
 
-  --color-accent: #6a44f5;
-  --color-accent-strong: #5530e0;
-  --color-accent-soft: #efe9ff;
+  --color-accent: #1d6b63;
+  --color-accent-strong: #17554f;
+  --color-accent-soft: #e3efec;
   --color-accent-ink: #ffffff;
 
-  --color-peach: #ff8a65;
-  --color-peach-soft: #fff0e9;
-  --color-mint: #15803d;
-  --color-mint-soft: #e7f7ee;
+  /* Retired hues, aliased so nothing breaks: peach → sunken, mint (confirmed) → accent. */
+  --color-peach: #55534d;
+  --color-peach-soft: #efeee9;
+  --color-mint: #1d6b63;
+  --color-mint-soft: #e3efec;
 
-  --color-warm: #9a4d0e;
-  --color-warm-soft: #fff3e3;
+  /* Attention: something needs her. Never "danger". */
+  --color-warm: #8f4a0c;
+  --color-warm-soft: #fbeedc;
 
-  --color-error: #c4281c;
+  /* Failure of an operation only. Never a place, route or person. */
+  --color-error: #b42318;
   --color-error-soft: #fdecea;
+
+  /* Lighting evidence glyphs (icons only, ≥ 3:1). */
+  --color-light: #b7791f;
+  --color-scrim: rgb(17 19 18 / 0.4);
 
   --color-glass-edge: rgb(255 255 255 / 0.7);
 
-  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", sans-serif;
+  --font-sans: var(--font-inst), var(--font-deva), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", sans-serif;
 
-  --radius-card: 1.75rem;
-  --radius-control: 1.1rem;
-  --shadow-card: 0 1px 2px rgb(40 20 90 / 0.05), 0 10px 30px -12px rgb(60 30 140 / 0.18);
-  --shadow-float: 0 16px 40px -12px rgb(50 25 120 / 0.35);
+  --radius-xs: 0.5rem;
+  --radius-control: 0.75rem;
+  --radius-button: 0.875rem;
+  --radius-card: 1rem;
+  --radius-lg: 1.5rem;
+  /* Cards on the canvas get a hairline, not a floating shadow. Over-map chrome uses --shadow-float. */
+  --shadow-card: 0 0 0 1px var(--color-line);
+  --shadow-float: 0 1px 2px rgb(0 0 0 / 0.08), 0 4px 12px rgb(0 0 0 / 0.1);
+  --shadow-sheet: 0 -6px 24px rgb(0 0 0 / 0.1);
 
-  --animate-rise: rise 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
-  --animate-fade: fade 300ms ease-out both;
-  --animate-breathe: breathe 4s ease-in-out infinite;
+  --animate-rise: rise 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade: fade 200ms ease-out both;
 }
 
 /*
@@ -50,61 +62,67 @@
  * (src/domain/daypart.ts) and kept current by DaypartSync. "day" is the base palette above.
  */
 :root {
-  --glow-a: rgb(255 138 101 / 0.16);
-  --glow-b: rgb(106 68 245 / 0.14);
-  --glass-bg: rgb(255 255 255 / 0.82);
+  --glass-bg: rgb(255 255 255 / 0.9);
   --pin-bg: #ffffff;
-  --map-route: #6a44f5;
-  --map-route-glow: #a78bfa;
+  --map-route: #1d6b63;
+  --map-route-glow: #5fa89e;
+  --map-route-alt: #6b6961;
+  --map-unknown: #7a776f;
+  --map-lit: #ffc94d;
   --map-me: #2563eb;
+  --tabbar-h: 3.5rem;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-press: 100ms;
+  --dur-state: 180ms;
+  --dur-enter: 240ms;
+  --dur-exit: 160ms;
+  --dur-overlay: 280ms;
+  --dur-sheet: 380ms;
   color-scheme: light;
 }
 :root[data-daypart="dawn"] {
-  --color-canvas: #fff6f0;
-  --color-sunken: #fbeee8;
-  --color-line: #f5e4dc;
-  --glow-a: rgb(255 170 120 / 0.28);
-  --glow-b: rgb(236 110 170 / 0.14);
+  --color-canvas: #f8f3ec;
+  --color-sunken: #f1ebe2;
 }
 :root[data-daypart="evening"] {
-  --color-canvas: #fbf3ee;
-  --color-sunken: #f6ebe6;
-  --color-line: #efe0da;
-  --glow-a: rgb(245 140 60 / 0.24);
-  --glow-b: rgb(126 58 242 / 0.2);
+  --color-canvas: #f4f0e8;
+  --color-sunken: #ece6db;
 }
 :root[data-daypart="night"] {
   color-scheme: dark;
-  --color-canvas: #120f24;
-  --color-surface: #1d1936;
-  --color-sunken: #262143;
-  --color-ink: #f2eeff;
-  --color-ink-muted: #bdb6da;
-  --color-ink-subtle: #a19abf;
-  --color-line: #2f2950;
-  --color-line-strong: #463e6e;
-  /* Lighter violet so accent text reads on the dark canvas (5.4:1); filled accents take dark text. */
-  --color-accent: #8f73ff;
-  --color-accent-strong: #a48fff;
-  --color-accent-soft: #2a2257;
-  --color-accent-ink: #140f2e;
-  --color-peach: #ff9e7f;
-  --color-peach-soft: #3a2432;
-  --color-mint: #4ade80;
-  --color-mint-soft: #15301f;
-  --color-warm: #fbbf77;
-  --color-warm-soft: #3a2a17;
+  --color-canvas: #111312;
+  --color-surface: #1a1c1b;
+  --color-sunken: #232625;
+  --color-ink: #eceeea;
+  --color-ink-muted: #aeb3ad;
+  --color-ink-subtle: #8e938d;
+  --color-line: #2a2e2c;
+  --color-line-strong: #3a3f3c;
+  --color-accent: #7cc4b9;
+  --color-accent-strong: #9ad3ca;
+  --color-accent-soft: #17302c;
+  --color-accent-ink: #0b1f1c;
+  --color-peach: #aeb3ad;
+  --color-peach-soft: #232625;
+  --color-mint: #7cc4b9;
+  --color-mint-soft: #17302c;
+  --color-warm: #f2b872;
+  --color-warm-soft: #352615;
   --color-error: #ff8a80;
   --color-error-soft: #3b1d22;
-  --color-glass-edge: rgb(255 255 255 / 0.08);
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 30px -12px rgb(0 0 0 / 0.6);
-  --shadow-float: 0 16px 40px -12px rgb(0 0 0 / 0.7);
-  --glow-a: rgb(255 138 101 / 0.1);
-  --glow-b: rgb(143 115 255 / 0.18);
-  --glass-bg: rgb(29 25 54 / 0.84);
-  --pin-bg: #262143;
-  --map-route: #9d85ff;
-  --map-route-glow: #6a44f5;
+  --color-light: #f2c45a;
+  --color-scrim: rgb(0 0 0 / 0.55);
+  --color-glass-edge: rgb(255 255 255 / 0.06);
+  --shadow-float: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 12px rgb(0 0 0 / 0.45);
+  --shadow-sheet: 0 -6px 24px rgb(0 0 0 / 0.5);
+  --glass-bg: rgb(26 28 27 / 0.9);
+  --pin-bg: #232625;
+  --map-route: #7cc4b9;
+  --map-route-glow: #2f6f66;
+  --map-route-alt: #8e938d;
+  --map-unknown: #8e938d;
   --map-me: #60a5fa;
 }
 
@@ -113,7 +131,7 @@
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.98);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -128,18 +146,6 @@
     opacity: 1;
   }
 }
-@keyframes breathe {
-  0%,
-  100% {
-    transform: scale(1);
-    filter: saturate(1);
-  }
-  50% {
-    transform: scale(1.06);
-    filter: saturate(1.2);
-  }
-}
-
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
@@ -167,7 +173,7 @@
     text-wrap: pretty;
   }
   :focus-visible {
-    outline: 3px solid var(--color-accent);
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
     border-radius: 10px;
   }
@@ -188,28 +194,26 @@
   }
 }
 
-/* Warm companion backdrop used on full-page screens. */
+/* Full-page screens sit on the flat, time-of-day canvas (the tint is the "living city" signal). */
 @utility bg-companion {
-  background:
-    radial-gradient(120% 60% at 100% 0%, var(--glow-a), transparent 60%),
-    radial-gradient(90% 60% at 0% 10%, var(--glow-b), transparent 60%),
-    var(--color-canvas);
+  background: var(--color-canvas);
 }
 
-/* White text stays ≥ 4.5:1 across the whole gradient (violet → purple → rose). */
+/* Retired signature gradient: the one accent, solid. */
 @utility bg-mira {
-  background: linear-gradient(135deg, #5b36e8 0%, #9333ea 50%, #c43d62 100%);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
 }
 
 @utility glass {
   background: var(--glass-bg);
   /* Prefixed first: Lightning CSS keeps only the LAST of the pair, and Chrome ignores the -webkit- one. */
-  -webkit-backdrop-filter: blur(18px) saturate(1.4);
-  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  backdrop-filter: blur(12px) saturate(1.2);
 }
 
 @utility skeleton {
-  background: linear-gradient(90deg, var(--color-sunken) 0%, #faf8ff 50%, var(--color-sunken) 100%);
+  background: linear-gradient(90deg, var(--color-sunken) 0%, var(--color-line) 50%, var(--color-sunken) 100%);
   background-size: 200% 100%;
   animation: mira-shimmer 1.4s ease-in-out infinite;
   border-radius: 0.75rem;
@@ -225,7 +229,7 @@
 }
 
 .mira-select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231c1633' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2355534d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   background-size: 1.1rem;
@@ -239,8 +243,8 @@
   border-radius: 999px 0 0 0;
 }
 .maplibregl-ctrl-group {
-  border-radius: 14px !important;
-  box-shadow: var(--shadow-card) !important;
+  border-radius: var(--radius-control) !important;
+  box-shadow: var(--shadow-float) !important;
 }
 
 /* Nearby place pins on the map (WorldMap). The button is the dot; the name floats below. */
@@ -259,19 +263,21 @@
 .mira-pin-dot {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
   background: var(--pin-bg);
-  border: 2px solid var(--pin-bg);
-  box-shadow: 0 2px 8px -2px rgb(50 25 120 / 0.35), 0 0 0 1px var(--color-line);
-  font-size: 15px;
+  color: var(--color-ink);
+  box-shadow: var(--shadow-float), 0 0 0 1px var(--color-line);
   line-height: 1;
   transition: transform 150ms ease;
 }
+.mira-pin-strong {
+  box-shadow: var(--shadow-float), 0 0 0 2px var(--color-ink);
+}
 .mira-pin:hover .mira-pin-dot,
 .mira-pin:focus-visible .mira-pin-dot {
-  transform: scale(1.15);
+  transform: scale(1.1);
 }
 .mira-pin:focus-visible {
   outline: none;
@@ -289,15 +295,52 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--glass-bg);
+  border-radius: var(--radius-xs);
+  background: var(--pin-bg);
   color: var(--color-ink);
-  font: 700 11px/16px var(--font-jakarta), system-ui, sans-serif;
-  box-shadow: 0 1px 4px -1px rgb(50 25 120 / 0.25);
+  font: 600 12px/16px var(--font-sans);
+  box-shadow: var(--shadow-float);
   pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .mira-pin-dot {
     transition: none;
   }
+}
+
+/* Mira Pulse (docs/launch-ux/04 §12). Static state styles; motion is added in the motion layer below. */
+.mira-pulse-ring {
+  opacity: 0.35;
+}
+.mira-pulse[data-pulse="attention"] .mira-pulse-ring,
+.mira-pulse[data-pulse="with-you"] .mira-pulse-ring {
+  opacity: 0.6;
+}
+.mira-pulse[data-pulse="thinking"] .mira-pulse-ring {
+  opacity: 0.9;
+  border-style: dashed;
+}
+
+/*
+ * Shell geometry. --tabbar-space is what the docked tab bar occupies (0 in immersive journey mode);
+ * --chrome-top is measured by Home/Trip from their top chrome so the sheet's full detent never covers
+ * the help anchors (docs/launch-ux/02 C-10.2).
+ */
+:root {
+  --tabbar-space: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  --chrome-top: 11rem;
+  --sheet-peek: max(34dvh, 280px);
+  --sheet-half: 50dvh;
+  --sheet-full: calc(100dvh - var(--chrome-top) - var(--tabbar-space));
+}
+:root[data-journey="open"] {
+  --tabbar-space: 0px;
+}
+:root[data-journey="open"] .mira-tabbar {
+  display: none;
+}
+/* On a journey the sheet owns the bottom of the screen: toasts drop from the top instead of covering "I'm here". */
+:root[data-journey="open"] .mira-toasts {
+  top: calc(env(safe-area-inset-top) + var(--chrome-top));
+  bottom: auto;
 }

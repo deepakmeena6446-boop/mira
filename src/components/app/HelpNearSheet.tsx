@@ -65,10 +65,10 @@ export function HelpNearSheet({
   const shown = all ? filtered : filtered.slice(0, FIRST);
   const sources = [...new Set(ranked.map((p) => SOURCE_NAME[p.source]))];
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-labelledby="near-h" className="fixed inset-0 z-50 flex items-end justify-center bg-[rgb(10_6_24/0.45)] animate-fade sm:items-center" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-[2rem] bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[2rem]">
+    <div role="dialog" aria-modal="true" aria-labelledby="near-h" className="fixed inset-0 z-50 flex items-end justify-center bg-scrim animate-fade sm:items-center" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-[var(--radius-lg)] bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[var(--radius-lg)]">
         <div className="flex items-center gap-3">
-          <h2 id="near-h" className="flex-1 text-xl font-extrabold">
+          <h2 id="near-h" className="flex-1 text-xl font-semibold">
             Help Points near you
           </h2>
           <button type="button" aria-label="Close" onClick={onClose} className="grid size-11 place-items-center rounded-full bg-sunken">
@@ -80,7 +80,7 @@ export function HelpNearSheet({
         ) : loading ? (
           <p className="mt-3 text-sm text-ink-muted">Finding Help Points near you…</p>
         ) : failed || evidence?.state === "failed" ? (
-          <div role="status" className="mt-3 text-sm text-ink-muted"><p>MIRA couldn&apos;t check Help Points right now.</p>{onRetry ? <button type="button" onClick={onRetry} className="mt-2 min-h-11 font-bold text-accent">Retry</button> : null}</div>
+          <div role="status" className="mt-3 text-sm text-ink-muted"><p>Mira couldn&apos;t check Help Points right now.</p>{onRetry ? <button type="button" onClick={onRetry} className="mt-2 min-h-11 font-bold text-accent">Retry</button> : null}</div>
         ) : !ranked.length ? (
           <p className="mt-3 text-sm text-ink-muted">No mapped Help Points were found from the sources checked. Other places may exist.</p>
         ) : (
@@ -128,7 +128,7 @@ export function HelpNearSheet({
         {evidence?.state === "partial" ? <p role="status" className="mt-2 text-xs text-ink-muted">Some sources couldn&apos;t be checked. Showing available results.</p> : null}
         {ranked.length ? (
           <p className="mt-3 text-xs text-ink-subtle">
-            Kinds of places that usually have people or staff around, from {sources.join(" and ")}. Places listed as closed now are left out. Hours are as listed by the source; MIRA can&apos;t confirm who&apos;s there.
+            Kinds of places that usually have people or staff around, from {sources.join(" and ")}. Places listed as closed now are left out. Hours are as listed by the source; Mira can&apos;t confirm who&apos;s there.
           </p>
         ) : null}
       </div>

@@ -17,18 +17,18 @@ import type { CheckView } from "@/server/contributions/checks";
 import type { ImpactView } from "@/server/contributions";
 
 /** Same wording everywhere a report is offered: honest about review, never promises a person. */
-const REPORT_PRIVACY_LINE = "Submitted privately. Reports may be reviewed before they can contribute to MIRA's information.";
+const REPORT_PRIVACY_LINE = "Submitted privately. Reports may be reviewed before they can contribute to Mira's information.";
 
 export function ContributeScreen({ signedIn, durable, checks, impact, pendingChecks = false }: { signedIn: boolean; durable: boolean; checks: CheckView[]; impact: ImpactView | null; pendingChecks?: boolean }) {
   const [signIn, setSignIn] = useState(false);
 
   if (!signedIn) {
     return (
-      <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-32 text-center">
+      <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-[calc(var(--tabbar-space)+2rem)] text-center">
         <MiraOrb size={80} />
-        <h1 className="mt-6 text-3xl font-extrabold">Help MIRA know your area better</h1>
+        <h1 className="mt-6 text-3xl font-semibold">Help Mira know your area better</h1>
         <p className="mt-2 max-w-sm text-ink-muted">
-          After a walk, MIRA may ask one quick question about a place you passed, like whether it was open. You can also tell MIRA when something it shows is wrong. Anyone can help.
+          After a walk, Mira may ask one quick question about a place you passed, like whether it was open. You can also tell Mira when something it shows is wrong. Anyone can help.
         </p>
         <Button className="mt-7 max-w-xs" variant="hero" size="lg" onClick={() => setSignIn(true)}>
           Sign in to help
@@ -36,17 +36,17 @@ export function ContributeScreen({ signedIn, durable, checks, impact, pendingChe
         <Link href="/report" className="mt-4 min-h-11 text-sm font-bold text-accent">
           Report something privately
         </Link>
-        <SignInSheet open={signIn} onClose={() => setSignIn(false)} reason="Sign in to help MIRA" />
+        <SignInSheet open={signIn} onClose={() => setSignIn(false)} reason="Sign in to help Mira" />
       </div>
     );
   }
 
   return (
-    <div className="bg-companion min-h-dvh px-4 pb-36 pt-[max(1.25rem,env(safe-area-inset-top))]">
+    <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex max-w-xl flex-col gap-6">
         <header>
-          <h1 className="text-3xl font-extrabold">Contribute</h1>
-          <p className="mt-1 text-ink-muted">Help MIRA know your area better.</p>
+          <h1 className="text-3xl font-semibold">Contribute</h1>
+          <p className="mt-1 text-ink-muted">Help Mira know your area better.</p>
         </header>
 
         <ChecksSection checks={checks} durable={durable} pendingChecks={pendingChecks} />
@@ -70,8 +70,8 @@ export function ContributeScreen({ signedIn, durable, checks, impact, pendingChe
 function ChecksSection({ checks, durable, pendingChecks }: { checks: CheckView[]; durable: boolean; pendingChecks: boolean }) {
   return (
     <section aria-labelledby="checks-h">
-      <h2 id="checks-h" className="mb-2 px-1 text-sm font-bold uppercase tracking-wider text-ink-subtle">
-        MIRA Checks
+      <h2 id="checks-h" className="mb-2 px-1 text-[13px] font-medium text-ink-subtle">
+        Mira Checks
       </h2>
       {pendingChecks ? <p role="status" className="mb-3 rounded-[var(--radius-card)] bg-surface px-5 py-3 text-sm text-ink-muted shadow-[var(--shadow-card)]">A journey question is still being prepared. Check back here later.</p> : null}
       {checks.length ? (
@@ -83,8 +83,8 @@ function ChecksSection({ checks, durable, pendingChecks }: { checks: CheckView[]
       ) : (
         <p className="rounded-[var(--radius-card)] bg-surface px-5 py-4 text-sm text-ink-muted shadow-[var(--shadow-card)]">
           {durable
-            ? "After your journeys, MIRA may ask one quick question about something you passed."
-            : "After your journeys, MIRA may ask one quick question about something you passed. Sign in with Google or add your email in Me first: it keeps it to one voice per person."}
+            ? "After your journeys, Mira may ask one quick question about something you passed."
+            : "After your journeys, Mira may ask one quick question about something you passed. Sign in with Google or add your email in Me first: it keeps it to one voice per person."}
         </p>
       )}
     </section>
@@ -119,7 +119,7 @@ function CorrectSection({ durable }: { durable: boolean }) {
       <div className="p-5">
         {!durable ? (
           <p className="text-sm text-ink-muted">
-            Something MIRA shows about a place is wrong? <Link href="/me#account" className="font-bold text-accent">Sign in with Google or add your email in Me</Link> to correct it. It keeps corrections to one voice per person.
+            Something Mira shows about a place is wrong? <Link href="/me#account" className="font-bold text-accent">Sign in with Google or add your email in Me</Link> to correct it. It keeps corrections to one voice per person.
           </p>
         ) : place ? (
           <div>
@@ -141,11 +141,11 @@ function CorrectSection({ durable }: { durable: boolean }) {
             <button type="button" onClick={() => setPlace(null)} className="mt-2 min-h-11 text-sm font-bold text-ink-muted">
               Cancel
             </button>
-            <p className="mt-1 text-xs text-ink-subtle">MIRA changes nothing on one person&apos;s word: a correction counts once someone else says the same.</p>
+            <p className="mt-1 text-xs text-ink-subtle">Mira changes nothing on one person&apos;s word: a correction counts once someone else says the same.</p>
           </div>
         ) : (
           <div>
-            <p className="text-sm text-ink-muted">Something MIRA shows about a place is wrong? Find the place and choose what&apos;s wrong. No writing needed.</p>
+            <p className="text-sm text-ink-muted">Something Mira shows about a place is wrong? Find the place and choose what&apos;s wrong. No writing needed.</p>
             {result ? (
               <p role="status" className="mt-3 rounded-2xl bg-sunken px-4 py-3 text-sm">
                 {result}
@@ -178,7 +178,7 @@ function ImpactSection({ impact }: { impact: ImpactView }) {
     <Section id="impact" title="Your impact">
       <div className="flex flex-col gap-3 p-5 text-sm">
         <p className="text-base font-bold">{impact.line ?? "Nothing verified yet."}</p>
-        {!impact.line ? <p className="text-ink-muted">When someone else confirms what you told MIRA, it shows here.</p> : null}
+        {!impact.line ? <p className="text-ink-muted">When someone else confirms what you told Mira, it shows here.</p> : null}
         {s.archived ? <p className="text-ink-muted">{s.archived} earlier credited {s.archived === 1 ? "answer is" : "answers are"} kept for your record but cannot be rechecked, so {s.archived === 1 ? "it no longer counts" : "they no longer count"} toward current impact or Local Steward.</p> : null}
         {s.pending ? <p className="text-ink-muted">{s.pending} waiting for someone else to confirm.</p> : null}
         {s.differed ? <p className="text-ink-muted">{s.differed} where reports differed, so nobody was credited.</p> : null}
@@ -202,7 +202,7 @@ function ImpactSection({ impact }: { impact: ImpactView }) {
             </details>
           )}
         </div>
-        <p className="text-xs text-ink-subtle">No points, streaks or leaderboards. MIRA counts only what someone else confirmed, and a place you&apos;ve already confirmed counts once a month.</p>
+        <p className="text-xs text-ink-subtle">No points, streaks or leaderboards. Mira counts only what someone else confirmed, and a place you&apos;ve already confirmed counts once a month.</p>
       </div>
     </Section>
   );

@@ -62,7 +62,7 @@ for (const kind of process.argv[4] ? process.argv[4].split(",") : ["mobile", "de
     await page.waitForURL("**/welcome", { timeout: 15000 });
     await shot(page, p("01-welcome-1"));
     await shot(page, p("01-welcome-1-full"), { full: true });
-    await page.getByRole("button", { name: "Start with MIRA" }).click();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
     await shot(page, p("02-welcome-2"));
     await page.getByRole("button", { name: "Use my location" }).click();
     await page.waitForURL((u) => u.pathname === "/", { timeout: 15000 });
@@ -140,7 +140,7 @@ for (const kind of process.argv[4] ? process.argv[4].split(",") : ["mobile", "de
     await shot(page, p("16-route-sheet-signedin-full"), { wait: 1500 });
   });
   await step("start-trip", async () => {
-    await page.getByRole("button", { name: /Start with MIRA/ }).click();
+    await page.getByRole("button", { name: /Go with Mira/ }).click();
     await page.waitForURL("**/trip", { timeout: 20000 });
     await shot(page, p("17-trip-active-half"), { wait: 6000 });
     await page.getByRole("button", { name: /Resize panel/ }).click();

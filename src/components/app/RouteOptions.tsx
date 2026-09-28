@@ -27,7 +27,7 @@ export function RouteOptions({ options, selected, onSelect }: { options: RouteOp
   const units = distanceUnits(useCountry().iso);
   return (
     <fieldset className="mt-4">
-      <legend className="text-sm font-bold uppercase tracking-wider text-ink-subtle">{options.length} ways to walk</legend>
+      <legend className="text-[13px] font-medium text-ink-subtle">{options.length} ways to walk</legend>
       <div className="mt-2 grid gap-2">
         {options.map((o, i) => (
           <label
@@ -68,7 +68,7 @@ export function ArrivalContextLines({ mode, arrivalHelp, arrivalEvidence, dest }
       </ContextRow>
       <ContextRow label="Help" why={first || arrivalEvidence?.state === "failed" ? undefined : NO_HELP_WHY}>
         {arrivalEvidence?.state === "failed" ? (
-          "MIRA couldn't check Help Points near where you arrive right now."
+          "Mira couldn't check Help Points near where you arrive right now."
         ) : first ? (
           <>
             {arrivalHelp.length} Help Point{arrivalHelp.length === 1 ? "" : "s"} near where you arrive

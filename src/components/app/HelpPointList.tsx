@@ -11,7 +11,7 @@ import { ContextRow } from "./ContextRow";
 
 /** "4 Help Points along this journey" — a summary line (for option cards and the route sheet). */
 export function helpPointsLine(points: HelpPoint[], evidence?: EvidenceState<HelpPoint[]>): string {
-  if (evidence?.state === "failed") return "MIRA couldn't check Help Points right now.";
+  if (evidence?.state === "failed") return "Mira couldn't check Help Points right now.";
   if (evidence?.state === "unavailable") return "Help Point mapping is unavailable here.";
   const base = points.length ? `${points.length} mapped Help Point${points.length === 1 ? "" : "s"} along the way` : "No mapped Help Points from sources checked";
   return evidence?.state === "partial" ? `${base} · Some sources couldn't be checked` : base;
@@ -39,7 +39,7 @@ export function HelpPointList({ points, evidence, onPick, defaultOpen = false }:
   const sources = [...new Set(points.map((p) => SOURCE_NAME[p.source]))];
   return (
     <section className="mt-5" aria-label="Help Points along this route">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">Help Points</h3>
+      <h3 className="text-[13px] font-medium text-ink-subtle">Help Points</h3>
       {!points.length ? (
         <p className="mt-2 text-sm text-ink-muted">{helpPointsLine(points, evidence)}. Other places may exist.</p>
       ) : (
@@ -76,7 +76,7 @@ export function HelpPointList({ points, evidence, onPick, defaultOpen = false }:
             </ul>
           ) : null}
           {evidence?.state === "partial" ? <p role="status" className="mt-2 text-xs text-ink-muted">Some Help Point sources couldn&apos;t be checked. Showing results that were available.</p> : null}
-          <p className="mt-1.5 text-xs text-ink-subtle">Kinds of places that usually have people or staff around, from {sources.join(" and ")}. Hours are as listed; MIRA can&apos;t confirm who&apos;s there or that they&apos;re open.</p>
+          <p className="mt-1.5 text-xs text-ink-subtle">Kinds of places that usually have people or staff around, from {sources.join(" and ")}. Hours are as listed; Mira can&apos;t confirm who&apos;s there or that they&apos;re open.</p>
         </>
       )}
     </section>
@@ -85,10 +85,10 @@ export function HelpPointList({ points, evidence, onPick, defaultOpen = false }:
 
 /** Why "no Help Points" may just be missing map data (shown in one tap). */
 export const NO_HELP_WHY =
-  "MIRA checks mapped types of places where help may be available near the way. No results from checked sources does not mean no places exist.";
+  "Mira checks mapped types of places where help may be available near the way. No results from checked sources does not mean no places exist.";
 
 /**
- * Two short lines above "Start with MIRA": the route's lighting and its Help Points, facts only,
+ * Two short lines above "Go with Mira": the route's lighting and its Help Points, facts only,
  * with the unknown share always shown and why it's unknown one tap away. Details sit below.
  */
 export function RouteContextLines({ option }: { option: RouteOption }) {

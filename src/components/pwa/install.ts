@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * "Install MIRA" support. Chrome/Android fire `beforeinstallprompt` once, early, so we
+ * "Install Mira" support. Chrome/Android fire `beforeinstallprompt` once, early, so we
  * capture it at startup (captureInstallPrompt runs from ServiceWorkerRegister) and
  * replay it when the person taps Install. iOS Safari has no prompt API: we show the
  * Share → "Add to Home Screen" steps instead. Already-installed (standalone) hides it.

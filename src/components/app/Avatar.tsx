@@ -1,6 +1,7 @@
 import { cx } from "@/components/ui/cx";
 
-const PALETTE = ["#6a44f5", "#e2557a", "#f08a24", "#0f9d8a", "#3b82f6", "#a855f7"];
+// Muted, warm-neutral hues: people are distinguishable without the avatars shouting.
+const PALETTE = ["#1d6b63", "#8a5a2b", "#5b6b8c", "#7a5c7a", "#4d7a4a", "#8c5a4f"];
 
 export function Avatar({ name, src, size = 40, className }: { name: string; src?: string | null; size?: number; className?: string }) {
   const initials = name
@@ -15,7 +16,7 @@ export function Avatar({ name, src, size = 40, className }: { name: string; src?
     return <img src={src} alt="" width={size} height={size} className={cx("rounded-full object-cover", className)} style={{ width: size, height: size }} />;
   }
   return (
-    <span aria-hidden className={cx("inline-grid shrink-0 place-items-center rounded-full font-bold text-white", className)} style={{ width: size, height: size, background: color, fontSize: size * 0.38 }}>
+    <span aria-hidden className={cx("inline-grid shrink-0 place-items-center rounded-full font-semibold text-white", className)} style={{ width: size, height: size, background: color, fontSize: size * 0.38 }}>
       {initials || "?"}
     </span>
   );

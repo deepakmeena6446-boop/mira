@@ -8,8 +8,11 @@ import { BottomSheet, type Snap } from "@/components/app/BottomSheet";
 import { MiraOrb } from "@/components/app/MiraOrb";
 import { Avatar } from "@/components/app/Avatar";
 import { EmergencyPill } from "@/components/app/EmergencyPill";
+import { HelpCluster } from "@/components/app/HelpCluster";
+import { useChromeTop } from "@/lib/use-chrome-top";
 import { UnsafeSheet } from "@/components/app/UnsafeSheet";
 import { AfterArrival } from "@/components/app/AfterArrival";
+import { HELP_ICON } from "@/components/app/kinds";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
@@ -52,7 +55,7 @@ export function TripScreen({
   helpExclude?: string[];
   /** She has accepted trusted contacts and email is on: "Tell my people now" can reach someone. */
   canTell?: boolean;
-  /** MIRA can send email at all (smtpConfigured()). Without it, nobody is ever alerted automatically. */
+  /** Mira can send email at all (smtpConfigured()). Without it, nobody is ever alerted automatically. */
   emailAlerts?: boolean;
 }) {
   const router = useRouter();
@@ -76,11 +79,22 @@ export function TripScreen({
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [awake, setAwake] = useState(false);
-  // Health of live sharing while the screen is open: GPS permission/availability, and whether uploads reach MIRA.
+  // Health of live sharing while the screen is open: GPS permission/availability, and whether uploads reach Mira.
   const [gps, setGps] = useState<"ok" | "denied" | "lost">("ok");
   const [uploadFailing, setUploadFailing] = useState(false);
   const lastSent = useRef<{ at: number; lat: number; lon: number } | null>(null);
   const open = trip.state === "active" || trip.state === "missed";
+  const chromeRef = useRef<HTMLDivElement>(null);
+  useChromeTop(chromeRef);
+  // Immersive journey mode: no tab bar while the journey is open (globals.css `html[data-journey]`).
+  useEffect(() => {
+    if (!open) return;
+    const root = document.documentElement;
+    root.dataset.journey = "open";
+    return () => {
+      delete root.dataset.journey;
+    };
+  }, [open]);
 
   const refresh = useCallback(async () => {
     const r = await api<{ trip: TripView | null; safetyNet?: SafetyNet }>("/api/trips/current");
@@ -187,7 +201,7 @@ export function TripScreen({
       setLocation(p);
       const last = lastSent.current;
       // Every 20 s, or sooner after 50 m — but never more than every 8 s: in a fast ride 50 m passes in
-      // 2 s, which would hit the server's 30/min limit and show "Can't reach MIRA" for nothing.
+      // 2 s, which would hit the server's 30/min limit and show "Can't reach Mira" for nothing.
       const since = last ? Date.now() - last.at : Infinity;
       if (last && (since < 8_000 || (since < 20_000 && haversine(last, p) < 50))) return;
       void upload(p);
@@ -266,11 +280,11 @@ export function TripScreen({
 
   if (!open) {
     return (
-      <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-32 text-center">
+      <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-[calc(var(--tabbar-space)+2rem)] text-center">
         <div className="animate-rise">
           <MiraOrb size={84} />
         </div>
-        <h1 className="mt-6 text-3xl font-extrabold animate-rise">
+        <h1 className="mt-6 text-3xl font-semibold animate-rise">
           {!trip.autoArrival && trip.state !== "expired" ? "Sharing stopped" : trip.state === "arrived" ? "You made it 🎉" : trip.state === "ended" ? "Journey ended" : "Journey closed"}
         </h1>
         <p className="mt-2 max-w-sm text-ink-muted animate-rise">
@@ -283,7 +297,7 @@ export function TripScreen({
         {/* The one question after a journey (or nothing): its own slot, extended in AfterArrival. */}
         <AfterArrival trip={trip} route={route} hour={clock ? clock.getHours() : null} onDone={() => clearTripRoutes()} />
         <p className="mt-6 max-w-sm text-sm text-ink-subtle">
-          Journey details are deleted{trip.purgeAt && clock ? ` by ${time(trip.purgeAt)}` : " within a day"}. MIRA doesn&apos;t keep a history of where you&apos;ve been.
+          Journey details are deleted{trip.purgeAt && clock ? ` by ${time(trip.purgeAt)}` : " within a day"}. Mira doesn&apos;t keep a history of where you&apos;ve been.
         </p>
         <Link href="/report" className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-bold text-ink-muted">
           <Icon name="flag" className="size-4" /> Something happened on the way? Report it privately
@@ -313,7 +327,7 @@ export function TripScreen({
   const noun = journeyNoun(trip.autoArrival ? trip.mode : "other");
   const modeLine = trip.mode === "other" ? "" : modeWords(trip.mode).short;
   const aheadCount = ranked.filter((p) => p.ahead).length;
-  const mapPins = ranked.slice(0, 6).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, emoji: HELP_CLASSES[p.cls].emoji }));
+  const mapPins = ranked.slice(0, 6).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, icon: HELP_ICON[p.cls] ?? "pin", strong: HELP_CLASSES[p.cls].emergency }));
   const directions = (p: { lat: number; lon: number }) => `https://www.google.com/maps/dir/?api=1&destination=${p.lat.toFixed(5)},${p.lon.toFixed(5)}&travelmode=walking`;
 
   return (
@@ -321,7 +335,8 @@ export function TripScreen({
       <WorldMap tiles={tiles} me={me} dest={trip.destination} route={route} places={mapPins} follow label={`Live map of your journey to ${trip.destination.name}`} padding={{ top: 170, bottom: 420, left: 40, right: 40 }} />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.9rem,env(safe-area-inset-top))]">
-        <div className="pointer-events-auto glass mx-auto flex max-w-xl items-center gap-3 rounded-[1.6rem] border border-glass-edge px-4 py-3 shadow-[var(--shadow-card)]">
+        <div ref={chromeRef} className="mx-auto max-w-xl">
+        <div className="pointer-events-auto glass mx-auto flex max-w-xl items-center gap-3 rounded-[var(--radius-card)] border border-glass-edge px-4 py-2.5 shadow-[var(--shadow-float)]">
           <Link href="/trips" aria-label="Back to your trips" className="grid size-11 shrink-0 place-items-center rounded-full bg-sunken">
             <Icon name="back" className="size-5" />
           </Link>
@@ -333,42 +348,43 @@ export function TripScreen({
               </span>
               {sharedOk.length ? "Sharing live" : `${noun[0].toUpperCase()}${noun.slice(1)} in progress`}
             </p>
-            <h1 className="truncate font-extrabold">{trip.autoArrival ? `To ${trip.destination.name}${modeLine ? ` · ${modeLine}` : ""}` : "Sharing where you are"}</h1>
+            <h1 className="truncate font-semibold">{trip.autoArrival ? `To ${trip.destination.name}${modeLine ? ` · ${modeLine}` : ""}` : "Sharing where you are"}</h1>
           </div>
         </div>
-        <div className="pointer-events-auto mx-auto mt-2 flex max-w-xl justify-end">
-          <EmergencyPill />
+        <div className="pointer-events-auto mx-auto mt-2 max-w-xl">
+          <HelpCluster onUnsafe={() => setUnsafe(true)} />
+        </div>
         </div>
       </div>
 
       <BottomSheet snap={snap} onSnap={setSnap} label="Journey controls">
         {netDown ? (
-          <div role="alert" className="mb-4 rounded-3xl bg-warm-soft p-4">
-            <p className="font-extrabold text-warm">Missed-arrival checks are paused</p>
-            <p className="mt-1 text-sm text-ink-muted">MIRA&apos;s background service isn&apos;t responding, so nobody would be told if you don&apos;t arrive. Send your live link, or let someone know directly.</p>
+          <div role="alert" className="mb-4 rounded-[var(--radius-card)] bg-warm-soft p-4">
+            <p className="font-semibold text-warm">Missed-arrival checks are paused</p>
+            <p className="mt-1 text-sm text-ink-muted">Mira&apos;s background service isn&apos;t responding, so nobody would be told if you don&apos;t arrive. Send your live link, or let someone know directly.</p>
           </div>
         ) : null}
         {gps !== "ok" || uploadFailing ? (
-          <div role="status" className="mb-4 rounded-3xl bg-warm-soft p-4">
-            <p className="font-extrabold text-warm">{gps === "denied" ? "Location is off for MIRA" : gps === "lost" ? "Can't get your location right now" : "Can't reach MIRA right now"}</p>
+          <div role="status" className="mb-4 rounded-[var(--radius-card)] bg-warm-soft p-4">
+            <p className="font-semibold text-warm">{gps === "denied" ? "Location is off for Mira" : gps === "lost" ? "Can't get your location right now" : "Can't reach Mira right now"}</p>
             <p className="mt-1 text-sm text-ink-muted">
               {sharedOk.length ? "Your contacts are seeing your last spot. " : ""}
-              {gps === "denied" ? "Turn location back on for this site in your browser settings." : gps === "lost" ? "It usually comes back once you're outdoors or have signal." : "Check your connection — MIRA keeps trying."}
-              {alertsOn ? " If you miss check-in, MIRA still attempts an email after your ETA; sending can fail." : ""}
+              {gps === "denied" ? "Turn location back on for this site in your browser settings." : gps === "lost" ? "It usually comes back once you're outdoors or have signal." : "Check your connection — Mira keeps trying."}
+              {alertsOn ? " If you miss check-in, Mira still attempts an email after your ETA; sending can fail." : ""}
             </p>
           </div>
         ) : null}
         {trip.sharedWith.some((c) => c.viaEmail && !c.notified) ? (
-          <div role="status" className="mb-4 rounded-3xl bg-warm-soft p-4">
-            <p className="font-extrabold text-warm">
+          <div role="status" className="mb-4 rounded-[var(--radius-card)] bg-warm-soft p-4">
+            <p className="font-semibold text-warm">
               Couldn&apos;t email your link to {names(trip.sharedWith.filter((c) => c.viaEmail && !c.notified).map((c) => c.name))}
             </p>
             <p className="mt-1 text-sm text-ink-muted">Tap &ldquo;Send my live link&rdquo; to send it yourself.</p>
           </div>
         ) : null}
         {trip.state === "missed" ? (
-          <div role="alert" className="mb-4 rounded-3xl bg-warm-soft p-4">
-            <p className="font-extrabold">Are you okay? Tap &ldquo;I&apos;m here&rdquo; if you&apos;ve arrived.</p>
+          <div role="alert" className="mb-4 rounded-[var(--radius-card)] bg-warm-soft p-4">
+            <p className="font-semibold">Are you okay? Tap &ldquo;I&apos;m here&rdquo; if you&apos;ve arrived.</p>
             <p className="mt-1 text-sm text-ink-muted">
               {trip.alert === "sent"
                 ? "I've let your contacts know you haven't checked in."
@@ -377,7 +393,7 @@ export function TripScreen({
                   : trip.alert === "failed" || trip.alert === "unconfirmed"
                     ? "I tried to reach your contacts but couldn't confirm the message went out."
                     : onWhatsApp.length
-                      ? "Nobody was notified automatically — MIRA can't send WhatsApp for you. Use “Send to …” above, or call someone."
+                      ? "Nobody was notified automatically — Mira can't send WhatsApp for you. Use “Send to …” above, or call someone."
                       : "Nobody was notified — either no contact on this trip has accepted your invite, or email isn't available right now."}{" "}
               If you&apos;re in danger, <EmergencyPill variant="link" />.
             </p>
@@ -386,8 +402,8 @@ export function TripScreen({
 
         {/* 1. Where and when: destination, ETA in her local time, how far. */}
         <div>
-          <p className="text-sm font-bold uppercase tracking-wider text-ink-subtle">{trip.autoArrival ? (left > 0 ? "Expected in" : "Expected") : "Sharing for"}</p>
-          <p className="text-4xl font-extrabold tabular-nums">{!clock ? "…" : left > 0 ? span : mins < 1 ? "now" : `${span} ago`}</p>
+          <p className="text-[13px] font-medium text-ink-subtle">{trip.autoArrival ? (left > 0 ? "Expected in" : "Expected") : "Sharing for"}</p>
+          <p className="text-4xl font-semibold tabular-nums">{!clock ? "…" : left > 0 ? span : mins < 1 ? "now" : `${span} ago`}</p>
           <p className="text-ink-muted">
             {/* The ETA is the check-in time: the route's time plus spare time (etaFor), so it's later than the walk Home showed. */}
             {trip.autoArrival ? (clock ? `ETA ${time(trip.etaAt)}, with time to spare` : "ETA") : clock ? `Until ${time(trip.etaAt)}` : ""}
@@ -417,9 +433,9 @@ export function TripScreen({
           </Button>
         </div>
 
-        {/* 2b. Her WhatsApp contacts: each one tap, their own link, message ready. MIRA opens WhatsApp; she presses Send. */}
+        {/* 2b. Her WhatsApp contacts: each one tap, their own link, message ready. Mira opens WhatsApp; she presses Send. */}
         {onWhatsApp.length ? (
-          <div className="mt-4 rounded-3xl bg-surface p-4 shadow-[var(--shadow-card)]">
+          <div className="mt-4 rounded-[var(--radius-card)] bg-surface p-4 shadow-[var(--shadow-card)]">
             <p className="text-sm font-bold">Send your live link on WhatsApp</p>
             <ul className="mt-2 grid gap-2">
               {onWhatsApp.map((c) => (
@@ -429,19 +445,19 @@ export function TripScreen({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => markOpened(c.name)}
-                    className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl px-4 font-extrabold ${opened.includes(c.name) ? "bg-mint-soft text-ink" : "bg-accent text-accent-ink"}`}
+                    className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl px-4 font-semibold ${opened.includes(c.name) ? "bg-mint-soft text-ink" : "bg-accent text-accent-ink"}`}
                   >
                     <Icon name="send" className="size-4" /> {opened.includes(c.name) ? `Opened WhatsApp for ${c.name} ✓` : `Send to ${c.name}`}
                   </a>
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-ink-muted">Each link is theirs alone and stops when you {trip.autoArrival ? "arrive" : "stop sharing"}. MIRA can&apos;t see whether you pressed Send.</p>
+            <p className="mt-2 text-xs text-ink-muted">Each link is theirs alone and stops when you {trip.autoArrival ? "arrive" : "stop sharing"}. Mira can&apos;t see whether you pressed Send.</p>
           </div>
         ) : null}
 
         {/* 3. Who's following, and what happens if she doesn't arrive — plainly. */}
-        <div className="mt-4 flex items-start gap-3 rounded-3xl bg-sunken p-4">
+        <div className="mt-4 flex items-start gap-3 rounded-[var(--radius-card)] bg-sunken p-4">
           {sharedOk.length ? (
             <div className="flex shrink-0 -space-x-2" aria-hidden>
               {sharedOk.slice(0, 3).map((c) => (
@@ -456,9 +472,9 @@ export function TripScreen({
           <p className="text-sm text-ink-muted">
             <span className="block font-semibold text-ink">{sharedOk.length ? `${names(sharedOk.map((c) => c.name))} can see where you are until you ${trip.autoArrival ? "arrive" : "stop sharing"}.` : "Only people you send your live link to can follow."}</span>{" "}
             {alertsOn
-              ? `If you haven't ${trip.autoArrival ? "arrived" : "checked in"} ${Math.round(MISS_GRACE_MS / 60_000)} min after ${trip.autoArrival ? "your ETA" : "your sharing time ends"}, MIRA emails ${sharedOk.length === 1 ? "them" : "them all"}.`
+              ? `If you haven't ${trip.autoArrival ? "arrived" : "checked in"} ${Math.round(MISS_GRACE_MS / 60_000)} min after ${trip.autoArrival ? "your ETA" : "your sharing time ends"}, Mira emails ${sharedOk.length === 1 ? "them" : "them all"}.`
               : !emailAlerts
-                ? `Nobody is alerted automatically if you don't ${trip.autoArrival ? "arrive" : "check in"} — MIRA can't send email alerts yet. Your live link is how people follow you.`
+                ? `Nobody is alerted automatically if you don't ${trip.autoArrival ? "arrive" : "check in"} — Mira can't send email alerts yet. Your live link is how people follow you.`
                 : netDown
                   ? "Nobody is alerted automatically right now — missed-arrival checks are paused."
                   : (
@@ -474,31 +490,28 @@ export function TripScreen({
         </div>
 
         {/* 4. If something feels wrong, or she needs longer. */}
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <Button variant="secondary" onClick={() => setUnsafe(true)} className="border-accent/40 font-extrabold text-accent-strong">
-            I feel unsafe
-          </Button>
+        <div className="mt-3 grid grid-cols-1 gap-3">
           <Button variant="secondary" onClick={() => act("extend")} busy={busy === "extend"} disabled={trip.extended || trip.state !== "active"}>
             <Icon name="clock" className="size-4" /> {trip.extended ? "Extended" : "+10 min"}
           </Button>
         </div>
         {trip.checkRequestedAt && clock && clock.getTime() - new Date(trip.checkRequestedAt).getTime() < 30 * 60_000 ? (
           <p role="status" className="mt-3 rounded-2xl bg-mint-soft px-4 py-3 text-sm">
-            You asked {sharedOk.length ? names(sharedOk.map((c) => c.name)) : "your people"} to check on you at {time(trip.checkRequestedAt)}. MIRA didn&apos;t contact anyone else.
+            You asked {sharedOk.length ? names(sharedOk.map((c) => c.name)) : "your people"} to check on you at {time(trip.checkRequestedAt)}. Mira didn&apos;t contact anyone else.
           </p>
         ) : null}
 
         {/* The nearest Help Point, ranked for right now */}
         {focus ? (
-          <div className="mt-3 rounded-3xl bg-accent-soft p-4">
+          <div className="mt-3 rounded-[var(--radius-card)] bg-accent-soft p-4">
             <div className="flex items-start gap-3">
               <span aria-hidden className="text-2xl">{HELP_CLASSES[focus.cls].emoji}</span>
               <div className="min-w-0 flex-1">
-                <p className="font-extrabold">{focus.name}</p>
+                <p className="font-semibold">{focus.name}</p>
                 <p className="text-sm text-ink-muted">
                   {HELP_CLASSES[focus.cls].label} · about {focus.minutes} min walk · {hoursLine(focus)}
                 </p>
-                <p className="mt-1 text-xs text-ink-subtle">{HELP_CLASSES[focus.cls].staffing}. MIRA can&apos;t confirm who&apos;s there right now.</p>
+                <p className="mt-1 text-xs text-ink-subtle">{HELP_CLASSES[focus.cls].staffing}. Mira can&apos;t confirm who&apos;s there right now.</p>
               </div>
               <button type="button" aria-label="Close" onClick={() => setFocus(null)} className="grid size-11 shrink-0 place-items-center rounded-full bg-surface">
                 <Icon name="close" className="size-4" />
@@ -509,10 +522,10 @@ export function TripScreen({
             </a>
           </div>
         ) : nextHelp ? (
-          <button type="button" onClick={() => setFocus(nextHelp)} className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-3xl px-4 py-2 text-left hover:bg-sunken">
+          <button type="button" onClick={() => setFocus(nextHelp)} className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-[var(--radius-card)] px-4 py-2 text-left hover:bg-sunken">
             <span aria-hidden className="text-xl">{HELP_CLASSES[nextHelp.cls].emoji}</span>
             <span className="min-w-0 flex-1">
-              <span className="block text-xs font-bold uppercase tracking-wider text-ink-subtle">Nearest Help Point{nextHelp.ahead ? " ahead" : ""}</span>
+              <span className="block text-[13px] font-medium text-ink-subtle">Nearest Help Point{nextHelp.ahead ? " ahead" : ""}</span>
               <span className="block truncate font-semibold">
                 {nextHelp.name} <span className="font-normal text-ink-muted">· {HELP_CLASSES[nextHelp.cls].label} · {nextHelp.minutes} min</span>
               </span>
@@ -522,15 +535,15 @@ export function TripScreen({
         ) : null}
 
         <p className="mt-4 text-sm text-ink-muted">
-          {awake ? "MIRA is keeping your screen on. " : ""}
+          {awake ? "Mira is keeping your screen on. " : ""}
           Your location updates while this screen is open.{" "}
-          {sharedOk.length ? "If you close MIRA, they'll see your last spot. " : ""}
-          {trip.autoArrival ? <>Tap &ldquo;I&apos;m here&rdquo; when you arrive if MIRA hasn&apos;t noticed.</> : null}
+          {sharedOk.length ? "If you close Mira, they'll see your last spot. " : ""}
+          {trip.autoArrival ? <>Tap &ldquo;I&apos;m here&rdquo; when you arrive if Mira hasn&apos;t noticed.</> : null}
         </p>
 
         <div className="mt-5">
           {confirmEnd ? (
-            <div className="rounded-3xl bg-sunken p-4">
+            <div className="rounded-[var(--radius-card)] bg-sunken p-4">
               <p className="font-semibold">End the {noun}? Live sharing stops{alertsOn ? " and nobody is told if you don't arrive" : ""}.</p>
               <div className="mt-3 flex gap-2">
                 <Button variant="danger" onClick={() => act("end")} busy={busy === "end"}>

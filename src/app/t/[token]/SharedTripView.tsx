@@ -79,16 +79,16 @@ export function SharedTripView({ token, initial, tiles }: { token: string; initi
     return (
       <main className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 text-center">
         <MiraOrb size={72} />
-        <h1 className="mt-5 text-2xl font-extrabold">{gone ? "This trip link has ended" : trip.state === "arrived" ? `${trip.name} arrived 🎉` : `${trip.name}'s trip has ended`}</h1>
+        <h1 className="mt-5 text-2xl font-semibold">{gone ? "This trip link has ended" : trip.state === "arrived" ? `${trip.name} arrived 🎉` : `${trip.name}'s trip has ended`}</h1>
         <p className="mt-2 max-w-sm text-ink-muted">
-Live sharing is off. MIRA doesn&apos;t keep a record of the trip.
+Live sharing is off. Mira doesn&apos;t keep a record of the trip.
         </p>
         {/* The viewer → user loop: one quiet card, no referral ids, no tracking parameters. */}
-        <div className="mt-8 w-full max-w-sm rounded-3xl bg-surface p-5 text-left shadow-[var(--shadow-card)]">
-          <p className="font-bold">Want MIRA with you on your journeys?</p>
+        <div className="mt-8 w-full max-w-sm rounded-[var(--radius-card)] bg-surface p-5 text-left shadow-[var(--shadow-card)]">
+          <p className="font-bold">Want Mira with you on your journeys?</p>
           <p className="mt-1 text-sm text-ink-muted">See what&apos;s known about the way before you go, share your journey in one tap, and it ends by itself when you arrive. No account needed to follow someone.</p>
           <Link href="/" className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-accent-soft px-4 text-sm font-bold text-accent-strong">
-            Try MIRA <Icon name="arrow" className="size-4" />
+            Try Mira <Icon name="arrow" className="size-4" />
           </Link>
         </div>
       </main>
@@ -103,14 +103,14 @@ Live sharing is off. MIRA doesn&apos;t keep a record of the trip.
   return (
     <main className="fixed inset-0">
       <WorldMap tiles={tiles} me={me} dest={trip.dest ?? null} follow label={`Live location of ${trip.name}`} padding={{ top: 80, bottom: 320, left: 40, right: 40 }} />
-      <section className="glass absolute inset-x-0 bottom-0 z-20 mx-auto max-w-xl rounded-t-[2rem] border border-glass-edge p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)]">
-        <p className={cx("inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-extrabold uppercase tracking-wider", checkOn ? "bg-warm-soft text-warm" : "bg-accent-soft text-accent-strong")}>
+      <section className="glass absolute inset-x-0 bottom-0 z-20 mx-auto max-w-xl rounded-t-[var(--radius-lg)] border border-glass-edge p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)]">
+        <p className={cx("inline-flex items-center gap-2 rounded-full px-3 py-1 text-[13px] font-semibold", checkOn ? "bg-warm-soft text-warm" : "bg-accent-soft text-accent-strong")}>
           {checkOn ? "Check on them" : here ? "Sharing where they are" : "On the way"}
         </p>
         <div className="mt-3 flex items-center gap-3">
           <Avatar name={trip.name} size={48} />
           <div className="min-w-0">
-            <h1 className="text-xl font-extrabold">{here ? `${trip.name} is sharing where they are` : `${trip.name} ${verb(trip.mode)} ${trip.destination}`}</h1>
+            <h1 className="text-xl font-semibold">{here ? `${trip.name} is sharing where they are` : `${trip.name} ${verb(trip.mode)} ${trip.destination}`}</h1>
             {/* The ETA is in the traveller's own time zone, labelled, so it reads the same for every viewer. */}
             <p className="text-ink-muted">
               {trip.etaAt ? `${here ? "Sharing until" : "Expected by"} ${formatPlaceTime(trip.etaAt, trip.tz ?? null)}` : ""}
@@ -125,21 +125,21 @@ Live sharing is off. MIRA doesn&apos;t keep a record of the trip.
         ) : null}
         {trip.checkRequested ? (
           <p role="alert" className="mt-4 rounded-2xl bg-warm-soft px-4 py-3 font-semibold text-warm">
-            {trip.name} asked you to check on them. The best next step is usually to call or message them. MIRA isn&apos;t an emergency service; if you think they&apos;re in danger, call your local emergency number.
+            {trip.name} asked you to check on them. The best next step is usually to call or message them. Mira isn&apos;t an emergency service; if you think they&apos;re in danger, call your local emergency number.
           </p>
         ) : null}
         {trip.state === "missed" ? (
           <p role="alert" className="mt-4 rounded-2xl bg-warm-soft px-4 py-3 font-semibold text-warm">
-            {trip.name} hasn&apos;t checked in yet. They may just have forgotten — try calling them. MIRA isn&apos;t an emergency service; if you think they&apos;re in danger, call your local emergency number.
+            {trip.name} hasn&apos;t checked in yet. They may just have forgotten — try calling them. Mira isn&apos;t an emergency service; if you think they&apos;re in danger, call your local emergency number.
           </p>
         ) : age !== null && age > 180 ? (
           <p className="mt-4 rounded-2xl bg-sunken px-4 py-3 text-sm text-ink-muted">
             <span className="font-bold text-ink">Location paused.</span> This is their last shared spot, from {ago(age)} — often it just means the phone screen is off.
-            {trip.alertsViewer ? ` MIRA may attempt an email if ${trip.name} misses check-in; sending can fail.` : ""}
+            {trip.alertsViewer ? ` Mira may attempt an email if ${trip.name} misses check-in; sending can fail.` : ""}
           </p>
         ) : null}
         <p className="mt-4 flex items-center gap-2 text-xs text-ink-subtle">
-          <MiraOrb size={18} calm /> Shared privately with you on MIRA. Only their latest spot is shown, and this link stops working shortly after the trip ends.
+          <MiraOrb size={18} calm /> Shared privately with you on Mira. Only their latest spot is shown, and this link stops working shortly after the trip ends.
         </p>
       </section>
     </main>

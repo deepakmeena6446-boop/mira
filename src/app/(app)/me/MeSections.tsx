@@ -160,11 +160,11 @@ export function PushSection({ available }: { available: boolean }) {
   return (
     <Section id="notifications" title="Notifications">
       <div className="p-5">
-        <p className="text-sm text-ink-muted">Get told on this phone, even with MIRA closed: a missed check-in, someone accepting your invite, or your live location pausing. No location is in the notification.</p>
+        <p className="text-sm text-ink-muted">Get told on this phone, even with Mira closed: a missed check-in, someone accepting your invite, or your live location pausing. No location is in the notification.</p>
         {state === "unsupported" ? (
-          <p className="mt-3 text-sm">This browser can&apos;t show notifications from MIRA. On iPhone, add MIRA to your Home Screen first, then open it from there.</p>
+          <p className="mt-3 text-sm">This browser can&apos;t show notifications from Mira. On iPhone, add Mira to your Home Screen first, then open it from there.</p>
         ) : state === "denied" ? (
-          <p className="mt-3 text-sm">Notifications are blocked for MIRA in your browser&apos;s site settings.</p>
+          <p className="mt-3 text-sm">Notifications are blocked for Mira in your browser&apos;s site settings.</p>
         ) : (
           <Button className="mt-3" variant={state === "on" ? "secondary" : "primary"} size="lg" busy={state === "busy" || state === "loading"} busyLabel="One moment…" onClick={state === "on" ? turnOff : turnOn}>
             {state === "on" ? "Turn off on this phone" : "Turn on notifications"}

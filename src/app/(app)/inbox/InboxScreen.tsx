@@ -36,13 +36,13 @@ export function InboxScreen({ signedIn, initial }: { signedIn: boolean; initial:
   }, [hasUnread]);
 
   return (
-    <div className="bg-companion min-h-dvh px-4 pb-32 pt-[max(1rem,env(safe-area-inset-top))]">
+    <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1rem,env(safe-area-inset-top))]">
       <div className="mx-auto max-w-xl">
         <header className="flex items-center gap-3 py-2">
           <button type="button" onClick={() => (window.history.length > 1 ? router.back() : router.push("/"))} aria-label="Back" className="grid size-11 place-items-center rounded-full bg-surface shadow-[var(--shadow-card)]">
             <Icon name="back" className="size-5" />
           </button>
-          <h1 className="text-2xl font-extrabold">Updates</h1>
+          <h1 className="text-2xl font-semibold">Updates</h1>
         </header>
 
         {!signedIn ? (
@@ -71,7 +71,7 @@ export function InboxScreen({ signedIn, initial }: { signedIn: boolean; initial:
                   {!n.read_at ? <span className="mt-1.5 size-2.5 shrink-0 rounded-full bg-accent" aria-label="New" /> : null}
                 </div>
               );
-              const cls = cx("block rounded-3xl bg-surface p-4 shadow-[var(--shadow-card)] animate-rise", !n.read_at && "ring-2 ring-accent/30");
+              const cls = cx("block rounded-[var(--radius-card)] bg-surface p-4 shadow-[var(--shadow-card)] animate-rise", !n.read_at && "ring-2 ring-accent/30");
               return <li key={n.id}>{n.href ? <Link href={n.href} className={cls}>{body}</Link> : <div className={cls}>{body}</div>}</li>;
             })}
           </ul>

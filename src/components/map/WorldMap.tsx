@@ -1,5 +1,6 @@
 "use client";
 
+import { iconSvg } from "@/components/ui/icon-paths";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, GeoJSONSource, MapMouseEvent, MapTouchEvent, Marker } from "maplibre-gl";
@@ -14,7 +15,10 @@ export interface MapPlace {
   name: string;
   lat: number;
   lon: number;
-  emoji: string;
+  /** Line-icon name (components/ui/icon-paths.ts). */
+  icon: string;
+  /** Places that are usually staffed day and night (hospital, police) get a stronger ring. */
+  strong?: boolean;
 }
 export interface MapNote {
   id: string;
@@ -225,26 +229,28 @@ export function WorldMap({
           // Overlay colors come from the theme (globals.css), so routes stay legible at night.
           const css = getComputedStyle(document.documentElement);
           const token = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
-          const routeColor = token("--map-route", "#6a44f5");
-          const glowColor = token("--map-route-glow", "#a78bfa");
+          const routeColor = token("--map-route", "#1d6b63");
+          const glowColor = token("--map-route-glow", "#5fa89e");
+          const litColor = token("--map-lit", "#ffc94d");
+          const unknownColor = token("--map-unknown", "#7a776f");
           const meColor = token("--map-me", "#2563eb");
           const ring = token("--pin-bg", "#ffffff");
           // App overlays sit on top of whichever basemap style is in use.
           map.addSource("route", { type: "geojson", data: EMPTY });
           map.addSource("lighting", { type: "geojson", data: EMPTY });
           // Under the route: a soft warm glow where the street is lit (or poles are mapped).
-          map.addLayer({ id: "lit-glow", type: "line", source: "lighting", filter: ["in", ["get", "status"], ["literal", ["lit", "poles"]]], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#ffc94d", "line-width": ["case", ["==", ["get", "status"], "lit"], 16, 11], "line-opacity": ["case", ["==", ["get", "status"], "lit"], 0.55, 0.3], "line-blur": 2 } });
+          map.addLayer({ id: "lit-glow", type: "line", source: "lighting", filter: ["in", ["get", "status"], ["literal", ["lit", "poles"]]], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": litColor, "line-width": ["case", ["==", ["get", "status"], "lit"], 14, 10], "line-opacity": ["case", ["==", ["get", "status"], "lit"], 0.55, 0.3], "line-blur": 2 } });
           map.addSource("points", { type: "geojson", data: EMPTY });
           map.addSource("notes", { type: "geojson", data: EMPTY });
-          map.addLayer({ id: "route-glow", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": glowColor, "line-width": 12, "line-opacity": 0.35 } });
+          map.addLayer({ id: "route-glow", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": glowColor, "line-width": 11, "line-opacity": 0.3 } });
           map.addLayer({ id: "route", type: "line", source: "route", filter: ["!", ["get", "approx"]], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": routeColor, "line-width": 5 } });
           map.addLayer({ id: "route-approx", type: "line", source: "route", filter: ["get", "approx"], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": routeColor, "line-width": 5, "line-dasharray": [1.2, 1.6] } });
           // Over the route: dark stretches as a quiet dotted grey (information, not a warning colour).
-          map.addLayer({ id: "lit-dark", type: "line", source: "lighting", filter: ["==", ["get", "status"], "dark"], layout: { "line-cap": "round" }, paint: { "line-color": "#6b6480", "line-width": 3, "line-dasharray": [0.4, 1.8] } });
-          map.addLayer({ id: "notes", type: "circle", source: "notes", paint: { "circle-radius": 11, "circle-color": "#ff8a65", "circle-opacity": 0.85, "circle-stroke-color": ring, "circle-stroke-width": 3 } });
+          map.addLayer({ id: "lit-dark", type: "line", source: "lighting", filter: ["==", ["get", "status"], "dark"], layout: { "line-cap": "round" }, paint: { "line-color": unknownColor, "line-width": 3, "line-dasharray": [0.4, 1.8] } });
+          map.addLayer({ id: "notes", type: "circle", source: "notes", paint: { "circle-radius": 11, "circle-color": unknownColor, "circle-opacity": 0.6, "circle-stroke-color": ring, "circle-stroke-width": 3 } });
           map.addLayer({ id: "me-halo", type: "circle", source: "points", filter: ["==", ["get", "kind"], "me"], paint: { "circle-radius": 22, "circle-color": meColor, "circle-opacity": 0.22 } });
           map.addLayer({ id: "me", type: "circle", source: "points", filter: ["==", ["get", "kind"], "me"], paint: { "circle-radius": 8, "circle-color": meColor, "circle-stroke-color": ring, "circle-stroke-width": 3 } });
-          map.addLayer({ id: "dest", type: "circle", source: "points", filter: ["==", ["get", "kind"], "dest"], paint: { "circle-radius": 11, "circle-color": routeColor, "circle-stroke-color": ring, "circle-stroke-width": 4 } });
+          map.addLayer({ id: "dest", type: "circle", source: "points", filter: ["==", ["get", "kind"], "dest"], paint: { "circle-radius": 9, "circle-color": routeColor, "circle-stroke-color": ring, "circle-stroke-width": 4 } });
           readyRef.current?.(true);
           setReady(true);
         });
@@ -285,7 +291,7 @@ export function WorldMap({
     );
   }, [me, dest, route, notes, lighting, ready]);
 
-  // Place pins (HTML markers: crisp emoji, keyboard-focusable, work on any basemap).
+  // Place pins (HTML markers: crisp line icons, keyboard-focusable, work on any basemap).
   const placesKey = places.map((p) => p.id).join("|");
   useEffect(() => {
     const map = mapRef.current;
@@ -307,8 +313,8 @@ export function WorldMap({
       el.setAttribute("aria-label", `${p.name} — show route`);
       el.title = p.name;
       const dot = document.createElement("span");
-      dot.className = "mira-pin-dot";
-      dot.textContent = p.emoji;
+      dot.className = p.strong ? "mira-pin-dot mira-pin-strong" : "mira-pin-dot";
+      dot.innerHTML = iconSvg(p.icon, 16); // static glyph markup from our own icon set, never user text
       el.append(dot);
       const label = document.createElement("span");
       label.className = "mira-pin-label";

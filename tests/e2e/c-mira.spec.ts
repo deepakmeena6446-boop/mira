@@ -24,7 +24,7 @@ test.describe("Mira — the companion (placeholder engine)", () => {
     await box.fill("take me home");
     await page.getByRole("button", { name: "Send" }).click();
     await expect(page.getByRole("log").getByText("To Home", { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: /Start with MIRA/ }).last().click();
+    await page.getByRole("button", { name: /Go with Mira/ }).last().click();
     await page.waitForURL("**/trip");
     await expect(page.getByText(/To Home/).first()).toBeVisible();
     await ctx.close();

@@ -24,7 +24,7 @@ export interface UnsafeShareAction {
  */
 export interface UnsafeTellAction {
   names: string[];
-  /** Whether any of them is reached by email (then MIRA sends); otherwise it's WhatsApp only. */
+  /** Whether any of them is reached by email (then Mira sends); otherwise it's WhatsApp only. */
   email: boolean;
   onTell: () => Promise<{ told: string[]; failed: string[]; whatsapp?: Array<{ name: string; url: string }> } | { error: string }>;
 }
@@ -107,14 +107,14 @@ export function UnsafeSheet({
   };
   // Portal: screens are position:fixed (their own stacking context), and this must sit above the tab bar.
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-labelledby="unsafe-h" className="fixed inset-0 z-50 flex items-end justify-center bg-[rgb(10_6_24/0.5)] animate-fade sm:items-center" onClick={onClose}>
+    <div role="dialog" aria-modal="true" aria-labelledby="unsafe-h" className="fixed inset-0 z-50 flex items-end justify-center bg-scrim animate-fade sm:items-center" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[92dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-[2rem] bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[2rem]"
+        className="max-h-[92dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-[var(--radius-lg)] bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[var(--radius-lg)]"
       >
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
-            <h2 id="unsafe-h" className="text-xl font-extrabold">
+            <h2 id="unsafe-h" className="text-xl font-semibold">
               Right now
             </h2>
             <p className="truncate text-sm text-ink-muted">
@@ -129,12 +129,12 @@ export function UnsafeSheet({
         {/* 1. Go to a Help Point: the best one for right now, and two more */}
         <div className="mt-4">
           {first ? (
-            <button type="button" onClick={() => onGoHelpPoint(first)} className="flex w-full items-center gap-3 rounded-3xl bg-accent-soft p-4 text-left">
+            <button type="button" onClick={() => onGoHelpPoint(first)} className="flex w-full items-center gap-3 rounded-[var(--radius-card)] bg-accent-soft p-4 text-left">
               <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-2xl bg-surface text-2xl">
                 {HELP_CLASSES[first.cls].emoji}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block font-extrabold text-accent-strong">Go to a Help Point</span>
+                <span className="block font-semibold text-accent-strong">Go to a Help Point</span>
                 <span className="block truncate font-semibold">{first.name}</span>
                 <span className="block text-sm text-ink-muted">
                   {HELP_CLASSES[first.cls].label} · about {first.minutes} min walk{aheadNote(first)} · {hoursLine(first)}
@@ -143,7 +143,7 @@ export function UnsafeSheet({
               <span className="shrink-0 text-sm font-bold text-accent">{goLabel}</span>
             </button>
           ) : (
-            <p className="rounded-3xl bg-sunken p-4 text-sm text-ink-muted">
+            <p className="rounded-[var(--radius-card)] bg-sunken p-4 text-sm text-ink-muted">
               {!me
                 ? "Turn on location to see Help Points near you."
                 : helpLoading
@@ -179,12 +179,12 @@ export function UnsafeSheet({
         {/* 2. Tell people */}
         {tell ? <TellMyPeople tell={tell} /> : null}
         {share ? (
-          <button type="button" onClick={() => void share.onShare()} className="mt-3 flex w-full items-center gap-3 rounded-3xl border border-line p-4 text-left">
+          <button type="button" onClick={() => void share.onShare()} className="mt-3 flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-line p-4 text-left">
             <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-2xl bg-sunken text-accent">
               <Icon name="share" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block font-extrabold">{share.label}</span>
+              <span className="block font-semibold">{share.label}</span>
               <span className="block text-sm text-ink-muted">{share.detail}</span>
             </span>
           </button>
@@ -204,7 +204,7 @@ export function UnsafeSheet({
               <li key={n.number}>
                 <a href={`tel:${n.number}`} className="flex min-h-11 items-center justify-between rounded-2xl bg-sunken px-4 text-sm">
                   <span className="font-semibold">{n.label}</span>
-                  <span className="font-extrabold">{n.number}</span>
+                  <span className="font-semibold">{n.number}</span>
                 </a>
               </li>
             ))}
@@ -216,7 +216,7 @@ export function UnsafeSheet({
               <li key={h.number}>
                 <a href={`tel:${h.number}`} className="flex min-h-11 items-center justify-between rounded-2xl bg-sunken px-4 text-sm">
                   <span className="font-semibold">{h.name}</span>
-                  <span className="font-extrabold">
+                  <span className="font-semibold">
                     {h.number}
                     {h.hours ? <span className="font-normal text-ink-muted"> · {h.hours}</span> : null}
                   </span>
@@ -240,8 +240,8 @@ export function UnsafeSheet({
         </div>
 
         <p className="mt-3 text-xs leading-relaxed text-ink-subtle">
-          {ranked.length ? `Help Points are types of places where help may be available, from ${sources.join(" and ")}. MIRA can't confirm who's there right now. ` : ""}
-          Emergency opens your phone&apos;s dialler: MIRA doesn&apos;t call or alert anyone for you.
+          {ranked.length ? `Help Points are types of places where help may be available, from ${sources.join(" and ")}. Mira can't confirm who's there right now. ` : ""}
+          Emergency opens your phone&apos;s dialler: Mira doesn&apos;t call or alert anyone for you.
           {onTrip ? " Your live location keeps updating only while the trip screen is open." : ""}
         </p>
       </div>
@@ -254,7 +254,7 @@ type ContactsPicker = { select: (props: string[], opts?: { multiple?: boolean })
 
 /**
  * "Call someone": on phones that support it (Android Chrome), the phone's own contact
- * picker, then the dialler. Elsewhere, type a number. MIRA never sees or keeps the number.
+ * picker, then the dialler. Elsewhere, type a number. Mira never sees or keeps the number.
  */
 function CallSomeone() {
   const [typing, setTyping] = useState(false);
@@ -279,7 +279,7 @@ function CallSomeone() {
   };
   if (!typing) {
     return (
-      <button type="button" onClick={() => void pick()} className="flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-line-strong bg-surface px-3 text-[0.95rem] font-extrabold">
+      <button type="button" onClick={() => void pick()} className="flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-2xl border border-line-strong bg-surface px-3 text-[0.95rem] font-semibold">
         <Icon name="phone" className="size-5" /> Call someone
       </button>
     );
@@ -306,7 +306,7 @@ function CallSomeone() {
         placeholder="Number to call"
         className="min-h-14 min-w-0 flex-1 rounded-2xl border border-line bg-sunken px-4 text-lg outline-none focus:border-accent"
       />
-      <button type="submit" disabled={clean.length < 3} className="min-h-14 rounded-2xl bg-accent px-5 font-extrabold text-accent-ink disabled:opacity-50">
+      <button type="submit" disabled={clean.length < 3} className="min-h-14 rounded-2xl bg-accent px-5 font-semibold text-accent-ink disabled:opacity-50">
         Call
       </button>
     </form>
@@ -319,14 +319,14 @@ function TellMyPeople({ tell }: { tell: UnsafeTellAction }) {
   const who = tell.names.length <= 2 ? tell.names.join(" and ") : `${tell.names.slice(0, -1).join(", ")} and ${tell.names[tell.names.length - 1]}`;
   if (state.kind === "done") {
     return (
-      <div role="status" className="mt-3 rounded-3xl bg-mint-soft p-4 text-sm">
+      <div role="status" className="mt-3 rounded-[var(--radius-card)] bg-mint-soft p-4 text-sm">
         {state.whatsapp.length ? (
           <>
             <p className="font-bold">Ask them on WhatsApp — tap, then press Send:</p>
             <ul className="mt-2 grid gap-2">
               {state.whatsapp.map((w) => (
                 <li key={w.url}>
-                  <a href={w.url} target="_blank" rel="noopener noreferrer" onClick={() => setOpened((xs) => [...xs, w.name])} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-surface px-4 font-extrabold text-ink">
+                  <a href={w.url} target="_blank" rel="noopener noreferrer" onClick={() => setOpened((xs) => [...xs, w.name])} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-surface px-4 font-semibold text-ink">
                     <Icon name="send" className="size-4" /> {opened.includes(w.name) ? `Opened WhatsApp for ${w.name} ✓` : `Send to ${w.name} on WhatsApp`}
                   </a>
                 </li>
@@ -338,7 +338,7 @@ function TellMyPeople({ tell }: { tell: UnsafeTellAction }) {
           {state.told.length ? <strong>Emailed {state.told.join(" and ")}. </strong> : null}
           {state.told.length ? "They can see where you are and were asked to check on you. " : ""}
           {state.failed.length ? `Couldn't reach ${state.failed.join(", ")} by email — call them, or send your live link. ` : ""}
-          MIRA didn&apos;t contact anyone else.
+          Mira didn&apos;t contact anyone else.
         </p>
       </div>
     );
@@ -352,13 +352,13 @@ function TellMyPeople({ tell }: { tell: UnsafeTellAction }) {
         const r = await tell.onTell();
         setState("error" in r ? { kind: "error", message: r.error } : { kind: "done", told: r.told, failed: r.failed, whatsapp: r.whatsapp ?? [] });
       }}
-      className="mt-3 flex w-full items-center gap-3 rounded-3xl border-2 border-accent/40 p-4 text-left disabled:opacity-60"
+      className="mt-3 flex w-full items-center gap-3 rounded-[var(--radius-card)] border-2 border-accent/40 p-4 text-left disabled:opacity-60"
     >
       <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-2xl bg-accent-soft text-accent-strong">
         <Icon name="send" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block font-extrabold">{state.kind === "busy" ? "Telling them…" : "Tell my people now"}</span>
+        <span className="block font-semibold">{state.kind === "busy" ? "Telling them…" : "Tell my people now"}</span>
         <span className="block text-sm text-ink-muted">
           {state.kind === "error" ? state.message : tell.email ? `Asks ${who} to check on you, with your live location — by email, and on WhatsApp where you've saved a number.` : `Opens WhatsApp for ${who} with your live location, asking them to check on you.`}
         </span>
@@ -374,7 +374,7 @@ function LocationInWords({ me, area, landmark }: { me: { lat: number; lon: numbe
   const text = `I'm ${place || "here"}. Coordinates: ${coords}.`;
   return (
     <div className="mt-3 rounded-2xl bg-sunken px-4 py-3 text-sm">
-      <p className="text-xs font-bold uppercase tracking-wider text-ink-subtle">Your location in words</p>
+      <p className="text-[13px] font-medium text-ink-subtle">Your location in words</p>
       <p className="mt-1">
         {place ? <span className="font-semibold">I&apos;m {place}.</span> : null} <span className="text-ink-muted">Coordinates {coords}</span>
       </p>

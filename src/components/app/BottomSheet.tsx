@@ -4,11 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cx } from "@/components/ui/cx";
 
 export type Snap = "peek" | "half" | "full";
-const HEIGHTS: Record<Snap, string> = { peek: "40dvh", half: "55dvh", full: "88dvh" };
+/** Detents are CSS variables (globals.css): `full` stops below the top chrome, so the help anchors stay visible. */
+const HEIGHTS: Record<Snap, string> = { peek: "var(--sheet-peek)", half: "var(--sheet-half)", full: "var(--sheet-full)" };
 
 /**
- * Draggable bottom sheet with three snap points. The handle is also a button so
- * keyboard and screen-reader users can change the size. Content scrolls inside.
+ * Draggable, non-modal bottom sheet with three snap points. It sits above the docked tab bar
+ * (or at the bottom edge in immersive journey mode). The handle is also a button so keyboard and
+ * screen-reader users can change the size. Content scrolls inside.
  */
 export function BottomSheet({
   children,
@@ -40,9 +42,11 @@ export function BottomSheet({
       start.current = null;
       return;
     }
-    const vh = window.innerHeight;
-    const ratio = drag / vh;
-    onSnap(ratio > 0.72 ? "full" : ratio > 0.42 ? "half" : "peek");
+    // Snap by the share of the space the sheet may use (between the tab bar and the top chrome).
+    const box = ref.current?.getBoundingClientRect();
+    const room = box ? box.bottom - readPx("--chrome-top") : window.innerHeight;
+    const ratio = drag / Math.max(1, room);
+    onSnap(ratio > 0.8 ? "full" : ratio > 0.45 ? "half" : "peek");
     setDrag(null);
     start.current = null;
   }, [drag, onSnap]);
@@ -64,12 +68,13 @@ export function BottomSheet({
     <section
       ref={ref}
       aria-label={label}
+      data-snap={snap}
       className={cx(
-        "glass fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-xl flex-col rounded-t-[2rem] border border-glass-edge shadow-[0_-12px_40px_-16px_rgb(50_25_120/0.35)]",
-        drag === null && "transition-[height] duration-300 ease-[cubic-bezier(0.2,0.9,0.3,1)]",
+        "fixed inset-x-0 bottom-[var(--tabbar-space)] z-30 mx-auto flex max-w-xl flex-col rounded-t-[var(--radius-lg)] border border-b-0 border-line bg-surface shadow-[var(--shadow-sheet)]",
+        drag === null && "transition-[height] duration-[var(--dur-sheet)] ease-[var(--ease-sheet)]",
         className,
       )}
-      style={{ height: drag ?? HEIGHTS[snap] }}
+      style={{ height: drag ?? HEIGHTS[snap], maxHeight: "var(--sheet-full)" }}
     >
       <button
         type="button"
@@ -77,11 +82,21 @@ export function BottomSheet({
         onPointerDown={onDown}
         onPointerMove={onMove}
         onClick={() => drag === null && onSnap(next[snap])}
-        className="flex min-h-11 w-full touch-none cursor-grab items-center justify-center rounded-t-[2rem] pt-2"
+        className="flex min-h-11 w-full touch-none cursor-grab items-center justify-center rounded-t-[var(--radius-lg)] pt-1"
       >
-        <span className="h-1.5 w-11 rounded-full bg-line-strong" />
+        <span className="h-[5px] w-9 rounded-full bg-line-strong" />
       </button>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-28">{children}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-6">{children}</div>
     </section>
   );
+}
+
+/** A CSS length variable on <html> in px (rem-based values are converted). */
+function readPx(name: string): number {
+  const probe = document.createElement("div");
+  probe.style.cssText = `position:absolute;visibility:hidden;height:var(${name})`;
+  document.body.append(probe);
+  const px = probe.getBoundingClientRect().height;
+  probe.remove();
+  return px;
 }

@@ -23,8 +23,8 @@ export function Chip({
       aria-label={ariaLabel}
       aria-pressed={active}
       className={cx(
-        "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-[0.95rem] font-semibold transition-all active:scale-[0.97] disabled:opacity-60",
-        active ? "border-accent bg-accent text-accent-ink" : "border-line bg-surface text-ink shadow-[var(--shadow-card)] hover:border-accent/40",
+        "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-[0.95rem] font-medium transition-[background-color,border-color,transform] duration-150 active:scale-[0.97] disabled:opacity-45",
+        active ? "border-accent bg-accent-soft text-accent-strong" : "border-line bg-surface text-ink hover:border-line-strong",
         className,
       )}
     >

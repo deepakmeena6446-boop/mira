@@ -22,12 +22,12 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     // Home → "Where are you going?" → one tap on the saved place → context → Start with MIRA.
     await owner.page.goto("/");
     await expect(owner.page.getByRole("heading", { name: "Where are you going?", exact: true })).toBeVisible();
-    await expect(owner.page.getByText(/MIRA attempts to email Mum a live link/)).toBeVisible(); // the alert channel, stated
+    await expect(owner.page.getByText(/Mira attempts to email Mum a live link/)).toBeVisible(); // the alert channel, stated
     await expect(owner.page.getByRole("link", { name: /Emergency call, 112/ })).toHaveAttribute("href", "tel:112");
     await owner.page.getByRole("button", { name: /Home/ }).first().click();
     await expect(owner.page.getByRole("region", { name: "Help Points along this route" })).toBeVisible();
     await expect(owner.page.getByRole("radio", { name: /Share with Mum/ })).toHaveAttribute("aria-checked", "true");
-    await owner.page.getByRole("button", { name: /Start with MIRA/ }).click();
+    await owner.page.getByRole("button", { name: /Go with Mira/ }).click();
     await owner.page.waitForURL("**/trip");
     await expect(owner.page.getByText("Sharing live")).toBeVisible();
     await expect(owner.page.getByText(/Mum can see where you are/)).toBeVisible();
@@ -61,8 +61,8 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     await mum.page.goto(link);
     await expect(mum.page.getByRole("heading", { name: /Priya arrived/ })).toBeVisible();
     // The viewer → user line: quiet, and no tracking parameters.
-    await expect(mum.page.getByText("Want MIRA with you on your journeys?")).toBeVisible();
-    await expect(mum.page.getByRole("link", { name: /Try MIRA/ })).toHaveAttribute("href", "/");
+    await expect(mum.page.getByText("Want Mira with you on your journeys?")).toBeVisible();
+    await expect(mum.page.getByRole("link", { name: /Try Mira/ })).toHaveAttribute("href", "/");
     const after = await (await mum.page.request.get(`/api/t/${link.split("/t/")[1]}`)).json();
     expect(after.location).toBeUndefined();
 
@@ -80,7 +80,7 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     const solo = await newUser(browser, "Zoya");
     await openRoute(solo.page);
     await expect(solo.page.getByText(/Nobody is alerted automatically/)).toBeVisible(); // honest before starting
-    await solo.page.getByRole("button", { name: /Start with MIRA/ }).click();
+    await solo.page.getByRole("button", { name: /Go with Mira/ }).click();
     await solo.page.waitForURL("**/trip");
     await expect(solo.page.getByText(/Only people you send your live link to can follow\. Nobody is alerted automatically/)).toBeVisible();
     await expect(solo.page.getByText(/they'll see your last spot/)).toHaveCount(0);

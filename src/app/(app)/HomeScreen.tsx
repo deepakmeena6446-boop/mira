@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { WorldMap } from "@/components/map/WorldMap";
@@ -9,12 +9,13 @@ import { Avatar } from "@/components/app/Avatar";
 import { Chip } from "@/components/app/Chip";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { SearchOverlay, type Destination } from "@/components/app/SearchOverlay";
-import { kindEmoji } from "@/components/app/kinds";
+import { HELP_ICON, kindEmoji, kindIcon } from "@/components/app/kinds";
 import { LightingSummary, lightingEvidenceLine, sourceDetails } from "@/components/app/LightingSummary";
 import { HelpPointList, RouteContextLines } from "@/components/app/HelpPointList";
 import { ArrivalContextLines, RouteOptions, type RouteOption } from "@/components/app/RouteOptions";
 import { TRAVEL_MODES, TRAVEL_MODE_INFO, distanceUnits, expectedMinutes, formatDistance, formatMinutes, type TravelMode } from "@/domain/travel-mode";
-import { EmergencyPill } from "@/components/app/EmergencyPill";
+import { HelpCluster } from "@/components/app/HelpCluster";
+import { useChromeTop } from "@/lib/use-chrome-top";
 import { UnsafeSheet, type UnsafeShareAction, type UnsafeTellAction } from "@/components/app/UnsafeSheet";
 import { HelpNearSheet } from "@/components/app/HelpNearSheet";
 import { HELP_CLASSES, dedupeHelpPoints, type HelpClass, type HelpPoint } from "@/domain/help-points";
@@ -90,7 +91,7 @@ export function HomeScreen({
   contacts: Contact[];
   trip: TripView | null;
   tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null };
-  /** Whether MIRA can email trusted contacts at all (production SMTP configured). */
+  /** Whether Mira can email trusted contacts at all (production SMTP configured). */
   emailAlerts: boolean;
 }) {
   const router = useRouter();
@@ -135,13 +136,15 @@ export function HomeScreen({
   const [nearOpen, setNearOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("walk");
   const [etaMin, setEtaMin] = useState(30);
-  // With a provider ride/transit time, MIRA proposes the ETA; she can set her own instead.
+  // With a provider ride/transit time, Mira proposes the ETA; she can set her own instead.
   const [ownTime, setOwnTime] = useState(false);
   const countryIso = useCountry().iso;
   const units = distanceUnits(countryIso);
   const exclude = useMemo(() => (user?.helpExclude ?? []) as HelpClass[], [user?.helpExclude]);
   const accepted = contacts.filter((c) => c.status === "accepted" && c.isDefault);
   const [shareWithCircle, setShareWithCircle] = useState(true);
+  const chromeRef = useRef<HTMLDivElement>(null);
+  useChromeTop(chromeRef);
 
   // First visit: show the short onboarding once (per-device convenience flag only).
   useEffect(() => {
@@ -236,8 +239,8 @@ export function HomeScreen({
   const mapPlaces = useMemo(
     () =>
       dest
-        ? (mode === "walk" ? (chosen?.helpPoints ?? []) : arrivalHelp).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, emoji: HELP_CLASSES[p.cls].emoji }))
-        : nearby.places.slice(0, 20).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, emoji: kindEmoji(p.kind) })),
+        ? (mode === "walk" ? (chosen?.helpPoints ?? []) : arrivalHelp).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, icon: HELP_ICON[p.cls] ?? "pin", strong: HELP_CLASSES[p.cls].emergency }))
+        : nearby.places.slice(0, 20).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, icon: kindIcon(p.kind) })),
     [dest, mode, chosen, arrivalHelp, nearby.places],
   );
   const onPlaceClick = useCallback(
@@ -285,23 +288,23 @@ export function HomeScreen({
   const firstName = user?.name.split(" ")[0];
   const activeTrip = trip && (trip.state === "active" || trip.state === "missed") ? trip : null;
   const invited = contacts.filter((c) => c.status === "invited");
-  // Her Circle for a journey: accepted email contacts MIRA emails (when email is on), and contacts she sends her link on WhatsApp.
+  // Her Circle for a journey: accepted email contacts Mira emails (when email is on), and contacts she sends her link on WhatsApp.
   const emailed = emailAlerts ? accepted : [];
   const onWhatsApp = contacts.filter((c) => c.phone && c.isDefault);
   const circle = [...new Map([...emailed, ...onWhatsApp].map((c) => [c.id, c])).values()];
   const sharesWithCircle = Boolean(user && circle.length && shareWithCircle);
-  /** Who follows this journey and how, in her words — WhatsApp is a tap she makes; email is an attempt MIRA makes. */
+  /** Who follows this journey and how, in her words — WhatsApp is a tap she makes; email is an attempt Mira makes. */
   const circleStartLine = () =>
     [
       onWhatsApp.length ? `After you start, send ${names(onWhatsApp.map((c) => c.name))} your live link on WhatsApp in one tap: your latest spot and ETA, until you arrive.` : null,
-      emailed.length ? `MIRA attempts to email ${names(emailed.map((c) => c.name))} a live link when this journey starts, and an alert if you miss your check-in. Sending can fail.` : "Nobody is alerted automatically if you don't arrive.",
+      emailed.length ? `Mira attempts to email ${names(emailed.map((c) => c.name))} a live link when this journey starts, and an alert if you miss your check-in. Sending can fail.` : "Nobody is alerted automatically if you don't arrive.",
     ]
       .filter(Boolean)
       .join(" ");
 
   /** Start a journey (her tap, always). `to` defaults to the destination on screen. */
   const startTrip = async (to?: { name: string; lat: number; lon: number }) => {
-    if (!user) return setSignIn("Sign in to start with MIRA");
+    if (!user) return setSignIn("Sign in to start with Mira");
     const target = to ?? dest;
     if (!target || !me || starting) return;
     const picked = !to && option > 0 ? chosen : null;
@@ -345,7 +348,7 @@ export function HomeScreen({
     } else toast(res.message, "error");
   };
 
-  // "I feel unsafe": the share action depends on what's already known — never asks for anything MIRA has.
+  // "I feel unsafe": the share action depends on what's already known — never asks for anything Mira has.
   const unsafeShare: UnsafeShareAction = activeTrip?.shareUrl
     ? {
         label: "Send my live link",
@@ -357,7 +360,7 @@ export function HomeScreen({
         },
       }
     : !user
-      ? { label: "Share my journey live", detail: "Sign in, then send a live link to anyone.", onShare: () => (setUnsafe(false), setSignIn("Sign in to start with MIRA")) }
+      ? { label: "Share my journey live", detail: "Sign in, then send a live link to anyone.", onShare: () => (setUnsafe(false), setSignIn("Sign in to start with Mira")) }
       : dest || home
         ? {
             label: `Share my journey to ${dest ? dest.name : home!.label}`,
@@ -433,7 +436,7 @@ export function HomeScreen({
       <Link href="/circle" className="font-bold text-accent">
         add someone
       </Link>{" "}
-      to send it on WhatsApp in one tap (with their email, MIRA can also attempt an alert if you don&apos;t arrive).
+      to send it on WhatsApp in one tap (with their email, Mira can also attempt an alert if you don&apos;t arrive).
     </>
   );
 
@@ -452,7 +455,7 @@ export function HomeScreen({
   const nudge = useMemo(() => {
     if (activeTrip || !user) return null;
     const usual = habit ? places.find((p) => p.id === habit.placeId) : undefined;
-    if (habit && usual && me) return { text: habit.text, cta: "Start with MIRA", action: () => pick({ name: usual.label, lat: usual.lat, lon: usual.lon }) };
+    if (habit && usual && me) return { text: habit.text, cta: "Go with Mira", action: () => pick({ name: usual.label, lat: usual.lat, lon: usual.lon }) };
     if (g?.late && home && me) return { text: `Heading home, ${firstName}?`, cta: `Take me ${home.label === "Home" ? "home" : "to " + home.label}`, action: () => pick({ name: home.label, lat: home.lat, lon: home.lon }) };
     if (!home) return { text: "Save Home once, and the walk back is one tap.", cta: "Find it", action: () => setSearchOpen(true) };
     return null;
@@ -461,15 +464,16 @@ export function HomeScreen({
 
   return (
     <div className="fixed inset-0 overflow-hidden">
-      <h1 className="sr-only">MIRA — where are you going?</h1>
+      <h1 className="sr-only">Mira — where are you going?</h1>
       <WorldMap tiles={tiles} me={me} dest={dest} route={mode === "walk" ? (chosen?.route.geometry ?? null) : (rideRoute?.geometry ?? null)} notes={[]} places={mapPlaces} recenter={recenter} lighting={mode === "walk" ? (chosen?.lighting?.segments ?? null) : null} onPlaceClick={onPlaceClick} onLongPress={onLongPress} onMapClick={onMapClick} onArea={setArea} label="Map around your location" padding={MAP_PADDING} />
 
       {/* Top: greeting, and help that's always one tap away */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.9rem,env(safe-area-inset-top))]">
         <div className="pointer-events-auto mx-auto max-w-xl">
-          <div className="glass flex items-center gap-3 rounded-[1.6rem] border border-glass-edge px-4 py-3 shadow-[var(--shadow-card)] animate-rise">
+          <div ref={chromeRef}>
+          <div className="glass flex items-center gap-3 rounded-[var(--radius-card)] border border-glass-edge px-4 py-2.5 shadow-[var(--shadow-float)]">
             <div className="min-w-0 flex-1">
-              <p className="line-clamp-2 text-[clamp(1rem,4.6vw,1.125rem)] font-extrabold leading-tight">
+              <p className="line-clamp-2 text-[clamp(1rem,4.6vw,1.125rem)] font-semibold leading-tight">
                 {g ? `${g.hello}${firstName ? `, ${firstName}` : ""} ${g.emoji}` : " "}
               </p>
               <p className="truncate text-sm text-ink-muted">
@@ -481,7 +485,7 @@ export function HomeScreen({
               <>
                 <Link href="/inbox" aria-label={unread ? `Updates, ${unread} new` : "Updates"} className="relative grid size-11 place-items-center rounded-full bg-sunken text-ink">
                   <Icon name="bell" className="size-5" />
-                  {unread ? <span aria-hidden className="absolute right-1.5 top-1.5 grid min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-extrabold leading-4 text-accent-ink">{unread > 9 ? "9+" : unread}</span> : null}
+                  {unread ? <span aria-hidden className="absolute right-1.5 top-1.5 grid min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-4 text-accent-ink">{unread > 9 ? "9+" : unread}</span> : null}
                 </Link>
                 <Link href="/me" aria-label="Your profile">
                   <Avatar name={user.name} src={user.avatarUrl} size={42} />
@@ -493,16 +497,14 @@ export function HomeScreen({
               </button>
             )}
           </div>
-          <div className="mt-2 flex justify-end gap-2 animate-rise">
-            <button type="button" onClick={() => setUnsafe(true)} className="min-h-11 rounded-full bg-surface px-4 text-sm font-extrabold text-accent-strong shadow-[var(--shadow-card)]">
-              I feel unsafe
-            </button>
-            <EmergencyPill />
+          <div className="mt-2">
+            <HelpCluster onUnsafe={() => setUnsafe(true)} />
+          </div>
           </div>
           {loc.status === "denied" || loc.status === "unavailable" ? (
             <button type="button" onClick={() => loc.request()} className="mt-2 w-full rounded-2xl bg-warm-soft px-4 py-2.5 text-left text-sm font-semibold text-warm">
               {loc.status === "denied"
-                ? "Location is off for MIRA, so it can't show the way from here or Help Points near you. Allow it in your browser's site settings (the icon next to the address), then tap here. Search still works."
+                ? "Location is off for Mira, so it can't show the way from here or Help Points near you. Allow it in your browser's site settings (the icon next to the address), then tap here. Search still works."
                 : "Can't find you right now → Tap to try again"}
             </button>
           ) : null}
@@ -515,7 +517,7 @@ export function HomeScreen({
             </div>
           ) : null}
           {pressed ? (
-            <div role="dialog" aria-label="This spot" className={cx("mt-2.5 rounded-3xl border border-line bg-surface p-4 shadow-[var(--shadow-float)] animate-rise", pressArmed ? "pointer-events-auto" : "pointer-events-none")}>
+            <div role="dialog" aria-label="This spot" className={cx("mt-2.5 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-float)] animate-rise", pressArmed ? "pointer-events-auto" : "pointer-events-none")}>
               <div className="flex items-start gap-3">
                 <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-2xl bg-accent-soft text-xl">📍</span>
                 <div className="min-w-0 flex-1">
@@ -562,7 +564,7 @@ export function HomeScreen({
             void loc.request();
           }}
           className="absolute right-4 z-20 grid size-12 place-items-center rounded-full bg-surface text-accent shadow-[var(--shadow-float)]"
-          style={{ bottom: snap === "peek" ? "calc(40dvh + 1rem)" : "calc(55dvh + 1rem)" }}
+          style={{ bottom: `calc(${snap === "peek" ? "var(--sheet-peek)" : "var(--sheet-half)"} + var(--tabbar-space) + 1rem)`, visibility: snap === "full" ? "hidden" : undefined }}
         >
           <Icon name="locate" />
         </button>
@@ -570,13 +572,13 @@ export function HomeScreen({
 
       <BottomSheet snap={snap} onSnap={setSnap} label={dest ? `Route to ${dest.name}` : "Where are you going?"}>
         {activeTrip ? (
-          <Link href="/trip" className="mb-4 flex items-center gap-3 rounded-3xl bg-mira p-4 text-white shadow-[var(--shadow-float)]">
+          <Link href="/trip" className="mb-4 flex items-center gap-3 rounded-[var(--radius-card)] bg-mira p-4 text-white shadow-[var(--shadow-float)]">
             <span className="relative flex size-3">
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-white opacity-70" />
               <span className="relative inline-flex size-3 rounded-full bg-white" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block font-extrabold">{activeTrip.state === "missed" ? "Are you okay?" : `On your way to ${activeTrip.destination.name}`}</span>
+              <span className="block font-semibold">{activeTrip.state === "missed" ? "Are you okay?" : `On your way to ${activeTrip.destination.name}`}</span>
               <span className="block text-sm text-white/85">
                 {now ? `ETA ${clock(new Date(activeTrip.etaAt))} · ` : ""}
                 {activeTrip.sharedWith.some((c) => c.notified) ? `${activeTrip.sharedWith.filter((c) => c.notified).map((c) => c.name).join(", ")} following` : "Only people you send the link to can follow"}
@@ -591,7 +593,7 @@ export function HomeScreen({
             <div className="flex items-start gap-3">
               <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-accent-soft text-2xl">{kindEmoji(dest.kind ?? "")}</span>
               <div className="min-w-0 flex-1">
-                <h2 className="text-xl font-extrabold text-mixed">{dest.name}</h2>
+                <h2 className="text-xl font-semibold text-mixed">{dest.name}</h2>
                 {mode !== "walk" ? (
                   routeLoading ? (
                     <p className="text-ink-muted">Finding the time {TRAVEL_MODE_INFO[mode].by}…</p>
@@ -618,7 +620,7 @@ export function HomeScreen({
                 ) : !me ? (
                   <p className="text-ink-muted">Turn on location to see the way from here.</p>
                 ) : byMode.walk ? (
-                  <p className="text-ink-muted">Couldn&apos;t get the walking time — you can still start with MIRA.</p>
+                  <p className="text-ink-muted">Couldn&apos;t get the walking time — you can still start with Mira.</p>
                 ) : null}
               </div>
               <button
@@ -655,7 +657,7 @@ export function HomeScreen({
               ) : null
             ) : routeLoading ? null : (
               <div className="mt-3">
-                {walkTooFar ? <p className="text-xs text-ink-subtle">Too far to walk from here, so MIRA switched to {TRAVEL_MODE_INFO.ride.label}.</p> : null}
+                {walkTooFar ? <p className="text-xs text-ink-subtle">Too far to walk from here, so Mira switched to {TRAVEL_MODE_INFO.ride.label}.</p> : null}
                 {manualEta ? (
                   <>
                     {rideRoute ? null : (
@@ -663,7 +665,7 @@ export function HomeScreen({
                         {!me
                           ? "Turn on location to see the time from here."
                           : modeRes?.code === "too_far"
-                          ? "That's further than a journey MIRA can follow (up to 4 hours)."
+                          ? "That's further than a journey Mira can follow (up to 4 hours)."
                           : mode === "ride"
                             ? "The driving time from here is not known."
                             : "Transit times are not known for this journey."}
@@ -678,7 +680,7 @@ export function HomeScreen({
                       ))}
                     </div>
                     <p className="mt-2 text-xs text-ink-muted">
-                      MIRA uses the time you choose{now ? ` (around ${clock(new Date(now.getTime() + etaMin * 60_000))})` : ""}.{" "}
+                      Mira uses the time you choose{now ? ` (around ${clock(new Date(now.getTime() + etaMin * 60_000))})` : ""}.{" "}
                       {rideRoute ? (
                         <button type="button" onClick={() => setOwnTime(false)} className="min-h-6 font-bold text-accent">
                           Use the estimate instead
@@ -688,7 +690,7 @@ export function HomeScreen({
                   </>
                 ) : rideRoute ? (
                   <p className="text-xs text-ink-muted">
-                    MIRA expects you by {now ? clock(new Date(now.getTime() + tripEta * 60_000)) : `${formatMinutes(tripEta)} from now`}, with a little extra time for {mode === "ride" ? "traffic" : "waiting and changes"}.{" "}
+                    Mira expects you by {now ? clock(new Date(now.getTime() + tripEta * 60_000)) : `${formatMinutes(tripEta)} from now`}, with a little extra time for {mode === "ride" ? "traffic" : "waiting and changes"}.{" "}
                     <button
                       type="button"
                       onClick={() => {
@@ -713,7 +715,7 @@ export function HomeScreen({
                   <LightingSummary lighting={chosen.lighting} compact />
                 ) : (
                   <>
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">Lighting on the way</h3>
+                    <h3 className="text-[13px] font-medium text-ink-subtle">Lighting on the way</h3>
                     <p className="mt-1 text-sm text-ink-muted">{lightingEvidenceLine(chosen.lightingEvidence, chosen.lighting)}</p>
                   </>
                 )}
@@ -728,7 +730,7 @@ export function HomeScreen({
             ) : null}
             <div className="mt-4">
               <Button variant="hero" size="lg" onClick={() => void startTrip()} busy={starting} busyLabel="Starting…" disabled={!me || (mode !== "walk" && routeLoading)}>
-                <Icon name={mode === "walk" ? "walk" : "route"} /> Start with MIRA
+                <Icon name={mode === "walk" ? "walk" : "route"} /> Go with Mira
               </Button>
               {user && circle.length ? (
                 <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Who follows this journey">
@@ -766,7 +768,7 @@ export function HomeScreen({
             ) : null}
             {mode === "walk" && info?.notes.length ? (
               <section className="mt-5">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">Community notes on this route</h3>
+                <h3 className="text-[13px] font-medium text-ink-subtle">Community notes on this route</h3>
                 <ul className="mt-2 space-y-2">
                   {info.notes.map((n) => (
                     <li key={n.id} className="rounded-2xl bg-sunken px-4 py-3 text-sm">
@@ -782,7 +784,7 @@ export function HomeScreen({
             ) : null}
             <SafetyUpdatesSection point={{ lat: dest.lat, lon: dest.lon }} heading="Safety updates near there" />
             <section className="mt-5">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">Save this place</h3>
+              <h3 className="text-[13px] font-medium text-ink-subtle">Save this place</h3>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Chip disabled={saving !== null} onClick={() => savePlace("Home", "🏠")}>🏠 Home</Chip>
                 <Chip disabled={saving !== null} onClick={() => savePlace("College", "🎓")}>🎓 College</Chip>
@@ -793,8 +795,8 @@ export function HomeScreen({
           </div>
         ) : (
           <div>
-            <h2 className="text-2xl font-extrabold tracking-tight">Where are you going?</h2>
-            {/* What MIRA adds to a maps app, said by the product itself: once, quietly, until she has places of her own. */}
+            <h2 className="text-2xl font-semibold tracking-tight">Where are you going?</h2>
+            {/* What Mira adds to a maps app, said by the product itself: once, quietly, until she has places of her own. */}
             {places.length ? null : <p className="mt-1 text-sm text-ink-muted">Before you go: the way, its lighting and the Help Points on it. On the way: your people can follow until you arrive.</p>}
             <button type="button" onClick={() => setSearchOpen(true)} className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-full bg-surface px-5 text-left text-lg font-semibold text-ink-subtle shadow-[var(--shadow-card)]">
               <Icon name="know" className="size-5 text-accent" /> Search a place or address
@@ -837,7 +839,7 @@ export function HomeScreen({
             {user && !installDismissed.value ? <InstallCard variant="card" onDismiss={installDismissed.set} /> : null}
 
             <section className="mt-5" aria-label="Around you">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">Around you</h2>
+              <h2 className="text-[13px] font-medium text-ink-subtle">Around you</h2>
               {!me ? (
                 <p className="mt-2 text-ink-muted">{loc.status === "asking" ? "Finding where you are…" : "Turn on location to see what's nearby."}</p>
               ) : nearbyFailed ? (
@@ -846,7 +848,7 @@ export function HomeScreen({
                 <p className="mt-2 text-ink-muted">No detailed places for this area yet. Search or drop a pin to plan a walk.</p>
               ) : (
                 <>
-                  <ul className="mt-2 divide-y divide-line overflow-hidden rounded-3xl bg-surface shadow-[var(--shadow-card)]">
+                  <ul className="mt-2 divide-y divide-line overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]">
                     {nearby.places.slice(0, 5).map((p) => (
                       <li key={p.id}>
                         <button type="button" onClick={() => pick({ name: p.name, lat: p.lat, lon: p.lon, kind: p.kind })} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-sunken">

@@ -13,10 +13,10 @@ type Part = { key: string; label: string; pct: number; swatch: string };
 export function lightingParts(lighting: RouteLighting): Part[] {
   const { summary, confirmed = { lit: 0, dark: 0 } } = lighting;
   const parts: Part[] = [
-    { key: "confirmedLit", label: "Lit, say MIRA walkers", pct: confirmed.lit, swatch: "bg-[#ffc94d]" },
+    { key: "confirmedLit", label: "Lit, say Mira walkers", pct: confirmed.lit, swatch: "bg-[#ffc94d]" },
     { key: "mappedLit", label: "Mapped as lit", pct: summary.lit - confirmed.lit, swatch: "bg-[#ffc94d]" },
     { key: "poles", label: "Streetlights mapped", pct: summary.poles, swatch: "bg-[#ffc94d]/60" },
-    { key: "confirmedDark", label: "Dark, say MIRA walkers", pct: confirmed.dark, swatch: "bg-ink-subtle" },
+    { key: "confirmedDark", label: "Dark, say Mira walkers", pct: confirmed.dark, swatch: "bg-ink-subtle" },
     { key: "mappedDark", label: "Mapped as unlit", pct: summary.dark - confirmed.dark, swatch: "bg-ink-subtle" },
     { key: "unknown", label: "Not known", pct: summary.unknown, swatch: "bg-line-strong" },
   ];
@@ -40,7 +40,7 @@ export function lightingLine(lighting: RouteLighting | null): string {
 
 export function lightingEvidenceLine(evidence: EvidenceState<RouteLighting> | undefined, lighting: RouteLighting | null): string {
   if (!evidence) return lightingLine(lighting);
-  if (evidence.state === "failed") return "MIRA couldn't check lighting sources right now.";
+  if (evidence.state === "failed") return "Mira couldn't check lighting sources right now.";
   if (evidence.state === "unavailable") return "Lighting evidence is unavailable for this route.";
   const prefix = evidence.state === "empty" ? "No mapped lighting evidence from sources checked" : lightingLine("data" in evidence ? evidence.data : lighting);
   // Only a source that failed is "couldn't check"; one this server doesn't use (not configured) isn't a gap to report.
@@ -53,12 +53,12 @@ export function lightingEvidenceLine(evidence: EvidenceState<RouteLighting> | un
  * stretch is known. Absence of data is never read as "dark" or "lit".
  */
 export function lightingWhy(lighting: RouteLighting | null, evidence?: EvidenceState<RouteLighting>): string | null {
-  const ask = "After a walk at night, MIRA asks “Was the way lit?” — each answer fills in a stretch for the next person.";
+  const ask = "After a walk at night, Mira asks “Was the way lit?” — each answer fills in a stretch for the next person.";
   const failed = evidence?.sources.filter((s) => s.state === "failed").map((s) => s.source) ?? [];
   // A source that didn't answer may well have data: never describe that as "nobody has mapped it".
-  if (failed.length) return `MIRA couldn't reach ${failed.join(" and ")} just now, so some of what's known may be missing here. Try again in a moment. ${ask}`;
+  if (failed.length) return `Mira couldn't reach ${failed.join(" and ")} just now, so some of what's known may be missing here. Try again in a moment. ${ask}`;
   if (!lighting || lighting.summary.lit + lighting.summary.poles + lighting.summary.dark === 0)
-    return `No source MIRA uses (OpenStreetMap, street imagery, MIRA walkers) has mapped the street lights here yet. That says nothing either way about tonight. ${ask}`;
+    return `No source Mira uses (OpenStreetMap, street imagery, Mira walkers) has mapped the street lights here yet. That says nothing either way about tonight. ${ask}`;
   if (lighting.summary.unknown <= 0) return null;
   return `“Not known” is the part of this way that no source has mapped yet: it may be lit or not. ${ask}`;
 }
@@ -68,7 +68,7 @@ export function sourceList(l: RouteLighting): string {
   const f = l.freshness;
   const osm = f?.osmFrom ? `OpenStreetMap (streets last edited ${f.osmFrom === f.osmTo ? f.osmFrom : `${f.osmFrom}–${f.osmTo}`})` : "OpenStreetMap";
   const poles = f?.polesTo ? `street imagery (Mapillary, last seen ${f.polesTo})` : "street imagery (Mapillary)";
-  return [l.sources.walkers && "MIRA walkers (last 90 days)", l.sources.osm && osm, l.sources.poles && poles].filter(Boolean).join(", ");
+  return [l.sources.walkers && "Mira walkers (last 90 days)", l.sources.osm && osm, l.sources.poles && poles].filter(Boolean).join(", ");
 }
 
 /**
@@ -76,15 +76,18 @@ export function sourceList(l: RouteLighting): string {
  * couldn't be checked just now, or not available on this server. Provenance names what was
  * looked at, not only what had something to show.
  */
+/** Source labels arrive from the server as data keys ("MIRA walkers"); the UI names the product "Mira". */
+const displaySource = (name: string) => name.replace(/^MIRA\b/, "Mira");
+
 export function sourceDetails(evidence: EvidenceState<RouteLighting> | undefined, lighting: RouteLighting | null): string {
   const withData = lighting ? sourceList(lighting) : "";
   const has = (name: string) =>
     Boolean(lighting && ((name === "MIRA walkers" && lighting.sources.walkers) || (name === "OpenStreetMap" && lighting.sources.osm) || (name === "Mapillary" && lighting.sources.poles)));
   const others = (evidence?.sources ?? [])
     .filter((src) => !has(src.source))
-    .map((src) => `${src.source}: ${src.state === "ready" ? "nothing mapped here yet" : src.state === "failed" ? "couldn't check just now" : "not available here"}`);
+    .map((src) => `${displaySource(src.source)}: ${src.state === "ready" ? "nothing mapped here yet" : src.state === "failed" ? "couldn't check just now" : "not available here"}`);
   const text = [withData ? `From ${withData}.` : null, others.length ? `${others.join("; ")}.` : null].filter(Boolean).join(" ");
-  return text || "MIRA could not confirm source coverage.";
+  return text || "Mira could not confirm source coverage.";
 }
 
 /**
@@ -97,9 +100,9 @@ export function LightingSummary({ lighting, compact = false }: { lighting: Route
   const parts = lightingParts(lighting);
   return (
     <section className={compact ? "" : "mt-5"} aria-label="Street lighting on this route">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-ink-subtle">Lighting on the way</h3>
+      <h3 className="text-[13px] font-medium text-ink-subtle">Lighting on the way</h3>
       {known === 0 ? (
-        <p className="mt-2 text-sm text-ink-muted">Not known for these streets yet. After a walk at night, you can tell MIRA if it was lit — it helps the next person.</p>
+        <p className="mt-2 text-sm text-ink-muted">Not known for these streets yet. After a walk at night, you can tell Mira if it was lit — it helps the next person.</p>
       ) : (
         <>
           <div className="mt-2 flex h-3 overflow-hidden rounded-full bg-sunken" role="img" aria-label={parts.map((p) => `${p.label} ${p.pct}%`).join(", ")}>

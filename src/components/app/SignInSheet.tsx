@@ -17,8 +17,8 @@ export interface SignInOptions {
   demo: boolean;
 }
 
-/** What MIRA keeps from Google, said once wherever she's offered it. */
-export const GOOGLE_KEEPS = "MIRA keeps your first name and a protected copy of your email — nothing else from Google.";
+/** What Mira keeps from Google, said once wherever she's offered it. */
+export const GOOGLE_KEEPS = "Mira keeps your first name and a protected copy of your email — nothing else from Google.";
 
 let optionsOnce: Promise<SignInOptions | null> | null = null;
 function loadOptions(): Promise<SignInOptions | null> {
@@ -111,10 +111,10 @@ export function SignInSheet({ open, onClose, reason }: { open: boolean; onClose:
   const onlyName = options ? options.demo && !options.google : false;
   // Portal: screens are position:fixed (their own stacking context), and this must sit above the tab bar.
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-labelledby="signin-h" className="fixed inset-0 z-50 flex items-end justify-center bg-[rgb(10_6_24/0.45)] animate-fade sm:items-center" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md animate-rise rounded-t-[2rem] bg-surface p-7 pb-[max(1.75rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[2rem]">
+    <div role="dialog" aria-modal="true" aria-labelledby="signin-h" className="fixed inset-0 z-50 flex items-end justify-center bg-scrim animate-fade sm:items-center" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md animate-rise rounded-t-[var(--radius-lg)] bg-surface p-7 pb-[max(1.75rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[var(--radius-lg)]">
         <MiraOrb size={52} />
-        <h2 id="signin-h" className="mt-4 text-2xl font-extrabold">
+        <h2 id="signin-h" className="mt-4 text-2xl font-semibold">
           {reason ?? "Let's get you set up"}
         </h2>
         <p className="mt-1 text-ink-muted">I&apos;ll remember your places and the people you trust, so sharing a journey takes one tap.</p>
@@ -122,7 +122,7 @@ export function SignInSheet({ open, onClose, reason }: { open: boolean; onClose:
         {!options ? (
           failed ? (
             <p role="alert" className="mt-5 rounded-2xl bg-error-soft px-4 py-3 text-sm font-semibold text-error">
-              We couldn&apos;t reach MIRA. Check your connection and try again.
+              We couldn&apos;t reach Mira. Check your connection and try again.
             </p>
           ) : (
             <div aria-busy="true" aria-label="Loading sign-in options" className="mt-5 h-13 w-full animate-pulse rounded-full bg-sunken" />
@@ -161,7 +161,7 @@ export function SignInSheet({ open, onClose, reason }: { open: boolean; onClose:
             }}
           >
             <label htmlFor="signin-name" className={cx("block text-sm font-bold", onlyName && "mt-5")}>
-              {onlyName ? "What should I call you?" : "Or try MIRA with just your first name"}
+              {onlyName ? "What should I call you?" : "Or try Mira with just your first name"}
             </label>
             <input
               autoFocus={onlyName}

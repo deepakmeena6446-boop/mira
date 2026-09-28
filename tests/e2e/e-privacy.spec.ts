@@ -8,7 +8,7 @@ test.describe("Privacy — links die, strangers see nothing, deletion is real", 
     const address = await addContact(owner.page, "Bhai", "bhai");
     const contact = await acceptContactInvite(browser, address);
     await openRoute(owner.page);
-    await owner.page.getByRole("button", { name: /Start with MIRA/ }).click();
+    await owner.page.getByRole("button", { name: /Go with Mira/ }).click();
     await owner.page.waitForURL("**/trip");
     const link = await shareLinkFor(address);
     const [trip] = await db`SELECT id FROM journeys ORDER BY created_at DESC LIMIT 1`;

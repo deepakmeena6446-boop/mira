@@ -54,7 +54,7 @@ test.describe("Mobile extras — long-press report, inbox, time of day, installa
     await page.clock.setFixedTime(new Date("2026-09-25T22:40:00+05:30"));
     await page.goto("/welcome");
     await expect(page.locator("html")).toHaveAttribute("data-daypart", "night");
-    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#120f24");
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#111312");
     await page.clock.setFixedTime(new Date("2026-09-25T07:10:00+05:30"));
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute("data-daypart", "dawn");

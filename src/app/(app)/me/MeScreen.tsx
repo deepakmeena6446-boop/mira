@@ -46,7 +46,7 @@ export function MeScreen({
   places: SavedPlace[];
   contacts: Contact[];
   modes: ProviderModes;
-  /** Whether MIRA can send email at all (production SMTP configured). */
+  /** Whether Mira can send email at all (production SMTP configured). */
   emailAlerts: boolean;
   /** Just came back from adding an email to this account. */
   saved?: boolean;
@@ -69,9 +69,9 @@ export function MeScreen({
 
   if (!user) {
     return (
-      <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-32 text-center">
+      <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-[calc(var(--tabbar-space)+2rem)] text-center">
         <MiraOrb size={80} />
-        <h1 className="mt-6 text-3xl font-extrabold">Make MIRA yours</h1>
+        <h1 className="mt-6 text-3xl font-semibold">Make Mira yours</h1>
         <p className="mt-2 max-w-sm text-ink-muted">Save the places you go and the people you trust, so sharing a trip is one tap.</p>
         <Button className="mt-7 max-w-xs" variant="hero" size="lg" onClick={() => setSignIn(true)}>
           Get started
@@ -98,12 +98,12 @@ export function MeScreen({
   };
 
   return (
-    <div className="bg-companion min-h-dvh px-4 pb-32 pt-[max(1.25rem,env(safe-area-inset-top))]">
+    <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex max-w-xl flex-col gap-6">
         <header className="flex items-center gap-4 pt-2 animate-rise">
           <Avatar name={user.name} src={user.avatarUrl} size={68} />
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-2xl font-extrabold">{user.name}</h1>
+            <h1 className="truncate text-2xl font-semibold">{user.name}</h1>
             <p className="text-ink-muted">
               {places.length} place{places.length === 1 ? "" : "s"} ·{" "}
               <Link href="/circle" className="font-semibold text-accent">
@@ -114,7 +114,7 @@ export function MeScreen({
         </header>
 
         <CircleRow accepted={contacts.filter((c) => c.status === "accepted").length} invited={contacts.filter((c) => c.status === "invited").length} />
-        <div className="mt-3 overflow-hidden rounded-3xl bg-surface shadow-[var(--shadow-card)]">
+        <div className="mt-3 overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]">
           <ImpactRow />
         </div>
 
@@ -193,12 +193,12 @@ export function MeScreen({
           )}
         </Section>
 
-        {switchPreserved ? <p role="alert" className="rounded-2xl bg-warm-soft px-5 py-4 text-sm text-ink">This Google sign-in belongs to another MIRA account. Your current account and its places, contacts, and journeys were kept here. To keep this account after signing out, upgrade it with a different Google account or email first; then you can switch accounts. MIRA does not merge contribution identities automatically.</p> : null}
+        {switchPreserved ? <p role="alert" className="rounded-2xl bg-warm-soft px-5 py-4 text-sm text-ink">This Google sign-in belongs to another Mira account. Your current account and its places, contacts, and journeys were kept here. To keep this account after signing out, upgrade it with a different Google account or email first; then you can switch accounts. Mira does not merge contribution identities automatically.</p> : null}
         <AccountSection durable={user.durable} google={user.google} emailHint={user.emailHint} emailAvailable={emailAlerts} googleAvailable={modes.auth === "google"} saved={saved} />
 
         <Section id="help" title="Help Points">
           <div className="p-5">
-            <p className="text-sm text-ink-muted">Kinds of places MIRA suggests when you feel unsafe and along your routes. Turn off any you&apos;d rather not be pointed to.</p>
+            <p className="text-sm text-ink-muted">Kinds of places Mira suggests when you feel unsafe and along your routes. Turn off any you&apos;d rather not be pointed to.</p>
             <ul className="mt-3 grid grid-cols-2 gap-2">
               {(Object.keys(HELP_CLASSES) as HelpClass[]).map((c) => {
                 const on = !exclude.includes(c);
@@ -248,7 +248,7 @@ export function MeScreen({
             </li>
             <li>
               <Link href="/privacy" className="flex min-h-14 items-center gap-3 px-5 hover:bg-sunken">
-                <Icon name="shield" className="text-accent" /> <span className="flex-1 font-semibold">How MIRA handles your data</span> <Icon name="chevron" className="size-4 text-ink-subtle" />
+                <Icon name="shield" className="text-accent" /> <span className="flex-1 font-semibold">How Mira handles your data</span> <Icon name="chevron" className="size-4 text-ink-subtle" />
               </Link>
             </li>
             <li>

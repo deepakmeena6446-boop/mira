@@ -31,11 +31,11 @@ export default async function TripsPage() {
   const data = user ? await tripsOverview(sql, user.id, now) : null;
 
   return (
-    <div className="bg-companion min-h-dvh px-4 pb-32 pt-[max(1.25rem,env(safe-area-inset-top))]">
+    <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex max-w-xl flex-col gap-6">
         <header className="flex items-center gap-3 pt-2">
           <MiraOrb size={40} calm />
-          <h1 className="text-2xl font-extrabold">Trips</h1>
+          <h1 className="text-2xl font-semibold">Trips</h1>
         </header>
 
         {!data ? (
@@ -54,7 +54,7 @@ export default async function TripsPage() {
                 <p className="p-5 text-ink-muted">No finished journeys right now.</p>
               )}
             </Section>
-            <p className="px-1 text-sm text-ink-subtle">MIRA keeps finished journeys for a day at most, then deletes them. There&apos;s no travel diary and no map of where you&apos;ve been.</p>
+            <p className="px-1 text-sm text-ink-subtle">Mira keeps finished journeys for a day at most, then deletes them. There&apos;s no travel diary and no map of where you&apos;ve been.</p>
           </>
         )}
       </div>
@@ -76,7 +76,7 @@ function ActiveCard({ trip, now }: { trip: TripView; now: Date }) {
         {trip.state === "missed" ? "Waiting for you to check in" : "On the way now"}
       </p>
       <p className="mt-1 flex items-center justify-between gap-3">
-        <span className="min-w-0 truncate text-xl font-extrabold">{trip.autoArrival ? `To ${trip.destination.name}${mode}` : "Sharing where you are"}</span>
+        <span className="min-w-0 truncate text-xl font-semibold">{trip.autoArrival ? `To ${trip.destination.name}${mode}` : "Sharing where you are"}</span>
         <Icon name="chevron" className="size-5 shrink-0 text-ink-subtle" />
       </p>
       <p className="mt-1 text-ink-muted">
@@ -92,7 +92,7 @@ function NoActive() {
   return (
     <div className="rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--shadow-card)]">
       <p className="font-bold">No journey right now</p>
-      <p className="mt-1 text-sm text-ink-muted">Start one from Home: MIRA stays with you until you arrive, and ends by itself when you get there.</p>
+      <p className="mt-1 text-sm text-ink-muted">Start one from Home: Mira stays with you until you arrive, and ends by itself when you get there.</p>
       <ButtonLink href="/" variant="primary" className="mt-4">
         Where are you going?
       </ButtonLink>

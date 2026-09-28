@@ -1,22 +1,24 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Instrument_Sans, Noto_Sans_Devanagari } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
 import { DaypartSync } from "@/lib/daypart-store";
 
-const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta", display: "swap" });
+// Latin face preloaded; the Devanagari companion is fetched only when Devanagari text renders (unicode-range).
+const inst = Instrument_Sans({ subsets: ["latin", "latin-ext"], variable: "--font-inst", display: "swap" });
+const deva = Noto_Sans_Devanagari({ subsets: ["devanagari"], variable: "--font-deva", display: "swap", preload: false });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_BASE_URL ?? "http://localhost:3100"),
-  title: { default: "MIRA — with you until you arrive", template: "%s · MIRA" },
+  title: { default: "Mira — with you until you arrive", template: "%s · Mira" },
   description: "Understand the way before you go, let your people follow until you arrive, and keep help one tap away if something feels wrong.",
-  applicationName: "MIRA",
-  appleWebApp: { capable: true, title: "MIRA", statusBarStyle: "default" },
+  applicationName: "Mira",
+  appleWebApp: { capable: true, title: "Mira", statusBarStyle: "default" },
   formatDetection: { telephone: false, address: false, email: false },
   icons: { icon: "/icon.svg", apple: "/apple-icon.png" },
-  openGraph: { title: "MIRA — with you until you arrive", description: "Understand the way before you go, let your people follow until you arrive, and keep help one tap away if something feels wrong.", siteName: "MIRA", type: "website" },
+  openGraph: { title: "Mira — with you until you arrive", description: "Understand the way before you go, let your people follow until you arrive, and keep help one tap away if something feels wrong.", siteName: "Mira", type: "website" },
 };
 
 export const viewport: Viewport = {
@@ -32,7 +34,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const nonce = (await headers()).get("x-nonce") ?? undefined; // per-request, from src/proxy.ts
   return (
     // data-daypart is set before paint by the inline script (device clock), so it differs from the server render.
-    <html lang="en" className={jakarta.variable} data-daypart="day" suppressHydrationWarning>
+    <html lang="en" className={`${inst.variable} ${deva.variable}`} data-daypart="day" suppressHydrationWarning>
       <head>
         {/* Blocking on purpose: sets the time-of-day theme before first paint (a few hundred bytes, cached). */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
@@ -41,7 +43,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <body className="antialiased">
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-3 focus:shadow-lg"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-3 focus:shadow-[var(--shadow-float)]"
         >
           Skip to content
         </a>

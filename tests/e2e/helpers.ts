@@ -65,7 +65,7 @@ export async function newUser(browser: Browser, name: string): Promise<{ ctx: Br
   await page.goto("/");
   await page.waitForURL("**/welcome");
   await expect(page.getByRole("heading", { name: "With you until you arrive." })).toBeVisible();
-  await page.getByRole("button", { name: "Start with MIRA" }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.getByRole("button", { name: "Use my location" }).click();
   await page.waitForURL((u) => u.pathname === "/"); // Home, signed out
   await page.goto("/me");
@@ -119,7 +119,7 @@ export async function openRoute(page: Page, name = DEST) {
   await page.getByRole("button", { name: /Search a place or address/ }).click();
   await page.getByPlaceholder("Search a place or address").fill(name);
   await page.getByRole("button", { name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first().click();
-  await expect(page.getByRole("button", { name: /Start with MIRA/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Go with Mira/ })).toBeVisible();
 }
 
 export async function adminPage(browser: Browser): Promise<Page> {

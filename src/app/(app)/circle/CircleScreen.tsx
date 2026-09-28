@@ -17,8 +17,8 @@ import { useCountry } from "@/lib/locale-store";
 
 /**
  * Circle: the people who follow her journeys. Who they are and exactly how they're reached:
- * WhatsApp (she sends her live link in one tap — MIRA opens WhatsApp, it doesn't send), and
- * optionally email (MIRA invites them and can attempt the automatic missed-arrival alert). So
+ * WhatsApp (she sends her live link in one tap — Mira opens WhatsApp, it doesn't send), and
+ * optionally email (Mira invites them and can attempt the automatic missed-arrival alert). So
  * nobody believes someone will be alerted who won't.
  */
 export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: { user: { name: string } | null; contacts: Contact[]; emailAlerts: boolean }) {
@@ -36,9 +36,9 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
 
   if (!user) {
     return (
-      <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-32 text-center">
+      <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-[calc(var(--tabbar-space)+2rem)] text-center">
         <MiraOrb size={80} />
-        <h1 className="mt-6 text-3xl font-extrabold">Your circle</h1>
+        <h1 className="mt-6 text-3xl font-semibold">Your circle</h1>
         <p className="mt-2 max-w-sm text-ink-muted">Save the people who should know you got there. When you start a journey, you send them your live link on WhatsApp in one tap. Contact email depends on availability and their acceptance.</p>
         <Button className="mt-7 max-w-xs" variant="hero" size="lg" onClick={() => setSignIn(true)}>
           Get started
@@ -70,18 +70,18 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
   const list = (xs: Contact[]) => (xs.length <= 2 ? xs.map((c) => c.name).join(" and ") : `${xs.slice(0, -1).map((c) => c.name).join(", ")} and ${xs[xs.length - 1].name}`);
 
   return (
-    <div className="bg-companion min-h-dvh px-4 pb-32 pt-[max(1.25rem,env(safe-area-inset-top))]">
+    <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex max-w-xl flex-col gap-6">
         <header className="pt-2 animate-rise">
-          <h1 className="text-2xl font-extrabold">Your circle</h1>
+          <h1 className="text-2xl font-semibold">Your circle</h1>
           {onWhatsApp.length ? (
             <p className="mt-1 text-ink-muted">
-              <span className="font-semibold text-ink">{list(onWhatsApp)}</span> {onWhatsApp.length === 1 ? "is" : "are"} one tap away on WhatsApp: when you start a journey, send them your live link from the journey screen. MIRA opens WhatsApp; you press Send.
+              <span className="font-semibold text-ink">{list(onWhatsApp)}</span> {onWhatsApp.length === 1 ? "is" : "are"} one tap away on WhatsApp: when you start a journey, send them your live link from the journey screen. Mira opens WhatsApp; you press Send.
             </p>
           ) : null}
           <p className="mt-1 text-ink-muted">
             {accepted.length && emailAlerts
-              ? `${accepted.map((c) => c.name).join(", ")} ${accepted.length === 1 ? "is" : "are"} eligible for a live-link email when you share a journey and a missed-check-in email. MIRA shows sending results on the journey screen.`
+              ? `${accepted.map((c) => c.name).join(", ")} ${accepted.length === 1 ? "is" : "are"} eligible for a live-link email when you share a journey and a missed-check-in email. Mira shows sending results on the journey screen.`
               : emailAlerts ? "Automatic email needs an accepted trusted contact on the journey: add their email too, and they'll get an invite." : "Contact email is unavailable right now, so nobody is emailed automatically."}
           </p>
         </header>
@@ -116,12 +116,12 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
                 WhatsApp number
               </label>
               <input id="c-phone" type="tel" inputMode="tel" autoComplete="tel" value={cPhone} maxLength={32} onChange={(e) => setCPhone(e.target.value)} placeholder={country.callingCode ? `${country.callingCode} 98765 43210` : "+91 98765 43210"} className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
-              <p className="mt-1 text-sm text-ink-muted">When you start a journey, MIRA opens WhatsApp with your live link ready for them — you press Send.</p>
+              <p className="mt-1 text-sm text-ink-muted">When you start a journey, Mira opens WhatsApp with your live link ready for them — you press Send.</p>
               <label className="mt-3 block text-sm font-bold" htmlFor="c-email">
                 Email <span className="font-normal text-ink-muted">(optional)</span>
               </label>
               <input id="c-email" type="email" inputMode="email" value={cEmail} onChange={(e) => setCEmail(e.target.value)} className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
-              <p className="mt-1 text-sm text-ink-muted">For an automatic alert if you don&apos;t arrive. MIRA attempts an email invite when email is available. After they accept, journey and missed-check-in emails can be attempted; sending can fail.</p>
+              <p className="mt-1 text-sm text-ink-muted">For an automatic alert if you don&apos;t arrive. Mira attempts an email invite when email is available. After they accept, journey and missed-check-in emails can be attempted; sending can fail.</p>
               <Button type="submit" className="mt-4" variant="primary" size="lg" busy={busy === "contact"} busyLabel="Saving…" disabled={!cName.trim() || (!cPhone.trim() && !cEmail.trim())}>
                 {cEmail.trim() ? "Save and send invite" : "Save"}
               </Button>
@@ -186,7 +186,7 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
         </Section>
 
         <p className="px-1 text-sm text-ink-muted">
-          On a journey, <strong>Tell my people now</strong> (in &ldquo;I feel unsafe&rdquo;) opens WhatsApp for each contact with a number, asking them to check on you, and {emailAlerts ? "attempts to email accepted contacts who are available for that journey with a live link. The screen shows which attempts the provider accepted or rejected." : "cannot email contacts while contact email is unavailable."} MIRA never contacts anyone else.{" "}
+          On a journey, <strong>Tell my people now</strong> (in &ldquo;I feel unsafe&rdquo;) opens WhatsApp for each contact with a number, asking them to check on you, and {emailAlerts ? "attempts to email accepted contacts who are available for that journey with a live link. The screen shows which attempts the provider accepted or rejected." : "cannot email contacts while contact email is unavailable."} Mira never contacts anyone else.{" "}
           <Link href="/privacy" className="font-bold text-accent">
             Privacy
           </Link>

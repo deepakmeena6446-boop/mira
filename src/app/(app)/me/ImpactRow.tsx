@@ -23,7 +23,7 @@ export function ImpactRow({ impact: initial }: { impact?: ImpactView | null }) {
     };
   }, [initial]);
   const pending = impact?.summary.pending ?? 0;
-  const sub = impact?.line ?? (pending ? `${pending} waiting for someone else to confirm` : "Help MIRA know your area better");
+  const sub = impact?.line ?? (pending ? `${pending} waiting for someone else to confirm` : "Help Mira know your area better");
   return (
     <Link href="/contribute" className="flex min-h-14 items-center gap-3 px-5 py-3 hover:bg-sunken">
       <Icon name="contribute" className="text-accent" />

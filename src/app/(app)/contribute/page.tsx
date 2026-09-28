@@ -8,7 +8,7 @@ import { ContributeScreen } from "./ContributeScreen";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Contribute" };
 
-/** CONTRIBUTE tab: MIRA Checks, corrections, private reports, and honest (verified-only) impact. */
+/** CONTRIBUTE tab: Mira Checks, corrections, private reports, and honest (verified-only) impact. */
 export default async function ContributePage() {
   const sql = getSql();
   const user = await getUser(sql);

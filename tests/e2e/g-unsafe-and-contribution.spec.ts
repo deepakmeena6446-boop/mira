@@ -37,7 +37,7 @@ test.describe("When something feels wrong — instant, deterministic help", () =
     // The best Help Point for right now opens its walk, ready to start with MIRA.
     await sheet.getByRole("button", { name: /Go to a Help Point/ }).click();
     await expect(sheet).toBeHidden();
-    await expect(page.getByRole("button", { name: /Start with MIRA/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Go with Mira/ })).toBeVisible();
     expect(miraCalls).toEqual([]);
     await ctx.close();
   });
@@ -45,7 +45,7 @@ test.describe("When something feels wrong — instant, deterministic help", () =
   test("Trip: the same sheet offers the live link, and a Help Point shows where it is", async ({ browser }) => {
     const { ctx, page } = await newUser(browser, "Ira");
     await openRoute(page);
-    await page.getByRole("button", { name: /Start with MIRA/ }).click();
+    await page.getByRole("button", { name: /Go with Mira/ }).click();
     await page.waitForURL("**/trip");
     await expect(page.getByText(/Nearest Help Point/)).toBeVisible();
     await page.getByRole("button", { name: "I feel unsafe" }).click();
@@ -69,7 +69,7 @@ test.describe("Journeys that aren't walks", () => {
     await expect(page.getByText("The driving time from here is not known.")).toBeVisible();
     await page.getByRole("radio", { name: "45 min" }).click();
     await expect(page.getByText(/expected in 45 min/)).toBeVisible();
-    await page.getByRole("button", { name: /Start with MIRA/ }).click();
+    await page.getByRole("button", { name: /Go with Mira/ }).click();
     await page.waitForURL("**/trip");
     await expect(page.getByRole("heading", { name: /by car or taxi/ })).toBeVisible();
     const [trip] = await db`SELECT mode, eta_at, created_at FROM journeys ORDER BY created_at DESC LIMIT 1`;
@@ -88,7 +88,7 @@ test.describe("After — one tiny factual contribution", () => {
     night.setHours(22, 30, 0, 0); // device clock only; the server keeps real time
     await page.clock.setFixedTime(night);
     await openRoute(page);
-    await page.getByRole("button", { name: /Start with MIRA/ }).click();
+    await page.getByRole("button", { name: /Go with Mira/ }).click();
     await page.waitForURL("**/trip");
     await page.getByRole("button", { name: "End trip without arriving" }).click();
     await page.getByRole("button", { name: "End trip", exact: true }).click();
@@ -109,10 +109,10 @@ test.describe("Degraded states are honest", () => {
     const page = await ctx.newPage();
     await page.goto("/");
     await page.waitForURL("**/welcome");
-    await page.getByRole("button", { name: "Start with MIRA" }).click();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.getByRole("button", { name: "Use my location" }).click();
     await page.waitForURL((u) => u.pathname === "/"); // no account needed to look around
-    await expect(page.getByText(/Location is off for MIRA/)).toBeVisible();
+    await expect(page.getByText(/Location is off for Mira/)).toBeVisible();
     // Country not known (location off): Emergency is still one tap away, without an invented dial number.
     await page.getByRole("button", { name: "Emergency options" }).first().click();
     const options = page.getByRole("dialog", { name: "Emergency call options" });

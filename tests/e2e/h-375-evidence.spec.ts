@@ -8,13 +8,13 @@ test("375 px walk shows lighting before Start, with accessible details and no ho
   await page.setViewportSize({ width: 375, height: 812 });
   await openRoute(page);
   const evidence = page.getByRole("region", { name: "Lighting evidence before starting" });
-  const start = page.getByRole("button", { name: /Start with MIRA/ });
+  const start = page.getByRole("button", { name: /Go with Mira/ });
   await expect(evidence).toBeVisible();
   await expect(evidence).toContainText(/mapped|lighting/i);
   await expect(start).toBeVisible();
-  expect(await evidence.evaluate((node) => { const button = [...document.querySelectorAll("button")].find((b) => b.textContent?.includes("Start with MIRA")); return Boolean(button && (node.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)); })).toBe(true);
+  expect(await evidence.evaluate((node) => { const button = [...document.querySelectorAll("button")].find((b) => b.textContent?.includes("Go with Mira")); return Boolean(button && (node.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)); })).toBe(true);
   await evidence.getByText("Sources and freshness").click();
-  await expect(evidence).toContainText(/OpenStreetMap|MIRA walkers|could not confirm/i);
+  await expect(evidence).toContainText(/OpenStreetMap|Mira walkers|could not confirm/i);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   await page.getByRole("button", { name: "🏠 Home" }).click();
   await expect(page.getByText("Saved as Home")).toBeVisible();
@@ -43,7 +43,7 @@ test("375 px Help Points, Emergency, arrival and Contribute remain usable", asyn
   await expect(page.getByRole("heading", { name: "Contribute" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   await openRoute(page);
-  await page.getByRole("button", { name: /Start with MIRA/ }).click();
+  await page.getByRole("button", { name: /Go with Mira/ }).click();
   await page.waitForURL("**/trip");
   await page.getByRole("button", { name: /I'm here/ }).click();
   await expect(page.getByText(/You made it/).first()).toBeVisible();

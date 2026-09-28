@@ -6,8 +6,8 @@ import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 
 /**
- * HOME · MIRA · TRIPS · CONTRIBUTE · ME — the locked Day-0 navigation. Emergency is never a tab:
- * it sits on Home, on the journey screen and in "I feel unsafe". Circle lives in Me.
+ * HOME · Mira · TRIPS · CONTRIBUTE · ME — the locked Day-0 navigation (a stable anchor: never adaptive).
+ * Emergency is never a tab: it sits on Home, on the journey screen and in "I feel unsafe". Circle lives in Me.
  */
 const TABS = [
   { href: "/", label: "Home", icon: "home", match: ["/"] },
@@ -21,25 +21,26 @@ function active(path: string, match: readonly string[]) {
   return match.some((m) => (m === "/" ? path === "/" : path === m || path.startsWith(`${m}/`)));
 }
 
-/** Floating pill tab bar — the app's single navigation. */
+/**
+ * Docked tab bar — the app's single navigation. Hidden while a journey is open on /trip
+ * (immersive journey mode: `html[data-journey="open"]`, set by TripScreen; see globals.css).
+ */
 export function TabBar() {
   const path = usePathname() ?? "/";
   return (
-    <nav aria-label="Main" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-      <ul className="glass pointer-events-auto grid w-full max-w-md grid-cols-5 rounded-full border border-glass-edge p-1.5 shadow-[var(--shadow-float)]">
+    <nav aria-label="Main" className="mira-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
+      <ul className="mx-auto grid h-[var(--tabbar-h)] max-w-xl grid-cols-5">
         {TABS.map((t) => {
           const on = active(path, t.match);
           return (
-            <li key={t.href}>
+            <li key={t.href} className="relative">
               <Link
                 href={t.href}
                 aria-current={on ? "page" : undefined}
-                className={cx(
-                  "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-full text-[0.66rem] font-semibold transition-colors",
-                  on ? "bg-accent text-accent-ink shadow-[0_6px_16px_-6px_rgb(106_68_245/0.7)]" : "text-ink-muted hover:text-ink",
-                )}
+                className={cx("flex h-full flex-col items-center justify-center gap-0.5 text-[0.72rem] font-medium transition-colors duration-150", on ? "text-accent" : "text-ink-muted hover:text-ink")}
               >
-                <Icon name={t.icon} className="size-5" />
+                {on ? <span aria-hidden className="absolute inset-x-5 top-0 h-0.5 rounded-b-full bg-accent" /> : null}
+                <Icon name={t.icon} className="size-[22px]" />
                 <span>{t.label}</span>
               </Link>
             </li>

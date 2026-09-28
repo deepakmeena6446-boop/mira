@@ -17,12 +17,12 @@ export default async function InvitePage() {
     return (
       <section aria-labelledby="inv-h" className="animate-rise rounded-[var(--radius-card)] bg-surface p-7 shadow-[var(--shadow-card)]">
         <Avatar name={contact.owner} size={64} />
-        <h1 id="inv-h" className="mt-4 text-2xl font-extrabold">
+        <h1 id="inv-h" className="mt-4 text-2xl font-semibold">
           {contact.owner} wants you as a trusted contact
         </h1>
         <ul className="mt-4 space-y-2 text-ink-muted">
           <li>• When {contact.owner} shares a trip, you get a link to follow along live until they arrive.</li>
-          <li>• If they don&apos;t check in on time, MIRA lets you know.</li>
+          <li>• If they don&apos;t check in on time, Mira lets you know.</li>
           <li>• You only see their location during a trip they choose to share. Never otherwise.</li>
         </ul>
         <div className="mt-6">
@@ -58,7 +58,7 @@ export default async function InvitePage() {
       <h1 id="inv-h" className="text-2xl font-bold">
         Be a check-in contact for one journey
       </h1>
-      <p className="text-ink-muted">Someone asked MIRA to email you if they don&apos;t check in after a planned trip.</p>
+      <p className="text-ink-muted">Someone asked Mira to email you if they don&apos;t check in after a planned trip.</p>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-[var(--radius-control)] bg-sunken p-4">
         <dt className="text-ink-muted">Planned arrival</dt>
         <dd className="font-medium">{formatPlaceDateTime(invite.etaAt!, invite.tz ?? null)}</dd>
@@ -70,8 +70,8 @@ export default async function InvitePage() {
       <div>
         <h2 className="font-semibold">What accepting means</h2>
         <ul className="mt-1 list-disc space-y-1 pl-5 text-ink-muted">
-          <li>If they miss the check-in by 10 minutes, MIRA tries to send you one email. Delivery isn&apos;t guaranteed.</li>
-          <li>MIRA never shows you a live location, map or route, and it isn&apos;t an emergency service.</li>
+          <li>If they miss the check-in by 10 minutes, Mira tries to send you one email. Delivery isn&apos;t guaranteed.</li>
+          <li>Mira never shows you a live location, map or route, and it isn&apos;t an emergency service.</li>
           <li>You won&apos;t get anything else, and the invitation ends with this journey. They can withdraw it at any time.</li>
           <li>Anyone with the email link can accept it, so don&apos;t forward the link.</li>
         </ul>

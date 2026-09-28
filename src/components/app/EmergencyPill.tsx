@@ -17,8 +17,8 @@ export function EmergencyPill({ className, variant = "pill" }: { className?: str
   const direct = actions.length === 1 && actions[0].scope === "all" ? actions[0] : null;
   const [explain, setExplain] = useState(false);
   const styles = {
-    pill: "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-sm font-extrabold text-ink shadow-[var(--shadow-card)]",
-    block: "flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-ink px-3 text-[0.95rem] font-extrabold text-canvas",
+    pill: "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-sm font-semibold text-ink shadow-[var(--shadow-float)]",
+    block: "flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-button)] bg-ink px-3 text-[0.95rem] font-semibold text-canvas",
     link: "font-bold text-ink underline",
   }[variant];
   const icon = variant === "link" ? null : <Icon name="phone" className={variant === "block" ? "size-5" : "size-4"} />;
@@ -40,11 +40,11 @@ function EmergencyOptionsSheet({ open, onClose, country, actions }: { open: bool
   useOverlay(open, onClose);
   if (!open) return null;
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-labelledby="emergency-h" className="fixed inset-0 z-[60] flex items-end justify-center bg-[rgb(10_6_24/0.5)] animate-fade sm:items-center" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-t-[2rem] bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[2rem]">
-        <h2 id="emergency-h" className="text-xl font-extrabold">Emergency call options</h2>
+    <div role="dialog" aria-modal="true" aria-labelledby="emergency-h" className="fixed inset-0 z-[60] flex items-end justify-center bg-scrim animate-fade sm:items-center" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-t-[var(--radius-lg)] bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[var(--radius-lg)]">
+        <h2 id="emergency-h" className="text-xl font-semibold">Emergency call options</h2>
         {actions.length ? <>
-          <p className="mt-2 text-sm text-ink-muted">Choose the service you need. MIRA opens your phone&apos;s dialler; it does not make the call.</p>
+          <p className="mt-2 text-sm text-ink-muted">Choose the service you need. Mira opens your phone&apos;s dialler; it does not make the call.</p>
           <ul className="mt-4 space-y-2">{actions.map((n) => <li key={n.number}>
             <a href={`tel:${n.number}`} className="flex min-h-14 items-center justify-between gap-3 rounded-2xl bg-ink px-4 font-bold text-canvas"><span>{n.label}</span><span>{n.number}</span></a>
             {n.qualification ? <p className="mt-1 text-xs text-ink-muted">{n.qualification}</p> : null}

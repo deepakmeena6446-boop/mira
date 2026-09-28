@@ -21,7 +21,7 @@ function markWelcomed() {
 
 /**
  * Two steps, no account: the promise → location, then Home, signed out. She can search a place and
- * see what's known about the way first; MIRA asks her to sign in only when she reaches something
+ * see what's known about the way first; Mira asks her to sign in only when she reaches something
  * that needs an account (starting a journey, her circle, saved places, contributing, Mira).
  */
 export function Welcome({ signedIn }: { signedIn: boolean }) {
@@ -48,8 +48,8 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
   const steps = [
     <div key="promise" className="flex flex-col items-center text-center">
       <MiraOrb size={72} />
-      <h1 className="mt-7 text-4xl font-extrabold tracking-tight">With you until you arrive.</h1>
-      <p className="mt-3 max-w-xs text-lg text-ink-muted">MIRA helps you understand the way, lets your people follow until you arrive, and puts help one tap away if something feels wrong.</p>
+      <h1 className="mt-7 text-4xl font-semibold tracking-tight">With you until you arrive.</h1>
+      <p className="mt-3 max-w-xs text-lg text-ink-muted">Mira helps you understand the way, lets your people follow until you arrive, and puts help one tap away if something feels wrong.</p>
       <p className="mt-2 max-w-xs text-sm text-ink-subtle">Designed around the realities women face moving through cities. Useful to anyone.</p>
       <ul className="mt-7 w-full max-w-xs space-y-3 text-left">
         {[
@@ -69,15 +69,15 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
         ))}
       </ul>
       <p className="mt-5 max-w-xs text-sm text-ink-muted">
-        <strong className="text-ink">Mira</strong>, your companion, can do any of this with you — and all of it works without her. Your live location is shared only during a journey you start, and MIRA keeps no history of where you&apos;ve been.
+        <strong className="text-ink">Mira</strong>, your companion, can do any of this with you — and all of it works without her. Your live location is shared only during a journey you start, and Mira keeps no history of where you&apos;ve been.
       </p>
     </div>,
     <div key="loc" className="flex flex-col items-center text-center">
       <div className="grid size-28 place-items-center rounded-full bg-accent-soft text-accent">
         <Icon name="locate" className="size-14" />
       </div>
-      <h1 className="mt-8 text-3xl font-extrabold">Where are you?</h1>
-      <p className="mt-3 max-w-xs text-lg text-ink-muted">MIRA uses your location to show the way from here, the Help Points near you, and to share the journeys you choose. It never keeps a history of where you&apos;ve been.</p>
+      <h1 className="mt-8 text-3xl font-semibold">Where are you?</h1>
+      <p className="mt-3 max-w-xs text-lg text-ink-muted">Mira uses your location to show the way from here, the Help Points near you, and to share the journeys you choose. It never keeps a history of where you&apos;ve been.</p>
       <p className="mt-3 max-w-xs text-sm text-ink-subtle">No account needed to look around. You can always search for places instead.</p>
     </div>,
   ];
@@ -103,11 +103,11 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
       {/* Always on screen: on a small phone the story scrolls under the action instead of pushing it off. */}
       <div className="sticky bottom-0 -mx-6 flex flex-col bg-gradient-to-t from-canvas via-canvas to-transparent px-6 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-6">
         <Button variant="hero" size="lg" onClick={next} busy={busy} busyLabel="Asking…" className="mx-auto max-w-sm">
-          {step === 0 ? "Start with MIRA" : "Use my location"}
+          {step === 0 ? "Continue" : "Use my location"}
         </Button>
         {step === 0 && !signedIn ? (
           <button type="button" onClick={() => setSignIn(true)} className="mx-auto mt-1 min-h-11 px-3 text-sm font-bold text-ink-muted">
-            Already use MIRA? Sign in
+            Already use Mira? Sign in
           </button>
         ) : null}
       </div>

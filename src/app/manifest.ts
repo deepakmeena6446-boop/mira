@@ -2,14 +2,14 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "MIRA",
-    short_name: "MIRA",
+    name: "Mira",
+    short_name: "Mira",
     description: "Understand the way before you go, let your people follow until you arrive, and keep help one tap away if something feels wrong.",
     start_url: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#faf7ff",
-    theme_color: "#6a44f5",
+    background_color: "#f6f5f1",
+    theme_color: "#1d6b63",
     icons: [
       { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
