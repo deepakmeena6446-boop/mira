@@ -145,3 +145,13 @@ Branch `feat/launch-ux` (from `docs/launch-ux` @ `1111b24`). Plan: `08_LAUNCH_UX
 - CP-1: no verdict words in UI. CP-2: no "MIRA" in React UI except the server data key `"MIRA walkers"` (matched, and displayed as "Mira walkers").
 - Welcome and Circle restyled (06 §3.1, §3.15). PNG app icons redrawn from the new `icon.svg`.
 - **Refinements (owner correction 3):** none beyond the detent heights noted in Phase 3. Colours, fonts and radii are as documented.
+
+## Phase 12 — Regression and release readiness — **PASS**
+- `npm run check`: lint and typecheck clean, **64 files / 797 tests**.
+- `npm run test:e2e` (fresh build): **47 passed / 5 skipped / 0 failed**, the same as the baseline.
+- `npm run audit:bundle`: no secrets.
+- Bundle size versus `81db304` (built in place from a detached checkout): JS gz 716,989 → 733,575 (**+2.3%**), CSS +2.6%.
+- Console: 0 app errors across 10 screens. The only errors are headless Google-tile fetches, the same as the baseline.
+- Fonts: the Devanagari file is not requested on an English session.
+- M-1: the Google basemap renders in the in-app browser (world map, night style).
+- Final report: `FINAL_UX_EXECUTION_REPORT.md`. Verdict **READY_FOR_BETA_DEPLOYMENT**; the owner-only operations and the real-phone smoke test remain.
