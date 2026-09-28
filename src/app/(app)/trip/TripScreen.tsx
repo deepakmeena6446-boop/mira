@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { WorldMap } from "@/components/map/WorldMap";
 import { BottomSheet, type Snap } from "@/components/app/BottomSheet";
-import { MiraOrb } from "@/components/app/MiraOrb";
-import { Avatar } from "@/components/app/Avatar";
 import { EmergencyPill } from "@/components/app/EmergencyPill";
 import { HelpCluster } from "@/components/app/HelpCluster";
 import { useChromeTop } from "@/lib/use-chrome-top";
+import { MiraPulse } from "@/components/app/MiraPulse";
+import { journeyNextAction } from "@/lib/trip-actions";
 import { UnsafeSheet } from "@/components/app/UnsafeSheet";
 import { AfterArrival } from "@/components/app/AfterArrival";
 import { HELP_ICON } from "@/components/app/kinds";
@@ -281,11 +281,11 @@ export function TripScreen({
   if (!open) {
     return (
       <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-[calc(var(--tabbar-space)+2rem)] text-center">
-        <div className="animate-rise">
-          <MiraOrb size={84} />
-        </div>
-        <h1 className="mt-6 text-3xl font-semibold animate-rise">
-          {!trip.autoArrival && trip.state !== "expired" ? "Sharing stopped" : trip.state === "arrived" ? "You made it 🎉" : trip.state === "ended" ? "Journey ended" : "Journey closed"}
+        <span aria-hidden className={`grid size-14 place-items-center rounded-full ${trip.state === "arrived" ? "bg-accent-soft text-accent" : "bg-sunken text-ink-muted"}`}>
+          <Icon name={trip.state === "arrived" ? "check" : "route"} className="size-7" />
+        </span>
+        <h1 className="mt-5 text-[1.75rem] font-semibold animate-rise">
+          {!trip.autoArrival && trip.state !== "expired" ? "Sharing stopped" : trip.state === "arrived" ? "You made it." : trip.state === "ended" ? "Journey ended" : "Journey closed"}
         </h1>
         <p className="mt-2 max-w-sm text-ink-muted animate-rise">
           {!trip.autoArrival
@@ -299,12 +299,12 @@ export function TripScreen({
         <p className="mt-6 max-w-sm text-sm text-ink-subtle">
           Journey details are deleted{trip.purgeAt && clock ? ` by ${time(trip.purgeAt)}` : " within a day"}. Mira doesn&apos;t keep a history of where you&apos;ve been.
         </p>
-        <Link href="/report" className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-bold text-ink-muted">
-          <Icon name="flag" className="size-4" /> Something happened on the way? Report it privately
+        <Link href="/report?from=journey" className="mt-3 inline-flex min-h-11 max-w-sm items-center justify-center gap-1.5 text-sm font-semibold text-ink-muted">
+          <Icon name="flag" className="size-4" /> <span>Something happened on the way? Report it privately</span>
         </Link>
         <Button
           className="mt-6 max-w-xs"
-          variant="hero"
+          variant="primary"
           size="lg"
           onClick={() => {
             clearTripRoutes();
@@ -312,9 +312,9 @@ export function TripScreen({
             router.refresh();
           }}
         >
-          Back home
+          Done
         </Button>
-        <Link href="/trips" className="mt-2 inline-flex min-h-11 items-center text-sm font-bold text-accent">
+        <Link href="/trips" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-strong">
           Your trips
         </Link>
       </div>
@@ -322,6 +322,8 @@ export function TripScreen({
   }
 
   const netDown = !net.worker;
+  const attention = netDown || gps !== "ok" || uploadFailing || trip.state === "missed" || trip.sharedWith.some((c) => c.viaEmail && !c.notified);
+  const next = journeyNextAction({ missed: trip.state === "missed", whatsapp: onWhatsApp.map((c) => c.name), opened, following: sharedOk.length, canShare: Boolean(trip.shareUrl) });
   // Honest alert behaviour: only claim an automatic email when email works, someone accepted and got the link, and the worker is up.
   const alertsOn = emailAlerts && sharedOk.length > 0 && !netDown;
   const noun = journeyNoun(trip.autoArrival ? trip.mode : "other");
@@ -341,11 +343,8 @@ export function TripScreen({
             <Icon name="back" className="size-5" />
           </Link>
           <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-2 text-sm font-bold text-accent">
-              <span className="relative flex size-2.5">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-60" />
-                <span className="relative inline-flex size-2.5 rounded-full bg-accent" />
-              </span>
+            <p className="flex items-center gap-2 text-sm font-semibold text-accent-strong">
+              <MiraPulse size={12} state={trip.state === "missed" ? "attention" : "with-you"} />
               {sharedOk.length ? "Sharing live" : `${noun[0].toUpperCase()}${noun.slice(1)} in progress`}
             </p>
             <h1 className="truncate font-semibold">{trip.autoArrival ? `To ${trip.destination.name}${modeLine ? ` · ${modeLine}` : ""}` : "Sharing where you are"}</h1>
@@ -400,8 +399,31 @@ export function TripScreen({
           </div>
         ) : null}
 
-        {/* 1. Where and when: destination, ETA in her local time, how far. */}
-        <div>
+        {/* 1. Who can see her, and what happens if she doesn't arrive — the Mira line, plainly. */}
+        <div className="flex items-start gap-3">
+          <MiraPulse size={16} state={attention ? "attention" : "with-you"} className="mt-[5px]" />
+          <p className="min-w-0 flex-1 text-sm text-ink-muted">
+            <span className="block text-[1.0625rem] font-medium leading-snug text-ink">{sharedOk.length ? `${names(sharedOk.map((c) => c.name))} can see where you are until you ${trip.autoArrival ? "arrive" : "stop sharing"}.` : "Only people you send your live link to can follow."}</span>{" "}
+            {alertsOn
+              ? `If you haven't ${trip.autoArrival ? "arrived" : "checked in"} ${Math.round(MISS_GRACE_MS / 60_000)} min after ${trip.autoArrival ? "your ETA" : "your sharing time ends"}, Mira emails ${sharedOk.length === 1 ? "them" : "them all"}.`
+              : !emailAlerts
+                ? `Nobody is alerted automatically if you don't ${trip.autoArrival ? "arrive" : "check in"} — Mira can't send email alerts yet. Your live link is how people follow you.`
+                : netDown
+                  ? "Nobody is alerted automatically right now — missed-arrival checks are paused."
+                  : (
+                      <>
+                        Nobody is alerted automatically if you don&apos;t {trip.autoArrival ? "arrive" : "check in"} —{" "}
+                        <Link href="/circle" className="font-semibold text-accent-strong">
+                          add someone in Circle
+                        </Link>{" "}
+                        for that.
+                      </>
+                    )}
+          </p>
+        </div>
+
+        {/* 2. Where and when: ETA in her local time, how far. */}
+        <div className="mt-4">
           <p className="text-[13px] font-medium text-ink-subtle">{trip.autoArrival ? (left > 0 ? "Expected in" : "Expected") : "Sharing for"}</p>
           <p className="text-4xl font-semibold tabular-nums">{!clock ? "…" : left > 0 ? span : mins < 1 ? "now" : `${span} ago`}</p>
           <p className="text-ink-muted">
@@ -417,83 +439,58 @@ export function TripScreen({
           ) : null}
         </div>
 
-        {/* 2. The main actions: arrive, share. */}
-        <div className="mt-5 grid gap-3">
-          {trip.autoArrival ? (
-            <Button variant="hero" size="lg" onClick={() => act("arrive")} busy={busy === "arrive"} busyLabel="Saving…">
-              <Icon name="check" /> I&apos;m here
+
+        {/* 3. The one next action (exactly one filled button), then the other journey actions. */}
+        <div className="mt-4 grid gap-2.5">
+          {next.kind === "whatsapp" ? null : next.kind === "share" ? (
+            <Button variant="primary" size="lg" onClick={share} disabled={!trip.shareUrl}>
+              <Icon name="share" className="size-5" /> Send my live link
             </Button>
           ) : (
-            <Button variant="hero" size="lg" onClick={() => act("arrive")} busy={busy === "arrive"} busyLabel="Stopping…">
-              <Icon name="check" /> I&apos;m okay — stop sharing
+            <Button variant="primary" size="lg" onClick={() => act("arrive")} busy={busy === "arrive"} busyLabel={trip.autoArrival ? "Saving…" : "Stopping…"}>
+              <Icon name="check" /> {trip.autoArrival ? <>I&apos;m here</> : <>I&apos;m okay — stop sharing</>}
             </Button>
           )}
-          <Button variant={sharedOk.length ? "secondary" : "primary"} size="lg" onClick={share} disabled={!trip.shareUrl}>
-            <Icon name="share" className="size-5" /> Send my live link
-          </Button>
-        </div>
-
-        {/* 2b. Her WhatsApp contacts: each one tap, their own link, message ready. Mira opens WhatsApp; she presses Send. */}
-        {onWhatsApp.length ? (
-          <div className="mt-4 rounded-[var(--radius-card)] bg-surface p-4 shadow-[var(--shadow-card)]">
-            <p className="text-sm font-bold">Send your live link on WhatsApp</p>
-            <ul className="mt-2 grid gap-2">
-              {onWhatsApp.map((c) => (
-                <li key={c.name}>
-                  <a
-                    href={c.whatsapp!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => markOpened(c.name)}
-                    className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl px-4 font-semibold ${opened.includes(c.name) ? "bg-mint-soft text-ink" : "bg-accent text-accent-ink"}`}
-                  >
-                    <Icon name="send" className="size-4" /> {opened.includes(c.name) ? `Opened WhatsApp for ${c.name} ✓` : `Send to ${c.name}`}
-                  </a>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-xs text-ink-muted">Each link is theirs alone and stops when you {trip.autoArrival ? "arrive" : "stop sharing"}. Mira can&apos;t see whether you pressed Send.</p>
-          </div>
-        ) : null}
-
-        {/* 3. Who's following, and what happens if she doesn't arrive — plainly. */}
-        <div className="mt-4 flex items-start gap-3 rounded-[var(--radius-card)] bg-sunken p-4">
-          {sharedOk.length ? (
-            <div className="flex shrink-0 -space-x-2" aria-hidden>
-              {sharedOk.slice(0, 3).map((c) => (
-                <Avatar key={c.name} name={c.name} size={34} className="ring-2 ring-sunken" />
-              ))}
+          {/* Her WhatsApp contacts: each one tap, their own link, message ready. Mira opens WhatsApp; she presses Send. */}
+          {onWhatsApp.length ? (
+            <div>
+              <ul className="grid gap-2">
+                {onWhatsApp.map((c) => {
+                  const isNext = next.kind === "whatsapp" && next.name === c.name;
+                  return (
+                    <li key={c.name}>
+                      <a
+                        href={c.whatsapp!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => markOpened(c.name)}
+                        data-variant={isNext ? "primary" : "secondary"}
+                        className={`flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-button)] px-4 font-semibold ${isNext ? "bg-accent text-accent-ink" : opened.includes(c.name) ? "border border-line bg-accent-soft text-ink" : "border border-line-strong bg-surface text-ink"}`}
+                      >
+                        <Icon name={opened.includes(c.name) ? "check" : "send"} className="size-4" /> {opened.includes(c.name) ? `Opened WhatsApp for ${c.name} ✓` : `Send to ${c.name}`}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="mt-1.5 text-xs text-ink-muted">Each link is theirs alone and stops when you {trip.autoArrival ? "arrive" : "stop sharing"}. Mira can&apos;t see whether you pressed Send.</p>
             </div>
-          ) : (
-            <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-surface">
-              <Icon name="share" className="size-4 text-ink-muted" />
-            </span>
-          )}
-          <p className="text-sm text-ink-muted">
-            <span className="block font-semibold text-ink">{sharedOk.length ? `${names(sharedOk.map((c) => c.name))} can see where you are until you ${trip.autoArrival ? "arrive" : "stop sharing"}.` : "Only people you send your live link to can follow."}</span>{" "}
-            {alertsOn
-              ? `If you haven't ${trip.autoArrival ? "arrived" : "checked in"} ${Math.round(MISS_GRACE_MS / 60_000)} min after ${trip.autoArrival ? "your ETA" : "your sharing time ends"}, Mira emails ${sharedOk.length === 1 ? "them" : "them all"}.`
-              : !emailAlerts
-                ? `Nobody is alerted automatically if you don't ${trip.autoArrival ? "arrive" : "check in"} — Mira can't send email alerts yet. Your live link is how people follow you.`
-                : netDown
-                  ? "Nobody is alerted automatically right now — missed-arrival checks are paused."
-                  : (
-                      <>
-                        Nobody is alerted automatically if you don&apos;t {trip.autoArrival ? "arrive" : "check in"} —{" "}
-                        <Link href="/circle" className="font-bold text-accent">
-                          add someone in Circle
-                        </Link>{" "}
-                        for that.
-                      </>
-                    )}
-          </p>
-        </div>
-
-        {/* 4. If something feels wrong, or she needs longer. */}
-        <div className="mt-3 grid grid-cols-1 gap-3">
-          <Button variant="secondary" onClick={() => act("extend")} busy={busy === "extend"} disabled={trip.extended || trip.state !== "active"}>
-            <Icon name="clock" className="size-4" /> {trip.extended ? "Extended" : "+10 min"}
-          </Button>
+          ) : null}
+          <div className="grid grid-cols-2 gap-2.5">
+            {next.kind === "arrive" ? null : (
+              <Button variant="secondary" onClick={() => act("arrive")} busy={busy === "arrive"} busyLabel={trip.autoArrival ? "Saving…" : "Stopping…"} className="col-span-2">
+                <Icon name="check" className="size-4" /> {trip.autoArrival ? <>I&apos;m here</> : <>I&apos;m okay — stop sharing</>}
+              </Button>
+            )}
+            {next.kind === "share" ? null : (
+              <Button variant="secondary" onClick={share} disabled={!trip.shareUrl}>
+                <Icon name="share" className="size-4" /> Send my live link
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => act("extend")} busy={busy === "extend"} disabled={trip.extended || trip.state !== "active"} className={next.kind === "share" ? "col-span-2" : undefined}>
+              <Icon name="clock" className="size-4" /> {trip.extended ? "Extended" : "+10 min"}
+            </Button>
+          </div>
         </div>
         {trip.checkRequestedAt && clock && clock.getTime() - new Date(trip.checkRequestedAt).getTime() < 30 * 60_000 ? (
           <p role="status" className="mt-3 rounded-2xl bg-mint-soft px-4 py-3 text-sm">
@@ -505,7 +502,7 @@ export function TripScreen({
         {focus ? (
           <div className="mt-3 rounded-[var(--radius-card)] bg-accent-soft p-4">
             <div className="flex items-start gap-3">
-              <span aria-hidden className="text-2xl">{HELP_CLASSES[focus.cls].emoji}</span>
+              <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-surface text-ink"><Icon name={HELP_ICON[focus.cls] ?? "pin"} className="size-5" /></span>
               <div className="min-w-0 flex-1">
                 <p className="font-semibold">{focus.name}</p>
                 <p className="text-sm text-ink-muted">
@@ -517,13 +514,13 @@ export function TripScreen({
                 <Icon name="close" className="size-4" />
               </button>
             </div>
-            <a href={directions(focus)} target="_blank" rel="noopener noreferrer" className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-full bg-surface text-sm font-bold text-accent-strong">
+            <a href={directions(focus)} target="_blank" rel="noopener noreferrer" className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-full bg-surface text-sm font-semibold text-accent-strong">
               Directions in Maps <Icon name="arrow" className="size-4" />
             </a>
           </div>
         ) : nextHelp ? (
           <button type="button" onClick={() => setFocus(nextHelp)} className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-[var(--radius-card)] px-4 py-2 text-left hover:bg-sunken">
-            <span aria-hidden className="text-xl">{HELP_CLASSES[nextHelp.cls].emoji}</span>
+            <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink"><Icon name={HELP_ICON[nextHelp.cls] ?? "pin"} className="size-[18px]" /></span>
             <span className="min-w-0 flex-1">
               <span className="block text-[13px] font-medium text-ink-subtle">Nearest Help Point{nextHelp.ahead ? " ahead" : ""}</span>
               <span className="block truncate font-semibold">
@@ -555,7 +552,7 @@ export function TripScreen({
               </div>
             </div>
           ) : trip.autoArrival ? (
-            <button type="button" onClick={() => setConfirmEnd(true)} className="min-h-11 w-full rounded-full text-sm font-bold text-ink-muted hover:bg-sunken">
+            <button type="button" onClick={() => setConfirmEnd(true)} className="min-h-11 w-full rounded-full text-sm font-semibold text-ink-muted hover:bg-sunken">
               End trip without arriving
             </button>
           ) : null /* sharing where she is: "I'm okay — stop sharing" already ends it */}

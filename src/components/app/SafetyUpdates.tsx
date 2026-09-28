@@ -26,6 +26,9 @@ import {
   type SafetyWindow,
 } from "@/domain/safety-updates";
 
+/** Domain copy names the service "MIRA"; the UI calls it Mira (display only — the constants stay as tested). */
+const ui = (text: string) => text.replace(/\bMIRA\b/g, "Mira");
+
 type Answer = { area: SafetyArea | null; evidence: EvidenceState<SafetyUpdatesData> };
 type Loaded = { key: string; answer: Answer | null; failed: boolean };
 
@@ -71,18 +74,18 @@ export function SafetyUpdatesSection({ point, heading = "Safety updates", classN
   const prevEv = previous?.answer?.evidence;
   const sheetData = data ?? (open && prevEv && "data" in prevEv ? prevEv.data : null);
   const sheetEv = data ? ev : prevEv;
-  const sheetPartial = sheetEv?.state === "partial" ? partialLine(sheetEv.sources, !sheetData?.updates.length) : null;
+  const sheetPartial = sheetEv?.state === "partial" ? ui(partialLine(sheetEv.sources, !sheetData?.updates.length)) : null;
 
   let body: React.ReactNode;
   if (loading) body = <p className="mt-2 text-sm text-ink-muted">Checking recent updates…</p>;
   else if (!answer || loaded?.failed || ev?.state === "failed") {
     body = (
-      <p className="mt-2 text-sm text-ink-muted">
-        {FAILED_LINE}{" "}
-        <button type="button" onClick={() => setRetry((n) => n + 1)} className="min-h-11 font-bold text-accent">
+      <div className="mt-2 text-sm text-ink-muted">
+        <p>{ui(FAILED_LINE)}</p>
+        <button type="button" onClick={() => setRetry((n) => n + 1)} className="-ml-1 min-h-11 px-1 font-semibold text-accent-strong">
           Try again
         </button>
-      </p>
+      </div>
     );
   } else if (ev?.state === "unavailable") {
     body = ev.sources.some((x) => x.source === "area")
@@ -93,8 +96,8 @@ export function SafetyUpdatesSection({ point, heading = "Safety updates", classN
     // Nothing shown, but not everything was checked (a source or the relevance check): not "no updates".
     body = (
       <p className="mt-2 text-sm text-ink-muted">
-        {partialLine(ev.sources, true)}{" "}
-        <button type="button" onClick={() => setRetry((n) => n + 1)} className="min-h-11 font-bold text-accent">
+        {ui(partialLine(ev.sources, true))}{" "}
+        <button type="button" onClick={() => setRetry((n) => n + 1)} className="min-h-11 font-semibold text-accent-strong">
           Try again
         </button>
       </p>
@@ -102,11 +105,11 @@ export function SafetyUpdatesSection({ point, heading = "Safety updates", classN
   } else if (data && !data.updates.length) {
     body = (
       <p className="mt-2 text-sm text-ink-muted">
-        {EMPTY_LINE} {EMPTY_CAVEAT}
+        {ui(EMPTY_LINE)} {ui(EMPTY_CAVEAT)}
         {windowDays === 7 ? (
           <>
             {" "}
-            <button type="button" onClick={() => setWindowDays(30)} className="font-bold text-accent">
+            <button type="button" onClick={() => setWindowDays(30)} className="font-semibold text-accent-strong">
               Check the past 30 days
             </button>
           </>
@@ -116,12 +119,12 @@ export function SafetyUpdatesSection({ point, heading = "Safety updates", classN
   } else if (data) {
     body = (
       <div className="mt-2 rounded-[var(--radius-card)] bg-surface px-4 py-3 shadow-[var(--shadow-card)]">
-        <p className="font-semibold">{summaryLine(data)}</p>
+        <p className="font-semibold">{ui(summaryLine(data))}</p>
         <p className="mt-0.5 text-xs text-ink-muted">
           Official advisories {data.counts.official} · News reports {data.counts.news} · Community reports: not in the beta
         </p>
-        {ev?.state === "partial" ? <p className="mt-1 text-xs text-ink-muted">{partialLine(ev.sources, false)}</p> : null}
-        <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className="mt-2 min-h-11 rounded-full bg-accent-soft px-4 text-sm font-bold text-accent-strong">
+        {ev?.state === "partial" ? <p className="mt-1 text-xs text-ink-muted">{ui(partialLine(ev.sources, false))}</p> : null}
+        <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className="mt-2 min-h-11 rounded-full bg-accent-soft px-4 text-sm font-semibold text-accent-strong">
           View updates
         </button>
       </div>
@@ -161,10 +164,10 @@ function SafetyUpdatesSheet({ open, data, updating, partial, windowDays, onWindo
           <h2 id="safety-updates-h" className="text-xl font-semibold">
             Safety updates · {data.area.name}
           </h2>
-          <p className="mt-1 text-sm text-ink-muted">{NOT_A_RATING}</p>
+          <p className="mt-1 text-sm text-ink-muted">{ui(NOT_A_RATING)}</p>
           <div className="mt-3 flex gap-2" role="group" aria-label="Time window">
             {([7, 30] as const).map((w) => (
-              <button key={w} type="button" aria-pressed={windowDays === w} onClick={() => onWindow(w)} className={cx("min-h-11 rounded-full px-4 text-sm font-bold", windowDays === w ? "bg-ink text-canvas" : "bg-sunken text-ink-muted")}>
+              <button key={w} type="button" aria-pressed={windowDays === w} onClick={() => onWindow(w)} className={cx("min-h-11 rounded-full px-4 text-sm font-semibold", windowDays === w ? "bg-ink text-canvas" : "bg-sunken text-ink-muted")}>
                 Past {w} days
               </button>
             ))}
@@ -173,13 +176,13 @@ function SafetyUpdatesSheet({ open, data, updating, partial, windowDays, onWindo
           {partial ? <p className="mt-2 text-xs text-ink-muted">{partial}</p> : null}
         </div>
         <ul className="mt-3 flex-1 space-y-3 overflow-y-auto px-5 pb-2">
-          {data.updates.length ? data.updates.map((u) => <UpdateCard key={u.id} u={u} />) : partial ? null : <li className="text-sm text-ink-muted">{EMPTY_LINE} {EMPTY_CAVEAT}</li>}
+          {data.updates.length ? data.updates.map((u) => <UpdateCard key={u.id} u={u} />) : partial ? null : <li className="text-sm text-ink-muted">{ui(EMPTY_LINE)} {ui(EMPTY_CAVEAT)}</li>}
         </ul>
         <div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2">
           <p className="text-xs leading-relaxed text-ink-subtle">
             Found through a news index and official sources, then filtered by Mira for relevance. Headlines are the publisher&apos;s words; Mira doesn&apos;t verify them. Dates are when the news index first saw a report, which can be later than its publication. Community reports are a separate signal and aren&apos;t shown in the beta. Checked {ageLabel(data.checkedAt).toLowerCase()}.
           </p>
-          <button type="button" onClick={onClose} className="mt-2 min-h-11 w-full rounded-full font-bold text-ink-muted hover:bg-sunken">
+          <button type="button" onClick={onClose} className="mt-2 min-h-11 w-full rounded-full font-semibold text-ink-muted hover:bg-sunken">
             Close
           </button>
         </div>
@@ -221,7 +224,7 @@ function UpdateCard({ u }: { u: SafetyUpdate }) {
       {u.sensitive ? <p className="mt-1 text-xs text-ink-muted">An active case: follow the source for the latest official appeal.</p> : null}
       <div className="mt-2 flex flex-wrap items-center gap-x-4">
         {link ? (
-          <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm font-bold text-accent">
+          <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm font-semibold text-accent-strong">
             Read source
           </a>
         ) : null}

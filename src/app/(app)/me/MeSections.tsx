@@ -56,7 +56,7 @@ export function AccountSection({
         }}
       >
         {googleAvailable ? null : <p className="text-sm text-ink-muted">Right now your account lives in this browser only. Add your email to sign in on another phone or after clearing your browser — no password.</p>}
-        <label htmlFor="acct-email" className="mt-3 block text-sm font-bold">
+        <label htmlFor="acct-email" className="mt-3 block text-sm font-semibold">
           Email
         </label>
         <input id="acct-email" type="email" inputMode="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
@@ -92,7 +92,7 @@ export function AccountSection({
               useEmail ? (
                 <div className="mt-4 border-t border-line pt-1">{emailForm}</div>
               ) : (
-                <button type="button" onClick={() => setUseEmail(true)} className="mt-2 min-h-11 text-sm font-bold text-accent">
+                <button type="button" onClick={() => setUseEmail(true)} className="mt-2 min-h-11 text-sm font-semibold text-accent-strong">
                   Use email instead
                 </button>
               )

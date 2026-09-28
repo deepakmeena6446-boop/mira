@@ -23,7 +23,7 @@ test.describe("Mobile extras — long-press report, inbox, time of day, installa
     await expect(card).toBeVisible();
     await expect(page).toHaveURL(/\/$/); // lifting the finger didn't "ghost tap" a button
     await card.getByRole("button", { name: /Report here/ }).click();
-    await expect(page).toHaveURL(/\/report$/); // the spot travels in memory, not the URL
+    await expect(page).toHaveURL(/\/report\?from=map$/); // the spot travels in memory, not the URL (only a UI entry hint)
     await expect(page.getByText(/^Reporting /)).toBeVisible();
     await page.getByRole("button", { name: /Dark or broken street/ }).click();
     await expect(page.getByRole("button", { name: "Use where I am instead" })).toBeVisible();

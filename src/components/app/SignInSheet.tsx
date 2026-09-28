@@ -160,7 +160,7 @@ export function SignInSheet({ open, onClose, reason }: { open: boolean; onClose:
               } else setError(res.message);
             }}
           >
-            <label htmlFor="signin-name" className={cx("block text-sm font-bold", onlyName && "mt-5")}>
+            <label htmlFor="signin-name" className={cx("block text-sm font-semibold", onlyName && "mt-5")}>
               {onlyName ? "What should I call you?" : "Or try Mira with just your first name"}
             </label>
             <input

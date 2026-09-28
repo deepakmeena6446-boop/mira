@@ -45,7 +45,7 @@ export default async function InvitePage() {
     }[invite.status];
     return (
       <section aria-labelledby="inv-h" className="rounded-[var(--radius-card)] border border-line bg-surface p-6">
-        <h1 id="inv-h" className="text-2xl font-bold">
+        <h1 id="inv-h" className="text-2xl font-semibold">
           Invitation not available
         </h1>
         <p className="mt-2 text-ink-muted">{copy}</p>
@@ -55,7 +55,7 @@ export default async function InvitePage() {
 
   return (
     <section aria-labelledby="inv-h" className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-line bg-surface p-6">
-      <h1 id="inv-h" className="text-2xl font-bold">
+      <h1 id="inv-h" className="text-2xl font-semibold">
         Be a check-in contact for one journey
       </h1>
       <p className="text-ink-muted">Someone asked Mira to email you if they don&apos;t check in after a planned trip.</p>

@@ -95,7 +95,7 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
                 {MAX_CONTACTS} of {MAX_CONTACTS}
               </span>
             ) : (
-              <button type="button" onClick={() => setAddingContact((v) => !v)} className="min-h-11 rounded-full px-3 text-sm font-bold text-accent">
+              <button type="button" onClick={() => setAddingContact((v) => !v)} className="min-h-11 rounded-full px-3 text-sm font-semibold text-accent-strong">
                 {addingContact ? "Cancel" : "+ Add"}
               </button>
             )
@@ -108,16 +108,16 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
           ) : null}
           {addingContact ? (
             <form onSubmit={addContact} className="border-b border-line p-5">
-              <label className="block text-sm font-bold" htmlFor="c-name">
+              <label className="block text-sm font-semibold" htmlFor="c-name">
                 Name
               </label>
               <input id="c-name" required value={cName} maxLength={60} onChange={(e) => setCName(e.target.value)} placeholder="e.g. Mum" className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
-              <label className="mt-3 block text-sm font-bold" htmlFor="c-phone">
+              <label className="mt-3 block text-sm font-semibold" htmlFor="c-phone">
                 WhatsApp number
               </label>
               <input id="c-phone" type="tel" inputMode="tel" autoComplete="tel" value={cPhone} maxLength={32} onChange={(e) => setCPhone(e.target.value)} placeholder={country.callingCode ? `${country.callingCode} 98765 43210` : "+91 98765 43210"} className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
               <p className="mt-1 text-sm text-ink-muted">When you start a journey, Mira opens WhatsApp with your live link ready for them — you press Send.</p>
-              <label className="mt-3 block text-sm font-bold" htmlFor="c-email">
+              <label className="mt-3 block text-sm font-semibold" htmlFor="c-email">
                 Email <span className="font-normal text-ink-muted">(optional)</span>
               </label>
               <input id="c-email" type="email" inputMode="email" value={cEmail} onChange={(e) => setCEmail(e.target.value)} className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
@@ -135,12 +135,12 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
                 <li key={c.id} className="flex items-center gap-3 px-5 py-3">
                   <Avatar name={c.name} size={44} />
                   <span className="min-w-0 flex-1">
-                    <span className="block font-bold">{c.name}</span>
+                    <span className="block font-semibold">{c.name}</span>
                     <span className="block truncate text-sm text-ink-muted">{[c.phoneHint ? `WhatsApp ${c.phoneHint}` : null, c.emailHint].filter(Boolean).join(" · ")}</span>
                   </span>
                   <span
                     className={cx(
-                      "rounded-full px-3 py-1 text-xs font-bold",
+                      "rounded-full px-3 py-1 text-xs font-semibold",
                       c.status === "accepted" || c.status === "phone" ? "bg-mint-soft text-mint" : c.status === "invited" ? "bg-sunken text-ink-muted" : "bg-error-soft text-error",
                     )}
                   >
@@ -161,11 +161,11 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
                             toast(`${c.name} removed — any live link they had stops working now.`);
                           } else toast(r.message, "error");
                         }}
-                        className="min-h-11 rounded-full bg-ink px-3 text-sm font-bold text-canvas disabled:opacity-50"
+                        className="min-h-11 rounded-full bg-ink px-3 text-sm font-semibold text-canvas disabled:opacity-50"
                       >
                         Remove
                       </button>
-                      <button type="button" onClick={() => setConfirmRemove(null)} className="min-h-11 rounded-full px-2 text-sm font-bold text-ink-muted">
+                      <button type="button" onClick={() => setConfirmRemove(null)} className="min-h-11 rounded-full px-2 text-sm font-semibold text-ink-muted">
                         Keep
                       </button>
                     </span>
@@ -187,7 +187,7 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
 
         <p className="px-1 text-sm text-ink-muted">
           On a journey, <strong>Tell my people now</strong> (in &ldquo;I feel unsafe&rdquo;) opens WhatsApp for each contact with a number, asking them to check on you, and {emailAlerts ? "attempts to email accepted contacts who are available for that journey with a live link. The screen shows which attempts the provider accepted or rejected." : "cannot email contacts while contact email is unavailable."} Mira never contacts anyone else.{" "}
-          <Link href="/privacy" className="font-bold text-accent">
+          <Link href="/privacy" className="font-semibold text-accent-strong">
             Privacy
           </Link>
         </p>

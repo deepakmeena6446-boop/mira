@@ -62,7 +62,7 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
               {e}
             </span>
             <span>
-              <span className="block font-bold">{t}</span>
+              <span className="block font-semibold">{t}</span>
               <span className="block text-sm text-ink-muted">{d}</span>
             </span>
           </li>
@@ -91,7 +91,7 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
             <span key={i} className={cx("h-1.5 rounded-full transition-all", i === step ? "w-8 bg-accent" : "w-3 bg-line-strong")} />
           ))}
         </div>
-        <button type="button" onClick={finish} className="min-h-11 rounded-full px-3 text-sm font-bold text-ink-muted">
+        <button type="button" onClick={finish} className="min-h-11 rounded-full px-3 text-sm font-semibold text-ink-muted">
           Skip
         </button>
       </div>
@@ -106,7 +106,7 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
           {step === 0 ? "Continue" : "Use my location"}
         </Button>
         {step === 0 && !signedIn ? (
-          <button type="button" onClick={() => setSignIn(true)} className="mx-auto mt-1 min-h-11 px-3 text-sm font-bold text-ink-muted">
+          <button type="button" onClick={() => setSignIn(true)} className="mx-auto mt-1 min-h-11 px-3 text-sm font-semibold text-ink-muted">
             Already use Mira? Sign in
           </button>
         ) : null}

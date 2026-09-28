@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getSql } from "@/server/db/client";
 import { systemClock } from "@/server/clock";
 import { getUser } from "@/server/session/user";
 import { tripsOverview, type TripSummary, type TripView } from "@/server/trips";
-import { MiraOrb } from "@/components/app/MiraOrb";
+import { JourneyCapsule } from "@/components/app/JourneyCapsule";
 import { Section } from "@/components/app/Section";
 import { ButtonLink } from "@/components/ui/Button";
-import { Icon } from "@/components/ui/Icon";
 import { formatPlaceTime } from "@/lib/time";
 import { modeWords } from "@/domain/travel-prefs";
 import { TripsSignedOut } from "./TripsSignedOut";
@@ -33,9 +31,8 @@ export default async function TripsPage() {
   return (
     <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex max-w-xl flex-col gap-6">
-        <header className="flex items-center gap-3 pt-2">
-          <MiraOrb size={40} calm />
-          <h1 className="text-2xl font-semibold">Trips</h1>
+        <header className="pt-2">
+          <h1 className="text-[1.75rem] font-semibold tracking-tight">Trips</h1>
         </header>
 
         {!data ? (
@@ -67,32 +64,20 @@ function ActiveCard({ trip, now }: { trip: TripView; now: Date }) {
   const left = Math.round((new Date(trip.etaAt).getTime() - now.getTime()) / 60_000);
   const mode = trip.autoArrival && trip.mode !== "other" ? ` · ${modeWords(trip.mode).short}` : "";
   return (
-    <Link href="/trip" className="block rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--shadow-card)] hover:bg-sunken" aria-label={`Open your journey${trip.autoArrival ? ` to ${trip.destination.name}` : ""}`}>
-      <p className="flex items-center gap-2 text-sm font-bold text-accent">
-        <span className="relative flex size-2.5">
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-accent opacity-60" />
-          <span className="relative inline-flex size-2.5 rounded-full bg-accent" />
-        </span>
-        {trip.state === "missed" ? "Waiting for you to check in" : "On the way now"}
-      </p>
-      <p className="mt-1 flex items-center justify-between gap-3">
-        <span className="min-w-0 truncate text-xl font-semibold">{trip.autoArrival ? `To ${trip.destination.name}${mode}` : "Sharing where you are"}</span>
-        <Icon name="chevron" className="size-5 shrink-0 text-ink-subtle" />
-      </p>
-      <p className="mt-1 text-ink-muted">
-        {trip.autoArrival ? "ETA" : "Until"} {formatPlaceTime(trip.etaAt, trip.tz)}
-        {left > 0 ? ` · in about ${left} min` : ""}
-      </p>
-      <p className="mt-2 text-sm text-ink-muted">{shared.length ? `${names(shared)} can follow along.` : "Only people you send your live link to can follow."}</p>
-    </Link>
+    <JourneyCapsule
+      large
+      attention={trip.state === "missed"}
+      title={trip.state === "missed" ? "Waiting for you to check in" : trip.autoArrival ? `To ${trip.destination.name}${mode}` : "Sharing where you are"}
+      detail={`${trip.autoArrival ? "ETA" : "Until"} ${formatPlaceTime(trip.etaAt, trip.tz)}${left > 0 ? ` · in about ${left} min` : ""} · ${shared.length ? `${names(shared)} can follow` : "Only people you send your link to can follow"}`}
+    />
   );
 }
 
 function NoActive() {
   return (
-    <div className="rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--shadow-card)]">
-      <p className="font-bold">No journey right now</p>
-      <p className="mt-1 text-sm text-ink-muted">Start one from Home: Mira stays with you until you arrive, and ends by itself when you get there.</p>
+    <div className="rounded-[var(--radius-card)] border border-line bg-surface p-5">
+      <p className="font-semibold">No journey right now</p>
+      <p className="mt-1 text-sm text-ink-muted">When you go with Mira, your journey shows here until a day after you arrive.</p>
       <ButtonLink href="/" variant="primary" className="mt-4">
         Where are you going?
       </ButtonLink>
@@ -105,7 +90,7 @@ function RecentRow({ trip }: { trip: TripSummary }) {
   const mode = trip.autoArrival && trip.mode !== "other" ? ` · ${modeWords(trip.mode).short}` : "";
   return (
     <li className="px-5 py-3">
-      <p className="font-bold">
+      <p className="font-semibold">
         {title}
         <span className="font-normal text-ink-muted">{mode}</span>
       </p>

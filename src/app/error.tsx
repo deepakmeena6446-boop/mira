@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 export default function RouteError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <main id="main" className="mx-auto max-w-5xl px-4 py-10" aria-labelledby="err-title">
-      <h1 id="err-title" className="text-2xl font-bold">
+      <h1 id="err-title" className="text-2xl font-semibold">
         Something went wrong
       </h1>
       <p className="mt-2 max-w-prose text-ink-muted">

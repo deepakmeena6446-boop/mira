@@ -63,14 +63,14 @@ export function InstallCard({ variant, onDismiss }: { variant: "row" | "card"; o
       <div className="flex items-start gap-3">
         <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-accent-soft text-2xl">📲</span>
         <div className="min-w-0 flex-1">
-          <p className="font-bold leading-snug">Add Mira to your home screen</p>
+          <p className="font-semibold leading-snug">Add Mira to your home screen</p>
           <p className="text-sm text-ink-muted">One tap to open, even when you&apos;re in a hurry.</p>
           {iosSteps}
           <div className="mt-3 flex gap-2">
-            <button type="button" onClick={install} className="min-h-11 rounded-full bg-accent px-4 text-sm font-bold text-accent-ink">
+            <button type="button" onClick={install} className="min-h-11 rounded-full bg-accent px-4 text-sm font-semibold text-accent-ink">
               {state.kind === "ios" ? (iosHelp ? "Got it" : "Show me how") : "Install"}
             </button>
-            <button type="button" onClick={onDismiss} className="min-h-11 rounded-full px-3 text-sm font-bold text-ink-muted hover:bg-sunken">
+            <button type="button" onClick={onDismiss} className="min-h-11 rounded-full px-3 text-sm font-semibold text-ink-muted hover:bg-sunken">
               Not now
             </button>
           </div>

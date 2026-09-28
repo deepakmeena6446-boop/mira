@@ -330,11 +330,17 @@
   --tabbar-space: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
   --chrome-top: 11rem;
   --sheet-peek: max(34dvh, 280px);
-  --sheet-half: 50dvh;
+  --sheet-half: 60dvh;
   --sheet-full: calc(100dvh - var(--chrome-top) - var(--tabbar-space));
 }
 :root[data-journey="open"] {
   --tabbar-space: 0px;
+}
+/* Short phones: a little more sheet at "half", so the decision (Go with Mira) is on the first screen. */
+@media (max-height: 760px) {
+  :root {
+    --sheet-half: 64dvh;
+  }
 }
 :root[data-journey="open"] .mira-tabbar {
   display: none;

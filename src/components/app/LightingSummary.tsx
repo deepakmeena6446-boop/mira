@@ -100,9 +100,12 @@ export function LightingSummary({ lighting, compact = false }: { lighting: Route
   const parts = lightingParts(lighting);
   return (
     <section className={compact ? "" : "mt-5"} aria-label="Street lighting on this route">
-      <h3 className="text-[13px] font-medium text-ink-subtle">Lighting on the way</h3>
+      <h3 className="text-[13px] font-medium text-ink-subtle">
+        Lighting on the way{known === 0 && compact ? <span className="text-ink-muted"> · not mapped for these streets yet</span> : null}
+      </h3>
       {known === 0 ? (
-        <p className="mt-2 text-sm text-ink-muted">Not known for these streets yet. After a walk at night, you can tell Mira if it was lit — it helps the next person.</p>
+        // Compact (route sheet): the why lives in "Sources and freshness" right below, so it isn't said twice.
+        compact ? null : <p className="mt-2 text-sm text-ink-muted">Not known for these streets yet. After a walk at night, you can tell Mira if it was lit — it helps the next person.</p>
       ) : (
         <>
           <div className="mt-2 flex h-3 overflow-hidden rounded-full bg-sunken" role="img" aria-label={parts.map((p) => `${p.label} ${p.pct}%`).join(", ")}>

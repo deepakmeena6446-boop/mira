@@ -33,13 +33,13 @@ export function RouteOptions({ options, selected, onSelect }: { options: RouteOp
           <label
             key={i}
             className={cx(
-              "flex cursor-pointer items-start gap-3 rounded-2xl border-2 bg-surface px-4 py-3 shadow-[var(--shadow-card)]",
-              i === selected ? "border-accent" : "border-transparent",
+              "flex cursor-pointer items-start gap-3 rounded-[var(--radius-card)] border bg-surface px-4 py-3",
+              i === selected ? "border-accent ring-1 ring-accent" : "border-line",
             )}
           >
             <input type="radio" name="route-option" className="mt-1.5 size-4 accent-[var(--color-accent)]" checked={i === selected} onChange={() => onSelect(i)} />
             <span className="min-w-0 flex-1">
-              <span className="block font-bold">
+              <span className="block font-semibold">
                 {o.route.minutes} min · {formatDistance(o.route.meters, units)}
                 {i === 0 ? <span className="ml-2 rounded-full bg-sunken px-2 py-0.5 text-xs font-semibold text-ink-muted">Fastest</span> : null}
               </span>

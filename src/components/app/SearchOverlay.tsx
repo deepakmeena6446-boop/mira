@@ -6,7 +6,7 @@ import { useOverlay } from "@/lib/use-overlay";
 import { Icon } from "@/components/ui/Icon";
 import { api } from "@/lib/api-client";
 import type { SavedPlace } from "@/server/account/places";
-import { kindEmoji } from "./kinds";
+import { kindIcon } from "./kinds";
 import { distanceUnits, formatDistance } from "@/domain/travel-mode";
 import { useCountry } from "@/lib/locale-store";
 
@@ -92,7 +92,7 @@ export function SearchOverlay({
   return createPortal(
     <div role="dialog" aria-modal="true" aria-label="Where to?" className="bg-companion fixed inset-0 z-50 flex flex-col animate-fade">
       <div className="flex items-center gap-2 px-4 pt-[max(1rem,env(safe-area-inset-top))]">
-        <button type="button" onClick={onClose} aria-label="Close search" className="grid size-12 shrink-0 place-items-center rounded-full bg-surface shadow-[var(--shadow-card)]">
+        <button type="button" onClick={onClose} aria-label="Close search" className="grid size-12 shrink-0 place-items-center rounded-full border border-line bg-surface">
           <Icon name="back" />
         </button>
         <form
@@ -103,8 +103,8 @@ export function SearchOverlay({
           }}
           className="flex min-h-12 flex-1"
         >
-          <label className="flex min-h-12 flex-1 items-center gap-2 rounded-full bg-surface px-4 shadow-[var(--shadow-card)] focus-within:ring-2 focus-within:ring-accent">
-            <Icon name="know" className="size-5 text-ink-subtle" />
+          <label className="flex min-h-12 flex-1 items-center gap-2 rounded-[var(--radius-control)] border border-line-strong bg-surface px-4 focus-within:ring-2 focus-within:ring-accent">
+            <Icon name="search" className="size-5 text-ink-subtle" />
             <span className="sr-only">Search for a place</span>
             <input autoFocus type="search" enterKeyHint="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} className="h-12 w-full bg-transparent text-lg outline-none" autoComplete="off" />
           </label>
@@ -118,9 +118,9 @@ export function SearchOverlay({
               {savedHits.map((s) => (
                 <li key={s.id} className="border-b border-line last:border-0">
                   <button type="button" onClick={() => onPick({ name: s.label, lat: s.lat, lon: s.lon })} className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left hover:bg-sunken">
-                    <span className="grid size-10 place-items-center rounded-2xl bg-accent-soft text-xl">{s.emoji}</span>
+                    <span aria-hidden className="grid size-10 place-items-center rounded-[var(--radius-control)] bg-sunken text-lg">{s.emoji}</span>
                     <span className="min-w-0">
-                      <span className="block font-bold">{s.label}</span>
+                      <span className="block font-semibold">{s.label}</span>
                       {s.address ? <span className="block truncate text-sm text-ink-muted">{s.address}</span> : null}
                     </span>
                   </button>
@@ -138,9 +138,9 @@ export function SearchOverlay({
                 {hits.map((h) => (
                   <li key={h.id} className="border-b border-line last:border-0">
                     <button type="button" onClick={() => onPick({ name: h.name, lat: h.lat, lon: h.lon, kind: h.kind })} className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left hover:bg-sunken">
-                      <span className="grid size-10 place-items-center rounded-2xl bg-sunken text-xl">{kindEmoji(h.kind)}</span>
+                      <span aria-hidden className="grid size-10 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink-muted"><Icon name={kindIcon(h.kind)} className="size-5" /></span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-bold text-mixed">{h.name}</span>
+                        <span className="block truncate font-semibold text-mixed">{h.name}</span>
                         <span className="block text-sm text-ink-muted">{h.kind}</span>
                       </span>
                       <span className="text-sm text-ink-subtle">{h.distanceM === undefined ? "" : formatDistance(h.distanceM, units)}</span>
@@ -166,9 +166,9 @@ export function SearchOverlay({
           <button
             type="button"
             onClick={onDropPin}
-            className="mt-4 flex min-h-14 w-full items-center gap-3 rounded-[var(--radius-card)] bg-surface px-4 py-3 text-left font-bold shadow-[var(--shadow-card)] hover:bg-sunken"
+            className="mt-4 flex min-h-14 w-full items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 text-left font-semibold hover:bg-sunken"
           >
-            <span className="grid size-10 place-items-center rounded-2xl bg-peach-soft text-xl">📍</span>
+            <span aria-hidden className="grid size-10 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink"><Icon name="pin" className="size-5" /></span>
             Choose a spot on the map
           </button>
         ) : null}

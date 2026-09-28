@@ -30,7 +30,7 @@ export function ImpactRow({ impact: initial }: { impact?: ImpactView | null }) {
       <span className="flex-1">
         <span className="flex items-center gap-2 font-semibold">
           Your impact
-          {impact?.steward.steward ? <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-bold text-accent">Local Steward</span> : null}
+          {impact?.steward.steward ? <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent-strong">Mira Scout</span> : null}
         </span>
         <span className="block text-sm text-ink-muted">{sub}</span>
       </span>

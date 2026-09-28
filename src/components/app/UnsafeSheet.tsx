@@ -140,7 +140,7 @@ export function UnsafeSheet({
                   {HELP_CLASSES[first.cls].label} · about {first.minutes} min walk{aheadNote(first)} · {hoursLine(first)}
                 </span>
               </span>
-              <span className="shrink-0 text-sm font-bold text-accent">{goLabel}</span>
+              <span className="shrink-0 text-sm font-semibold text-accent-strong">{goLabel}</span>
             </button>
           ) : (
             <p className="rounded-[var(--radius-card)] bg-sunken p-4 text-sm text-ink-muted">
@@ -231,10 +231,10 @@ export function UnsafeSheet({
 
         {/* 4. Quiet options */}
         <div className="mt-4 flex items-center justify-between gap-2 text-sm">
-          <Link href="/mira" className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 font-bold text-accent hover:bg-accent-soft">
+          <Link href="/mira" className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 font-semibold text-accent hover:bg-accent-soft">
             <Icon name="sparkle" className="size-4" /> Talk to Mira
           </Link>
-          <button type="button" onClick={onClose} className="min-h-11 rounded-full px-3 font-bold text-ink-muted hover:bg-sunken">
+          <button type="button" onClick={onClose} className="min-h-11 rounded-full px-3 font-semibold text-ink-muted hover:bg-sunken">
             I&apos;m okay now
           </button>
         </div>
@@ -322,7 +322,7 @@ function TellMyPeople({ tell }: { tell: UnsafeTellAction }) {
       <div role="status" className="mt-3 rounded-[var(--radius-card)] bg-mint-soft p-4 text-sm">
         {state.whatsapp.length ? (
           <>
-            <p className="font-bold">Ask them on WhatsApp — tap, then press Send:</p>
+            <p className="font-semibold">Ask them on WhatsApp — tap, then press Send:</p>
             <ul className="mt-2 grid gap-2">
               {state.whatsapp.map((w) => (
                 <li key={w.url}>
@@ -388,7 +388,7 @@ function LocationInWords({ me, area, landmark }: { me: { lat: number; lon: numbe
             setCopied(false);
           }
         }}
-        className="mt-1 min-h-11 font-bold text-accent"
+        className="mt-1 min-h-11 font-semibold text-accent-strong"
       >
         {copied ? "Copied" : "Copy to read out or send"}
       </button>

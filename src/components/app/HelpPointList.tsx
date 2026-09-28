@@ -5,6 +5,7 @@ import type { EvidenceState } from "@/domain/evidence-state";
 import { HELP_CLASSES, SOURCE_NAME, hoursLine, hoursState, isNight, minutesIn, type HelpPoint } from "@/domain/help-points";
 import { localTime } from "@/domain/opening-hours";
 import { Icon } from "@/components/ui/Icon";
+import { HELP_ICON } from "./kinds";
 import type { RouteOption } from "./RouteOptions";
 import { lightingEvidenceLine, lightingWhy } from "./LightingSummary";
 import { ContextRow } from "./ContextRow";
@@ -44,9 +45,9 @@ export function HelpPointList({ points, evidence, onPick, defaultOpen = false }:
         <p className="mt-2 text-sm text-ink-muted">{helpPointsLine(points, evidence)}. Other places may exist.</p>
       ) : (
         <>
-          <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="mt-2 flex min-h-12 w-full items-center gap-3 rounded-2xl bg-surface px-4 py-2.5 text-left shadow-[var(--shadow-card)]">
-            <span aria-hidden className="text-xl">
-              {HELP_CLASSES[nearest.cls].emoji}
+          <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="mt-2 flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5 text-left">
+            <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink">
+              <Icon name={HELP_ICON[nearest.cls] ?? "pin"} className="size-[18px]" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block font-semibold">{helpPointsLine(points, evidence)}</span>
@@ -57,12 +58,12 @@ export function HelpPointList({ points, evidence, onPick, defaultOpen = false }:
             <Icon name="chevron" className={open ? "size-4 rotate-90 transition-transform" : "size-4 transition-transform"} />
           </button>
           {open ? (
-            <ul className="mt-2 divide-y divide-line overflow-hidden rounded-2xl bg-surface shadow-[var(--shadow-card)]">
+            <ul className="mt-2 divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
               {points.map((p) => (
                 <li key={p.id}>
                   <button type="button" disabled={!onPick} onClick={() => onPick?.(p)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left enabled:hover:bg-sunken">
-                    <span aria-hidden className="text-xl">
-                      {HELP_CLASSES[p.cls].emoji}
+                    <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink">
+                      <Icon name={HELP_ICON[p.cls] ?? "pin"} className="size-[18px]" />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold">{p.name}</span>

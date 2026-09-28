@@ -15,7 +15,7 @@ export function TripsSignedOut() {
       <Button className="mt-5" variant="hero" size="lg" onClick={() => setOpen(true)}>
         Sign in
       </Button>
-      <Link href="/" className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-bold text-accent">
+      <Link href="/" className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-accent-strong">
         Where are you going? <Icon name="arrow" className="size-4" />
       </Link>
       <SignInSheet open={open} onClose={() => setOpen(false)} reason="Sign in to start with Mira" />

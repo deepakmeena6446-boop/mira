@@ -50,7 +50,7 @@ export function InboxScreen({ signedIn, initial }: { signedIn: boolean; initial:
         ) : initial.length === 0 ? (
           <div className="mt-16 flex flex-col items-center text-center animate-rise">
             <MiraOrb size={64} calm />
-            <p className="mt-4 text-lg font-bold">All quiet</p>
+            <p className="mt-4 text-lg font-semibold">All quiet</p>
             <p className="mt-1 max-w-xs text-ink-muted">I&apos;ll let you know here when a contact accepts, or if something needs your attention on a trip.</p>
           </div>
         ) : (
@@ -63,7 +63,7 @@ export function InboxScreen({ signedIn, initial }: { signedIn: boolean; initial:
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="flex items-baseline justify-between gap-2">
-                      <span className="font-bold leading-snug">{n.title}</span>
+                      <span className="font-semibold leading-snug">{n.title}</span>
                       <span className="shrink-0 text-xs text-ink-subtle">{now ? ago(n.created_at, now) : ""}</span>
                     </p>
                     <p className="text-sm text-ink-muted text-mixed">{n.body}</p>

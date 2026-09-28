@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { WorldMap } from "@/components/map/WorldMap";
-import { MiraOrb } from "@/components/app/MiraOrb";
+import { MiraPulse } from "@/components/app/MiraPulse";
 import { Avatar } from "@/components/app/Avatar";
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
@@ -78,16 +78,16 @@ export function SharedTripView({ token, initial, tiles }: { token: string; initi
   if (!open) {
     return (
       <main className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 text-center">
-        <MiraOrb size={72} />
-        <h1 className="mt-5 text-2xl font-semibold">{gone ? "This trip link has ended" : trip.state === "arrived" ? `${trip.name} arrived 🎉` : `${trip.name}'s trip has ended`}</h1>
+        <span aria-hidden className={`grid size-14 place-items-center rounded-full ${trip.state === "arrived" ? "bg-accent-soft text-accent" : "bg-sunken text-ink-muted"}`}><Icon name={trip.state === "arrived" ? "check" : "route"} className="size-7" /></span>
+        <h1 className="mt-5 text-2xl font-semibold">{gone ? "This trip link has ended" : trip.state === "arrived" ? `${trip.name} arrived.` : `${trip.name}'s trip has ended`}</h1>
         <p className="mt-2 max-w-sm text-ink-muted">
 Live sharing is off. Mira doesn&apos;t keep a record of the trip.
         </p>
         {/* The viewer → user loop: one quiet card, no referral ids, no tracking parameters. */}
-        <div className="mt-8 w-full max-w-sm rounded-[var(--radius-card)] bg-surface p-5 text-left shadow-[var(--shadow-card)]">
-          <p className="font-bold">Want Mira with you on your journeys?</p>
+        <div className="mt-8 w-full max-w-sm rounded-[var(--radius-card)] border border-line bg-surface p-5 text-left">
+          <p className="font-semibold">Want Mira with you on your journeys?</p>
           <p className="mt-1 text-sm text-ink-muted">See what&apos;s known about the way before you go, share your journey in one tap, and it ends by itself when you arrive. No account needed to follow someone.</p>
-          <Link href="/" className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-accent-soft px-4 text-sm font-bold text-accent-strong">
+          <Link href="/" className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-accent-soft px-4 text-sm font-semibold text-accent-strong">
             Try Mira <Icon name="arrow" className="size-4" />
           </Link>
         </div>
@@ -103,7 +103,7 @@ Live sharing is off. Mira doesn&apos;t keep a record of the trip.
   return (
     <main className="fixed inset-0">
       <WorldMap tiles={tiles} me={me} dest={trip.dest ?? null} follow label={`Live location of ${trip.name}`} padding={{ top: 80, bottom: 320, left: 40, right: 40 }} />
-      <section className="glass absolute inset-x-0 bottom-0 z-20 mx-auto max-w-xl rounded-t-[var(--radius-lg)] border border-glass-edge p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)]">
+      <section className="absolute inset-x-0 bottom-0 z-20 mx-auto max-w-xl rounded-t-[var(--radius-lg)] border border-b-0 border-line bg-surface p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-sheet)]">
         <p className={cx("inline-flex items-center gap-2 rounded-full px-3 py-1 text-[13px] font-semibold", checkOn ? "bg-warm-soft text-warm" : "bg-accent-soft text-accent-strong")}>
           {checkOn ? "Check on them" : here ? "Sharing where they are" : "On the way"}
         </p>
@@ -119,27 +119,30 @@ Live sharing is off. Mira doesn&apos;t keep a record of the trip.
           </div>
         </div>
         {polledFailed ? (
-          <p role="status" className="mt-4 rounded-2xl bg-sunken px-4 py-3 text-sm text-ink-muted">
-            <span className="font-bold text-ink">Can&apos;t refresh right now.</span> Check your connection — this shows the last update I received.
+          <p role="status" className="mt-4 rounded-[var(--radius-card)] bg-sunken px-4 py-3 text-sm text-ink-muted">
+            <span className="font-semibold text-ink">Can&apos;t refresh right now.</span> Check your connection — this shows the last update I received.
           </p>
         ) : null}
         {trip.checkRequested ? (
-          <p role="alert" className="mt-4 rounded-2xl bg-warm-soft px-4 py-3 font-semibold text-warm">
+          <p role="alert" className="mt-4 rounded-[var(--radius-card)] bg-warm-soft px-4 py-3 font-semibold text-warm">
             {trip.name} asked you to check on them. The best next step is usually to call or message them. Mira isn&apos;t an emergency service; if you think they&apos;re in danger, call your local emergency number.
           </p>
         ) : null}
         {trip.state === "missed" ? (
-          <p role="alert" className="mt-4 rounded-2xl bg-warm-soft px-4 py-3 font-semibold text-warm">
+          <p role="alert" className="mt-4 rounded-[var(--radius-card)] bg-warm-soft px-4 py-3 font-semibold text-warm">
             {trip.name} hasn&apos;t checked in yet. They may just have forgotten — try calling them. Mira isn&apos;t an emergency service; if you think they&apos;re in danger, call your local emergency number.
           </p>
         ) : age !== null && age > 180 ? (
-          <p className="mt-4 rounded-2xl bg-sunken px-4 py-3 text-sm text-ink-muted">
-            <span className="font-bold text-ink">Location paused.</span> This is their last shared spot, from {ago(age)} — often it just means the phone screen is off.
+          <p className="mt-4 rounded-[var(--radius-card)] bg-sunken px-4 py-3 text-sm text-ink-muted">
+            <span className="font-semibold text-ink">Location paused.</span> This is their last shared spot, from {ago(age)} — often it just means the phone screen is off.
             {trip.alertsViewer ? ` Mira may attempt an email if ${trip.name} misses check-in; sending can fail.` : ""}
           </p>
         ) : null}
+        {checkOn ? null : (
+          <p className="mt-4 text-sm text-ink-muted">If you&apos;re worried, call {trip.name} first. In an emergency, call your local emergency number.</p>
+        )}
         <p className="mt-4 flex items-center gap-2 text-xs text-ink-subtle">
-          <MiraOrb size={18} calm /> Shared privately with you on Mira. Only their latest spot is shown, and this link stops working shortly after the trip ends.
+          <MiraPulse size={12} /> Shared privately with you on Mira. Only their latest spot is shown, and this link stops working shortly after the trip ends.
         </p>
       </section>
     </main>

@@ -1,5 +1,6 @@
 "use client";
 
+import { recordUsage } from "@/lib/usage-signal";
 import { useState } from "react";
 import { api } from "@/lib/api-client";
 import { useCountry } from "@/lib/locale-store";
@@ -34,6 +35,7 @@ export function CheckCard({ check, onDone }: { check: Pick<CheckView, "id" | "qu
     setState("sending");
     const r = await api<{ recorded: boolean; outcome: ContributionOutcome }>(`/api/contribute/check/${check.id}`, { body: { answer, country: country.iso } });
     if (r.ok) {
+      if (answer !== "skip" && r.data.recorded) recordUsage("check");
       setDone(outcomeMessage(r.data.outcome, r.data.recorded));
       onDone?.(r.data.outcome);
     } else if (r.status === 404 || r.status === 409) {
@@ -50,10 +52,10 @@ export function CheckCard({ check, onDone }: { check: Pick<CheckView, "id" | "qu
   }
   return (
     <div className="rounded-[var(--radius-card)] bg-surface p-5 text-left shadow-[var(--shadow-card)] animate-rise">
-      <p className="font-bold">{check.question}</p>
+      <p className="font-semibold">{check.question}</p>
       <div className="mt-3 grid grid-cols-3 gap-2">
         {check.options.map((o) => (
-          <button key={o.value} type="button" disabled={state === "sending"} onClick={() => send(o.value)} className="min-h-12 rounded-2xl bg-sunken px-2 text-sm font-bold disabled:opacity-60">
+          <button key={o.value} type="button" disabled={state === "sending"} onClick={() => send(o.value)} className="min-h-12 rounded-[var(--radius-button)] border border-line-strong bg-surface px-2 text-sm font-semibold hover:bg-sunken disabled:opacity-60">
             {o.label}
           </button>
         ))}
@@ -62,7 +64,7 @@ export function CheckCard({ check, onDone }: { check: Pick<CheckView, "id" | "qu
         <p className="text-xs text-ink-subtle">
           {state === "failed" ? "Couldn't send that. Check your connection and try again." : "About the place, not about you. Your answer is stored without your name."}
         </p>
-        <button type="button" disabled={state === "sending"} onClick={() => send("skip")} className="min-h-11 shrink-0 rounded-full px-3 text-xs font-bold text-ink-muted hover:bg-sunken">
+        <button type="button" disabled={state === "sending"} onClick={() => send("skip")} className="min-h-11 shrink-0 rounded-full px-3 text-xs font-semibold text-ink-muted hover:bg-sunken">
           Skip
         </button>
       </div>

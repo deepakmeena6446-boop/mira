@@ -17,7 +17,7 @@ export function EmailSignIn({ label = "Already have an account? Sign in with ema
   const [message, setMessage] = useState("");
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="mt-3 min-h-11 text-sm font-bold text-accent">
+      <button type="button" onClick={() => setOpen(true)} className="mt-3 min-h-11 text-sm font-semibold text-accent-strong">
         {label}
       </button>
     );
@@ -46,7 +46,7 @@ export function EmailSignIn({ label = "Already have an account? Sign in with ema
         }
       }}
     >
-      <label htmlFor="signin-email" className="block text-sm font-bold">
+      <label htmlFor="signin-email" className="block text-sm font-semibold">
         Your email
       </label>
       <p className="text-xs text-ink-subtle">For an account that already uses this email.</p>

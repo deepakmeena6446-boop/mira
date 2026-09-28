@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function NotFound() {
   return (
     <main id="main" className="mx-auto max-w-5xl px-4 py-10" aria-labelledby="nf-title">
-      <h1 id="nf-title" className="text-2xl font-bold">
+      <h1 id="nf-title" className="text-2xl font-semibold">
         Page not found
       </h1>
       <p className="mt-2 text-ink-muted">This page doesn&apos;t exist or is no longer available.</p>

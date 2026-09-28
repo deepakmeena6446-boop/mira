@@ -31,7 +31,7 @@ export function AppearancePicker() {
             role="radio"
             aria-checked={pref === o.value}
             onClick={() => setThemePref(o.value)}
-            className={cx("min-h-11 rounded-xl text-sm font-bold transition-colors", pref === o.value ? "bg-surface text-ink shadow-[var(--shadow-card)]" : "text-ink-muted")}
+            className={cx("min-h-11 rounded-xl text-sm font-semibold transition-colors", pref === o.value ? "bg-surface text-ink shadow-[var(--shadow-card)]" : "text-ink-muted")}
           >
             <span aria-hidden>{o.emoji}</span> {o.label}
           </button>

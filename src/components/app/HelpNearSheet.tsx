@@ -80,7 +80,7 @@ export function HelpNearSheet({
         ) : loading ? (
           <p className="mt-3 text-sm text-ink-muted">Finding Help Points near you…</p>
         ) : failed || evidence?.state === "failed" ? (
-          <div role="status" className="mt-3 text-sm text-ink-muted"><p>Mira couldn&apos;t check Help Points right now.</p>{onRetry ? <button type="button" onClick={onRetry} className="mt-2 min-h-11 font-bold text-accent">Retry</button> : null}</div>
+          <div role="status" className="mt-3 text-sm text-ink-muted"><p>Mira couldn&apos;t check Help Points right now.</p>{onRetry ? <button type="button" onClick={onRetry} className="mt-2 min-h-11 font-semibold text-accent-strong">Retry</button> : null}</div>
         ) : !ranked.length ? (
           <p className="mt-3 text-sm text-ink-muted">No mapped Help Points were found from the sources checked. Other places may exist.</p>
         ) : (
@@ -119,7 +119,7 @@ export function HelpNearSheet({
               ))}
             </ul>
             {!all && filtered.length > FIRST ? (
-              <button type="button" onClick={() => setAll(true)} className="mt-1 min-h-11 text-sm font-bold text-accent">
+              <button type="button" onClick={() => setAll(true)} className="mt-1 min-h-11 text-sm font-semibold text-accent-strong">
                 Show {filtered.length - FIRST} more
               </button>
             ) : null}

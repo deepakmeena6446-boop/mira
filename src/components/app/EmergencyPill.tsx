@@ -19,7 +19,7 @@ export function EmergencyPill({ className, variant = "pill" }: { className?: str
   const styles = {
     pill: "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-sm font-semibold text-ink shadow-[var(--shadow-float)]",
     block: "flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-button)] bg-ink px-3 text-[0.95rem] font-semibold text-canvas",
-    link: "font-bold text-ink underline",
+    link: "font-semibold text-ink underline",
   }[variant];
   const icon = variant === "link" ? null : <Icon name="phone" className={variant === "block" ? "size-5" : "size-4"} />;
 
@@ -46,12 +46,12 @@ function EmergencyOptionsSheet({ open, onClose, country, actions }: { open: bool
         {actions.length ? <>
           <p className="mt-2 text-sm text-ink-muted">Choose the service you need. Mira opens your phone&apos;s dialler; it does not make the call.</p>
           <ul className="mt-4 space-y-2">{actions.map((n) => <li key={n.number}>
-            <a href={`tel:${n.number}`} className="flex min-h-14 items-center justify-between gap-3 rounded-2xl bg-ink px-4 font-bold text-canvas"><span>{n.label}</span><span>{n.number}</span></a>
+            <a href={`tel:${n.number}`} className="flex min-h-14 items-center justify-between gap-3 rounded-2xl bg-ink px-4 font-semibold text-canvas"><span>{n.label}</span><span>{n.number}</span></a>
             {n.qualification ? <p className="mt-1 text-xs text-ink-muted">{n.qualification}</p> : null}
           </li>)}</ul>
           {note ? <p className="mt-3 text-xs text-ink-muted">{note}</p> : null}
         </> : <p className="mt-2 text-sm text-ink-muted">{noNumberReason(country)} If you know the local number, use your phone&apos;s dialler.</p>}
-        <button type="button" onClick={onClose} className="mt-3 min-h-11 w-full rounded-full font-bold text-ink-muted hover:bg-sunken">Close</button>
+        <button type="button" onClick={onClose} className="mt-3 min-h-11 w-full rounded-full font-semibold text-ink-muted hover:bg-sunken">Close</button>
       </div>
     </div>, document.body,
   );
