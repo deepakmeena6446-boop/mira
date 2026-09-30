@@ -12,6 +12,7 @@ import { useDaypart } from "@/lib/daypart-store";
 import type { Daypart } from "@/domain/daypart";
 import { Icon } from "@/components/ui/Icon";
 import { EmergencyPill } from "@/components/app/EmergencyPill";
+import { SafetyAccess } from "@/components/app/SafetyAccess";
 import { useToast } from "@/components/ui/Toast";
 import { cx } from "@/components/ui/cx";
 import { api } from "@/lib/api-client";
@@ -37,10 +38,10 @@ const CONTRIBUTOR_EXAMPLES = ["Report a broken streetlight", "What's open nearby
 const NIGHT_EXAMPLES = ["Take me home", "I feel uneasy", "Find somewhere staffed nearby", "What's open nearby?", "I'm landing in London at 11 PM"];
 
 const INTRO: Record<Daypart, (name: string) => string> = {
-  dawn: (n) => `Morning${n}! Early start? I can share your journey with people you trust, find Help Points and what's open, and tell you what Mira knows about where you are.`,
-  day: (n) => `Hi${n}, I'm Mira. I can share your journey with people you trust, find Help Points and what's open nearby, and tell you what Mira knows — and doesn't — about where you are.`,
-  evening: (n) => `Good evening${n}. Heading somewhere? I can share your journey with people you trust, or find Help Points and what's open nearby.`,
-  night: (n) => `Hey${n}, it's late. Want me to share your journey home with someone you trust? I can also find Help Points and what's still open near you.`,
+  dawn: (n) => `Morning${n}. Ask about a place, a journey, or help nearby.`,
+  day: (n) => `Hi${n}, I'm Mira. Ask me about a place, your journey, or what we know nearby.`,
+  evening: (n) => `Evening${n}. Going somewhere? I can help you check the way or share your journey.`,
+  night: (n) => `Hey${n}. I can help you get home, find a Help Point, or check what's open.`,
 };
 const MODE_LABEL = { walk: "Walk", ride: "Ride (taxi / app cab)", transit: "Public transport" } as const;
 const fmtM = (m?: number) => (m === undefined ? "" : m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`);
@@ -80,7 +81,7 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
   const router = useRouter();
   const goTo = (d: { name: string; lat: number; lon: number; kind?: string }) => {
     setPendingDestination(d);
-    router.push("/");
+    router.push("/around/map");
   };
   switch (card.type) {
     case "trip": {
@@ -98,7 +99,7 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
           ) : (
             // Home plans rides and public transport, and asks her for the ETA.
             <Button className="mt-3" variant="primary" onClick={() => goTo(card.destination)}>
-              <Icon name="share" className="size-4" /> Plan it on Home
+              <Icon name="share" className="size-4" /> View route in Around
             </Button>
           )}
         </div>
@@ -168,7 +169,7 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
           <EmergencyPill variant="block" className="w-full" />
           <p className="mt-1 text-center text-xs text-ink-subtle">Opens your phone&apos;s dialler. Mira doesn&apos;t call anyone for you.</p>
           <p className="mt-2 text-center text-sm text-ink-muted">
-            {card.contacts.length ? `You can also share your journey so ${card.contacts.join(", ")} can see where you are.` : "Add people you trust in Circle (under Me) so they can follow your journeys."}
+            {card.contacts.length ? `You can also share your journey so ${card.contacts.join(", ")} can see where you are.` : "Add people you trust in Circle (under You) so they can follow your journeys."}
           </p>
         </div>
       );
@@ -213,12 +214,12 @@ function SignedOutIntro({ onSignIn }: { onSignIn: () => void }) {
       <Button className="mt-4 w-full" variant="primary" onClick={onSignIn}>
         Sign in to talk to Mira
       </Button>
-      <p className="mt-3 text-center text-xs text-ink-subtle">Emergency and &ldquo;I feel unsafe&rdquo; are on Home and never wait for Mira.</p>
+      <p className="mt-3 text-center text-xs text-ink-subtle">Emergency and &ldquo;I feel unsafe&rdquo; are above and never wait for Mira.</p>
     </div>
   );
 }
 
-export function MiraChat({ user }: { user: { name: string; avatarUrl: string | null } | null }) {
+export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUrl: string | null } | null; emailAlerts: boolean }) {
   const router = useRouter();
   const toast = useToast();
   const loc = useLocation(true);
@@ -324,9 +325,10 @@ export function MiraChat({ user }: { user: { name: string; avatarUrl: string | n
         <MiraPulse size={20} state={sending ? "thinking" : "observing"} />
         <div>
           <h1 className="text-xl font-semibold leading-tight">Mira</h1>
-          <p className="text-sm text-ink-muted">Ask about places, your journey, or what Mira knows here.</p>
+          <p className="text-sm text-ink-muted">Places, journeys, and local context</p>
         </div>
       </header>
+      <SafetyAccess emailAlerts={emailAlerts} className="z-10 border-b border-line bg-canvas px-4 py-1" />
 
       {/* The log isn't live (it would re-read every streamed word); each finished reply is announced once below. */}
       <p className="sr-only" aria-live="polite">

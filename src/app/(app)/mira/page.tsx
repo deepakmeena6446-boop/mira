@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { getUser } from "@/server/session/user";
 import { MiraChat } from "./MiraChat";
+import { smtpConfigured } from "@/server/config/env";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Ask Mira" };
 
 export default async function MiraPage() {
   const user = await getUser();
-  return <MiraChat user={user ? { name: user.name, avatarUrl: user.avatarUrl } : null} />;
+  return <MiraChat user={user ? { name: user.name, avatarUrl: user.avatarUrl } : null} emailAlerts={smtpConfigured()} />;
 }

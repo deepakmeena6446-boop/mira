@@ -130,7 +130,7 @@ describe("Mira: global context, budget and caps", () => {
       expect(tools.coverage()).toMatch(/Safety updates: recent news reports/);
       expect(await tools.safetyUpdates("destination")).toEqual({ status: "no_place", reason: expect.stringMatching(/No journey is running/) });
       const text = (await streamed("any recent safety updates here?")).filter((e) => e.type === "text").map((e) => e.delta).join("");
-      expect(text).toMatch(/Safety updates section on Home/);
+      expect(text).toMatch(/on Today/);
     } finally {
       process.env.SAFETY_UPDATES = "off";
       resetEnvCache();

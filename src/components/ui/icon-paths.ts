@@ -12,7 +12,9 @@ export const ICONS: Record<string, El[]> = {
   report: [["path", "M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4z"], ["path", "M8 8h8M8 12h5"]],
   pin: [["path", "M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"], ["circle", 12, 9, 2.5]],
   arrow: [["path", "M5 12h14M13 6l6 6-6 6"]],
-  contribute: [["path", "M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"], ["path", "m13.5 6.5 4 4"]],
+  // Shared local knowledge: three distinct voices converging on one useful signal.
+  community: [["circle", 5, 9, 2], ["circle", 19, 9, 2], ["circle", 12, 5, 2], ["path", "M2.5 18c.2-3 1.8-4.5 4-4.5M21.5 18c-.2-3-1.8-4.5-4-4.5M6.5 20c.3-4 2.2-6 5.5-6s5.2 2 5.5 6"]],
+  contribute: [["circle", 5, 9, 2], ["circle", 19, 9, 2], ["circle", 12, 5, 2], ["path", "M2.5 18c.2-3 1.8-4.5 4-4.5M21.5 18c-.2-3-1.8-4.5-4-4.5M6.5 20c.3-4 2.2-6 5.5-6s5.2 2 5.5 6"]],
   info: [["circle", 12, 12, 9], ["path", "M12 11v5M12 8h.01"]],
   check: [["path", "m5 12.5 4.5 4.5L19 7.5"]],
   "check-circle": [["circle", 12, 12, 9], ["path", "m8 12.5 3 3 5-6"]],

@@ -78,7 +78,7 @@ function NoActive() {
     <div className="rounded-[var(--radius-card)] border border-line bg-surface p-5">
       <p className="font-semibold">No journey right now</p>
       <p className="mt-1 text-sm text-ink-muted">When you go with Mira, your journey shows here until a day after you arrive.</p>
-      <ButtonLink href="/" variant="primary" className="mt-4">
+      <ButtonLink href="/around" variant="primary" className="mt-4">
         Where are you going?
       </ButtonLink>
     </div>

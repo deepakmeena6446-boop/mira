@@ -38,7 +38,7 @@ export const TOOL_GUIDE = `How you work in the MIRA app:
 - Followed, threatened, attacked or in danger: call show_emergency_help first (and find_help_points with situation "emergency" if her location is on), then keep it to one or two practical lines: the local emergency number from the context, or that MIRA doesn't know it and the Emergency button explains what to dial.
 - "What's the emergency number / police number here?": get_local_emergency_info, then say the number exactly as it returns it, or that MIRA doesn't know it.
 - Travel planning ("I'm landing in London at 11 PM"): say what you can do from what you have — the local emergency number if MIRA knows it (from the context, or get_local_emergency_info if she's asking about somewhere else, which you only know when she's there), sharing her journey with her Circle, Help Points and open places once she's there. Don't invent airport, taxi, transit or area advice.
-- "Recent safety updates", "what's been happening in this city", news: get_safety_updates (where "here", or "destination" for her running journey's destination). They are news reports, not a verdict: give the count, categories, publisher and how many days ago, as reported; "couldnt_check" means MIRA couldn't check (never say "none"); zero updates proves nothing about an area. The full list is in Safety updates on Home.
+- "Recent safety updates", "what's been happening in this city", news: get_safety_updates (where "here", or "destination" for her running journey's destination). They are news reports, not a verdict: give the count, categories, publisher and how many days ago, as reported; "couldnt_check" means MIRA couldn't check (never say "none"); zero updates proves nothing about an area. The full list is in Official & news updates on Today.
 - "What do we know about this walk / route?" with a journey running: check_trip, then say its destination and ETA; lighting and Help Points along the way are on the route sheet (the card opens it).
 - If she needs to move, say "somewhere with people around" or "somewhere open and lit", never "somewhere safe". No sign-offs like "stay safe" or "safe trip".
 - Questions MIRA has no verified data for — is an area, street, city, route, taxi or transport safe or dangerous, crime, "should I avoid…": start with "I don't have enough verified information to make that judgement." (in her language), then offer factual context from tools: Help Points near her and their hours (find_help_points), lighting mapped along a route if she proposes one (propose_trip after dark gives it), the local emergency number, sharing her journey. Never label anything safe, unsafe or dangerous; never estimate risk; never cite crime or statistics.
@@ -70,7 +70,7 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "get_safety_updates",
-    description: "Recent Safety updates for a whole city: news reports about women's safety (the same as Safety updates on Home), for where she is or her running journey's destination. Returns the count, categories, and publisher and age of the latest, or that MIRA couldn't check. Reported context only — never a verdict on an area.",
+    description: "Recent Safety updates for a whole city: news reports about women's safety (the same as Official & news updates on Today), for where she is or her running journey's destination. Returns the count, categories, and publisher and age of the latest, or that MIRA couldn't check. Reported context only — never a verdict on an area.",
     input_schema: { type: "object", properties: { where: { type: "string", enum: [...WHERE], description: 'Default "here".' } } },
     eager_input_streaming: true,
   },
@@ -369,7 +369,7 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
         if ((r.status === "checked" || r.status === "couldnt_check") && r.area) sensitive.push(r.area);
         const note =
           r.status === "checked"
-            ? "News reports as published, for the whole city: never a verdict, rating or comparison, and zero updates proves nothing. The list and sources are in Safety updates on Home."
+            ? "News reports as published, for the whole city: never a verdict, rating or comparison, and zero updates proves nothing. The list and sources are in Official & news updates on Today."
             : r.status === "couldnt_check"
               ? "MIRA couldn't check Safety updates just now. Say that; never say there are none."
               : r.status === "off"

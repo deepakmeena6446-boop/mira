@@ -5,6 +5,7 @@ test.describe("Mobile extras — long-press report, inbox, time of day, installa
   test("press and hold the map to report that exact spot", async ({ browser }, info) => {
     test.skip(info.project.name !== "mobile", "touch gesture");
     const { ctx, page } = await newUser(browser, "Pooja");
+    await page.goto("/around/map");
     await page.waitForTimeout(3000); // let the map settle
     const size = page.viewportSize()!;
     const spot = await page.evaluate(({ w, h }) => {
@@ -21,7 +22,7 @@ test.describe("Mobile extras — long-press report, inbox, time of day, installa
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     const card = page.getByRole("dialog", { name: "This spot" });
     await expect(card).toBeVisible();
-    await expect(page).toHaveURL(/\/$/); // lifting the finger didn't "ghost tap" a button
+    await expect(page).toHaveURL(/\/around\/map$/); // lifting the finger didn't "ghost tap" a button
     await card.getByRole("button", { name: /Report here/ }).click();
     await expect(page).toHaveURL(/\/report\?from=map$/); // the spot travels in memory, not the URL (only a UI entry hint)
     await expect(page.getByText(/^Reporting /)).toBeVisible();
@@ -68,7 +69,7 @@ test.describe("Mobile extras — long-press report, inbox, time of day, installa
     await hist;
     await expect(p2.locator("html")).toHaveAttribute("data-daypart", "night"); // "Dark" pinned in Me → App
     await expect(p2.getByRole("button", { name: "Take me home" })).toBeVisible();
-    await expect(p2.getByRole("log").getByText(/it's late/i)).toBeVisible();
+    await expect(p2.getByRole("log").getByText(/I can help you get home/i)).toBeVisible();
     await c2.close();
   });
 

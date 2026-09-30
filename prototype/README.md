@@ -1,0 +1,7 @@
+# Mira mobile concept
+
+Open [mira-mobile-concept.html](mira-mobile-concept.html) in any modern browser. It is a standalone, clickable storyboard with twenty-one phone screens; the desktop view includes a screen index. Start at **First open**, then follow the on-screen actions or use the index. The top-level screens use short, glanceable copy; source, privacy and Scout detail remains available on tap. Mira chat has a persistent tab and example prompts; Contribute has a private verified-impact chart. It makes no network calls, requests no location permission, submits no reports and changes no production code.
+
+All people, places, conditions, sources and dates shown are **fictional concept data**. The earned Scout and 28 confirmed details represent an illustrative eligible contributor, not a real account or promise of recognition. The aggregate-note screen illustrates a future moderated release; current beta publication remains off. The private-report and public-note screens are deliberately separate.
+
+Rendered checks: [first open](mira-first-open.png), [location choice](mira-location-choice.png), [Today](mira-today-revised.png), [Mira chat](mira-mira-revised.png), [Contribute](mira-contribute-revised.png), [Mira Scout](mira-scout-revised.png), [returning Today](mira-returning-today.png), [journey plan](mira-journey-plan.png), [live journey](mira-live-journey.png). Playwright/Chromium checked the first-open → place → journey → arrival path, Mira prompt/composer, Scout navigation and 320, 375 and 390 px for script errors and horizontal overflow.

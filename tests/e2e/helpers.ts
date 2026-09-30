@@ -64,7 +64,7 @@ export async function newUser(browser: Browser, name: string): Promise<{ ctx: Br
   const page = await ctx.newPage();
   await page.goto("/");
   await page.waitForURL("**/welcome");
-  await expect(page.getByRole("heading", { name: "With you until you arrive." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Know more. Move freely. Together." })).toBeVisible();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.getByRole("button", { name: "Use my location" }).click();
   await page.waitForURL((u) => u.pathname === "/"); // Home, signed out
@@ -113,9 +113,9 @@ export async function shareLinkFor(address: string): Promise<string> {
   return /http:\/\/localhost:\d+\/t\/[A-Za-z0-9_-]+/.exec(await mailText(mail.ID))![0];
 }
 
-/** Search a destination on Home and open its route sheet. */
+/** Open the explicit map and choose a destination in its existing route sheet. */
 export async function openRoute(page: Page, name = DEST) {
-  await page.goto("/");
+  await page.goto("/around/map");
   await page.getByRole("button", { name: /Search a place or address/ }).click();
   await page.getByPlaceholder("Search a place or address").fill(name);
   await page.getByRole("button", { name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first().click();

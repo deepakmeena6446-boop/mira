@@ -159,16 +159,16 @@ export function PersonalSections() {
         {failed ? <p className="border-t border-line px-5 py-4 text-sm text-ink-muted">Couldn&apos;t load this right now. Check your connection and open Me again.</p> : null}
         {/* Device-local only (docs/launch-ux/07 §B): never sent to Mira; cleared here, on sign-out and on delete. */}
         <div className="border-t border-line px-5 py-4">
-          <p className="text-sm text-ink-muted">On this phone: how you&apos;ve used Mira lately (journeys or contributions, by day only), to arrange Home&apos;s suggestions. Never sent anywhere.</p>
+          <p className="text-sm text-ink-muted">On this phone: how you&apos;ve used Mira lately (journeys or contributions, by day only), to arrange Mira&apos;s suggestions. Never sent anywhere.</p>
           <button
             type="button"
             onClick={() => {
               resetLocalPersonalisation();
-              toast("Home is back to its standard layout.");
+              toast("Mira suggestions are reset.");
             }}
             className="mt-1 min-h-11 text-sm font-semibold text-accent-strong"
           >
-            Reset how Mira arranges Home
+            Reset Mira suggestions
           </button>
         </div>
       </Section>

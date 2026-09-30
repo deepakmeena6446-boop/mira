@@ -18,7 +18,7 @@ test("375 px walk shows lighting before Start, with accessible details and no ho
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   await page.getByRole("button", { name: "🏠 Home" }).click();
   await expect(page.getByText("Saved as Home")).toBeVisible();
-  await page.goto("/");
+  await page.goto("/around/map");
   await page.getByRole("button", { name: /Home/ }).first().click();
   await expect(page.getByRole("region", { name: "Lighting evidence before starting" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
@@ -30,6 +30,7 @@ test("375 px Help Points, Emergency, arrival and Contribute remain usable", asyn
   test.skip(info.project.name !== "mobile", "one 375 px browser is enough");
   const { ctx, page } = await newUser(browser, "Leena");
   await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/around/map");
   await page.getByRole("button", { name: "Help Points near me" }).click();
   await expect(page.getByRole("dialog", { name: "Help Points near you" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
@@ -41,6 +42,8 @@ test("375 px Help Points, Emergency, arrival and Contribute remain usable", asyn
   await page.getByRole("button", { name: "I'm okay now" }).click();
   await page.goto("/contribute");
   await expect(page.getByRole("heading", { name: "Contribute" })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Verified contributions:/ })).toBeVisible();
+  await expect(page.getByText("Mira Scout")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   await openRoute(page);
   await page.getByRole("button", { name: /Go with Mira/ }).click();

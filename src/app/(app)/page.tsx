@@ -1,29 +1,22 @@
 import { getSql } from "@/server/db/client";
-import { tileConfig } from "@/server/providers/geo/tiles";
+import type { Metadata } from "next";
 import { systemClock } from "@/server/clock";
 import { getUser } from "@/server/session/user";
 import { listPlaces } from "@/server/account/places";
-import { listContacts } from "@/server/account/contacts";
 import { currentTrip } from "@/server/trips";
 import { smtpConfigured } from "@/server/config/env";
-import { HomeScreen } from "./HomeScreen";
+import { TodayScreen } from "./TodayScreen";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Today" };
 
-export default async function Home() {
+export default async function Today() {
   const sql = getSql();
   const user = await getUser(sql);
-  const [places, contacts, trip] = user
-    ? await Promise.all([listPlaces(sql, user.id), listContacts(sql, user.id), currentTrip(sql, user.id, systemClock.now())])
-    : [[], [], null];
+  const [places, trip] = user
+    ? await Promise.all([listPlaces(sql, user.id), currentTrip(sql, user.id, systemClock.now())])
+    : [[], null];
   return (
-    <HomeScreen
-      user={user ? { id: user.id, name: user.name, avatarUrl: user.avatarUrl, helpExclude: user.helpExclude } : null}
-      places={places}
-      contacts={contacts}
-      trip={trip}
-      tiles={await tileConfig()}
-      emailAlerts={smtpConfigured()}
-    />
+    <TodayScreen name={user?.name ?? null} places={places} trip={trip} emailAlerts={smtpConfigured()} />
   );
 }

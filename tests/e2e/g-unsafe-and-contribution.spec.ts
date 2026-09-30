@@ -2,11 +2,11 @@ import { expect, test } from "@playwright/test";
 import { db, newUser, openRoute, testClientIp } from "./helpers";
 
 test.describe("When something feels wrong — instant, deterministic help", () => {
-  test("Home: 'I feel unsafe' shows every action at once, with no Mira call, and walks to a Help Point", async ({ browser }) => {
+  test("Today: 'I feel unsafe' shows every action at once, with no Mira call, and walks to a Help Point", async ({ browser }) => {
     const { ctx, page } = await newUser(browser, "Tara");
     const miraCalls: string[] = [];
     page.on("request", (r) => new URL(r.url()).pathname.startsWith("/api/mira") && miraCalls.push(r.url()));
-    // Help Points are fetched ahead when Home gets a location; wait until they're in (first open), then close.
+    // Help Points are fetched ahead after her location choice; wait until they're in, then close.
     await page.getByRole("button", { name: "I feel unsafe" }).click();
     await expect(page.getByRole("dialog", { name: "Right now" }).getByRole("button", { name: /Go to a Help Point/ })).toBeVisible();
     await page.getByRole("button", { name: "I'm okay now" }).click();
@@ -122,8 +122,8 @@ test.describe("Degraded states are honest", () => {
     await page.getByRole("button", { name: "I feel unsafe" }).click();
     await expect(page.getByText("Turn on location to see Help Points near you.")).toBeVisible();
     await page.getByRole("button", { name: "I'm okay now" }).click();
-    await page.getByRole("button", { name: /Search a place or address/ }).click();
-    await page.getByPlaceholder("Search a place or address").fill("Vishwavidyalaya");
+    await page.getByRole("button", { name: "Check a place" }).click();
+    await page.getByPlaceholder("Check a place").fill("Vishwavidyalaya");
     await expect(page.getByRole("button", { name: /Vishwavidyalaya/ }).first()).toBeVisible();
     await ctx.close();
   });

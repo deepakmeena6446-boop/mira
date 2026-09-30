@@ -1,5 +1,7 @@
 # 09 — Launch UX Acceptance Tests
 
+**Revision note (2026-10-01):** The owner approved a community-first Today/Around shell after this map-first checklist was written. Updated navigation criteria below are current; references to Home map detents in other cases describe the explicit `/around/map` surface. The redesign documents and current E2E suite define the newer first-open and contribution hierarchy.
+
 **Purpose:** the definition of "launch-ready" for the UX redesign. Each case has:
 - an **ID**;
 - a **type**:
@@ -122,7 +124,7 @@ Baseline: `docs/launch-ux/e2e-contracts.baseline.txt` (Phase 0). **Every string 
 - region "Help Points along this route"
 - "Sources and freshness"
 - "The driving time from here is not known."
-- navigation "Main" with links Home, Mira, Trips, Contribute, Me
+- navigation "Main" with links Today, Around, Mira, Contribute, You (2026-10-01 owner revision)
 
 ## 3. Functional regression (MUST)
 
@@ -139,10 +141,10 @@ Baseline: `docs/launch-ux/e2e-contracts.baseline.txt` (Phase 0). **Every string 
 
 | ID | Pri | Type | Case |
 |---|---|---|---|
-| R-1 | MUST | VISUAL | At M, Home peek (P4): Mira line, "Where are you going?", search, chips and Circle line all visible without scrolling |
-| R-2 | MUST | VISUAL | At S, Home peek (P4): search and chips visible. At S, the route sheet half (P8): **Go with Mira** visible without scrolling |
+| R-1 | MUST | VISUAL | At M, Today shows the community promise, place check, Mira entry and immediate safety controls without scrolling |
+| R-2 | MUST | VISUAL | At S, Today search and immediate help are visible; the explicit map route sheet still shows **Go with Mira** at its usable detent |
 | R-3 | MUST | AUTO-SCRIPT | V-anchor: Home and Trip at peek/half/full, sizes S/M/D. The I feel unsafe and Emergency boxes don't intersect the sheet |
-| R-4 | MUST | VISUAL | At M, Contribute (P3): the report grid fully visible without scrolling |
+| R-4 | MUST | VISUAL | At M, Contribute shows the verified impact chart and Mira Scout status before routine reporting; category tiles remain directly accessible on the page |
 | R-5 | MUST | VISUAL | At M, Report category screen: all six tiles plus "Something else" visible |
 | R-6 | MUST | AUTO-SCRIPT | No horizontal scroll on any screen at S (`document.documentElement.scrollWidth <= innerWidth`) |
 | R-7 | MUST | VISUAL | No content hidden under the tab bar at any detent. The last element of each tab-root page is fully visible when scrolled to the end |
@@ -154,11 +156,11 @@ Baseline: `docs/launch-ux/e2e-contracts.baseline.txt` (Phase 0). **Every string 
 
 | ID | Pri | Type | Case |
 |---|---|---|---|
-| N-1 | MUST | AUTO-E2E | Tab links are exactly Home, Mira, Trips, Contribute, Me, in that order, with `aria-current` on the active one |
+| N-1 | MUST | AUTO-E2E | Tab links are exactly Today, Around, Mira, Contribute, You, in that order, with `aria-current` on the active one |
 | N-2 | MUST | AUTO-SCRIPT | The tab bar is hidden on `/trip` while the journey is `active`/`missed`, and visible when closed and on all other `(app)` routes |
 | N-3 | MUST | MANUAL | From an open journey, the header back button → `/trips` → the JourneyCapsule → back to `/trip` |
 | N-4 | MUST | MANUAL | System back closes modal sheets (Unsafe, Emergency options, Help near, Sign in, Search) without leaving the screen |
-| N-5 | MUST | AUTO-SCRIPT | Report reachable in ≤2 taps from each tab root: Home (secondary row → tile), Mira (Contribute tab → tile), Trips (Contribute tab → tile), Contribute (tile), Me (Report row → tile) |
+| N-5 | MUST | AUTO-SCRIPT | Report reachable in ≤2 taps from each tab root through Contribute; a category tile opens the report form. You also links directly to Report. |
 | N-6 | SHOULD | MANUAL | Deep links `/me#places`, `#account`, `#help`, `#travel`, `#remembers`, `#app`, `#privacy`, `/contribute#checks`, `#impact` scroll to their section |
 
 ## 6. Maps

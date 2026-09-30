@@ -1,14 +1,14 @@
-# MIRA — with you until you arrive
+# Mira — together, safer
 
-An installable, mobile-first web app (PWA) for adults 18 or older. It helps a woman understand the way before she goes, keeps the people she chooses with her until she arrives, and puts help one tap away. It never says a route, place or person is safe; it shows what's known, where it's from, and what isn't known.
+An installable, mobile-first web app (PWA) for adults 18 or older. Mira is a community-powered safety companion built around women's everyday movement; everyone can contribute useful local context. It helps someone understand a place, move with chosen support, and help the next person. It never says a route, place or person is safe; it shows what's known, where it's from, and what isn't known.
 
-1. **Where are you going?** Search, or tap a saved place like 🏠 Home. You get the walking route (and up to two alternatives when the maps provider has them), the time, how much of the way is **mapped as lit**, and the **Help Points** along it (hospitals, police, stations, pharmacies, fuel, hotel receptions), each with hours exactly as the source lists them or "hours not known".
+1. **Check a place.** Today and Around put local context and released community notes ahead of the map. Search, or tap a saved place like 🏠 Home. The place brief gives a walking summary when available; the explicit map shows alternatives, mapped lighting and Help Points along the way.
 2. **Start with MIRA.** Share with your trusted contacts (by email), or keep it to yourself and send your **live link** with the phone's share sheet (WhatsApp, SMS…). The journey screen has *I'm here*, *+10 min*, the nearest Help Point, *I feel unsafe* and Emergency.
 3. **Arrive.** Arrival is auto-detected. The link goes dark and the live points are deleted. If you miss a check-in, MIRA attempts **one** email per accepted contact when email is configured; the app shows failed or unconfirmed delivery honestly. After a journey at night, one tap: "Was the way lit?"
 
 **Walking, by auto/cab, or by metro/bus.** Walks get routes and context; for rides she picks the ETA (and they can be longer than a walk). "Tell my people now" can also start a journey that just shares where she is.
 
-**Navigation is Home · Mira · Trips · Contribute · Me.** Home is where you're going; Mira is the companion; Trips is the current journey and recent ones; Contribute holds the one question MIRA may ask after a journey and what your verified contributions changed; Me holds saved places, your Circle (trusted contacts), learned journey habits (visible, switch-off-able, deletable), Help Point filters (e.g. no police), notifications on this phone, and privacy. Report is reached from long-press, Home, after a journey, and Me.
+**Navigation is Today · Around · Mira · Contribute · You.** Today gives the short daily picture, inbox and active journey; Around gives a place brief with an explicit map; Mira remains the chatbot; Contribute shows verified impact, Mira Scout, quick Checks, corrections and private reports; You holds saved places, Circle, learned journey habits, Help Point filters and privacy. Trips remains a contextual route at `/trips`; the active journey stays at `/trip`.
 
 **I feel unsafe** (Home and journey screen) opens instantly, with no AI and no network wait: the nearest Help Point ranked for right now (listed as closed now → left out), **Tell my people now** (attempts to email accepted contacts her live link and shows the result), send your live link, call someone (the phone's own contacts or a typed number, never stored), **Emergency** with the number from the country's cited profile (`data/locales/`; service-specific numbers are labelled; every one of the 195 countries is in `data/countries/registry.json`, and one without a reviewed profile is named but has no guessed number: see [docs/COUNTRY_COVERAGE.md](docs/COUNTRY_COVERAGE.md)), her location in words to read out, and Mira last. **Emergency** is also a pill on Home and the journey screen.
 
@@ -61,7 +61,7 @@ npm run worker:dev              # second terminal: missed arrivals, deletion, we
 ```
 
 - Moderator area: `http://localhost:3100/admin/login`, using the password printed by `env:local`. To get a new one, run `npm run env:local -- --force`.
-- Walkthrough: open `/`, follow the three welcome steps, save a place as Home from its route sheet, add a trusted contact on **Me**, open their invite from Mailpit in another browser, then tap Home → **Start with MIRA**. The *I feel unsafe* button and the Emergency pill are on Home and the journey screen.
+- Walkthrough: open `/`, follow the two short welcome steps, check a place on Today, open its map from Around, save it as Home from the route sheet, add a trusted contact in **You**, then start a journey. *I feel unsafe* and Emergency are on each main root and the journey screen.
 - All mail, including contact invites, trip links and missed-arrival alerts, is captured in Mailpit at http://localhost:8025. Nothing reaches a real inbox.
 - To re-fetch a newer OSM snapshot (one rate-respecting Overpass request), run `npm run pilot:fetch -- --refresh`, then `npm run pilot:import`.
 

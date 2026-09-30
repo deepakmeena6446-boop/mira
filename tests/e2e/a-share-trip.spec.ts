@@ -16,11 +16,11 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     const mum = await acceptContactInvite(browser, address);
     await owner.page.reload();
     await expect(owner.page.getByText("Trusted", { exact: true })).toBeVisible();
-    // Navigation is locked: Home · Mira · Trips · Contribute · Me (Emergency is never a tab; Circle lives in Me).
-    await expect(owner.page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Home", "Mira", "Trips", "Contribute", "Me"]);
+    // Community-first roots stay fixed; Emergency remains an immediate contextual control.
+    await expect(owner.page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Today", "Around", "Mira", "Contribute", "You"]);
 
-    // Home → "Where are you going?" → one tap on the saved place → context → Start with MIRA.
-    await owner.page.goto("/");
+    // Around → map → one tap on the saved place → context → Start with Mira.
+    await owner.page.goto("/around/map");
     await expect(owner.page.getByRole("heading", { name: "Where are you going?", exact: true })).toBeVisible();
     await expect(owner.page.getByText(/Mira attempts to email Mum a live link/)).toBeVisible(); // the alert channel, stated
     await expect(owner.page.getByRole("link", { name: /Emergency call, 112/ })).toHaveAttribute("href", "tel:112");

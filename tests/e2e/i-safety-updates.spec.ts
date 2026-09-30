@@ -2,13 +2,13 @@ import { expect, test } from "@playwright/test";
 import { newUser } from "./helpers";
 
 /**
- * Women Safety Intelligence on Home (SAFETY_UPDATES=fixture: "[Sample]" data, no live index).
+ * City-level news intelligence on Today (SAFETY_UPDATES=fixture: "[Sample]" data, no live index).
  * A count and a sheet, never a feed or a rating; one story reported twice is one update;
  * official sources are marked apart from news; every update links to its source.
  */
-test("Home shows a restrained safety-updates line; the sheet keeps sources, ages and allegation status", async ({ browser }, info) => {
+test("Today shows a restrained official/news line; the sheet keeps sources, ages and allegation status", async ({ browser }, info) => {
   const { ctx, page } = await newUser(browser, "Meera");
-  const section = page.getByRole("region", { name: "Safety updates" });
+  const section = page.getByRole("region", { name: "Official & news updates" });
   await expect(section).toContainText("Delhi");
   await expect(section).toContainText("2 recent women-safety updates from the past 7 days");
   await expect(section).toContainText("Community reports: not in the beta");

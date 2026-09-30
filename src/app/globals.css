@@ -1,35 +1,33 @@
 @import "tailwindcss";
 
 /*
- * Mira design tokens (docs/launch-ux/04): calm intelligence × living city × premium companion.
- * Warm-neutral paper, one deep lagoon-teal accent (Mira / you / your journey), amber only for
- * lighting evidence, warm for "needs you", red only for failed operations. Token names are kept
- * stable so every screen inherits the system.
+ * Community-first palette: warm paper, jade for trust and active controls, solar orange for
+ * human warmth. Evidence and failure still have separate semantic colours.
  */
 @theme {
-  --color-canvas: #f6f5f1;
+  --color-canvas: #fff7ef;
   --color-surface: #ffffff;
-  --color-sunken: #efeee9;
-  --color-ink: #1a1a18;
-  --color-ink-muted: #55534d;
-  --color-ink-subtle: #6b6961;
-  --color-line: #e4e2db;
-  --color-line-strong: #cfccc3;
+  --color-sunken: #f4eee6;
+  --color-ink: #24312e;
+  --color-ink-muted: #56665e;
+  --color-ink-subtle: #68776f;
+  --color-line: #e9dfd3;
+  --color-line-strong: #c9d9d2;
 
-  --color-accent: #1d6b63;
-  --color-accent-strong: #17554f;
-  --color-accent-soft: #e3efec;
+  --color-accent: #17665b;
+  --color-accent-strong: #12554b;
+  --color-accent-soft: #e4f2e8;
   --color-accent-ink: #ffffff;
 
   /* Retired hues, aliased so nothing breaks: peach → sunken, mint (confirmed) → accent. */
-  --color-peach: #55534d;
-  --color-peach-soft: #efeee9;
-  --color-mint: #1d6b63;
-  --color-mint-soft: #e3efec;
+  --color-peach: #a95c25;
+  --color-peach-soft: #ffebd0;
+  --color-mint: #17665b;
+  --color-mint-soft: #e4f2e8;
 
   /* Attention: something needs her. Never "danger". */
-  --color-warm: #8f4a0c;
-  --color-warm-soft: #fbeedc;
+  --color-warm: #a95c25;
+  --color-warm-soft: #ffebd0;
 
   /* Failure of an operation only. Never a place, route or person. */
   --color-error: #b42318;
@@ -64,7 +62,7 @@
 :root {
   --glass-bg: rgb(255 255 255 / 0.9);
   --pin-bg: #ffffff;
-  --map-route: #1d6b63;
+  --map-route: #17665b;
   --map-route-glow: #5fa89e;
   --map-route-alt: #6b6961;
   --map-unknown: #7a776f;
@@ -83,12 +81,12 @@
   color-scheme: light;
 }
 :root[data-daypart="dawn"] {
-  --color-canvas: #f8f3ec;
-  --color-sunken: #f1ebe2;
+  --color-canvas: #fff4e8;
+  --color-sunken: #f5e9db;
 }
 :root[data-daypart="evening"] {
-  --color-canvas: #f4f0e8;
-  --color-sunken: #ece6db;
+  --color-canvas: #fff1e4;
+  --color-sunken: #f3e5d7;
 }
 :root[data-daypart="night"] {
   color-scheme: dark;
@@ -100,9 +98,9 @@
   --color-ink-subtle: #8e938d;
   --color-line: #2a2e2c;
   --color-line-strong: #3a3f3c;
-  --color-accent: #7cc4b9;
-  --color-accent-strong: #9ad3ca;
-  --color-accent-soft: #17302c;
+  --color-accent: #88ccb3;
+  --color-accent-strong: #a4dfc9;
+  --color-accent-soft: #19352c;
   --color-accent-ink: #0b1f1c;
   --color-peach: #aeb3ad;
   --color-peach-soft: #232625;
@@ -127,6 +125,21 @@
 }
 
 @custom-variant night (&:where([data-daypart="night"], [data-daypart="night"] *));
+
+.mira-today-hero {
+  background: linear-gradient(155deg, #fff9ee, #ffe4c1);
+  border: 1px solid #f0d4ab;
+  color: var(--color-ink);
+}
+:root[data-daypart="night"] .mira-today-hero {
+  background: linear-gradient(155deg, #493523, #2b2720);
+  border-color: #715438;
+  color: #fff4e6;
+}
+@media (max-width: 359px) {
+  .mira-helpcluster { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .mira-helpcluster > * { white-space: normal; padding-inline: 0.5rem; text-align: center; font-size: 0.75rem; }
+}
 
 @keyframes rise {
   from {

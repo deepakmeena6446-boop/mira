@@ -42,7 +42,7 @@ import { shareLiveLink } from "@/lib/share";
 import { keepTripRoute } from "@/lib/trip-route";
 import { suggestionQuery, tripStartExtras } from "@/lib/trip-start";
 import type { HabitSuggestion } from "@/domain/habits";
-import { greetingFor, setArea, setPendingReportSpot, takePendingDestination, useClock, useLocation, watchWhileVisible, type PickedSpot } from "@/lib/location-store";
+import { clearPendingDestination, greetingFor, peekPendingDestination, setArea, setPendingReportSpot, shouldAutoLocate, useClock, useLocation, watchWhileVisible, type PickedSpot } from "@/lib/location-store";
 import type { SavedPlace } from "@/server/account/places";
 import type { Contact } from "@/server/account/contacts";
 import type { TripView } from "@/server/trips";
@@ -107,14 +107,17 @@ export function HomeScreen({
 }) {
   const router = useRouter();
   const toast = useToast();
-  // Ask for location only once the welcome screen has explained why (a surprise prompt gets "Don't allow").
-  const welcomed = useFlag("mira.welcomed");
-  const loc = useLocation(Boolean(user) || welcomed.value);
+  // Honour the explicit first-open location choice on the map too.
+  const loc = useLocation(false);
+  const shouldRequestLocation = !loc.point;
+  const requestLocationAgain = loc.request;
+  useEffect(() => { if (shouldRequestLocation && shouldAutoLocate()) void requestLocationAgain(); }, [shouldRequestLocation, requestLocationAgain]);
   const lat = loc.point?.lat;
   const lon = loc.point?.lon;
   const me = useMemo(() => (lat !== undefined && lon !== undefined ? { lat, lon } : null), [lat, lon]);
   const now = useClock();
-  const [initialDest] = useState(() => takePendingDestination());
+  const [initialDest] = useState(() => peekPendingDestination());
+  useEffect(() => { if (initialDest) clearPendingDestination(initialDest); }, [initialDest]);
   const [poiArea, setPoiArea] = useState<string | null>(null);
   const installDismissed = useFlag("mira.installDismissed");
   const [pressed, setPressed] = useState<PickedSpot | null>(null);

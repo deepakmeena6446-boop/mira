@@ -1,7 +1,7 @@
 # 04 — Mira Design System
 
 **Direction:** *Calm intelligence × living city × premium companion.*
-**Constraint:** evolve the existing system (`src/app/globals.css` `@theme`, `components/ui/*`, `components/app/*`). **Token names stay stable** so every screen inherits changes. Values change, a few tokens are added, and a few utilities are retired. Every item is marked **KEEP**, **REFINE** or **REPLACE** against what exists today (01 §3).
+**Constraint:** evolve the existing system (`src/app/globals.css` `@theme`, `components/ui/*`, `components/app/*`). **Token names stay stable** so every screen inherits changes. Values change, a few tokens are added, and a few utilities are retired. Every item is marked **KEEP**, **REFINE** or **REPLACE** against the original launch baseline (01 §3). The owner-approved 2026-10-01 palette uses warm ivory, solar orange and jade; current token values in `globals.css` supersede earlier teal-only examples below.
 
 **Governing rules:** 02 (Constitution). Motion lives in 05. Per-screen application lives in 06.
 
@@ -293,7 +293,7 @@ On the map, the `me-halo` layer (currently a 22 px blue circle at 22%) becomes t
 - **Adopting native `<dialog>`** (focus trap, top layer) is CONSIDER LATER (post-launch). Safari lacks `closedby`, and the current portal pattern works.
 
 ## 17. Navigation (`TabBar.tsx`)
-- **REPLACE the presentation, KEEP the items and order:** Home · Mira · Trips · Contribute · Me (the locked Day-0 navigation, C-6.3).
+- **2026-10-01 product revision:** Today · Around · Mira · Contribute · You. Trips remains a contextual journey route; the map is explicitly opened from Around. The order and labels remain stable after this change (C-6.3).
 - **Docked bar:**
   - full width;
   - `surface` background with a 1 px top `line`;
@@ -303,7 +303,7 @@ On the map, the `me-halo` layer (currently a 22 px blue circle at 22%) becomes t
   - Active: accent icon (filled variant where available) plus accent label, with a 2 px accent bar at the top edge of the item. **No filled pill.**
 - **Hidden during an open journey** on `/trip` (immersive journey mode, 06 §3.5). The journey header's back button returns to `/trips`. The bar reappears when the journey closes.
 - **Hidden** on `/welcome`, `/t/*`, `/invite*`, `/auth/*` and `/admin/*` (as today: these are outside the `(app)` layout).
-- `aria-label="Main"`, `aria-current="page"` (KEEP; E2E contract: links named Home, Mira, Trips, Contribute, Me).
+- `aria-label="Main"`, `aria-current="page"` (KEEP; E2E contract: links named Today, Around, Mira, Contribute, You).
 
 ## 18. Maps
 - **Basemap:** Google raster day/night (KEEP), OpenFreeMap fallback.

@@ -182,7 +182,7 @@ export async function answerCheck(
   now: Date,
   country: string | null,
 ): Promise<{ recorded: boolean; outcome: ReceiptOutcome | null }> {
-  if (!user.durable) throw forbidden("Add an email to your account in Me to answer MIRA Checks — it keeps it to one voice per person.");
+  if (!user.durable) throw forbidden("Add an email to your account in You to answer Mira Checks — it keeps it to one voice per person.");
   const [c] = await sql<{ subject_key: string; weekday: number; band: Band; provider_open: boolean | null; area5: string | null }[]>`
     UPDATE mira_checks m SET state = 'answered', answered_at = ${now}, subject_key = NULL, subject_name = NULL, area5 = NULL
     FROM (SELECT id, subject_key, weekday, band, provider_open, area5 FROM mira_checks WHERE id = ${id} AND user_id = ${user.id} AND state = 'ready' AND expires_at > ${now} FOR UPDATE) old

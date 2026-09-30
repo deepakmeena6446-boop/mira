@@ -149,7 +149,7 @@ export function unknownAccountEmail() {
       "Hello,",
       "",
       "Someone asked to sign in to MIRA with this email address, but no MIRA account uses it yet.",
-      "To keep an account, open MIRA, start with your first name, then add this email in Me.",
+      "To keep an account, open Mira, start with your first name, then add this email in You.",
       "",
       "If this wasn't you, ignore this email.",
     ].join("\n"),

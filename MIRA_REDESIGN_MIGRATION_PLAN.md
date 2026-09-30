@@ -1,0 +1,76 @@
+# Mira redesign migration plan
+
+**Purpose:** Move from a map-framed journey app to a community-powered companion without losing working safety capability. The 2026-10-01 owner request authorised implementation. This file records the phased intent and remaining release gates; the first production slice is now implemented on `codex/community-first-mobile`. It uses the [audit](MIRA_CURRENT_EXPERIENCE_AUDIT.md), [architecture](MIRA_MOBILE_INFORMATION_ARCHITECTURE.md), [spec](MIRA_REDESIGN_SPEC.md), and the protected [principles](PRINCIPLES.md).
+
+## The change in one sentence
+
+Replace the Home *container* and navigation mental model; retain the evidence, journey, help, privacy and reporting engines; publish community knowledge only when existing truth and moderation gates allow it.
+
+## Capability disposition
+
+| Disposition | What | Why / precise treatment |
+|---|---|---|
+| **KEEP** | Chosen, time-limited Circle journey links; trip state, missed check-in, extension, arrival; WhatsApp/email delivery truth; live-location purge. | This is Mira's proven personal-safety value and privacy boundary. Reuse trip services and `/trip`, with a persistent active capsule and a more focused entry. |
+| **KEEP** | Emergency/country profile rules; prefetched Help Point and “I feel unsafe” actions; source/age/unknown evidence states. | These safety paths cannot wait on the new Home or new community read model. Preserve one-tap contract and fallbacks. |
+| **KEEP** | Private report intake, coarse location, moderation, retention, duplicate/abuse checks, aggregate thresholds; Check/correction/lighting verification and private impact/Scout rules. | These rules defend trust. Redesign surfaces must fit the data model rather than weakening it for visual density. |
+| **KEEP** | MapLibre GL JS map, geo provider adapters, route/lighting/Help Point computation, search, PWA and worker architecture. | Map remains essential in spatial tasks; there is no case for a new map SDK/native rewrite. |
+| **REPACKAGE** | Route sheet and nearby place data. | Split into text-led Place/Around intelligence plus an explicit Map view and “Go with Mira.” Retain present provider fallbacks and manual ETA. |
+| **REPACKAGE** | Mira line, saved-place/habit suggestions, safety updates, evidence disclosures. | Feed the Today briefing and place details with context and uncertainty; distinguish published city news from community knowledge. Do not call an AI model on Home. |
+| **REPACKAGE** | Contribute screen's report tiles, Checks, corrections, impact and Scout. | Show a private verified-impact chart and true Scout state alongside one eligible factual action; keep private report reachable without turning all users into reporters. |
+| **REPACKAGE** | `Me`/Circle/privacy/impact. | Make “You” an agency and contribution identity surface, still private. Do not add public profiles. |
+| **CHANGE** | Five roots Home · Mira · Trips · Contribute · Me, full-bleed Home map, sheet snap as the default browsing structure. | Move to Today · Around · Mira · Contribute · You. Keep the assistant unmistakably accessible; make trips contextual and the map explicitly invoked. A place becomes a decision object rather than only a destination. |
+| **CHANGE** | First-open story and hierarchy. | Explain collective local intelligence and the personal utility before permission; show provenance, not a feature list. Preserve skip, guest browse and permission timing. |
+| **REMOVE / DE-EMPHASISE** | Generic nearby POIs and map pins as Home content; a permanent mostly empty Trips root; raw city-news count as apparent community activity. | These objects currently teach the wrong mental model or are weak everyday value. Keep their capabilities discoverable in the right context. |
+| **NEW, REQUIRED** | A thin, server-owned **local briefing read model** that composes *existing* permitted sources by area/time and returns claim, scope, provenance, age, unknowns, state and permitted action. | Today and Place must display the same trustworthy facts without querying raw report tables from the client. This is composition, not a new truth engine. |
+| **NEW, REQUIRED** | Text-led Around/Place surfaces, empty-coverage language, disclosure component, “how community knowledge works” explanation, and prototype-tested IA. | These make the collective thesis legible when the map is closed and data is sparse. |
+| **NEW, CONDITIONAL** | A private report receipt detail and challenge flow; saved-place change notification; public aggregate local-note detail. | Build only after API, moderation operations, privacy and retention requirements are specified. Do not fake status or enable publication for UX completeness. |
+| **NOT IN SCOPE** | Itinerary planner, public report feed, social comments/likes, native mobile rewrite, background location history, safety score/heatmap, raw incident pins, AI-generated facts, additional rewards/tier ladder. | Not needed for the proposed mental model and several conflict with protected principles. |
+
+## Dependency and decision gates
+
+1. **Product rule amendment:** The 2026-10-01 owner implementation request superseded the earlier map-first presentation decision. C-13.1, C-12.5, C-6.3, the design system navigation and `TabBar.tsx` now record the community-first shell. C-13.2–5, C-14, C-10 and `PRINCIPLES.md` remain in force.
+2. **Community publication gate:** `src/server/aggregate/run.ts` defaults releases off until real moderation exists. Today must work with no public report-derived notes. Turning releases on requires staffed review, abuse testing, suppression/withdrawal operations, country/privacy review and a separate release decision. This is not a cosmetic feature flag.
+3. **Data provenance gate:** A local briefing may include only sources whose scope, date, failure mode and expiry are represented. `src/server/safety-intel/pipeline.ts` marks community unavailable in beta; city news must remain labelled news. Do not promote a safety update into an independently confirmed local condition.
+4. **Coverage gate:** Worldwide registry recognition is not worldwide reviewed emergency numbers or consistent route/lighting/Help Point coverage. Global rollout must test unknown-country and weak-data states first.
+5. **User evidence gate:** Run comprehension sessions before final nav shipping. If people still describe Mira as a route app or misread empty as safe, revise hierarchy before developing more features.
+
+No unresolved question requires a change to protected principles to create this design proposal. The later decision to operate public aggregate releases is a **launch/operations gate**, not a prerequisite for the new Today architecture; the sparse-state version is designed as a complete screen. The later decision to add a dedicated Community tab should depend on verified content density and user research.
+
+## Phased implementation sequence
+
+| Phase | Scope | Exit evidence | Safe fallback / rollback |
+|---|---|---|---|
+| **0. Freeze factual baseline** | Record current screen captures at 320/375/390 px, live guest and seeded account scenarios, source coverage and API state matrix. Review existing uncommitted code before touching it. Document route, check, report, unsafe and trip smoke paths. | Baseline walkthrough and product comprehension notes. | No user-facing change. |
+| **1. Approve product rule updates** | Record the owner decision on C-13.1 and stable tab order. Align names and the full-spec information hierarchy while preserving protected privacy/truth boundaries. | Written rule amendment and acceptance criteria. | Continue current shell if not approved. |
+| **2. Build the read model behind existing services** | A server composition endpoint/view for local briefing and place facts. It reads only released aggregates, corroborated place/lighting claims, provider facts and correctly labelled safety updates. Return source, scope, age, expiry, unknown/failure state and action eligibility. No raw report rows to client. Add source contract and retention tests. | Deterministic tests for empty/unknown/failed/partial/disputed/stale, scope coarsening, no individual leak; observability on source failures. | Existing Home keeps working; read model can remain dark. |
+| **3. Add text-led Around and Place in parallel** | New routes/components under a design flag. Reuse search/route/Help Point services and map component only when “View map” is opened. Preserve old `/` until these flows meet parity. | Search, route mode, manual ETA, lighting, Help Points, country help and report-from-place all pass mobile and keyboard flows. | Flag off restores current navigation. |
+| **4. Add Today and first-open** | Compose the local answer, place intent, community provenance/empty state and active journey. Update onboarding copy/order and location-denied branch; no synthetic live claims. | Five-second thesis comprehension, map-hidden test, 375 px fold check, guest and sparse area tests. | New Home flag off; route services unaffected. |
+| **5. Reframe Contribute and You** | Show a verified-only impact chart and true Mira Scout state on Contribute, then an eligible Check or structured correction, with the routine report list reachable. Keep anonymous report path and honest private outcome language. | One-tap Check, two-tap Report, correct verified/pending/differed/archived counts, Scout eligibility, skip/not-sure, rate limits and privacy; no report count reward. | Existing Contribute route can stay as fallback. |
+| **6. Switch mobile navigation** | Today · Around · Mira · Contribute · You; keep chat as a stable root with contextual entries, move Trips into a journey route, preserve deep links and accessibility semantics. Give active trip a global capsule and separate “I feel unsafe” and one-tap Emergency controls stable on every root. | All seven scenario walks at 320/375/390 and larger; Mira reachable in one tap, emergency from each root; no blocked controls under keyboard/sheet; analytics or research shows correct product comprehension. | App-shell flag and redirects restore current roots if needed. |
+| **7. Controlled release and monitoring** | Start with internal/seeded and low-data cohorts, then wider release. Inspect source failures, place-check completion, report abuse, trip delivery and emergency affordance use. | No regression in critical safety flows or privacy; comprehension improvement; support feedback. | Roll back shell flag independently from stable backend services. |
+| **8. Optional community expansion** | Only with operations ready, enable/moderate aggregate releases and local note detail/challenge. Consider saved-place change updates and dedicated Community root only from actual density/usefulness. | Privacy, moderation, source-age and notification tests; operational staffing; explicit release sign-off. | Keep releases off and show honest coverage. |
+
+## Interface and data contracts to protect
+
+### Capability visibility and parity gate
+
+The new shell must make existing capability discoverable at the moment it is useful, not collect every feature on Today. Before retiring the current roots, test these complete paths against the running product: search and saved places; walk/ride/transit with route alternatives, manual ETA, lighting coverage and Help Point preferences; chosen Circle audience and truthful handoff status; active ETA, I'm here, +10, end, next Help Point and offline/worker warnings; prefetched “I feel unsafe” actions and verified-country emergency help; contextual Mira action cards; private reporting and Check/correction/lighting vote; post-trip Check; personal impact/Scout eligibility; inbox, notifications, privacy and forget controls. Record each as **preserved**, **repackaged**, or **deliberately deferred** with a reason. The storyboard demonstrates their intended entry points but is not implementation parity evidence.
+
+- **No new raw-public path:** the client receives published note templates or independently corroborated condition claims, never report text, actor IDs, exact report points or non-released cells. Aggregate suppression propagates to Today, Around, Place, cache and notifications.
+- **Evidence state is typed:** `ok`, `partial`, `failed`, `unavailable`, plus claim-specific differing/stale/expired. A `0 items` response is not the same as failure or unavailable. Domain rules produce claim truth; composition decides relevance/order only.
+- **Time and geography are scoped:** represent observation date, validity window, area scale, time band and country. No “near you” claim from a city-level article. No public pins on exact incident locations.
+- **Chosen sharing stays explicit:** route start and active capsule state exactly who can follow and until when. A handoff to WhatsApp or email is not a delivery guarantee. Trip closure deletes live points as today.
+- **Person-specific state stays private:** saved places, Circle, habits, Check receipts and Scout status have server auth/device-local boundaries; nothing is repurposed as public social proof.
+- **Source failure is visible:** when a backend provider fails, Today does not fall through to reassuring empty text. Critical help controls render from prefetched or locally known data.
+
+## Verification and research plan
+
+- **Foundational interviews:** first-timers, repeat journey users, contributors without personal journey use, unfamiliar-city travellers, and a person with location disabled. Ask what product they think this is after five seconds, what one local claim means, whether it is individually posted or corroborated, and what an empty area implies.
+- **Task tests:** find a place before travelling; inspect a source and unknown; answer/skip a Check; make a private report; open map on purpose; start/share/end a journey; get help in an uneasy state; discover emergency options for a country with no reviewed number.
+- **Safety regression:** emergency reachable from every root, off-network path, failed provider path, keyboard/sheet overlap, reduced motion, 320 px viewport, right-to-left/long names where supported, high zoom. Existing E2E test families in `tests/e2e` should be updated only after new routes are ready.
+- **Success criteria:** proportion of people who correctly describe Mira without a map; correct understanding of public vs private evidence; place-check completion; useful verified contributions; route/journey task completion; ability to find help; trust in source/age/unknown communication. Do not optimise raw report count, session time or notification opens.
+- **Operational review:** before any release-derived community display, demonstrate staffed moderation, withdrawal/suppression latency, cache invalidation, abuse response and country-law review. The migration is successful even if those releases remain off initially, provided the sparse state honestly explains Mira's collective method.
+
+## Explicitly do not change yet
+
+Do not alter the production app in this design task. Do not rewrite the backend, replace MapLibre, enable `PUBLIC_AGGREGATE_RELEASES`, add a generic local feed, add passive movement learning, or ship a numeric safety judgement. The existing adaptation signal is action/date only; any movement-context learning beyond currently stored arrived-place habits needs its own privacy and utility decision.

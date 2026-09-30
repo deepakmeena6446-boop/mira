@@ -1,5 +1,7 @@
 # 08 — Launch UX Execution Plan
 
+**Historical execution plan:** The 2026-10-01 owner-approved community-first redesign supersedes this document's map-first Home and original tab order. Keep its privacy, evidence, emergency and quality gates; use the newer Mira redesign spec and migration plan for current screen architecture.
+
 **For:** an autonomous Claude Code session implementing the launch UX overnight.
 **Read first, in order:** 02 → 06 → 04 → 05 → 07 → this document → 09. Also read `AGENTS.md`: Next.js 16 differs from your training data, so read `node_modules/next/dist/docs/` for any Next API you touch (fonts: `01-app/03-api-reference/02-components/font.md`).
 
@@ -156,7 +158,7 @@
       Changing these alters AI prompts, email templates and unit-tested domain copy. They are listed as post-launch item D14 in the report. **KNOWN RISK (accepted):** Mira's replies and emails may still say "MIRA".
   - **Tests:** update every affected E2E spec string and component unit test (09 §2 mapping table). Server and domain tests are untouched.
 - **Must not break:**
-  - Tab link names Home/Mira/Trips/Contribute/Me.
+  - Tab link names Today/Around/Mira/Contribute/You (2026-10-01 owner revision).
   - Emergency `tel:`.
   - `useOverlay` history behaviour.
   - Sheet keyboard operability.

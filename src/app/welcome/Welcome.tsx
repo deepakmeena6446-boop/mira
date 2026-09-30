@@ -6,7 +6,7 @@ import { MiraPulse } from "@/components/app/MiraPulse";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
-import { requestLocation } from "@/lib/location-store";
+import { rememberLocationChoice, requestLocation } from "@/lib/location-store";
 import { SignInSheet } from "@/components/app/SignInSheet";
 
 export const WELCOMED_KEY = "mira.welcomed";
@@ -20,9 +20,7 @@ function markWelcomed() {
 }
 
 /**
- * Two steps, no account: the promise → location, then Home, signed out. She can search a place and
- * see what's known about the way first; Mira asks her to sign in only when she reaches something
- * that needs an account (starting a journey, her circle, saved places, contributing, Mira).
+ * Two short steps, no account required: shared purpose, then optional location.
  */
 export function Welcome({ signedIn }: { signedIn: boolean }) {
   const router = useRouter();
@@ -30,7 +28,8 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
   const [busy, setBusy] = useState(false);
   const [signIn, setSignIn] = useState(false);
 
-  const finish = () => {
+  const finish = (skipLocation = true) => {
+    rememberLocationChoice(!skipLocation);
     markWelcomed();
     router.replace("/");
     router.refresh();
@@ -42,41 +41,24 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
     const s = await requestLocation();
     setBusy(false);
     // Allowed, refused or unavailable: Home explains the state, and search works either way.
-    if (s.status === "ok" || s.status === "denied" || s.status === "unavailable") finish();
+    if (s.status === "ok" || s.status === "denied" || s.status === "unavailable") finish(s.status !== "ok");
   };
 
   const steps = [
     <div key="promise" className="flex flex-col">
       <MiraPulse size={28} />
-      <h1 className="mt-6 text-[2.25rem] font-semibold leading-[1.08] tracking-tight">With you until you arrive.</h1>
-      <p className="mt-3 text-lg text-ink-muted">Mira helps you understand the way, lets the people you choose follow until you arrive, and keeps help one tap away.</p>
-      <ul className="mt-6 space-y-4">
-        {[
-          ["route", "Before you go", "The way, its lighting and the Help Points on it — and what isn't known, said plainly."],
-          ["eye", "On the way", "Your people follow a live link that switches off when you arrive. No account needed to follow."],
-          ["phone", "If something feels wrong", "Help nearby, your people, and the local emergency number where it's been reviewed."],
-          ["lamp", "For everyone", "See a broken streetlight or a closed entrance? Tell Mira in two taps. It helps the next person."],
-        ].map(([icon, t, d]) => (
-          <li key={t} className="flex items-start gap-3">
-            <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-surface text-accent ring-1 ring-line">
-              <Icon name={icon} className="size-5" />
-            </span>
-            <span>
-              <span className="block font-semibold">{t}</span>
-              <span className="block text-sm text-ink-muted">{d}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-6 text-sm text-ink-subtle">Designed around the realities women face moving through cities. Useful to anyone. Mira keeps no history of where you&apos;ve been.</p>
+      <h1 className="mt-6 text-[2.25rem] font-semibold leading-[1.08] tracking-tight">Know more. Move freely. Together.</h1>
+      <p className="mt-3 text-lg text-ink-muted">Mira helps you know a place, move with support, and help the next person.</p>
+      <div className="mt-7 flex gap-3 rounded-[var(--radius-lg)] bg-warm-soft p-4"><Icon name="community" className="mt-0.5 shrink-0 text-warm" /><p className="text-sm font-medium">People share small details. Mira checks what holds up. Your local picture gets better over time.</p></div>
+      <p className="mt-5 text-sm text-ink-subtle">Built around women&apos;s everyday safety. Everyone can help. Your movement history stays yours.</p>
     </div>,
     <div key="loc" className="flex flex-col items-center text-center">
       <div className="grid size-20 place-items-center rounded-full bg-accent-soft text-accent">
         <Icon name="locate" className="size-10" />
       </div>
-      <h1 className="mt-7 text-[1.75rem] font-semibold">Where are you?</h1>
-      <p className="mt-3 max-w-xs text-lg text-ink-muted">Mira uses your location to show the way from here, the Help Points near you, and to share the journeys you choose. It never keeps a history of where you&apos;ve been.</p>
-      <p className="mt-3 max-w-xs text-sm text-ink-subtle">No account needed to look around. You can always search for places instead.</p>
+      <h1 className="mt-7 text-[1.75rem] font-semibold">See what&apos;s around you?</h1>
+      <p className="mt-3 max-w-xs text-lg text-ink-muted">Your location brings local context and help closer. Mira doesn&apos;t keep a movement history.</p>
+      <p className="mt-3 max-w-xs text-sm text-ink-subtle">Your choice. Search places without location too.</p>
     </div>,
   ];
 
@@ -89,7 +71,7 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
             <span key={i} className={cx("h-1.5 rounded-full transition-all", i === step ? "w-7 bg-accent" : "w-3 bg-line-strong")} />
           ))}
         </div>
-        <button type="button" onClick={finish} className="min-h-11 rounded-full px-3 text-sm font-semibold text-ink-muted">
+        <button type="button" onClick={() => finish()} className="min-h-11 rounded-full px-3 text-sm font-semibold text-ink-muted">
           Skip
         </button>
       </div>
@@ -103,6 +85,7 @@ export function Welcome({ signedIn }: { signedIn: boolean }) {
         <Button variant="primary" size="lg" onClick={next} busy={busy} busyLabel="Asking…" className="mx-auto max-w-sm">
           {step === 0 ? "Continue" : "Use my location"}
         </Button>
+        {step === 1 ? <button type="button" onClick={() => finish()} className="mx-auto mt-1 min-h-11 px-3 text-sm font-semibold text-accent-strong">Search places instead</button> : null}
         {step === 0 && !signedIn ? (
           <button type="button" onClick={() => setSignIn(true)} className="mx-auto mt-1 min-h-11 px-3 text-sm font-semibold text-ink-muted">
             Already use Mira? Sign in

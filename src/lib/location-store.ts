@@ -44,6 +44,14 @@ export function requestLocation(): Promise<LocState> {
   });
 }
 
+/** A declined first-open location choice is respected on later visits. */
+export function rememberLocationChoice(useLocation: boolean) {
+  try { localStorage.setItem("mira.location.skip", useLocation ? "0" : "1"); } catch { /* memory-only location still works */ }
+}
+export function shouldAutoLocate(): boolean {
+  try { return localStorage.getItem("mira.welcomed") === "1" && localStorage.getItem("mira.location.skip") !== "1"; } catch { return false; }
+}
+
 /** A fix older than this is refreshed before it's used for anything that matters. */
 const FRESH_MS = 2 * 60_000;
 
@@ -133,6 +141,13 @@ export function greetingFor(d: Date): { hello: string; emoji: string; late: bool
 let pendingDest: { name: string; lat: number; lon: number; kind?: string } | null = null;
 export function setPendingDestination(d: typeof pendingDest) {
   pendingDest = d;
+}
+/** Reading during React render must be pure: Strict Mode may render a screen twice. */
+export function peekPendingDestination() {
+  return pendingDest;
+}
+export function clearPendingDestination(expected: NonNullable<typeof pendingDest>) {
+  if (pendingDest === expected) pendingDest = null;
 }
 /** A spot picked on the map (long-press) for the Report screen. Memory only, never in URLs. */
 export interface PickedSpot {

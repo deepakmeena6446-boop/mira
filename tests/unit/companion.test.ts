@@ -395,9 +395,9 @@ describe("Scripted Mira: asks that must work (hardening)", () => {
     expect(none.cards).toEqual([]);
   });
 
-  it("recent safety updates point to Home, deterministically; reports accept 'something'; failed Help Point lookups say so", async () => {
+  it("recent safety updates point to Today, deterministically; reports accept 'something'; failed Help Point lookups say so", async () => {
     const r = await run("Any recent safety updates here?");
-    expect(r.text).toMatch(/Safety updates section on Home/);
+    expect(r.text).toMatch(/on Today/);
     expect(r.text).toMatch(/not a verdict/);
     expect((await run("Any recent safety updates here?", tools({ safetyUpdatesOn: () => false }))).text).toMatch(/aren't switched on/);
     expect((await run("I want to report something")).cards[0]).toMatchObject({ type: "report", category: "other" });

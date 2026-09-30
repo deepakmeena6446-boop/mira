@@ -16,9 +16,10 @@ import { useLocation } from "@/lib/location-store";
 import { CORRECTIONS, CORRECTION_LABEL, type Correction } from "@/domain/contributions";
 import type { CheckView } from "@/server/contributions/checks";
 import type { ImpactView } from "@/server/contributions";
+import { SafetyAccess } from "@/components/app/SafetyAccess";
 
 /** Same wording everywhere a report is offered: honest about review, never promises a person. */
-const REPORT_PRIVACY_LINE = "Submitted privately. Reports may be reviewed before they can contribute to Mira's information.";
+const REPORT_PRIVACY_LINE = "Sent privately. Some reports are reviewed before informing Mira.";
 
 /** The street tiles first (everyday observations anyone can make), then what happened. Two taps to a report. */
 const QUICK: Array<{ c: string; icon: string; label: string; hint: string }> = [
@@ -27,22 +28,23 @@ const QUICK: Array<{ c: string; icon: string; label: string; hint: string }> = [
   { c: "positive_condition", icon: "sun", label: "Something good", hint: "Good lighting, people around, help" },
 ];
 
-export function ContributeScreen({ signedIn, durable, checks, impact, pendingChecks = false }: { signedIn: boolean; durable: boolean; checks: CheckView[]; impact: ImpactView | null; pendingChecks?: boolean }) {
+export function ContributeScreen({ signedIn, durable, checks, impact, pendingChecks = false, emailAlerts }: { signedIn: boolean; durable: boolean; checks: CheckView[]; impact: ImpactView | null; pendingChecks?: boolean; emailAlerts: boolean }) {
   const [signIn, setSignIn] = useState(false);
-  // A ready question moves above Report for this visit only (Report stays in the first screen either way).
-  const checksFirst = signedIn && checks.length > 0;
   const report = <ReportSection key="report" />;
   const checksBlock = signedIn ? <ChecksSection key="checks" checks={checks} pendingChecks={pendingChecks} /> : null;
   return (
     <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
-      <div className="mx-auto flex max-w-xl flex-col gap-7">
+      <div className="mx-auto flex max-w-xl flex-col gap-5">
         <header>
           <h1 className="text-[1.75rem] font-semibold tracking-tight">Contribute</h1>
-          <p className="mt-1 text-ink-muted">Help Mira understand your streets. What you send is private.</p>
+          <p className="mt-1 text-sm text-ink-muted">A small detail can help the next person.</p>
         </header>
+        <SafetyAccess emailAlerts={emailAlerts} />
 
         {impact?.steward.steward ? <ScoutWelcome /> : null}
-        {checksFirst ? [checksBlock, report] : [report, checksBlock]}
+        {impact ? <ImpactSection impact={impact} /> : null}
+        {checksBlock}
+        {report}
 
         {!signedIn ? (
           <section className="rounded-[var(--radius-card)] border border-line bg-surface p-5">
@@ -63,7 +65,6 @@ export function ContributeScreen({ signedIn, durable, checks, impact, pendingChe
           <CorrectSection durable={durable} />
         )}
 
-        {impact ? <ImpactSection impact={impact} /> : null}
       </div>
     </div>
   );
@@ -94,7 +95,7 @@ function ReportSection() {
           <Icon name="chevron" className="size-4 text-ink-subtle" />
         </Link>
       </div>
-      <p className="mt-2 px-1 text-xs text-ink-subtle">{REPORT_PRIVACY_LINE} Reports are never counted as contributions or rewarded.</p>
+      <p className="mt-2 px-1 text-xs text-ink-subtle">{REPORT_PRIVACY_LINE} Reports never earn credit.</p>
     </section>
   );
 }
@@ -173,7 +174,7 @@ function CorrectSection({ durable }: { durable: boolean }) {
       <div className="p-5">
         {!durable ? (
           <p className="text-sm text-ink-muted">
-            Something Mira shows about a place is wrong? <Link href="/me#account" className="font-semibold text-accent-strong">Sign in with Google or add your email in Me</Link> to correct it. It keeps corrections to one voice per person.
+            Something Mira shows about a place is wrong? <Link href="/me#account" className="font-semibold text-accent-strong">Sign in with Google or add your email in You</Link> to correct it. It keeps corrections to one voice per person.
           </p>
         ) : place ? (
           <div>
@@ -228,11 +229,23 @@ function CorrectSection({ durable }: { durable: boolean }) {
 
 function ImpactSection({ impact }: { impact: ImpactView }) {
   const s = impact.summary;
+  const bars = [
+    { label: "Lighting", value: s.byKind.lighting },
+    { label: "Places", value: s.byKind.place_status },
+    { label: "Corrections", value: s.byKind.correction },
+  ];
+  const max = Math.max(1, ...bars.map((b) => b.value));
   return (
     <Section id="impact" title="Your impact">
       <div className="flex flex-col gap-3 p-5 text-sm">
-        <p className="text-base font-semibold">{impact.line ?? "Nothing confirmed yet."}</p>
-        {!impact.line ? <p className="text-ink-muted">When someone else confirms what you told Mira, it shows here.</p> : null}
+        <div className="flex items-start justify-between gap-3">
+          <p><strong className="block text-[2rem] leading-none tabular-nums">{s.verified}</strong><span className="mt-1 block text-ink-muted">local details confirmed</span></p>
+          <span className="rounded-full bg-sunken px-2.5 py-1 text-xs font-semibold text-ink-muted">Only you see this</span>
+        </div>
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-2" role="img" aria-label={`Verified contributions: ${bars.map((b) => `${b.label} ${b.value}`).join(", ")}`}>
+          {bars.map((b) => <div key={b.label} className="contents"><span className="text-ink-muted">{b.label}</span><span className="h-2.5 overflow-hidden rounded-full bg-sunken"><span className="block h-full rounded-full bg-accent" style={{ width: `${b.value ? Math.max(8, b.value / max * 100) : 0}%` }} /></span><strong className="tabular-nums">{b.value}</strong></div>)}
+        </div>
+        {!s.verified ? <p className="text-ink-muted">When someone else confirms a detail, it appears here.</p> : null}
         {s.archived ? <p className="text-ink-muted">{s.archived} earlier credited {s.archived === 1 ? "answer is" : "answers are"} kept for your record but cannot be rechecked, so {s.archived === 1 ? "it no longer counts" : "they no longer count"} toward current impact or Mira Scout.</p> : null}
         {s.pending ? <p className="text-ink-muted">{s.pending} waiting for someone else to confirm.</p> : null}
         {s.differed ? <p className="text-ink-muted">{s.differed} where reports differed, so nobody was credited.</p> : null}
@@ -242,12 +255,11 @@ function ImpactSection({ impact }: { impact: ImpactView }) {
           </p>
           {impact.steward.steward ? (
             <p className="mt-1 text-ink-muted">
-              Others keep confirming what you tell Mira, in different places and on different days. You can join beta local verification tasks. Your answers still need someone else to agree, like everyone&apos;s.
+              Your checks keep holding up across places and days. Scout answers still need independent agreement.
             </p>
           ) : (
-            // A status that comes with time, not a target: the list is there if she asks, never a checklist to chase.
             <details className="mt-1 text-ink-muted">
-              <summary className="min-h-8 cursor-pointer">For people whose answers others have confirmed over time and in different places. <span className="font-semibold text-accent-strong">What it takes</span></summary>
+              <summary className="min-h-8 cursor-pointer">Consistent, independently confirmed checks. <span className="font-semibold text-accent-strong">How it works</span></summary>
               <ul className="mt-2 list-disc pl-5">
                 {impact.steward.needs.map((n) => (
                   <li key={n}>{n}</li>

@@ -150,7 +150,7 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     cards.push({ type: "sos", contacts: await tools.trustedContacts() });
   } else if (RX.safetyNews.test(m)) {
     reply = tools.safetyUpdatesOn()
-      ? "Recent Safety updates for your city are in the Safety updates section on Home: news reports with their publisher and date. They're reported context, not a verdict on any area, and no updates doesn't mean nothing happened."
+      ? "Recent Safety updates for your city are on Today: news reports with their publisher and date. They're reported context, not a verdict on any area, and no updates doesn't mean nothing happened."
       : "Safety updates (news reports for a city) aren't switched on in this version of MIRA, so I can't show any.";
   } else if (RX.share.test(m)) {
     // No tool sends anything: the Trip screen has "Send my live link" and "Tell my people now".

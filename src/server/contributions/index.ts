@@ -60,7 +60,7 @@ export async function submitCorrection(
   input: { placeKey?: string; name: string; lat: number; lon: number; claim: Correction; country: string | null },
   now: Date,
 ): Promise<{ outcome: ReceiptOutcome; placeName: string }> {
-  if (!user.durable) throw forbidden("Add an email to your account in Me to correct places — it keeps it to one voice per person.");
+  if (!user.durable) throw forbidden("Add an email to your account in You to correct places — it keeps it to one voice per person.");
   const at = { lat: input.lat, lon: input.lon };
   const hits = (await geo.search(input.name, at)).filter((h) => PLACE_KEY_RE.test(h.id) && haversineMeters(at, h) <= 150);
   const place =

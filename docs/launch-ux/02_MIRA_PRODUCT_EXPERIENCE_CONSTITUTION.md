@@ -69,7 +69,7 @@ Two things rank above it:
 - **C-6.1** Mira adapts to *how the person uses Mira*, not to *who they are*. There are no personas: no "Traveller", "Contributor", "Woman", "Shopkeeper" or "Commuter" modes, labels or onboarding choices.
 - **C-6.2 MUST.** Adaptation is **progressive** (it needs evidence of use), **explainable** (the user can see why) and **reversible** (it can be reset in Me). 07 defines the algorithm.
 - **C-6.3 MUST.** The interface has **stable anchors** that never move, and **adaptive surfaces** that may change. Stable anchors are:
-  - tab bar order and labels;
+  - tab bar order and labels: Today · Around · Mira · Contribute · You (owner-approved community-first revision, 2026-10-01);
   - the Emergency and I feel unsafe positions;
   - the search field;
   - Report reachability;
@@ -156,12 +156,12 @@ Two things rank above it:
 - **C-12.2 MUST.** The **Mira line** (a one-sentence contextual summary on Home, the route sheet and the journey) is **deterministic**: composed in code from evidence already fetched. It never calls the LLM on page load (cost, speed, truth). [P10]
 - **C-12.3 MUST.** Any LLM text shown outside chat passes the existing output guard (`src/domain/companion-output.ts`). At launch, no LLM text appears outside chat.
 - **C-12.4 MUST.** AI replies propose actions as **cards** that need a tap (existing). The AI never starts, shares, sends or calls.
-- **C-12.5 SHOULD.** Mira's answers point back into the map (cards open the place on Home), so the conversation ends in the real world, not the transcript.
+- **C-12.5 SHOULD.** Mira's answers point back into place context or the explicit map when spatial detail helps. A card must lead to a real decision, not only the transcript.
 - **C-12.6 MUST NOT.** Do not use a chatbot-first UI: no floating chat bubble over the map, no AI-generated safety facts, no "typing…" theatre longer than the real wait.
 
 ## 13. Map philosophy
 
-- **C-13.1** The map is the **stage**, not a widget. Mira's identity on the map comes from its overlays: the route, lit stretches, the "you" dot and presence halo, and Help Points. The Google basemap can't be restyled.
+- **C-13.1 (revised 2026-10-01)** The map is an explicit Around and journey surface, not Mira's first-open identity. Today and Around first explain places, people, source quality and gaps in text. On the map, Mira's route, lighting, Help Points and "you" marker provide spatial context. The Google basemap cannot be restyled.
 - **C-13.2 MUST.** The map shows **conditions and places, never danger**. No red zones, no heatmaps, no incident pins, no crime overlays. [P1, "will not build" list]
 - **C-13.3 MUST.** Everything on the map is also in the sheet as text (existing accessibility rule).
 - **C-13.4 SHOULD.** Few pins. Before a destination: at most the places the sheet lists. With a destination: the Help Points on the chosen route. On a journey: the next ≤6 Help Points.

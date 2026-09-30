@@ -67,10 +67,11 @@ test.describe("Reports — private until reviewed, public only as thresholded no
     expect(json.notes).toHaveLength(1);
     expect(json.notes[0].text).toBe("Multiple reviewed observations mention poor lighting in this area during late hours.");
     expect(JSON.stringify(json)).not.toMatch(/Dark stretch|SECRET|harassment|actor|report_id/i);
-    // Notes are not a map layer or a Home feed: they appear only on a route through the area, dated, with why.
+    // Released, thresholded notes now make the community visible on Today; the lone report stays private.
     await me.page.goto("/");
-    await expect(me.page.getByRole("heading", { name: "Where are you going?", exact: true })).toBeVisible();
-    await expect(me.page.getByText(/poor lighting in this area/)).toHaveCount(0);
+    await expect(me.page.getByRole("heading", { name: /Today/ })).toBeVisible();
+    await expect(me.page.getByRole("region", { name: "Local pulse" }).getByText(/poor lighting in this area/)).toBeVisible();
+    await expect(me.page.locator("main")).not.toContainText("SECRET-SINGLE-REPORT");
     await openRoute(me.page);
     await expect(me.page.getByText(/poor lighting in this area/)).toBeVisible();
     await expect(me.page.getByText(/Why am I seeing this\?/)).toBeVisible();

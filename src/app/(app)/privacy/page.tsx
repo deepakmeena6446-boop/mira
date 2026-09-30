@@ -57,7 +57,7 @@ export default function PrivacyPage() {
             ) : (
               <>
                 <p>
-                  Safety updates show recent published news and official advisories about women&apos;s safety in a city: where you are on Home, or a destination you pick.
+                  Safety updates show recent published news and official advisories about women&apos;s safety in a city: where you are on Today, or a destination you pick.
                   Mira&apos;s server works out the city name from that point and sends only the city name to the {safetyUpdates === "fixture" ? "sample data used for testing" : "GDELT news index"} — never your
                   position, name or account. Results are cached per city for about 30 minutes, with nothing linking them to you.
                 </p>
@@ -88,8 +88,8 @@ export default function PrivacyPage() {
           </Item>
           <Item icon="bell" title="Notifications">
             <p>
-              If you turn them on in Me, your phone&apos;s push service (Google, Apple or Mozilla) delivers Mira&apos;s notifications to you: a missed check-in, someone
-              accepting your invite, or your live location pausing. Notifications never contain your location. Turn them off in Me at any time.
+              If you turn them on in You, your phone&apos;s push service (Google, Apple or Mozilla) delivers Mira&apos;s notifications to you: a missed check-in, someone
+              accepting your invite, or your live location pausing. Notifications never contain your location. Turn them off in You at any time.
             </p>
           </Item>
           <Item icon="phone" title="If you feel unsafe">
@@ -104,7 +104,7 @@ export default function PrivacyPage() {
             <p>
               Your first name, saved places (encrypted) and trusted contacts (their emails and phone numbers are encrypted). If you sign in with Google, Mira keeps your Google account
               id, your first name and a protected (encrypted) copy of your email — nothing else from Google: no photo, no contacts, no location history. If you add your
-              email to keep your account, it&apos;s stored encrypted and only used for sign-in links. Delete your account in Me and all of it is erased; any reports you sent stay anonymous and can no longer be linked
+              email to keep your account, it&apos;s stored encrypted and only used for sign-in links. Delete your account in You and all of it is erased; any reports you sent stay anonymous and can no longer be linked
               to you. An account with an email that isn&apos;t used for over a year is deleted; one without an email goes when you sign out or its session ends.
             </p>
           </Item>
@@ -113,21 +113,21 @@ export default function PrivacyPage() {
               Only what you chose: your preferred way of travelling, and — after a journey to one of <em>your saved places</em> that you finished — a counter of how
               often you go there, by which way, at about which hour, and who you shared it with last time. No routes, no coordinates, no times finer than the hour.
               It&apos;s used only to suggest &ldquo;like usual&rdquo; when you&apos;ve done the same thing at least three times. See it, switch it off or delete it
-              in Me &rarr; What Mira remembers. Mira never records where you go in the background.
+              in You &rarr; What Mira remembers. Mira never records where you go in the background.
             </p>
           </Item>
           <Item icon="home" title="What Mira keeps on this phone">
             <p>
-              To arrange Home&apos;s suggestions around how you use Mira, this phone keeps a short list of what you did lately — only the kind (a journey, a report, a
+              To arrange Mira&apos;s suggestions around how you use it, this phone keeps a short list of what you did lately — only the kind (a journey, a report, a
               check, a correction, a lighting answer, a message to Mira) and the day. No time, no place, no text. It&apos;s never sent to Mira, and it&apos;s cleared
-              after 60 days, when you tap &ldquo;Reset how Mira arranges Home&rdquo; in Me, when you sign out and when you delete your account.
+              after 60 days, when you tap &ldquo;Reset Mira suggestions&rdquo; in You, when you sign out and when you delete your account.
             </p>
           </Item>
           <Item icon="sparkle" title="Chatting with Mira">
             <p>
               Your chat is saved to your account for 30 days so Mira can follow the conversation. Mira&apos;s replies are saved without area names, walking times or
               nearby places. <strong className="text-ink">Your own messages are saved exactly as you typed them</strong>, so don&apos;t type addresses you&apos;d rather not
-              keep. Clear it any time in Me.
+              keep. Clear it any time in You.
             </p>
             <p>
               {providerModes().companion === "claude"

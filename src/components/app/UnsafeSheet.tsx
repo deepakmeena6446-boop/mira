@@ -52,6 +52,7 @@ export function UnsafeSheet({
   goLabel,
   share,
   tell,
+  peopleLoading = false,
   landmark,
   exclude,
   onTrip,
@@ -70,6 +71,8 @@ export function UnsafeSheet({
   goLabel: string;
   share: UnsafeShareAction | null;
   tell?: UnsafeTellAction | null;
+  /** Account/Circle lookup can finish after this instant-opening sheet appears. */
+  peopleLoading?: boolean;
   /** The nearest named place she's by (for "your location in words"). */
   landmark?: string | null;
   /** Help Point classes she chose not to see. */
@@ -183,7 +186,7 @@ export function UnsafeSheet({
         </div>
 
         {/* 2. Tell people */}
-        {tell ? <TellMyPeople tell={tell} /> : null}
+        {tell ? <TellMyPeople tell={tell} /> : peopleLoading ? <p role="status" className="mt-3 text-sm text-ink-muted">Checking your Circle…</p> : null}
         {share ? (
           <button type="button" onClick={() => void share.onShare()} className="mt-3 flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-line p-4 text-left">
             <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink">

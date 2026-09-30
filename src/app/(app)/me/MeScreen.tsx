@@ -23,6 +23,7 @@ import { Section } from "@/components/app/Section";
 import { AccountSection, PushSection } from "./MeSections";
 import { CircleRow, PersonalSections } from "./PersonalSections";
 import { ImpactRow } from "./ImpactRow";
+import { SafetyAccess } from "@/components/app/SafetyAccess";
 import type { ProviderModes } from "@/server/providers/modes";
 
 const EMOJIS = [
@@ -76,6 +77,7 @@ export function MeScreen({
         <Button className="mt-7 max-w-xs" variant="primary" size="lg" onClick={() => setSignIn(true)}>
           Get started
         </Button>
+        <SafetyAccess emailAlerts={emailAlerts} className="mt-5" />
         <SignInSheet open={signIn} onClose={() => setSignIn(false)} />
       </div>
     );
@@ -112,6 +114,7 @@ export function MeScreen({
             </p>
           </div>
         </header>
+        <SafetyAccess emailAlerts={emailAlerts} />
 
         <CircleRow accepted={contacts.filter((c) => c.status === "accepted").length} invited={contacts.filter((c) => c.status === "invited").length} />
         <Section

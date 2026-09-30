@@ -6,15 +6,15 @@ import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 
 /**
- * HOME · Mira · TRIPS · CONTRIBUTE · ME — the locked Day-0 navigation (a stable anchor: never adaptive).
- * Emergency is never a tab: it sits on Home, on the journey screen and in "I feel unsafe". Circle lives in Me.
+ * Stable mobile roots: Today · Around · Mira · Contribute · You.
+ * Trip and emergency controls remain available in context, without turning them into tabs.
  */
 const TABS = [
-  { href: "/", label: "Home", icon: "home", match: ["/"] },
+  { href: "/", label: "Today", icon: "home", match: ["/", "/trips", "/trip"] },
+  { href: "/around", label: "Around", icon: "pin", match: ["/around"] },
   { href: "/mira", label: "Mira", icon: "sparkle", match: ["/mira"] },
-  { href: "/trips", label: "Trips", icon: "route", match: ["/trips", "/trip"] },
   { href: "/contribute", label: "Contribute", icon: "contribute", match: ["/contribute", "/report"] },
-  { href: "/me", label: "Me", icon: "user", match: ["/me", "/circle", "/inbox", "/privacy"] },
+  { href: "/me", label: "You", icon: "user", match: ["/me", "/circle", "/inbox", "/privacy"] },
 ] as const;
 
 function active(path: string, match: readonly string[]) {
