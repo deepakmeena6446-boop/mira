@@ -1,11 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { DEST, newUser } from "./helpers";
 
-test("Today explains Mira, Around gives a place brief, and the map opens on request", async ({ browser }) => {
+test("Go leads to a decision while legacy Today, Around and map links remain usable", async ({ browser }) => {
   const { ctx, page } = await newUser(browser, "Amina");
-  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Today", "Around", "Mira", "Contribute", "You"]);
-  await expect(page.getByText("Know a place. Go with support. Help the next person.")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Go", "Journeys", "You"]);
+  await expect(page.getByRole("heading", { name: /Go, Amina/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Plan a movement/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /Ask Mira/ })).toBeVisible();
+  await page.goto("/today");
   await expect(page.getByRole("region", { name: "Local pulse" })).toBeVisible();
   await page.getByRole("button", { name: "Check a place" }).click();
   await page.getByPlaceholder("Check a place").fill(DEST);

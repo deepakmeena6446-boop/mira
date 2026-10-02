@@ -94,6 +94,32 @@ describe("Journey companion: time zones, habits, Trips", () => {
     await recordHeartbeat(sql, "job:journeys", new Date(), "test", new Date());
   });
 
+  it("pauses legacy habit use until an explicit choice while preserving review and deletion", async () => {
+    await signIn("Legacy");
+    const placeId = await saveHome();
+    const trip = (await (await start({ tz: "UTC", savedPlaceId: placeId, startHour: 8, share: false })).json()).trip;
+    const userId = await userIdOf(trip.id);
+    const sql = getSql();
+    const [initial] = await sql<{ remember_habits: boolean; legacy_remember_habits: boolean }[]>`
+      SELECT remember_habits, legacy_remember_habits FROM users WHERE id = ${userId}`;
+    expect(initial).toEqual({ remember_habits: false, legacy_remember_habits: false });
+
+    // Simulate a row retained by the forward migration from the old default-on setting.
+    await sql`UPDATE users SET legacy_remember_habits = true WHERE id = ${userId}`;
+    await sql`INSERT INTO journey_habits (user_id, place_id, mode, start_hour, times) VALUES (${userId}, ${placeId}, 'walk', 8, 3)`;
+    expect((await (await prefsGET()).json()).pausedLegacyHabits).toBe(true);
+    expect((await (await habitsGET()).json()).habits).toHaveLength(1);
+    expect((await (await suggestionGET(getRequest("/api/me/habits/suggestion?hour=8"))).json()).suggestion).toBeNull();
+    await action(trip.id, "arrive");
+    expect((await habitsOf(userId))[0].times).toBe(3);
+
+    const enabled = await (await prefsPATCH(jsonRequest("/api/me/prefs", { rememberHabits: true }, { method: "PATCH" }))).json();
+    expect(enabled).toMatchObject({ rememberHabits: true, pausedLegacyHabits: false });
+    expect((await (await suggestionGET(getRequest("/api/me/habits/suggestion?hour=8"))).json()).suggestion).toMatchObject({ placeId });
+    await prefsPATCH(jsonRequest("/api/me/prefs", { rememberHabits: false }, { method: "PATCH" }));
+    expect(await habitsOf(userId)).toHaveLength(0);
+  });
+
   it("starts a trip with the phone's time zone, a saved place and the local start hour", async () => {
     await signIn("Nora");
     const placeId = await saveHome();
@@ -139,6 +165,8 @@ describe("Journey companion: time zones, habits, Trips", () => {
   it("arriving at a saved place counts a habit (manual and auto-arrival); other trips count nothing", async () => {
     const owner = await signIn("Priya Nair");
     const placeId = await saveHome();
+    expect((await (await prefsGET()).json()).rememberHabits).toBe(false);
+    expect((await prefsPATCH(jsonRequest("/api/me/prefs", { rememberHabits: true }, { method: "PATCH" }))).status).toBe(200);
     const email = `habit-${randomUUID().slice(0, 6)}@example.test`;
     await contactsPOST(jsonRequest("/api/me/contacts", { name: "Asha", email }));
     await acceptInviteFor(email);
@@ -190,6 +218,7 @@ describe("Journey companion: time zones, habits, Trips", () => {
   it("learning off records nothing and forgets everything; Forget all deletes; account deletion cascades", async () => {
     await signIn("Sara");
     const placeId = await saveHome();
+    await prefsPATCH(jsonRequest("/api/me/prefs", { rememberHabits: true }, { method: "PATCH" }));
     const t1 = (await (await start({ tz: "Asia/Tokyo", savedPlaceId: placeId, startHour: 8, share: false })).json()).trip;
     const userId = await userIdOf(t1.id);
     await action(t1.id, "arrive");
@@ -217,7 +246,7 @@ describe("Journey companion: time zones, habits, Trips", () => {
     expect((await prefsPATCH(jsonRequest("/api/me/prefs", { mode: "teleport" }, { method: "PATCH" }))).status).toBe(400);
     expect((await prefsPATCH(jsonRequest("/api/me/prefs", { avoid: ["police"] }, { method: "PATCH" }))).status).toBe(400);
     await prefsPATCH(jsonRequest("/api/me/prefs", { mode: null, rememberHabits: true }, { method: "PATCH" }));
-    expect(await (await prefsGET()).json()).toEqual({ prefs: { shareByDefault: true }, rememberHabits: true, helpExclude: [] });
+    expect(await (await prefsGET()).json()).toEqual({ prefs: { shareByDefault: true }, rememberHabits: true, pausedLegacyHabits: false, helpExclude: [] });
 
     // Account deletion cascades to habits (FK ON DELETE CASCADE).
     const t4 = (await (await start({ tz: "Asia/Tokyo", savedPlaceId: placeId, startHour: 8, share: false })).json()).trip;
@@ -232,6 +261,7 @@ describe("Journey companion: time zones, habits, Trips", () => {
   it("deleting a saved place deletes its habits; retention drops habits unused for 400 days", async () => {
     await signIn("Maya");
     const placeId = await saveHome();
+    await prefsPATCH(jsonRequest("/api/me/prefs", { rememberHabits: true }, { method: "PATCH" }));
     const t = (await (await start({ tz: "UTC", savedPlaceId: placeId, startHour: 7, share: false })).json()).trip;
     const userId = await userIdOf(t.id);
     await action(t.id, "arrive");

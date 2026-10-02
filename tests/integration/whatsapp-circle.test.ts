@@ -108,4 +108,27 @@ describe("Circle on WhatsApp: she sends her link in one tap; MIRA never claims i
     const [note] = await getSql()`SELECT body FROM notifications WHERE user_id = ${j.user_id} AND kind = 'trip_missed'`;
     expect(note.body).toMatch(/Nobody was notified/);
   });
+
+  it("omitted share stays private, and a confirmed change keeps the same token and no contact recipients", async () => {
+    await signIn("Isha");
+    await contactsPOST(jsonRequest("/api/me/contacts", { name: "Friend", phone: "+91 91234 56789" }));
+    const started = await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" } }));
+    expect(started.status).toBe(201);
+    const { trip } = await started.json();
+    expect(trip.sharedWith).toEqual([]);
+    const token = new URL(trip.shareUrl).pathname.split("/").at(-1)!;
+    const changed = await tripActionPOST(jsonRequest(`/api/trips/${trip.id}/change`, { to: { lat: 28.6903, lon: 77.2113, name: "Library" }, etaMinutes: 35 }), { params: Promise.resolve({ id: trip.id, action: "change" }) });
+    expect(changed.status).toBe(200);
+    const { trip: updated } = await changed.json();
+    expect(updated.destination.name).toBe("Library");
+    expect(updated.shareUrl).toBe(trip.shareUrl);
+    expect(updated.sharedWith).toEqual([]);
+    expect((await (await sharedGET(getRequest(`/api/t/${token}`), { params: Promise.resolve({ token }) })).json()).destination).toBe("Library");
+    const [links] = await getSql()`SELECT count(*)::int AS n FROM trip_contacts WHERE journey_id = ${trip.id}`;
+    expect(links.n).toBe(0);
+    await getSql()`UPDATE journeys SET created_at = now() - interval '3 hours 20 minutes' WHERE id = ${trip.id}`;
+    const tooLong = await tripActionPOST(jsonRequest(`/api/trips/${trip.id}/change`, { to: { ...HOME, name: "Home" }, etaMinutes: 60 }), { params: Promise.resolve({ id: trip.id, action: "change" }) });
+    expect(tooLong.status).toBe(409);
+    expect((await (await action(trip.id, "end")).json()).trip.state).toBe("ended");
+  });
 });

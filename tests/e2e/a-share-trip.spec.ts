@@ -16,8 +16,8 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     const mum = await acceptContactInvite(browser, address);
     await owner.page.reload();
     await expect(owner.page.getByText("Trusted", { exact: true })).toBeVisible();
-    // Community-first roots stay fixed; Emergency remains an immediate contextual control.
-    await expect(owner.page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Today", "Around", "Mira", "Contribute", "You"]);
+    // Go, Journeys and You are stable roots; legacy routes remain reachable in context.
+    await expect(owner.page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Go", "Journeys", "You"]);
 
     // Around → map → one tap on the saved place → context → Start with Mira.
     await owner.page.goto("/around/map");
@@ -26,6 +26,8 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     await expect(owner.page.getByRole("link", { name: /Emergency call, 112/ })).toHaveAttribute("href", "tel:112");
     await owner.page.getByRole("button", { name: /Home/ }).first().click();
     await expect(owner.page.getByRole("region", { name: "Help Points along this route" })).toBeVisible();
+    await expect(owner.page.getByRole("radio", { name: /Just me/ })).toHaveAttribute("aria-checked", "true");
+    await owner.page.getByRole("radio", { name: /Share with Mum/ }).click();
     await expect(owner.page.getByRole("radio", { name: /Share with Mum/ })).toHaveAttribute("aria-checked", "true");
     await owner.page.getByRole("button", { name: /Go with Mira/ }).click();
     await owner.page.waitForURL("**/trip");

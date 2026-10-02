@@ -1,0 +1,14 @@
+# Phase 3 plan Ask privacy and abuse review
+
+Date: 2026-10-02. Scope: the new `/api/mira/plan` path and its client adapter only. This is an engineering review for local build validation; it is not a release privacy or penetration review.
+
+| Boundary | Implemented control | Evidence |
+|---|---|---|
+| Entry | Guest and signed-in plan questions use a strict POST body with at most 1,000 text characters and a versioned intent. Same-origin check applies. | `src/app/api/mira/plan/route.ts`, integration fixture |
+| Retention | The endpoint does not insert into `mira_messages`, call the model, create an account plan or store route geometry. Replies are `no-store` NDJSON. The browser keeps the visible turn in memory; a new guest activity draft is tab-scoped and expires under Phase 1's two-hour rule. | Code path and `tests/integration/phase-three-plan-chat.test.ts`; `src/lib/plan-store.ts` |
+| Third parties | Plan comparison reads the local imported OSM graph. Neither question nor route trace is sent to Claude, Google Routes or a live geocoder from this endpoint. Planned-place resolution is separately restricted to local OSM/Photon. | `src/server/plan/options.ts`, Phase 2 provider audit in [16](16_DATA_AND_PRIVACY_CONTRACT.md) |
+| Abuse budget | Non-urgent plan questions are capped by IP at 20/minute and 100/day using existing rate-limit storage. These buckets contain no question text or route. Urgent text bypasses the database and budget to show Emergency immediately; the global Emergency control remains present. | `src/app/api/mira/plan/route.ts`; danger-first integration and browser tests |
+| Grounding | The deterministic answer uses the same options resolver as Around. All known evidence is schema-validated before streaming. Unchecked coverage is labelled `not_checked`; a provider/validator failure returns a neutral retry line. User prose is not echoed as a source or followed as an instruction. | `src/domain/plan-ask.ts`, unit/adversarial and integration tests |
+| Actions | The answer can navigate to complete or review a plan. It cannot start a trip, share a link, notify contacts or claim those actions occurred. Existing signed-in legacy chat keeps its separate controls. | `plan_brief` card, browser legacy-chat regression |
+
+**Review finding — approved for local Phase 3 build validation:** This implementation avoids the current legacy chat's 30-day raw text retention for plan questions. Its guest mode has a bounded abuse budget and no model/provider transfer of the question. The code and automated fixtures support the local build. This engineering approval does not approve deployment or broad guest rollout. Before release, an independent privacy/security reviewer must verify request logging, proxy retention, abuse behaviour under shared IPs, provider terms, and the public notice. That release review is still open.

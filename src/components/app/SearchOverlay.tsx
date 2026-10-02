@@ -15,6 +15,7 @@ export interface Destination {
   lat: number;
   lon: number;
   kind?: string;
+  resolutionSource?: "search" | "saved_place" | "selected_point";
 }
 
 interface Hit {
@@ -36,6 +37,7 @@ export function SearchOverlay({
   saved,
   near,
   placeholder = "Where to?",
+  osmOnly = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -43,6 +45,7 @@ export function SearchOverlay({
   /** Omit to hide "Choose a spot on the map" (e.g. when there's no map on screen). */
   onDropPin?: () => void;
   placeholder?: string;
+  osmOnly?: boolean;
   saved: SavedPlace[];
   near: { lat: number; lon: number } | null;
 }) {
@@ -64,7 +67,7 @@ export function SearchOverlay({
     const t = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await api<{ places: Hit[] }>("/api/geo/search", { body: { q: term, near: near ? { lat: near.lat, lon: near.lon } : null, deep }, signal: ctrl.signal });
+        const res = await api<{ places: Hit[] }>("/api/geo/search", { body: { q: term, near: near ? { lat: near.lat, lon: near.lon } : null, deep, ...(osmOnly ? { source: "osm" } : {}) }, signal: ctrl.signal });
         if (res.ok) {
           setHits(res.data.places);
           setFailure(null);
@@ -81,7 +84,7 @@ export function SearchOverlay({
       clearTimeout(t);
       ctrl.abort();
     };
-  }, [q, near, deepFor]);
+  }, [q, near, deepFor, osmOnly]);
 
   if (!open) return null;
   const term = q.trim().toLowerCase();
@@ -117,7 +120,7 @@ export function SearchOverlay({
             <ul className="overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]">
               {savedHits.map((s) => (
                 <li key={s.id} className="border-b border-line last:border-0">
-                  <button type="button" onClick={() => onPick({ name: s.label, lat: s.lat, lon: s.lon })} className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left hover:bg-sunken">
+                  <button type="button" onClick={() => onPick({ name: s.label, lat: s.lat, lon: s.lon, resolutionSource: "saved_place" })} className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left hover:bg-sunken">
                     <span aria-hidden className="grid size-10 place-items-center rounded-[var(--radius-control)] bg-sunken text-lg">{s.emoji}</span>
                     <span className="min-w-0">
                       <span className="block font-semibold">{s.label}</span>
@@ -137,7 +140,7 @@ export function SearchOverlay({
               <ul className="overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]">
                 {hits.map((h) => (
                   <li key={h.id} className="border-b border-line last:border-0">
-                    <button type="button" onClick={() => onPick({ name: h.name, lat: h.lat, lon: h.lon, kind: h.kind })} className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left hover:bg-sunken">
+                    <button type="button" onClick={() => onPick({ name: h.name, lat: h.lat, lon: h.lon, kind: h.kind, resolutionSource: "search" })} className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left hover:bg-sunken">
                       <span aria-hidden className="grid size-10 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink-muted"><Icon name={kindIcon(h.kind)} className="size-5" /></span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-semibold text-mixed">{h.name}</span>

@@ -194,6 +194,7 @@ export function MeScreen({
 
         <Section id="contributing" title="Contributing">
           <ul className="divide-y divide-line">
+            <li><Link href="/contribute" className="flex min-h-14 items-center gap-3 px-5 hover:bg-sunken"><Icon name="contribute" className="text-accent" /> <span className="flex-1 font-semibold">Contribute a place check</span> <Icon name="chevron" className="size-4 text-ink-subtle" /></Link></li>
             <li>
               <ImpactRow />
             </li>

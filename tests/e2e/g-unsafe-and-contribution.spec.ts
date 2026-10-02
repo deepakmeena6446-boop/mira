@@ -4,6 +4,7 @@ import { db, newUser, openRoute, testClientIp } from "./helpers";
 test.describe("When something feels wrong — instant, deterministic help", () => {
   test("Today: 'I feel unsafe' shows every action at once, with no Mira call, and walks to a Help Point", async ({ browser }) => {
     const { ctx, page } = await newUser(browser, "Tara");
+    await page.goto("/today");
     const miraCalls: string[] = [];
     page.on("request", (r) => new URL(r.url()).pathname.startsWith("/api/mira") && miraCalls.push(r.url()));
     // Help Points are fetched ahead after her location choice; wait until they're in, then close.
@@ -112,7 +113,8 @@ test.describe("Degraded states are honest", () => {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await page.getByRole("button", { name: "Use my location" }).click();
     await page.waitForURL((u) => u.pathname === "/"); // no account needed to look around
-    await expect(page.getByText(/Location is off for Mira/)).toBeVisible();
+    await page.goto("/today");
+    await expect(page.getByRole("button", { name: /Use my location for local context|Location is off for Mira/ })).toBeVisible();
     // Country not known (location off): Emergency is still one tap away, without an invented dial number.
     await page.getByRole("button", { name: "Emergency options" }).first().click();
     const options = page.getByRole("dialog", { name: "Emergency call options" });

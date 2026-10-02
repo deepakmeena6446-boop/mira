@@ -9,7 +9,8 @@ import { recordTokens, tokensUsedToday } from "@/server/providers/companion/budg
 import { RESTING_NOTE } from "@/server/providers/companion";
 import { POST as demoPOST } from "@/app/api/auth/demo/route";
 import { POST as placesPOST } from "@/app/api/me/places/route";
-import { POST as miraPOST, GET as miraGET, MIRA_DAILY_MAX } from "@/app/api/mira/route";
+import { POST as miraPOST, GET as miraGET } from "@/app/api/mira/route";
+import { MIRA_DAILY_MAX } from "@/domain/limits";
 import { miraTools } from "@/server/providers/companion/tools";
 import { requireUser } from "@/server/session/user";
 import { applyTestEnv } from "../setup/test-env";
@@ -102,9 +103,12 @@ describe("Mira: global context, budget and caps", () => {
       expect(events.some((e) => e.type === "card" && e.card?.type === "sos")).toBe(true);
       expect(events.filter((e) => e.type === "text").map((e) => e.delta).join("")).toMatch(/If you're in danger right now/);
 
-      const minute = new Date(Math.floor(now.getTime() / 60_000) * 60_000);
+      // The streamed danger reply can cross a minute boundary; seed both windows
+      // so this assertion checks the burst guard rather than wall-clock timing.
+      const minute = new Date(Math.floor(Date.now() / 60_000) * 60_000);
       await sql`INSERT INTO abuse_counters (key_hmac, bucket, window_start, count, expires_at)
-                VALUES (${actor}, 'mira:m', ${minute}, 20, ${new Date(now.getTime() + DAY_MS)})
+                VALUES (${actor}, 'mira:m', ${minute}, 20, ${new Date(now.getTime() + DAY_MS)}),
+                       (${actor}, 'mira:m', ${new Date(minute.getTime() + 60_000)}, 20, ${new Date(now.getTime() + DAY_MS)})
                 ON CONFLICT (key_hmac, bucket, window_start) DO UPDATE SET count = 20`;
       expect((await miraPOST(jsonRequest("/api/mira", { message: "hi", context: ctx() }))).status).toBe(429);
     } finally {

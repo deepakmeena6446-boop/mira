@@ -9,16 +9,18 @@ import { ButtonLink } from "@/components/ui/Button";
 import { formatPlaceTime } from "@/lib/time";
 import { modeWords } from "@/domain/travel-prefs";
 import { TripsSignedOut } from "./TripsSignedOut";
+import { JourneyPlanCard } from "./JourneyPlanCard";
+import { SavedPlansList } from "./SavedPlansList";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Trips" };
+export const metadata: Metadata = { title: "Journeys" };
 
 const names = (list: string[]) => (list.length <= 2 ? list.join(" and ") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`);
 
 const CLOSED: Record<string, string> = { arrived: "Arrived", ended: "Ended", expired: "Closed" };
 
 /**
- * TRIPS tab: the journey she's on first, then journeys that finished in the last day (they are
+ * Journeys root: the journey she's on first, then journeys that finished in the last day (they are
  * deleted after that). No travel diary, no map history, no coordinates — times in the zone her
  * phone had when she started, labelled.
  */
@@ -32,8 +34,10 @@ export default async function TripsPage() {
     <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
       <div className="mx-auto flex max-w-xl flex-col gap-6">
         <header className="pt-2">
-          <h1 className="text-[1.75rem] font-semibold tracking-tight">Trips</h1>
+          <h1 className="text-[1.75rem] font-semibold tracking-tight">Journeys</h1>
         </header>
+        <JourneyPlanCard />
+        {user ? <SavedPlansList /> : null}
 
         {!data ? (
           <TripsSignedOut />
@@ -78,7 +82,7 @@ function NoActive() {
     <div className="rounded-[var(--radius-card)] border border-line bg-surface p-5">
       <p className="font-semibold">No journey right now</p>
       <p className="mt-1 text-sm text-ink-muted">When you go with Mira, your journey shows here until a day after you arrive.</p>
-      <ButtonLink href="/around" variant="primary" className="mt-4">
+      <ButtonLink href="/" variant="primary" className="mt-4">
         Where are you going?
       </ButtonLink>
     </div>

@@ -6,11 +6,16 @@ import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 
 /**
- * Stable mobile roots: Today · Around · Mira · Contribute · You.
+ * V1 stable roots: Go · Journeys · You. Map, Ask and contribution are contextual.
  * Trip and emergency controls remain available in context, without turning them into tabs.
  */
 const TABS = [
-  { href: "/", label: "Today", icon: "home", match: ["/", "/trips", "/trip"] },
+  { href: "/", label: "Go", icon: "home", match: ["/", "/today", "/plan", "/around", "/mira", "/contribute", "/report"] },
+  { href: "/trips", label: "Journeys", icon: "route", match: ["/trips", "/trip"] },
+  { href: "/me", label: "You", icon: "user", match: ["/me", "/circle", "/inbox", "/privacy"] },
+] as const;
+const LEGACY_TABS = [
+  { href: "/", label: "Today", icon: "home", match: ["/", "/today", "/trips", "/trip"] },
   { href: "/around", label: "Around", icon: "pin", match: ["/around"] },
   { href: "/mira", label: "Mira", icon: "sparkle", match: ["/mira"] },
   { href: "/contribute", label: "Contribute", icon: "contribute", match: ["/contribute", "/report"] },
@@ -27,10 +32,11 @@ function active(path: string, match: readonly string[]) {
  */
 export function TabBar() {
   const path = usePathname() ?? "/";
+  const tabs = process.env.NEXT_PUBLIC_MIRA_GO_ENTRY === "legacy" ? LEGACY_TABS : TABS;
   return (
     <nav aria-label="Main" className="mira-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
-      <ul className="mx-auto grid h-[var(--tabbar-h)] max-w-xl grid-cols-5">
-        {TABS.map((t) => {
+      <ul className={cx("mx-auto grid h-[var(--tabbar-h)] max-w-xl", tabs.length === 3 ? "grid-cols-3" : "grid-cols-5")}>
+        {tabs.map((t) => {
           const on = active(path, t.match);
           return (
             <li key={t.href} className="relative">

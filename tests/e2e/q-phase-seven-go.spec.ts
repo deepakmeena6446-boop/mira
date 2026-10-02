@@ -1,0 +1,61 @@
+import { expect, test } from "@playwright/test";
+import { newUser } from "./helpers";
+
+test("guest Go opens plan, Ask and map without requesting GPS, and keeps Emergency direct", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("mira.welcomed", "1");
+    const state = window as unknown as { geoCalls: number };
+    state.geoCalls = 0;
+    Object.defineProperty(navigator.geolocation, "getCurrentPosition", { configurable: true, value: () => { state.geoCalls++; } });
+  });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Go", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Go", "Journeys", "You"]);
+  await expect(page.getByText("Where are you going?")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Official & news updates" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Emergency options" }).first().focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: "Emergency call options" })).toContainText("couldn't determine which country you're in");
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await page.getByRole("link", { name: /Plan a movement/ }).click();
+  await expect(page).toHaveURL(/\/plan$/);
+  await page.getByLabel("What do you want to do?").fill("Get to a station");
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Go" }).click();
+  await expect(page.getByRole("region", { name: "Go plan" })).toContainText("Get to a station");
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Journeys" }).click();
+  await expect(page.getByRole("region", { name: "Current travel plan" })).toContainText("Get to a station");
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Go" }).click();
+  await page.getByRole("link", { name: "Ask Mira" }).click();
+  await expect(page).toHaveURL(/\/mira$/);
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Go" }).click();
+  await page.getByRole("link", { name: "Open map" }).click();
+  await expect(page).toHaveURL(/\/around\/map$/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
+  expect(await page.evaluate(() => (window as unknown as { geoCalls: number }).geoCalls)).toBe(0);
+});
+
+test("signed-in person explicitly saves, opens and deletes a plan without starting a journey", async ({ browser }) => {
+  const owner = await newUser(browser, "Saved");
+  const { page } = owner;
+  await page.goto("/plan");
+  await page.getByLabel("What do you want to do?").fill("Visit the museum");
+  await page.getByRole("textbox", { name: "From" }).fill("Central Station");
+  await page.getByRole("textbox", { name: "To", exact: true }).fill("Museum");
+  await page.getByRole("button", { name: "Save plan" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Saved to Journeys for 30 days" })).toBeVisible();
+  await page.goto("/");
+  await expect(page.getByRole("region", { name: "Recent saved plan" })).toContainText("Visit the museum");
+  await page.getByRole("region", { name: "Recent saved plan" }).getByRole("button", { name: "Open saved plan" }).click();
+  await expect(page).toHaveURL(/\/plan$/);
+  await expect(page.getByLabel("What do you want to do?")).toHaveValue("Visit the museum");
+  await page.goto("/trips");
+  await expect(page.getByRole("region", { name: "Saved plans" })).toContainText("Visit the museum");
+  await page.getByRole("region", { name: "Saved plans" }).getByRole("link", { name: "Open plan" }).click();
+  await expect(page).toHaveURL(/\/plan$/);
+  await expect(page.getByLabel("What do you want to do?")).toHaveValue("Visit the museum");
+  await page.goto("/trips");
+  await page.getByRole("region", { name: "Saved plans" }).getByRole("button", { name: "Delete plan" }).click();
+  await expect(page.getByRole("region", { name: "Saved plans" })).toContainText("No saved plans.");
+  await expect(page.getByText("No journey right now")).toBeVisible();
+  await owner.ctx.close();
+});

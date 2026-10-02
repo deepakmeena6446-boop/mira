@@ -26,7 +26,8 @@ export type MiraCard =
   | { type: "report"; category: string; label: string }
   | { type: "sos"; contacts: string[] }
   | { type: "trip_status"; destination: string; etaAt: string; state: string }
-  | { type: "save_place" };
+  | { type: "save_place" }
+  | { type: "plan_brief"; next: "edit_plan" | "review_options"; state: "not_checked" | "ready" | "missing" | "empty" | "stale" | "failed"; checkedAt: string; source: string | null; sourceAt: string | null; scope: string | null; options: Array<{ id: string; label: string; minutes: number; meters: number }>; daylight: import("@/domain/plan-contract").PlanEvidence | null };
 
 /**
  * `private` text is shown live but never stored in chat history: it's derived from where

@@ -98,14 +98,21 @@ export async function suggestionFor(sql: Db, userId: string, localHour: number, 
 export interface PersonalPrefs {
   prefs: TravelPrefs;
   rememberHabits: boolean;
+  /** Old default-on preference is preserved for a one-time informed choice. */
+  pausedLegacyHabits: boolean;
   /** Help Point classes she turned off (users.help_exclude, edited in Me → Help Points). Read-only here. */
   helpExclude: string[];
 }
 
 export async function getPrefs(sql: Db, userId: string): Promise<PersonalPrefs> {
-  const [u] = await sql<{ travel_prefs: unknown; remember_habits: boolean; help_exclude: string[] | null }[]>`
-    SELECT travel_prefs, remember_habits, help_exclude FROM users WHERE id = ${userId}`;
-  return { prefs: parseTravelPrefs(u?.travel_prefs), rememberHabits: u?.remember_habits ?? false, helpExclude: u?.help_exclude ?? [] };
+  const [u] = await sql<{ travel_prefs: unknown; remember_habits: boolean; legacy_remember_habits: boolean; habit_choice_reviewed_at: Date | null; help_exclude: string[] | null }[]>`
+    SELECT travel_prefs, remember_habits, legacy_remember_habits, habit_choice_reviewed_at, help_exclude FROM users WHERE id = ${userId}`;
+  return {
+    prefs: parseTravelPrefs(u?.travel_prefs),
+    rememberHabits: u?.remember_habits ?? false,
+    pausedLegacyHabits: Boolean(u?.legacy_remember_habits && !u.habit_choice_reviewed_at),
+    helpExclude: u?.help_exclude ?? [],
+  };
 }
 
 /** Update her preferences. Switching habit learning off forgets every habit in the same transaction. */
@@ -117,7 +124,7 @@ export async function updatePrefs(sql: postgres.Sql, userId: string, patch: Trav
       await tx`UPDATE users SET travel_prefs = ${tx.json(next as postgres.JSONValue)} WHERE id = ${userId}`;
     }
     if (patch.rememberHabits !== undefined) {
-      await tx`UPDATE users SET remember_habits = ${patch.rememberHabits} WHERE id = ${userId}`;
+      await tx`UPDATE users SET remember_habits = ${patch.rememberHabits}, habit_choice_reviewed_at = now() WHERE id = ${userId}`;
       if (!patch.rememberHabits) await tx`DELETE FROM journey_habits WHERE user_id = ${userId}`;
     }
   });

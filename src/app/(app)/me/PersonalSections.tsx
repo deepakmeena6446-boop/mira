@@ -31,7 +31,7 @@ export function CircleRow({ accepted, invited }: { accepted: number; invited: nu
   );
 }
 
-type Prefs = { prefs: TravelPrefs; rememberHabits: boolean };
+type Prefs = { prefs: TravelPrefs; rememberHabits: boolean; pausedLegacyHabits: boolean };
 
 /**
  * Personalisation she can see and undo: her travel preference, and what Mira remembers from
@@ -47,7 +47,7 @@ export function PersonalSections() {
 
   useEffect(() => {
     void Promise.all([api<Prefs>("/api/me/prefs"), api<{ habits: HabitView[] }>("/api/me/habits")]).then(([p, h]) => {
-      if (p.ok) setPrefs({ prefs: p.data.prefs, rememberHabits: p.data.rememberHabits });
+      if (p.ok) setPrefs(p.data);
       if (h.ok) setHabits(h.data.habits);
       if (!p.ok || !h.ok) setFailed(true);
     });
@@ -58,7 +58,7 @@ export function PersonalSections() {
     const r = await api<Prefs>("/api/me/prefs", { method: "PATCH", body });
     setBusy(null);
     if (!r.ok) return toast(r.message, "error");
-    setPrefs({ prefs: r.data.prefs, rememberHabits: r.data.rememberHabits });
+    setPrefs(r.data);
     if (body.rememberHabits === false) setHabits([]);
   };
 
@@ -119,7 +119,11 @@ export function PersonalSections() {
               <span className={cx("absolute top-1 size-5 rounded-full bg-white shadow transition-all", learning ? "left-6" : "left-1")} />
             </span>
           </button>
-          {prefs && !learning ? <p className="mt-1 text-sm text-ink-subtle">Off. Mira remembers nothing about your journeys.</p> : null}
+          {prefs?.pausedLegacyHabits ? (
+            <p className="mt-2 text-sm text-ink-muted">Habit learning was previously on by default. Mira has paused learning and suggestions. Your earlier habit summaries remain below for review. Turn this on to use them, or choose Forget all to delete them.</p>
+          ) : prefs && !learning ? (
+            <p className="mt-1 text-sm text-ink-subtle">Off. Mira does not learn from or suggest past journeys.</p>
+          ) : null}
         </div>
         {habits && habits.length ? (
           <>

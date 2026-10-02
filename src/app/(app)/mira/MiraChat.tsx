@@ -19,6 +19,10 @@ import { api } from "@/lib/api-client";
 import { freshLocation, setPendingDestination, useLocation } from "@/lib/location-store";
 import type { MiraCard } from "@/server/providers/companion/types";
 import { circleSharingLine } from "@/domain/companion-output";
+import { hasPlanWork, intentFromDraft, intentFromLeg, newPlanDraft } from "@/domain/plan-state";
+import { setPlanDraft, usePlanDraft, usePlanHydrated } from "@/lib/plan-store";
+import { DANGER } from "@/domain/urgent-intent";
+import { draftFromAsk } from "@/domain/plan-ask";
 
 interface Msg {
   id: string;
@@ -32,6 +36,7 @@ interface Msg {
 
 /** What Mira is good at, as tappable examples (signed out, they open sign-in). */
 const EXAMPLES = ["Take me home", "What's open nearby?", "I'm landing in London at 11 PM", "Find Help Points nearby", "I feel uneasy"];
+const GUEST_EXAMPLES = ["Run a loop before dawn", "Plan my late return", "I'm landing at 1:30 AM", "Plan a local destination"];
 /** After dark, the journey home and Help Points come first. */
 /** For people who mostly use Mira to contribute: the everyday observation first. */
 const CONTRIBUTOR_EXAMPLES = ["Report a broken streetlight", "What's open nearby?", "Take me home", "Find Help Points nearby", "I feel uneasy"];
@@ -189,30 +194,32 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
           <Icon name="home" className="size-4" /> Save my home
         </Link>
       );
+    case "plan_brief":
+      return <section className="mt-2 rounded-[var(--radius-card)] border border-line bg-surface p-4 text-sm" aria-label="Plan evidence"><h2 className="font-semibold">Plan evidence</h2><p className="mt-1">{card.state === "ready" ? `${card.options.length} mapped walking option${card.options.length === 1 ? "" : "s"}` : card.state === "not_checked" ? "Route check not started; complete the places and time first." : `Route coverage: ${card.state}`}</p>{card.source ? <p className="text-ink-muted">{card.source} · snapshot {card.sourceAt ? new Date(card.sourceAt).toLocaleDateString() : "unknown"} · checked {new Date(card.checkedAt).toLocaleString()}{card.scope ? ` · ${card.scope}` : ""}</p> : null}{card.daylight ? <p className="mt-1">Daylight: {card.daylight.status === "known" ? `${card.daylight.value} · ${card.daylight.source.label}` : `unknown (${card.daylight.reason})`}</p> : null}<Link href={card.next === "edit_plan" ? "/plan" : "/around"} className="mt-2 inline-flex min-h-11 items-center rounded-[var(--radius-button)] bg-accent px-4 font-semibold text-accent-ink">{card.next === "edit_plan" ? "Complete plan" : "Review options"}</Link><p className="mt-1 text-xs text-ink-muted">No journey starts or contact is notified from this reply.</p></section>;
   }
 }
 
 /** Signed out: what Mira does, why she needs an account, and what to ask. */
-function SignedOutIntro({ onSignIn }: { onSignIn: () => void }) {
+function SignedOutIntro({ onSignIn, onQuestion }: { onSignIn: () => void; onQuestion: (question: string) => void }) {
   return (
     <div className="animate-rise rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--shadow-card)]">
       <p className="text-lg font-semibold">Mira is your travel companion</p>
       <p className="mt-2 text-ink-muted">
         She shares your journey with people you trust, finds Help Points and what&apos;s open near you, and tells you what Mira knows — and what it doesn&apos;t — about where you are. She never guesses whether a place is safe.
       </p>
-      <p className="mt-2 text-sm text-ink-muted">Mira needs an account because your conversation is saved (you can clear it any time).</p>
+      <p className="mt-2 text-sm text-ink-muted">You can ask about a movement plan as a guest. Plan replies are not saved to an account. An account is needed for saved conversations and journeys.</p>
       <p className="mt-4 text-[13px] font-medium text-ink-subtle">You could ask</p>
       <ul className="mt-2 flex flex-wrap gap-2">
-        {EXAMPLES.map((q) => (
+        {GUEST_EXAMPLES.map((q) => (
           <li key={q}>
-            <button type="button" onClick={onSignIn} className="min-h-11 rounded-full border border-line bg-canvas px-4 text-sm font-semibold hover:border-accent/40">
+            <button type="button" onClick={() => onQuestion(q)} className="min-h-11 rounded-full border border-line bg-canvas px-4 text-sm font-semibold hover:border-accent/40">
               {q}
             </button>
           </li>
         ))}
       </ul>
       <Button className="mt-4 w-full" variant="primary" onClick={onSignIn}>
-        Sign in to talk to Mira
+        Sign in for saved chat
       </Button>
       <p className="mt-3 text-center text-xs text-ink-subtle">Emergency and &ldquo;I feel unsafe&rdquo; are above and never wait for Mira.</p>
     </div>
@@ -222,7 +229,11 @@ function SignedOutIntro({ onSignIn }: { onSignIn: () => void }) {
 export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUrl: string | null } | null; emailAlerts: boolean }) {
   const router = useRouter();
   const toast = useToast();
-  const loc = useLocation(true);
+  const planDraft = usePlanDraft();
+  const planHydrated = usePlanHydrated();
+  const planActive = hasPlanWork(planDraft);
+  const loc = useLocation(Boolean(user) && planHydrated && !planActive);
+  const plan = planDraft ? intentFromDraft(planDraft) : null;
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -246,7 +257,11 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   const send = async (text: string) => {
     const message = text.trim();
     if (!message || sending) return;
-    if (!user) return setSignIn(true);
+    const planFlow = planActive || !user;
+    if (planFlow && !planActive && !DANGER.test(message)) {
+      const timeZone = deviceTimeZone() ?? "UTC";
+      setPlanDraft(draftFromAsk(message, newPlanDraft(new Date(), timeZone)));
+    }
     recordUsage("mira");
     setInput("");
     setSending(true);
@@ -255,10 +270,10 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
     setMsgs((m) => [...m, mine, reply]);
     const now = new Date();
     try {
-      const res = await fetch("/api/mira", {
+      const res = await fetch(planFlow ? "/api/mira/plan" : "/api/mira", {
         method: "POST",
         headers: { "content-type": "application/json", "x-mira-request": "1" },
-        body: JSON.stringify({ message, context: { localTime: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), tz: deviceTimeZone(), location: loc.point ? { lat: loc.point.lat, lon: loc.point.lon } : null, area: loc.area } }),
+        body: planFlow ? JSON.stringify({ message, plan, legs: planDraft?.legs?.map(intentFromLeg) ?? [], countryIsos: [planDraft?.destinationCountryIso ?? null, ...(planDraft?.legs?.map((leg) => leg.destinationCountryIso) ?? [])] }) : JSON.stringify({ message, context: { localTime: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), tz: deviceTimeZone(), location: planHydrated && !planActive && loc.point ? { lat: loc.point.lat, lon: loc.point.lon } : null, area: planHydrated && !planActive ? loc.area : null } }),
       });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => null);
@@ -301,7 +316,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   const startTrip: StartTrip = async (dest) => {
     const l = await freshLocation();
     if (!l.point) return toast("Turn on location so I can start your trip.", "error");
-    const r = await api("/api/trips", { body: { from: { lat: l.point.lat, lon: l.point.lon }, to: dest, share: true } });
+    const r = await api("/api/trips", { body: { from: { lat: l.point.lat, lon: l.point.lon }, to: dest, share: false } });
     if (r.ok) recordUsage("journey");
     if (r.ok || r.code === "trip_active") {
       router.push("/trip");
@@ -329,6 +344,8 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
         </div>
       </header>
       <SafetyAccess emailAlerts={emailAlerts} className="z-10 border-b border-line bg-canvas px-4 py-1" />
+      {planActive ? <div className="z-10 border-b border-line bg-surface px-4 py-3 text-sm"><div className="mx-auto max-w-xl"><p className="font-semibold">Your movement plan</p><p className="text-ink-muted">{plan ? `${plan.activity} · ${plan.origin.kind === "device" ? "From here" : plan.origin.query}${plan.loop ? " · loop" : ` → ${plan.destination?.query}`} · ${plan.departure.local} (${plan.departure.timeZone})` : "Your plan is still being entered. Its details are kept in this tab."}</p>{planDraft?.legs?.length ? <p className="mt-1 text-xs">Plus {planDraft.legs.length} separate travel leg{planDraft.legs.length === 1 ? "" : "s"}; review each leg in Plan.</p> : null}<p className="mt-1 text-xs text-ink-muted">Questions about this plan use checked evidence and are not saved to chat history.</p><div className="mt-1 flex gap-4"><Link href="/plan" className="font-semibold text-accent-strong">Edit plan</Link><Link href="/around" className="font-semibold text-accent-strong">View in Around</Link></div></div></div> : null}
+      {user && !loc.point ? <button type="button" onClick={() => void loc.request()} className="mx-auto min-h-11 px-4 text-sm font-semibold text-accent-strong">Use current location for nearby questions</button> : null}
 
       {/* The log isn't live (it would re-read every streamed word); each finished reply is announced once below. */}
       <p className="sr-only" aria-live="polite">
@@ -336,7 +353,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
       </p>
       <div role="log" aria-live="off" aria-label="Conversation with Mira" className={cx("flex-1 overflow-y-auto px-4 pt-4", user ? "pb-44" : "pb-28")}>
         <div className="mx-auto flex max-w-xl flex-col gap-3">
-          {!user && <SignedOutIntro onSignIn={() => setSignIn(true)} />}
+          {!user && <SignedOutIntro onSignIn={() => setSignIn(true)} onQuestion={(question) => void send(question)} />}
           {user && loaded && msgs.length === 0 && (
             <div className="animate-rise">
               <div className="flex items-start gap-3">
@@ -368,7 +385,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
         </div>
       </div>
 
-      {user && (
+      {(
         <div className="fixed inset-x-0 bottom-[calc(var(--tabbar-space)+0.5rem)] z-30 px-4">
           <div className="mx-auto max-w-xl">
             <div className="mb-2 flex gap-2 overflow-x-auto pb-1">

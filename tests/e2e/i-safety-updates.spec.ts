@@ -8,6 +8,7 @@ import { newUser } from "./helpers";
  */
 test("Today shows a restrained official/news line; the sheet keeps sources, ages and allegation status", async ({ browser }, info) => {
   const { ctx, page } = await newUser(browser, "Meera");
+  await page.goto("/today");
   const section = page.getByRole("region", { name: "Official & news updates" });
   await expect(section).toContainText("Delhi");
   await expect(section).toContainText("2 recent women-safety updates from the past 7 days");

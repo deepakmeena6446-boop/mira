@@ -141,6 +141,20 @@
       "when": 1790482311333,
       "tag": "0019_contact_phone",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790937600000,
+      "tag": "0020_habit_consent",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790937600001,
+      "tag": "0021_saved_plans",
+      "breakpoints": true
     }
   ]
 }

@@ -7,7 +7,7 @@ import { getEnv } from "@/server/config/env";
  * authenticated data, so a ciphertext cannot be moved between columns.
  * Format: "v1." + base64url(iv ‖ ciphertext ‖ tag).
  */
-export type Purpose = "report_text" | "journey_destination" | "contact_email" | "share_token" | "saved_place" | "user_email" | "push_subscription" | "contribution_subject" | "check_evidence" | "contact_phone";
+export type Purpose = "report_text" | "journey_destination" | "contact_email" | "share_token" | "saved_place" | "saved_plan" | "user_email" | "push_subscription" | "contribution_subject" | "check_evidence" | "contact_phone";
 
 function dataKey(): Buffer {
   return Buffer.from(getEnv().DATA_ENCRYPTION_KEY, "base64");

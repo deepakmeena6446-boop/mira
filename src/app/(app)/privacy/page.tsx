@@ -110,11 +110,15 @@ export default function PrivacyPage() {
           </Item>
           <Item icon="route" title="What Mira remembers about how you travel">
             <p>
-              Only what you chose: your preferred way of travelling, and — after a journey to one of <em>your saved places</em> that you finished — a counter of how
+              Your chosen travel preference, and — only when you turn habit learning on — a counter after a finished journey to one of <em>your saved places</em> of how
               often you go there, by which way, at about which hour, and who you shared it with last time. No routes, no coordinates, no times finer than the hour.
-              It&apos;s used only to suggest &ldquo;like usual&rdquo; when you&apos;ve done the same thing at least three times. See it, switch it off or delete it
+              That counter can suggest &ldquo;like usual&rdquo; after at least three matching journeys while learning is on. See it, switch it off or delete it
               in You &rarr; What Mira remembers. Mira never records where you go in the background.
             </p>
+            <p>Habit learning now starts off. If an older account had learning on under the previous default, Mira pauses both learning and suggestions until you choose again. Earlier habit summaries remain available to review or delete; switching learning off deletes them.</p>
+          </Item>
+          <Item icon="route" title="Your travel plans">
+            <p>A plan stays in this browser tab for up to two hours after your last edit unless you clear it. Mira does not put it in your account automatically. If you choose Save plan while signed in, Mira encrypts its places, time, purpose and travel legs, keeps it for up to 30 days, and lets you open or delete it in Journeys. A current GPS origin and Google place result cannot be saved. Opening a saved plan does not start a journey or tell a contact.</p>
           </Item>
           <Item icon="home" title="What Mira keeps on this phone">
             <p>

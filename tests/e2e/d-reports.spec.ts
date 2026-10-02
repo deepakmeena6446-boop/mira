@@ -68,7 +68,7 @@ test.describe("Reports — private until reviewed, public only as thresholded no
     expect(json.notes[0].text).toBe("Multiple reviewed observations mention poor lighting in this area during late hours.");
     expect(JSON.stringify(json)).not.toMatch(/Dark stretch|SECRET|harassment|actor|report_id/i);
     // Released, thresholded notes now make the community visible on Today; the lone report stays private.
-    await me.page.goto("/");
+    await me.page.goto("/today");
     await expect(me.page.getByRole("heading", { name: /Today/ })).toBeVisible();
     await expect(me.page.getByRole("region", { name: "Local pulse" }).getByText(/poor lighting in this area/)).toBeVisible();
     await expect(me.page.locator("main")).not.toContainText("SECRET-SINGLE-REPORT");

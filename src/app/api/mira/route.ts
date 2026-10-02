@@ -7,11 +7,10 @@ import { requireUser } from "@/server/session/user";
 import { getEnv } from "@/server/config/env";
 import { respond, type MiraCard, type MiraTurn } from "@/server/providers/companion";
 import type { MiraEvent } from "@/server/providers/companion/types";
+import { MIRA_DAILY_MAX } from "@/domain/limits";
 
 export const dynamic = "force-dynamic";
 
-/** Messages per person per day: bounds AI spend on a public URL (launch audit P0-7). */
-export const MIRA_DAILY_MAX = 60;
 /** Messages per day across everyone (override with MIRA_GLOBAL_DAILY_MAX). */
 const MIRA_GLOBAL_DAILY_DEFAULT = 5000;
 

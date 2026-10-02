@@ -14,6 +14,7 @@ test("a WhatsApp contact gets a one-tap live link on the journey screen", async 
   await expect(page.getByText("WhatsApp +91 •••• ••3210")).toBeVisible();
 
   await openRoute(page);
+  await page.getByRole("radio", { name: /Share with Priya/ }).click();
   await expect(page.getByText(/send Priya your live link on WhatsApp in one tap/).first()).toBeVisible();
   await page.getByRole("button", { name: /Go with Mira/ }).click();
   await page.waitForURL("**/trip");

@@ -35,7 +35,8 @@ export const startTripSchema = z
     from: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).strict(),
     /** Omitted = "just share where I am": no destination to arrive at (ends with I'm here / End). */
     to: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180), name: placeLabel(80) }).strict().optional(),
-    share: z.boolean().default(true),
+    /** Contacts are linked only after an affirmative choice on this start. */
+    share: z.boolean().default(false),
     /** Walking minutes of the route option she chose, when it isn't the fastest (clamped on the server). */
     routeMinutes: z.number().int().min(1).max(240).optional(),
     /** Auto/cab, metro/bus or other: MIRA can't estimate those, so she gives the ETA. */
@@ -321,6 +322,21 @@ export async function tripById(sql: postgres.Sql, userId: string, id: string, no
   const [row] = await sql<Row[]>`SELECT ${sql.unsafe(COLS)} FROM journeys WHERE id = ${id} AND user_id = ${userId}`;
   if (!row) throw notFound("Trip not found.");
   return toView(sql, row, now);
+}
+
+/** A confirmed change keeps the existing share recipients and token; it creates no notification. */
+export async function changeTrip(sql: postgres.Sql, userId: string, id: string, input: { to: { lat: number; lon: number; name: string }; etaMinutes: number }, clock: Clock): Promise<TripView> {
+  const now = clock.now();
+  await sql.begin(async (tx) => {
+    const [row] = await tx<{ state: JourneyState; created_at: Date }[]>`SELECT state, created_at FROM journeys WHERE id = ${id} AND user_id = ${userId} FOR UPDATE`;
+    if (!row) throw notFound("Trip not found.");
+    if (row.state !== "active") throw conflict("trip_not_active", "Only an active journey can change destination.");
+    const eta = new Date(now.getTime() + input.etaMinutes * 60_000);
+    const issue = validateNewEta(now, eta);
+    if (issue || eta.getTime() > new Date(row.created_at).getTime() + MAX_JOURNEY_MS) throw conflict("trip_eta_invalid", issue ?? "A journey can last at most four hours from when it started.");
+    await tx`UPDATE journeys SET dest_lat = ${input.to.lat}, dest_lon = ${input.to.lon}, dest_name = ${input.to.name}, destination_label_enc = ${encryptText(input.to.name, "journey_destination")}, eta_at = ${eta}, route_meters = NULL, near_dest_since = NULL WHERE id = ${id}`;
+  });
+  return tripById(sql, userId, id, now);
 }
 
 /** Record a live point; auto-arrive after dwelling near the destination. */

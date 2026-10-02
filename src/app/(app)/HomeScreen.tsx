@@ -46,6 +46,12 @@ import { clearPendingDestination, greetingFor, peekPendingDestination, setArea, 
 import type { SavedPlace } from "@/server/account/places";
 import type { Contact } from "@/server/account/contacts";
 import type { TripView } from "@/server/trips";
+import { hasPlanWork, intentFromDraft, resolvedDestination, resolvedOrigin } from "@/domain/plan-state";
+import { setPlanDraft, usePlanDraft, usePlanHydrated } from "@/lib/plan-store";
+import { PlanOptions } from "@/components/app/PlanOptions";
+import { instantForLocal, type PlanOption } from "@/domain/plan-options";
+import { loopCheckInEligibility, planStartEligibility } from "@/domain/plan-journey";
+import { requestLocation } from "@/lib/location-store";
 
 interface Place {
   id: string;
@@ -111,11 +117,24 @@ export function HomeScreen({
   const loc = useLocation(false);
   const shouldRequestLocation = !loc.point;
   const requestLocationAgain = loc.request;
-  useEffect(() => { if (shouldRequestLocation && shouldAutoLocate()) void requestLocationAgain(); }, [shouldRequestLocation, requestLocationAgain]);
   const lat = loc.point?.lat;
   const lon = loc.point?.lon;
   const me = useMemo(() => (lat !== undefined && lon !== undefined ? { lat, lon } : null), [lat, lon]);
   const now = useClock();
+  const planDraft = usePlanDraft();
+  const planHydrated = usePlanHydrated();
+  const planActive = hasPlanWork(planDraft);
+  useEffect(() => { if (planHydrated && !planActive && shouldRequestLocation && shouldAutoLocate()) void requestLocationAgain(); }, [planHydrated, planActive, shouldRequestLocation, requestLocationAgain]);
+  const plan = planDraft ? intentFromDraft(planDraft) : null;
+  const planOrigin = plan ? resolvedOrigin(plan) : null;
+  const planDestination: Destination | null = plan ? resolvedDestination(plan) : null;
+  const planRouteKey = plan && planOrigin && planDestination ? JSON.stringify({ from: planOrigin, to: { lat: planDestination.lat, lon: planDestination.lon }, departure: plan.departure, mode: plan.mode }) : "";
+  const [planGeometry, setPlanGeometry] = useState<[number, number][] | null>(null);
+  const [planChoice, setPlanChoice] = useState<{ key: string; option: PlanOption } | null>(null);
+  const chosenPlanOption = planChoice?.key === planRouteKey ? planChoice.option : null;
+  const choosePlan = useCallback((option: PlanOption | null, key: string) => setPlanChoice(option ? { key, option } : null), []);
+  const [confirmPlanStart, setConfirmPlanStart] = useState<string | null>(null);
+  const [loopEtaMinutes, setLoopEtaMinutes] = useState(30);
   const [initialDest] = useState(() => peekPendingDestination());
   useEffect(() => { if (initialDest) clearPendingDestination(initialDest); }, [initialDest]);
   const [poiArea, setPoiArea] = useState<string | null>(null);
@@ -137,7 +156,8 @@ export function HomeScreen({
   const [saving, setSaving] = useState<string | null>(null);
   const [recenter, setRecenter] = useState(0);
   const [places, setPlaces] = useState(initialPlaces);
-  const [dest, setDest] = useState<Destination | null>(initialDest);
+  const [pickedDest, setDest] = useState<Destination | null>(initialDest);
+  const dest = planActive ? planDestination : pickedDest;
   // Route answers per travel mode for the destination on screen (switching modes back is instant).
   const [routed, setRouted] = useState<{ base: string; byMode: Partial<Record<Mode, Routed>> } | null>(null);
   const [option, setOption] = useState(0);
@@ -148,7 +168,8 @@ export function HomeScreen({
   const [starting, setStarting] = useState(false);
   const [unsafe, setUnsafe] = useState(false);
   const [nearOpen, setNearOpen] = useState(false);
-  const [mode, setMode] = useState<Mode>("walk");
+  const [selectedMode, setSelectedMode] = useState<Mode>("walk");
+  const mode = plan?.mode ?? selectedMode;
   const [etaMin, setEtaMin] = useState(30);
   // With a provider ride/transit time, Mira proposes the ETA; she can set her own instead.
   const [ownTime, setOwnTime] = useState(false);
@@ -156,7 +177,7 @@ export function HomeScreen({
   const units = distanceUnits(countryIso);
   const exclude = useMemo(() => (user?.helpExclude ?? []) as HelpClass[], [user?.helpExclude]);
   const accepted = contacts.filter((c) => c.status === "accepted" && c.isDefault);
-  const [shareWithCircle, setShareWithCircle] = useState(true);
+  const [shareWithCircle, setShareWithCircle] = useState(false);
   // "Like usual" — only when her own finished journeys back it up (>= 3 to this saved place around this hour).
   const [habit, setHabit] = useState<HabitSuggestion | null>(null);
   const chromeRef = useRef<HTMLDivElement>(null);
@@ -165,24 +186,24 @@ export function HomeScreen({
 
   // First visit: show the short onboarding once (per-device convenience flag only).
   useEffect(() => {
-    if (user) return;
+    if (user || !planHydrated || planActive) return;
     try {
       if (!localStorage.getItem("mira.welcomed")) router.replace("/welcome");
     } catch {
       /* storage unavailable: stay on home */
     }
-  }, [user, router]);
+  }, [user, router, planHydrated, planActive]);
 
   // Keep the dot live while Home is on screen (paused when the app is hidden).
   const located = loc.status === "ok";
-  useEffect(() => (located ? watchWhileVisible() : undefined), [located]);
+  useEffect(() => (planHydrated && located && !planActive ? watchWhileVisible() : undefined), [planHydrated, located, planActive]);
   // Locality from the map tiles ("Kamla Nagar"), else the nearest named place we know.
   const area = loc.area ?? poiArea;
 
   // Where am I, what's around, and the Help Points near me (fetched ahead, so "I feel unsafe" is instant).
   const meKey = me ? `${me.lat.toFixed(3)},${me.lon.toFixed(3)}` : "";
   useEffect(() => {
-    if (!me) return;
+    if (!planHydrated || !me || planActive) return;
     let stop = false;
     (async () => {
       const nearbyReq = api<{ places: Place[]; notes: Note[] }>("/api/geo/nearby", { body: me });
@@ -203,31 +224,33 @@ export function HomeScreen({
       stop = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meKey, helpRetry]);
+  }, [meKey, helpRetry, planHydrated, planActive]);
 
   const pick = useCallback((d: Destination) => {
     setSearchOpen(false);
     setPinMode(false);
     setDest(d);
+    if (planActive && planDraft) setPlanDraft({ ...planDraft, loop: false, destination: { query: d.name, resolution: { source: d.resolutionSource ?? "selected_point", point: { lat: d.lat, lon: d.lon }, name: d.name } } });
     setOption(0);
-    setMode("walk");
+    if (!planActive) setSelectedMode("walk");
     setOwnTime(false);
     setSnap("half");
-  }, []);
+  }, [planActive, planDraft]);
 
-  // The way for the chosen destination from where I am, for the chosen mode (derived; refetches if either changes).
-  const routeBase = dest && me ? `${dest.lat},${dest.lon}|${meKey}` : null;
+  // A named plan origin is separate from current GPS. Never substitute "near me" on lookup failure.
+  const routeFrom = planActive ? planOrigin : me;
+  const routeBase = planHydrated && !planActive && dest && routeFrom ? `${dest.lat},${dest.lon}|${meKey}` : null;
   const byMode = useMemo(() => (routed && routed.base === routeBase ? routed.byMode : {}), [routed, routeBase]);
   const haveMode = Boolean(byMode[mode]);
   useEffect(() => {
-    if (!routeBase || !dest || !me || haveMode) return;
+    if (!routeBase || !dest || !routeFrom || haveMode) return;
     let stop = false;
     const want = mode;
-    void api<RouteInfo | ModeInfo>("/api/geo/route", { body: { from: me, to: { lat: dest.lat, lon: dest.lon }, ...(want === "walk" ? {} : { mode: want }) } }).then((res) => {
+    void api<RouteInfo | ModeInfo>("/api/geo/route", { body: { from: routeFrom, to: { lat: dest.lat, lon: dest.lon }, ...(want === "walk" ? {} : { mode: want }) } }).then((res) => {
       if (stop) return;
       const answer: Routed = { data: res.ok ? res.data : null, code: res.ok ? undefined : res.code };
       setRouted((prev) => ({ base: routeBase, byMode: { ...(prev?.base === routeBase ? prev.byMode : {}), [want]: answer } }));
-      if (want === "walk" && !res.ok && res.code === "too_far") setMode("ride"); // too far to walk: she's probably riding
+      if (!plan && want === "walk" && !res.ok && res.code === "too_far") setSelectedMode("ride"); // legacy map: too far to walk
     });
     return () => {
       stop = true;
@@ -256,7 +279,7 @@ export function HomeScreen({
     loading: routeLoading,
     minutes: chosen?.route.minutes ?? null,
     approximate: Boolean(chosen?.route.approximate),
-    arriveAt: chosen && now ? clock(new Date(now.getTime() + chosen.route.minutes * 60_000)) : null,
+    arriveAt: !planActive && chosen && now ? clock(new Date(now.getTime() + chosen.route.minutes * 60_000)) : null,
     failed: !routeLoading && !chosen && Boolean(byMode.walk),
     tooFar: walkTooFar,
     lighting: chosen?.lighting ?? null,
@@ -264,7 +287,7 @@ export function HomeScreen({
     helpCount: chosen?.helpPoints.length ?? 0,
     helpFirstMinutes: chosen?.helpPoints[0] ? Math.round((chosen.helpPoints[0].alongM ?? 0) / 75) : null,
     helpState: chosen?.helpEvidence?.state,
-    likeLastTime: shareWithCircle && user ? likeLast : null,
+    likeLastTime: !planActive && shareWithCircle && user ? likeLast : null,
   });
   const arrivalHelp = useMemo(() => (modeInfo?.arrivalHelp ?? []).filter((p) => !exclude.includes(p.cls)), [modeInfo, exclude]);
 
@@ -337,6 +360,7 @@ export function HomeScreen({
 
   /** Start a journey (her tap, always). `to` defaults to the destination on screen. */
   const startTrip = async (to?: { name: string; lat: number; lon: number }) => {
+    if (planActive) return toast("This is a planned route. Edit or clear the plan before starting a live journey.", "error");
     if (!user) return setSignIn("Sign in to start with Mira");
     const target = to ?? dest;
     if (!target || !me || starting) return;
@@ -368,6 +392,59 @@ export function HomeScreen({
     } else {
       toast(res.message, "error");
     }
+  };
+
+  const startChosenPlan = async () => {
+    if (!plan || !chosenPlanOption || starting) return;
+    if (!user) return setSignIn("Sign in to start with Mira");
+    const target = resolvedDestination(plan);
+    if (!target) return;
+    const planned = instantForLocal(plan.departure.local, plan.departure.timeZone);
+    if (!planned || Math.abs(planned.getTime() - Date.now()) > 30 * 60_000) return toast("Edit the plan's departure to now before starting.", "error");
+    setStarting(true);
+    const fix = await requestLocation();
+    const eligibility = planStartEligibility(plan, chosenPlanOption, fix.status === "ok" && fix.point ? { ...fix.point, at: fix.at } : null, Date.now());
+    if (!eligibility.ok) { setStarting(false); return toast(eligibility.reason, "error"); }
+    const result = await api<{ trip: TripView }>("/api/trips", { body: {
+      from: { lat: fix.point!.lat, lon: fix.point!.lon },
+      to: { lat: target.lat, lon: target.lon, name: target.name.slice(0, 80) },
+      routeMinutes: Math.max(1, Math.round(chosenPlanOption.minutes)),
+      share: sharesWithCircle,
+    } });
+    setStarting(false);
+    if (result.ok) {
+      keepTripRoute(result.data.trip.id, chosenPlanOption.geometry);
+      recordUsage("journey");
+      haptic("journey-start");
+      router.push("/trip");
+      router.refresh();
+    } else if (result.code === "trip_active") {
+      router.push("/trip");
+    } else toast(result.message, "error");
+  };
+
+  const startLoopCheckIn = async () => {
+    if (!plan?.loop || starting) return;
+    if (!user) return setSignIn("Sign in to start with Mira");
+    setStarting(true);
+    const fix = await requestLocation();
+    const eligibility = loopCheckInEligibility(plan, fix.status === "ok" && fix.point ? { ...fix.point, at: fix.at } : null, Date.now());
+    if (!eligibility.ok) { setStarting(false); return toast(eligibility.reason, "error"); }
+    const result = await api<{ trip: TripView }>("/api/trips", { body: {
+      from: { lat: fix.point!.lat, lon: fix.point!.lon },
+      mode: "walk",
+      etaMinutes: loopEtaMinutes,
+      tz: plan.departure.timeZone,
+      share: sharesWithCircle,
+    } });
+    setStarting(false);
+    if (result.ok) {
+      recordUsage("journey");
+      haptic("journey-start");
+      router.push("/trip");
+      router.refresh();
+    } else if (result.code === "trip_active") router.push("/trip");
+    else toast(result.message, "error");
   };
 
   const savePlace = async (label: string, emoji: string) => {
@@ -564,7 +641,8 @@ export function HomeScreen({
   return (
     <div className="fixed inset-0 overflow-hidden">
       <h1 className="sr-only">Mira — where are you going?</h1>
-      <WorldMap tiles={tiles} me={me} dest={dest} route={mode === "walk" ? (chosen?.route.geometry ?? null) : (rideRoute?.geometry ?? null)} notes={[]} places={mapPlaces} recenter={recenter} lighting={mode === "walk" ? (chosen?.lighting?.segments ?? null) : null} onPlaceClick={onPlaceClick} onLongPress={onLongPress} onMapClick={onMapClick} onArea={setArea} label="Map around your location" padding={wide ? MAP_PADDING_WIDE : MAP_PADDING} />
+      <WorldMap tiles={tiles} me={planHydrated && !planActive ? me : null} dest={plan?.loop && planOrigin ? planOrigin : dest} route={planActive ? planGeometry : mode === "walk" ? (chosen?.route.approximate ? null : chosen?.route.geometry ?? null) : (rideRoute?.geometry ?? null)} notes={[]} places={planActive ? [] : mapPlaces} recenter={recenter} lighting={planActive ? null : mode === "walk" ? (chosen?.lighting?.segments ?? null) : null} onPlaceClick={onPlaceClick} onLongPress={onLongPress} onMapClick={onMapClick} onArea={setArea} label={planActive ? "Map for your plan" : "Map around your location"} padding={wide ? MAP_PADDING_WIDE : MAP_PADDING} />
+      {planActive ? <div className="pointer-events-none absolute inset-x-4 top-24 z-20 mx-auto max-w-xl"><div className="pointer-events-auto rounded-[var(--radius-card)] border border-line bg-surface/95 p-3 text-sm shadow-[var(--shadow-card)]"><p className="font-semibold">{plan ? `${plan.activity} · ${plan.origin.kind === "device" ? "From here" : plan.origin.query}${plan.loop ? " · loop" : ` → ${plan.destination?.query}`}` : "Your plan is still being entered"}</p><p className="text-xs text-ink-muted">{plan ? `${plan.departure.local} (${plan.departure.timeZone}) · ` : ""}Current map data only; planned-time service is not checked.</p><Link href="/plan" className="inline-flex min-h-11 items-center font-semibold text-accent-strong">Edit plan</Link></div></div> : null}
 
       {/* Top: greeting, and help that's always one tap away */}
       <div className="mira-chrome pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.9rem,env(safe-area-inset-top))]">
@@ -654,7 +732,7 @@ export function HomeScreen({
         </div>
       </div>
 
-      {me ? (
+      {me && !planActive ? (
         <button
           type="button"
           aria-label="Centre on my location"
@@ -680,7 +758,17 @@ export function HomeScreen({
           </div>
         ) : null}
 
-        {dest ? (
+        {planActive && plan?.loop && plan.mode === "walk" && planOrigin ? (
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold">Loop from {plan.origin.kind === "named" ? plan.origin.query : "here"}</h2>
+            <PlanOptions plan={plan} />
+            <p className="text-sm text-ink-muted">No loop route or walking time is verified. Choose your own check-in time; this journey will not detect when you return.</p>
+            <label className="block text-sm font-semibold">Check in after<select value={loopEtaMinutes} onChange={(e) => { setLoopEtaMinutes(Number(e.target.value)); setConfirmPlanStart(null); }} className="mt-1 min-h-11 w-full rounded-lg border border-line bg-surface px-3">{ETA_CHOICES.filter((minutes) => minutes <= 180).map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</select></label>
+            {activeTrip ? <Link href="/trip" className="inline-flex min-h-11 items-center text-accent-strong underline">Open active journey</Link> : confirmPlanStart === "loop" ? <div className="rounded-lg border border-line p-3"><p className="text-sm">Start a manual check-in-only loop now? Mira will request a fresh position and check that you are near the planned origin. No route or automatic arrival is available. {sharesWithCircle ? `Mira will attempt to notify ${names(circle.map((c) => c.name))}.` : "Nobody in your Circle will be notified. You can send a live link yourself."}</p><div className="mt-2 flex gap-2"><Button variant="primary" onClick={() => void startLoopCheckIn()} busy={starting} busyLabel="Checking location…">Confirm loop check-in</Button><Button variant="secondary" onClick={() => setConfirmPlanStart(null)}>Cancel</Button></div></div> : <Button variant="primary" size="lg" onClick={() => setConfirmPlanStart("loop")}><Icon name="walk" /> Start manual loop check-in</Button>}
+            {user && circle.length ? <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Who follows this journey">{[[true, `Share with ${names(circle.map((c) => c.name))}`], [false, "Just me"]].map(([value, label]) => <button key={String(value)} type="button" role="radio" aria-checked={shareWithCircle === value} onClick={() => setShareWithCircle(value as boolean)} className={cx("min-h-11 rounded-full border-2 px-3 text-sm font-semibold", shareWithCircle === value ? "border-accent bg-accent-soft text-accent-strong" : "border-line text-ink-muted")}>{label as string}</button>)}</div> : null}
+            <p className="text-xs text-ink-muted">{!user ? "Sign in is needed to start a live check-in; planning stays available without it." : sharesWithCircle ? circleStartLine() : "Nobody is alerted automatically. You can choose to send a live link after starting."}</p>
+          </div>
+        ) : dest ? (
           <div className="animate-rise">
             <div className="flex items-start gap-3">
               <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink"><Icon name={kindIcon(dest.kind ?? "")} /></span>
@@ -692,11 +780,11 @@ export function HomeScreen({
                   ) : rideRoute && !manualEta ? (
                     <p className="text-ink-muted">
                       <strong className="text-ink">{formatMinutes(rideRoute.minutes)}</strong> {TRAVEL_MODE_INFO[mode].by} · {formatDistance(rideRoute.meters, units)}
-                      {now ? ` · arrive around ${clock(new Date(now.getTime() + rideRoute.minutes * 60_000))}` : ""}
+                      {!planActive && now ? ` · arrive around ${clock(new Date(now.getTime() + rideRoute.minutes * 60_000))}` : ""}
                     </p>
                   ) : (
                     <p className="text-ink-muted">
-                      <strong className="text-ink">{TRAVEL_MODE_INFO[mode].label}</strong> · expected in {formatMinutes(etaMin)}
+                      <strong className="text-ink">{TRAVEL_MODE_INFO[mode].label}</strong>{planActive ? " · travel time unavailable for this plan" : ` · expected in ${formatMinutes(etaMin)}`}
                     </p>
                   )
                 ) : chosen ? (
@@ -704,8 +792,8 @@ export function HomeScreen({
                     Walking · {formatDistance(chosen.route.meters, units)}
                     {chosen.route.approximate ? " · approx." : ""}
                   </p>
-                ) : !me ? (
-                  <p className="text-ink-muted">Turn on location to see the way from here.</p>
+                ) : !routeFrom ? (
+                  <p className="text-ink-muted">{planActive ? "Resolve your named origin in the plan to check this way." : "Turn on location to see the way from here."}</p>
                 ) : null}
               </div>
               <button
@@ -713,6 +801,7 @@ export function HomeScreen({
                 aria-label="Close"
                 onClick={() => {
                   setDest(null);
+                  if (planActive && planDraft) setPlanDraft({ ...planDraft, destination: { ...planDraft.destination, resolution: null } });
                   setSnap("peek");
                 }}
                 className="grid size-11 place-items-center rounded-full bg-sunken"
@@ -723,15 +812,15 @@ export function HomeScreen({
 
             <div className="mt-3 grid grid-cols-3 gap-1 rounded-[var(--radius-control)] bg-sunken p-1" role="radiogroup" aria-label="How are you going?">
               {TRAVEL_MODES.map((m) => (
-                <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className={cx("min-h-10 rounded-[calc(var(--radius-control)-4px)] text-sm font-medium transition-colors duration-150", mode === m ? "bg-surface text-ink shadow-[var(--shadow-float)]" : "text-ink-muted")}>
+                <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => { if (planActive && planDraft) setPlanDraft({ ...planDraft, mode: m }); else setSelectedMode(m); }} className={cx("min-h-10 rounded-[calc(var(--radius-control)-4px)] text-sm font-medium transition-colors duration-150", mode === m ? "bg-surface text-ink shadow-[var(--shadow-float)]" : "text-ink-muted")}>
                   {TRAVEL_MODE_INFO[m].label}
                 </button>
               ))}
             </div>
 
             {/* What's known about getting there (short, facts only), then the way to start, then the details. */}
-            {mode === "walk" ? (
-              me ? (
+            {planActive && plan ? <div className="mt-3"><PlanOptions plan={plan} onRoute={setPlanGeometry} onChoice={choosePlan} /></div> : mode === "walk" ? (
+              routeFrom ? (
                 <>
                   <MiraLine line={walkLine} className="mt-3" />
                   {!routeLoading && options.length > 1 ? <RouteOptions options={options} selected={option} onSelect={setOption} /> : null}
@@ -740,12 +829,12 @@ export function HomeScreen({
             ) : routeLoading ? null : (
               <div className="mt-3">
                 {walkTooFar ? <p className="text-xs text-ink-subtle">Too far to walk from here, so Mira switched to {TRAVEL_MODE_INFO.ride.label}.</p> : null}
-                {manualEta ? (
+                {planActive ? <p className="text-xs text-ink-muted">{rideRoute ? "This is a current route estimate only." : "No provider travel time is available."} The planned departure time has not been checked against provider service.</p> : manualEta ? (
                   <>
                     {rideRoute ? null : (
                       <p className="text-sm text-ink-muted">
-                        {!me
-                          ? "Turn on location to see the time from here."
+                        {!routeFrom
+                          ? planActive ? "Resolve your named origin in the plan to check a route." : "Turn on location to see the time from here."
                           : modeRes?.code === "too_far"
                           ? "That's further than a journey Mira can follow (up to 4 hours)."
                           : mode === "ride"
@@ -812,9 +901,7 @@ export function HomeScreen({
               </section>
             ) : null}
             <div className="mt-3">
-              <Button variant="primary" size="lg" onClick={() => void startTrip()} busy={starting} busyLabel="Starting…" disabled={!me || (mode !== "walk" && routeLoading)}>
-                <Icon name={mode === "walk" ? "walk" : "route"} /> Go with Mira
-              </Button>
+              {planActive ? plan?.mode === "walk" && chosenPlanOption ? confirmPlanStart === planRouteKey ? <div className="rounded-lg border border-line p-3"><p className="text-sm">Start this walking journey now from your current position? Mira will check that you are near the planned origin. {sharesWithCircle ? `Mira will attempt to notify ${names(circle.map((c) => c.name))}.` : "Nobody in your Circle will be notified. You can send a live link yourself."}</p><div className="mt-2 flex gap-2"><Button variant="primary" onClick={() => void startChosenPlan()} busy={starting} busyLabel="Checking location…">Confirm start</Button><Button variant="secondary" onClick={() => setConfirmPlanStart(null)}>Cancel</Button></div></div> : <Button variant="primary" size="lg" onClick={() => setConfirmPlanStart(planRouteKey)}><Icon name="walk" /> Start chosen walk</Button> : <p className="text-sm text-ink-muted">Choose a mapped walking option before starting. Future plans can start when you are at the origin and ready to go.</p> : <Button variant="primary" size="lg" onClick={() => void startTrip()} busy={starting} busyLabel="Starting…" disabled={!me || (mode !== "walk" && routeLoading)}><Icon name={mode === "walk" ? "walk" : "route"} /> Go with Mira</Button>}
               {user && circle.length ? (
                 <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Who follows this journey">
                   {[
@@ -982,7 +1069,8 @@ export function HomeScreen({
           setSnap("peek");
         }}
         saved={places}
-        near={me}
+        near={planActive ? planOrigin : me}
+        osmOnly={planActive}
         placeholder="Search a place or address"
       />
       <UnsafeSheet

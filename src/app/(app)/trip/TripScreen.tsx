@@ -30,6 +30,8 @@ import { journeyNoun, modeWords } from "@/domain/travel-prefs";
 import type { EvidenceState } from "@/domain/evidence-state";
 import type { TripView } from "@/server/trips";
 import type { SafetyNet } from "@/server/health/safety-net";
+import { requestLocation } from "@/lib/location-store";
+import type { PlanOption, PlanOptionsResult } from "@/domain/plan-options";
 
 const time = (iso: string | number) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 const names = (list: string[]) => (list.length <= 2 ? list.join(" and ") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`);
@@ -65,12 +67,20 @@ export function TripScreen({
   const [trip, setTrip] = useState(initial);
   const [net, setNet] = useState(initialNet);
   const [me, setMe] = useState(initial.lastLocation ? { lat: initial.lastLocation.lat, lon: initial.lastLocation.lon } : null);
+  const [lastFixAt, setLastFixAt] = useState<number | null>(initial.lastLocation ? Date.parse(initial.lastLocation.at) : null);
+  const [lastAccuracyM, setLastAccuracyM] = useState<number | null>(null);
+  const [lastUploadAt, setLastUploadAt] = useState<number | null>(null);
+  const [visible, setVisible] = useState(true);
   // The planned route lives on this device only (kept when the journey was started from the route sheet).
   const [route, setRoute] = useState<Array<[number, number]> | null>(() => (typeof window === "undefined" ? null : tripRoute(initial.id)));
   const [help, setHelp] = useState<{ at: { lat: number; lon: number }; points: HelpPoint[]; failed?: boolean; partial?: boolean } | null>(null);
   const countryIso = useCountry().iso;
   const helpInFlight = useRef(false);
   const [focus, setFocus] = useState<RankedHelpPoint | null>(null);
+  const [pendingChange, setPendingChange] = useState<RankedHelpPoint | null>(null);
+  const [manualEtaMinutes, setManualEtaMinutes] = useState(30);
+  const [reviewedRoute, setReviewedRoute] = useState<PlanOption | null>(null);
+  const [routeReviewMessage, setRouteReviewMessage] = useState<string | null>(null);
   const [unsafe, setUnsafe] = useState(false);
   const [area, setAreaName] = useState<string | null>(null);
   const exclude = helpExclude as HelpClass[];
@@ -142,6 +152,7 @@ export function TripScreen({
         return;
       }
       setUploadFailing(false);
+      setLastUploadAt(Date.now());
       if (r.data.arrived) {
         haptic("arrived");
         toast(sharedOk.length ? "You made it! Live sharing has stopped." : "You made it!");
@@ -156,8 +167,10 @@ export function TripScreen({
     if (!me || route || !walking) return;
     void api<{ route: { geometry: Array<[number, number]>; approximate: boolean } }>("/api/geo/route", { body: { from: me, to: { lat: trip.destination.lat, lon: trip.destination.lon } } }).then((r) => {
       if (!r.ok) return;
-      setRoute(r.data.route.geometry);
-      if (!r.data.route.approximate) keepTripRoute(trip.id, r.data.route.geometry);
+      if (!r.data.route.approximate) {
+        setRoute(r.data.route.geometry);
+        keepTripRoute(trip.id, r.data.route.geometry);
+      }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me !== null]);
@@ -202,6 +215,8 @@ export function TripScreen({
       const p = { lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy };
       setGps("ok");
       setMe({ lat: p.lat, lon: p.lon });
+      setLastFixAt(Date.now());
+      setLastAccuracyM(p.accuracy);
       setLocation(p);
       const last = lastSent.current;
       // Every 20 s, or sooner after 50 m — but never more than every 8 s: in a fast ride 50 m passes in
@@ -216,7 +231,19 @@ export function TripScreen({
       // TIMEOUT just means no new fix yet (e.g. standing still) — not a problem.
     };
     // No timeout: a phone standing still at a bus stop may not produce new fixes for a while.
-    const id = navigator.geolocation.watchPosition(onFix, onError, { enableHighAccuracy: true, maximumAge: 10_000 });
+    let id: number | null = null;
+    const startWatch = () => {
+      if (id !== null || document.visibilityState !== "visible") return;
+      id = navigator.geolocation.watchPosition(onFix, onError, { enableHighAccuracy: true, maximumAge: 10_000 });
+    };
+    const stopWatch = () => { if (id !== null) navigator.geolocation.clearWatch(id); id = null; };
+    const onVisibility = () => {
+      const shown = document.visibilityState === "visible";
+      setVisible(shown);
+      if (shown) { startWatch(); void refresh(); } else stopWatch();
+    };
+    onVisibility();
+    document.addEventListener("visibilitychange", onVisibility);
     // Keep-alive: while you wait somewhere, re-send your spot every minute so contacts
     // (and the "location paused" check) know the trip is live, not frozen.
     const keepAlive = setInterval(() => {
@@ -229,10 +256,11 @@ export function TripScreen({
       );
     }, 60_000);
     return () => {
-      navigator.geolocation.clearWatch(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+      stopWatch();
       clearInterval(keepAlive);
     };
-  }, [open, upload]);
+  }, [open, upload, refresh]);
 
   // Keep the screen awake during a live trip (browsers pause location when hidden).
   useEffect(() => {
@@ -276,6 +304,37 @@ export function TripScreen({
     const r = await shareLiveLink(trip.shareUrl, trip.autoArrival ? trip.destination.name : null, trip.mode);
     if (r === "copied") toast("Live link copied — anyone you send it to can follow until you arrive.");
     if (r === "failed") toast("Couldn't copy the link on this device.", "error");
+  };
+
+  const changeDestination = async (to: { lat: number; lon: number; name: string }, etaMinutes: number, geometry: [number, number][] | null = null) => {
+    setBusy("change");
+    const r = await api<{ trip: TripView }>(`/api/trips/${trip.id}/change`, { body: { to, etaMinutes } });
+    setBusy(null);
+    if (!r.ok) return toast(r.message, "error");
+    clearTripRoutes();
+    setRoute(geometry);
+    if (geometry) keepTripRoute(trip.id, geometry);
+    setTrip(r.data.trip);
+    setFocus(null);
+    setPendingChange(null);
+    setReviewedRoute(null);
+    setUnsafe(false);
+    toast("Journey change saved. Your current contacts and live link are unchanged.");
+  };
+
+  const reviewCurrentRoute = async () => {
+    setBusy("route-review");
+    setRouteReviewMessage(null);
+    setReviewedRoute(null);
+    const fix = await requestLocation();
+    if (!fix.point || fix.point.accuracy > 100 || Date.now() - fix.at > 30_000) { setBusy(null); return setRouteReviewMessage("A recent, accurate position is needed to review the route."); }
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const local = new Intl.DateTimeFormat("sv-SE", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date()).replace(" ", "T");
+    const r = await api<PlanOptionsResult>("/api/plan/options", { body: { from: { lat: fix.point.lat, lon: fix.point.lon }, to: { lat: trip.destination.lat, lon: trip.destination.lon }, departure: { local, timeZone: zone } } });
+    setBusy(null);
+    if (!r.ok) return setRouteReviewMessage("The mapped route check failed. Keep your current ETA or set one manually.");
+    if (r.data.state !== "ready" || !r.data.options.length) return setRouteReviewMessage(`${r.data.detail} Your existing route and ETA are unchanged.`);
+    setReviewedRoute(r.data.options[0]);
   };
 
   const left = new Date(trip.etaAt).getTime() - now;
@@ -327,6 +386,9 @@ export function TripScreen({
   }
 
   const netDown = !net.worker;
+  const fixAge = lastFixAt === null || !clock ? null : Math.max(0, Math.floor((clock.getTime() - lastFixAt) / 1000));
+  const sharedAt = lastUploadAt ?? (trip.lastLocation ? Date.parse(trip.lastLocation.at) : null);
+  const sharedAge = sharedAt === null || !clock ? null : Math.max(0, Math.floor((clock.getTime() - sharedAt) / 1000));
   const attention = netDown || gps !== "ok" || uploadFailing || trip.state === "missed" || trip.sharedWith.some((c) => c.viaEmail && !c.notified);
   const next = journeyNextAction({ missed: trip.state === "missed", whatsapp: onWhatsApp.map((c) => c.name), opened, following: sharedOk.length, canShare: Boolean(trip.shareUrl) });
   // Honest alert behaviour: only claim an automatic email when email works, someone accepted and got the link, and the worker is up.
@@ -368,6 +430,14 @@ export function TripScreen({
             <p className="mt-1 text-sm text-ink-muted">Mira&apos;s background service isn&apos;t responding, so nobody would be told if you don&apos;t arrive. Send your live link, or let someone know directly.</p>
           </div>
         ) : null}
+        <p role="status" className="mb-4 rounded-[var(--radius-card)] bg-sunken p-3 text-sm text-ink-muted">
+          {visible ? "Foreground location is on while this journey screen is visible. " : "This screen is hidden; location updates are paused. "}
+          {fixAge === null ? "No device position yet. " : `Last device position ${fixAge < 60 ? `${fixAge} seconds` : `${Math.floor(fixAge / 60)} minutes`} ago. `}
+          {lastAccuracyM === null ? "Position accuracy is not available for the saved fix. " : `Device reported about ${Math.round(lastAccuracyM)} m accuracy. `}
+          {sharedAge === null ? "No position has reached Mira yet. " : `Last position shared ${sharedAge < 60 ? `${sharedAge} seconds` : `${Math.floor(sharedAge / 60)} minutes`} ago. `}
+          {fixAge !== null && fixAge >= 120 ? "The map marker is a last known position, not your current position. " : ""}
+          Browsers may stop updates when locked; missed check-ins still depend on the background service.
+        </p>
         {gps !== "ok" || uploadFailing ? (
           <div role="status" className="mb-4 rounded-[var(--radius-card)] bg-warm-soft p-4">
             <p className="font-semibold text-warm">{gps === "denied" ? "Location is off for Mira" : gps === "lost" ? "Can't get your location right now" : "Can't reach Mira right now"}</p>
@@ -442,6 +512,7 @@ export function TripScreen({
               {aheadCount ? ` · ${aheadCount} Help Point${aheadCount === 1 ? "" : "s"} along it` : ""}
             </p>
           ) : null}
+          {walking ? <div className="mt-3 rounded-[var(--radius-card)] bg-sunken p-3 text-sm"><Button variant="secondary" onClick={() => void reviewCurrentRoute()} busy={busy === "route-review"}>Review route from here</Button>{routeReviewMessage ? <p role="status" className="mt-2">{routeReviewMessage}</p> : null}{reviewedRoute ? <div className="mt-2"><p>A mapped walk from your latest position is about {Math.round(reviewedRoute.minutes)} min. Source: {reviewedRoute.evidence[0]?.status === "known" ? reviewedRoute.evidence[0].source.label : "unknown"}. Check actual access and conditions yourself.</p><Button variant="primary" onClick={() => void changeDestination(trip.destination, Math.min(235, Math.max(5, Math.ceil(reviewedRoute.minutes * 1.25) + 5)), reviewedRoute.geometry)} busy={busy === "change"}>Confirm route and ETA update</Button></div> : null}</div> : null}
         </div>
 
 
@@ -511,9 +582,9 @@ export function TripScreen({
               <div className="min-w-0 flex-1">
                 <p className="font-semibold">{focus.name}</p>
                 <p className="text-sm text-ink-muted">
-                  {HELP_CLASSES[focus.cls].label} · about {focus.minutes} min walk · {hoursLine(focus)}
+                  {HELP_CLASSES[focus.cls].label} · roughly {focus.minutes} min by distance, route unverified · {hoursLine(focus)}
                 </p>
-                <p className="mt-1 text-xs text-ink-subtle">{HELP_CLASSES[focus.cls].staffing}. Mira can&apos;t confirm who&apos;s there right now.</p>
+                <p className="mt-1 text-xs text-ink-subtle">Staffing is not verified. Check the place directly before relying on it.</p>
               </div>
               <button type="button" aria-label="Close" onClick={() => setFocus(null)} className="grid size-11 shrink-0 place-items-center rounded-full bg-surface">
                 <Icon name="close" className="size-4" />
@@ -522,6 +593,8 @@ export function TripScreen({
             <a href={directions(focus)} target="_blank" rel="noopener noreferrer" className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-full bg-surface text-sm font-semibold text-accent-strong">
               Directions in Maps <Icon name="arrow" className="size-4" />
             </a>
+            {trip.state === "active" ? <Button variant="secondary" className="mt-2" onClick={() => { setPendingChange(focus); setManualEtaMinutes(30); }}>Change journey to this place</Button> : null}
+            {pendingChange?.id === focus.id ? <div className="mt-2 rounded-lg bg-surface p-3 text-sm"><p>This changes your destination and check-in ETA. The route, opening hours and staffing have not been verified. Your existing contacts and live link stay the same; nobody new is notified.</p><label className="mt-2 block">Minutes until check-in <input type="number" min={5} max={235} value={manualEtaMinutes} onChange={(e) => setManualEtaMinutes(Number(e.target.value))} className="ml-2 w-20 rounded border border-line p-2" /></label><div className="mt-2 flex gap-2"><Button variant="primary" disabled={!Number.isInteger(manualEtaMinutes) || manualEtaMinutes < 5 || manualEtaMinutes > 235} busy={busy === "change"} onClick={() => void changeDestination({ lat: focus.lat, lon: focus.lon, name: focus.name.slice(0, 80) }, manualEtaMinutes)}>Confirm change</Button><Button variant="secondary" onClick={() => setPendingChange(null)}>Cancel</Button></div></div> : null}
           </div>
         ) : nextHelp ? (
           <button type="button" onClick={() => setFocus(nextHelp)} className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-[var(--radius-card)] px-4 py-2 text-left hover:bg-sunken">
@@ -529,7 +602,7 @@ export function TripScreen({
             <span className="min-w-0 flex-1">
               <span className="block text-[13px] font-medium text-ink-subtle">Nearest Help Point{nextHelp.ahead ? " ahead" : ""}</span>
               <span className="block truncate font-semibold">
-                {nextHelp.name} <span className="font-normal text-ink-muted">· {HELP_CLASSES[nextHelp.cls].label} · {nextHelp.minutes} min</span>
+                {nextHelp.name} <span className="font-normal text-ink-muted">· {HELP_CLASSES[nextHelp.cls].label} · roughly {nextHelp.minutes} min, route unverified</span>
               </span>
             </span>
             <Icon name="chevron" className="size-4" />
@@ -567,7 +640,8 @@ export function TripScreen({
       <UnsafeSheet
         open={unsafe}
         onClose={() => setUnsafe(false)}
-        me={me}
+        me={fixAge !== null && fixAge < 120 ? me : null}
+        staleLocation={fixAge !== null && fixAge >= 120}
         helpPoints={help?.points ?? []}
         helpLoading={!help}
         helpFailed={Boolean(help?.failed)}
