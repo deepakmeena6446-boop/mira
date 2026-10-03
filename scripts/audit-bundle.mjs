@@ -27,9 +27,13 @@ function* walk(d) {
 let files = 0;
 const findings = [];
 for (const p of walk(root)) {
-  files += 1;
+  if (/\.(?:js|css)$/.test(p)) files += 1;
   const text = readFileSync(p, "utf8");
   for (const n of needles) if (text.includes(n)) findings.push(`${p}: contains ${n.length > 24 ? n.slice(0, 6) + "…(secret value)" : n}`);
+}
+if (files === 0) {
+  console.error("Client bundle audit FAILED: no JavaScript or CSS client assets were scanned.");
+  process.exit(2);
 }
 if (findings.length) {
   console.error("Client bundle audit FAILED:\n" + findings.join("\n"));

@@ -1,6 +1,6 @@
 # Core journeys — current versus target
 
-All target flows use the same intent → evidence → options → plan → move → adapt/support loop. The target is a contract, not current behaviour. “Unknown” must never be recast as “no problem.”
+All target flows use the same intent → evidence → options → plan → move → adapt/support loop. The “Current” column is the original pre-vNext baseline retained for migration comparison; current local implementation and remaining gaps are in [20](20_ACCEPTANCE_TESTS.md). The target is a contract, not current behaviour. “Unknown” must never be recast as “no problem.”
 
 ```mermaid
 flowchart LR

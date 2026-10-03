@@ -16,6 +16,7 @@ const body = z
       .string()
       .regex(/^[A-Za-z]{2}$/)
       .nullish(),
+    source: z.literal("osm").optional(),
   })
   .strict();
 
@@ -30,8 +31,8 @@ export const POST = handle(async (req: Request) => {
   const sql = getSql();
   const now = new Date();
   await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "geo:help:m", max: 240, windowMs: 60_000 }], now);
-  const { country, ...p } = await readJson(req, body, 256);
-  const evidence = await helpPointsNearEvidence(getGeo(), p, { country });
+  const { country, source, ...p } = await readJson(req, body, 256);
+  const evidence = await helpPointsNearEvidence(getGeo(source), p, { country });
   const points = "data" in evidence ? await withoutCorroboratedGone(sql, evidence.data, now) : [];
   const state = "data" in evidence ? { ...evidence, data: points, state: evidence.state === "ready" && !points.length ? "empty" : evidence.state } : evidence;
   return json({ helpPoints: points, evidence: state });

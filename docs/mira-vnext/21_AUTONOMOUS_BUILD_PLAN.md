@@ -1,6 +1,6 @@
 # Autonomous build plan
 
-An agent can be instructed: **“Read `docs/mira-vnext/00_README.md` and execute Phase N.”** Execute only one phase per task, inspect the current tree first, and preserve user changes. Each phase ends with an operationally usable app, evidence linked to [20](20_ACCEPTANCE_TESTS.md), and a `PASS`, `FAIL` or `KNOWN-RISK` record. A `FAIL` blocks the next dependent phase; a known safety/privacy or false-assurance defect is never waivable. Phase 0 and Phase 1 can start without a founder product decision. This plan does not authorize deployment.
+An agent can be instructed to read `docs/mira-vnext/00_README.md` and complete the remaining work across phases. Inspect the current tree first and preserve user changes. Keep each phase's evidence linked to [20](20_ACCEPTANCE_TESTS.md), with a `PASS`, `FAIL` or `KNOWN-RISK` record. A `FAIL` blocks dependent functionality; a known safety/privacy or false-assurance defect is never waivable. [D30](22_DECISION_LOG.md) deferred new external API and partner integrations for the **2026-10-02 local build only**. Later sessions should use the recorded provider backlog and actual credentials/source rights; missing inputs still require honest disabled states. This plan does not authorize deployment.
 
 ## Phase 0 — Baseline and contracts
 
@@ -19,13 +19,13 @@ An agent can be instructed: **“Read `docs/mira-vnext/00_README.md` and execute
 ## Phase 1 — Intent and plan, as a vertical entry path
 
 - **Objective:** let a guest or signed-in user express a local or future movement intent and retain it across the existing entry surfaces.
-- **In scope:** typed, ephemeral plan state for purpose, origin/destination/loop, planned time/time zone, mode, constraints and explicit source of location; named-origin path without device permission; search ambiguity and edit/clear controls; compatibility adapters for Today/Around/Mira.
-- **Out of scope:** safety recommendation, new home IA, persistence by default, background location, multi-leg travel.
+- **In scope:** typed, ephemeral plan state for purpose, origin/destination/loop, planned time/time zone, mode, constraints and explicit source of location; named-origin path without device permission; search ambiguity and edit/clear controls; Go as the intent entry with compatibility routes for Today/Around/Mira.
+- **Out of scope:** safety recommendation, visual rebrand, persistence by default, background location, multi-leg travel.
 - **Dependencies:** Phase 0 contracts.
-- **Exact systems:** `src/app/(app)/TodayScreen.tsx`, `around/*`, `mira/MiraChat.tsx`, `src/lib/location-store.ts`, `src/app/api/geo/search/*`, new pure plan model/state code; auth boundary if guest access is added.
-- **Expected behaviour:** S1/S3 can enter time and remote origin; map/text navigation does not replace intent with “near me”; useful provider/place result or explicit resolution failure appears.
-- **Acceptance:** no location grant or sign-in for transient plan; no silent plan loss on navigation; clear state when geocode ambiguous/unavailable.
-- **Required tests:** unit serialization/state tests, integration guest/no-location/future-time tests, browser back/deep-link tests.
+- **Exact systems:** `src/app/(app)/{GoScreen,TodayScreen}.tsx`, `src/components/app/TabBar.tsx`, `around/*`, `mira/MiraChat.tsx`, `src/lib/location-store.ts`, `src/app/api/geo/search/*`, new pure plan model/state code; auth boundary if guest access is added.
+- **Expected behaviour:** Go opens with one intent action; S1/S3 can enter time and remote origin; map/text navigation does not replace intent with “near me”; useful provider/place result or explicit resolution failure appears.
+- **Acceptance:** no location grant or sign-in for transient plan; no silent plan loss on navigation; clear state when geocode ambiguous/unavailable; legacy entry, deep links and Emergency remain reachable.
+- **Required tests:** unit serialization/state tests, integration guest/no-location/future-time tests, Go/legacy entry and browser back/deep-link tests.
 - **Privacy/safety:** plan ephemeral; no analytics copy; obtain exact location only at “from here.”
 - **Rollback/stop:** feature flag or adapter fallback to current entry routes; stop if unauthenticated query path leaks account data or old routes break.
 - **Documentation:** update `14`, `17`, `20` and phase result.
@@ -75,15 +75,15 @@ An agent can be instructed: **“Read `docs/mira-vnext/00_README.md` and execute
 ## Phase 5 — Remote, multi-leg and global baseline
 
 - **Objective:** extend the same plan to late arrival and basic domestic/international travel without assuming local density.
-- **In scope:** destination time zones, departure/arrival legs, reviewed country essentials, per-claim coverage, hotel/airport/station named-place resolution, provider/manual handoff when service facts unavailable.
+- **In scope:** destination time zones, departure/arrival legs, reviewed country essentials, per-claim coverage, hotel/airport/station named-place resolution, provider/manual handoff when service facts unavailable; explicit saved-plan and habit-consent controls in Journeys/You.
 - **Out of scope:** bookings, fare guarantee, visa/legal advice, global 24-hour transport promise, unsupported emergency number.
 - **Dependencies:** Phases 1–4 and audited country/provider data.
-- **Exact systems:** plan/domain models, geo search/route providers, country registry/emergency UI, destination/arrival screens, Ask context/tools, tests.
-- **Expected behaviour:** S5–S6 can plan remotely without current location and see separate leg evidence and gaps.
-- **Acceptance:** local time conversions and coverage labels correct; unknown-country emergency pathway explicit; unsupported late transport never described as available.
-- **Required tests:** DST and time-zone fixtures, countries with full/partial/unknown coverage, no-route/provider-quota, S5–S6 browser tasks.
-- **Privacy/safety:** future hotel and journey details ephemeral unless saved; no itinerary analytics or contact exposure.
-- **Rollback/stop:** disable multi-leg entry, keep single-leg plan; stop on wrong time zone/emergency number or invented local facts.
+- **Exact systems:** plan/domain models, geo search/route providers, country registry/emergency UI, destination/arrival screens, Ask context/tools, Go/Journeys/You entry, `/api/me/plans`, `src/server/account/{saved-plans,habits}.ts`, migrations `0020–0021`, tests.
+- **Expected behaviour:** S5–S6 can plan remotely without current location and see separate leg evidence and gaps; an explicit save preserves a plan, while new and legacy habit learning waits for consent.
+- **Acceptance:** local time conversions and coverage labels correct; unknown-country emergency pathway explicit; unsupported late transport never described as available; save/open/delete is owner-scoped and opening never starts or shares a journey.
+- **Required tests:** DST and time-zone fixtures, countries with full/partial/unknown coverage, no-route/provider-quota, S5–S6 browser tasks, saved-plan encryption/expiry/owner tests, Go and legacy-entry regression.
+- **Privacy/safety:** future hotel and journey details ephemeral unless explicitly saved; no itinerary analytics or contact exposure; migrations do not treat the former habit default as consent.
+- **Rollback/stop:** disable multi-leg entry and use the legacy entry flag if needed; keep single-leg plan and forward-compatible schema; stop on wrong time zone/emergency number, invented local facts or consent/retention failure.
 - **Documentation:** update `12`, `14`, `16`, `20` and generated coverage only through its generator if registry changes.
 
 ## Phase 6 — Eligible community and local developments
@@ -100,19 +100,11 @@ An agent can be instructed: **“Read `docs/mira-vnext/00_README.md` and execute
 - **Rollback/stop:** feature flag individual claim class; stop if moderation capacity, false-positive impact or data rights are inadequate.
 - **Documentation:** update `09`, `10`, `16`, `20`, moderation and contribution policies.
 
-## Phase 7 — Entry architecture, validation and release candidate
+## Engineering completion check
 
-- **Objective:** make the proven paths feel like one product, then test whether they beat the existing alternatives for the selected user segment.
-- **In scope:** Go/Journeys/You navigation, contextual map/Ask/contribution, compatibility routes and links, accessibility and tone, end-to-end seven-scenario research and operational review.
-- **Out of scope:** unvalidated new category, universal rollout, visual rebrand for its own sake, native app or provider capability without separate contract.
-- **Dependencies:** Phases 1–5 pass; Phase 6 may remain disabled where coverage is not ready. Existing public-beta gate remains separate.
-- **Exact systems:** `TabBar`, `(app)/layout.tsx`, Today/Around/Mira/Contribute/Me/Trips screens, deep links, notifications, analytics, tests and deploy/incident docs.
-- **Expected behaviour:** Go leads with a useful movement decision; active journey dominates when present; emergency remains direct; old links retain intent.
-- **Acceptance:** all seven scenarios and cross-cutting tests in `20` pass; measured task comparison shows meaningful added value over Maps + general AI; no privacy/safety stop finding; operations can roll back.
-- **Required tests:** complete unit/integration/e2e suite, iOS/Android devices, accessibility audit, pen/privacy review, moderated comparative study, worker/provider outage exercise.
-- **Privacy/safety:** no routine-based notifications without consent; no fear-based feed; approve event schema and retention before analytics enablement.
-- **Rollback/stop:** flag restores previous entry hierarchy while retaining migrated data/API compatibility; stop release if benchmark or critical gate fails.
-- **Documentation:** update `00`, `02`–`05`, `13`–`17`, `20`, `22`, public-beta checklist and user-facing privacy/support copy.
+There is no separate integration or external-user phase. The Go/Journeys/You entry, compatibility routes, explicit saved plans and habit-consent transition already exist locally; audit them against [15](15_V1_PRODUCT_CONTRACT.md) and [20](20_ACCEPTANCE_TESTS.md) as part of the core product. Engineering completion requires the seven scripted scenarios, privacy/emergency/worker regressions, device behaviour and supported source/provider claims to pass on the intended environment. Phase 6 enrichment may remain disabled where moderation and source gates are absent. A comparative user study may inform later product decisions, but it is not a build-completion gate. Deployment remains governed separately by [the public-beta checklist](../PUBLIC_BETA_RELEASE.md).
+
+For the 2026-10-02 local continuation, independently buildable gaps used deterministic fixtures and provider work was recorded for the following integration session. Continue from the latest audit rather than repeating completed local work. Do not mark a scenario or the overall V1 engineering build `PASS` on the strength of a placeholder or fixture where live evidence is required.
 
 ## Phase result template
 

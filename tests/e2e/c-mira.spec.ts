@@ -9,13 +9,15 @@ async function openMira(page: Page) {
 }
 
 test.describe("Mira — the companion (placeholder engine)", () => {
-  test("knows saved places, finds what's nearby, and starts a trip from chat", async ({ browser }) => {
+  test("keeps nearby tools and seeds a saved Home in the shared plan without starting", async ({ browser }) => {
     const { ctx, page } = await newUser(browser, "Kavya");
     await openRoute(page);
     await page.getByRole("button", { name: "🏠 Home" }).click();
     await expect(page.getByText("Saved as Home")).toBeVisible();
 
     await openMira(page);
+    await page.getByRole("button", { name: "Use current location for nearby questions" }).click();
+    await expect(page.getByRole("button", { name: "Use current location for nearby questions" })).toBeHidden();
     const box = page.getByPlaceholder("Message Mira…");
     await box.fill("pharmacy near me");
     await page.getByRole("button", { name: "Send" }).click();
@@ -23,10 +25,11 @@ test.describe("Mira — the companion (placeholder engine)", () => {
 
     await box.fill("take me home");
     await page.getByRole("button", { name: "Send" }).click();
-    await expect(page.getByRole("log").getByText("To Home", { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: /Go with Mira/ }).last().click();
-    await page.waitForURL("**/trip");
-    await expect(page.getByText(/To Home/).first()).toBeVisible();
+    await expect(page.getByRole("log")).toContainText("Which starting place should I use?");
+    const draft = await page.evaluate(() => JSON.parse(sessionStorage.getItem("mira.plan.v1") ?? "null")?.draft);
+    expect(draft.destination.resolution.source).toBe("saved_place");
+    expect(draft.destination.query).toBe("Home");
+    expect((await (await page.request.get("/api/trips/current")).json()).trip).toBeNull();
     await ctx.close();
   });
 
@@ -35,9 +38,8 @@ test.describe("Mira — the companion (placeholder engine)", () => {
     await openMira(page);
     await page.getByPlaceholder("Message Mira…").fill("someone is following me, I'm scared");
     await page.getByRole("button", { name: "Send" }).click();
-    await expect(page.getByRole("log").getByText(/If you're in danger right now/)).toBeVisible();
-    // Today's shared safety entry resolved the reviewed country profile; chat offers its direct dial.
-    await expect(page.getByRole("log").getByRole("link", { name: "Emergency call, 112" })).toHaveAttribute("href", "tel:112");
+    await expect(page.getByRole("log").getByText(/If you may be in danger, use Emergency now/)).toBeVisible();
+    await expect(page.getByRole("log").getByRole("button", { name: "Emergency options" })).toBeVisible();
     await page.getByPlaceholder("Message Mira…").fill("who are you");
     await page.getByRole("button", { name: "Send" }).click();
     await expect(page.getByRole("log").getByText(/I'm not an emergency service/)).toBeVisible();

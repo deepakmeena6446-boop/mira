@@ -24,7 +24,7 @@ const ARRIVAL_MAX = 5;
 
 export const dynamic = "force-dynamic";
 
-const body = z.object({ from: point, to: point, mode: z.enum(TRAVEL_MODES).default("walk") }).strict();
+const body = z.object({ from: point, to: point, mode: z.enum(TRAVEL_MODES).default("walk"), source: z.literal("osm").optional() }).strict();
 
 /** Help Points near the destination (the last walk of a ride or transit journey), nearest first, with whether the lookup worked. */
 async function helpAtArrival(geo: GeoProvider, to: GeoPoint): Promise<{ points: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> }> {
@@ -61,8 +61,8 @@ export const POST = handle(async (req: Request) => {
   const sql = getSql();
   const now = new Date();
   await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "geo:route:m", max: 480, windowMs: 60_000 }], now);
-  const { from, to, mode } = await readJson(req, body, 512);
-  const geo = getGeo();
+  const { from, to, mode, source } = await readJson(req, body, 512);
+  const geo = getGeo(source);
 
   if (mode !== "walk") {
     if (haversineMeters(from, to) > MAX_RIDE_M) throw new ApiError(400, "too_far", "That's further than a journey MIRA can follow (up to 4 hours).");

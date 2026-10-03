@@ -24,10 +24,12 @@ V1 is a **single intent-to-journey product** usable with baseline data in multip
 | Basic trip planning | Multiple journey legs or arrival/departure plans with reviewed country essentials, not itinerary/booking. |
 | Uncomfortable during journey | Immediate support/change/contact/emergency options without a chat delay or false open/staffed claim. |
 
+The S1 guest/no-location start requirement and the minimum route/time comparison remain an explicit acceptance question in [23](23_OPEN_QUESTIONS.md). A private tab timer must not be described as a monitored journey or used alone to pass S1.
+
 ## Explicit exclusions and gates
 
 No live background GPS promise, lock-screen turn guidance, automated crime prediction, universal risk score, incident feed, booking, ride transaction, global verified refuge, inferred routine alert or general lifestyle advice. A city-level local claim is **feature-gated by measured source coverage and verification operations**. If a source or provider is unavailable, V1 must continue at the honest baseline. Emergency and chosen journey support remain usable without AI.
 
-**V1 acceptance:** all seven tasks meet [20](20_ACCEPTANCE_TESTS.md), privacy/worker gates pass, and an external task comparison shows value over Google Maps + a current general AI assistant. A working build alone is not proof of safety or market fit. [Research benchmark design](../mira-product-research/MIRA_PRODUCT_RESEARCH_SYNTHESIS.md).
+**V1 engineering acceptance:** all seven scripted tasks and the cross-cutting gates in [20](20_ACCEPTANCE_TESTS.md) pass, including privacy, emergency, worker, device and evidence checks. External-user comparison is useful later for product learning; it is not a condition for marking the build complete. A passing build does not guarantee anyone's safety.
 
-**Implementation state, 2026-10-02:** The local build now has explicit encrypted saved plans and a legacy habit-consent transition alongside Go/Journeys/You. It does not yet satisfy V1 acceptance: Phase 4 real-device evidence was skipped by user direction; Phase 6 enrichment is disabled; Phase 7 external comparative, accessibility, privacy/security and operational gates remain open. The public beta verdict stays **NOT READY**.
+**Implementation state, 2026-10-03:** The local build has Go/Journeys/You, signed-in and guest ephemeral movement Ask, explicit encrypted saved plans, a private guest timer and a legacy habit-consent transition. It does not yet satisfy full engineering acceptance: all seven scenarios remain partial, including first-turn Ask, S1 and S4 gaps; real-device journey behaviour was skipped by user direction, and live provider, privacy/security and operational checks remain open. Phase 6 enrichment is disabled; that is an honest low-coverage state, not a blocker to the baseline product. The separate public beta verdict stays **NOT READY**. [Current evidence](20_ACCEPTANCE_TESTS.md).

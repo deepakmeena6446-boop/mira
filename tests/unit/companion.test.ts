@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { placeholderMira } from "@/server/providers/companion/placeholder";
 import { MIRA_PERSONA } from "@/server/providers/companion/persona";
 import { claudeMira, contextBlock, safeArea, TOOL_GUIDE, TOOLS, DEFAULT_MIRA_MODEL, type MiraClient } from "@/server/providers/companion/claude";
-import { withFallback } from "@/server/providers/companion";
-import { DANGER, JUDGEMENT, verdictWords } from "@/server/providers/companion/signals";
+import { respond, withFallback } from "@/server/providers/companion";
+import { CAPABILITIES_QUESTION, DANGER, JUDGEMENT, verdictWords } from "@/server/providers/companion/signals";
 import { localClock } from "@/server/providers/companion/clock";
 import { coverageLine, safetyUpdatesSummary, type MiraNow } from "@/server/providers/companion/tools";
 import { UNKNOWN_COUNTRY, capabilitiesFor, type CountryContext } from "@/domain/country-context";
@@ -61,6 +61,22 @@ async function collect(gen: AsyncGenerator<MiraEvent>) {
 }
 
 const run = (msg: string, t = tools()) => collect(placeholderMira(msg, [], t, "Priya"));
+
+describe("Mira capabilities questions", () => {
+  it.each(["What u can help me with?", "What can Mira help me with?", "What can you do?", "How can you help me?"])("answers %s directly", async (message) => {
+    const r = await collect(respond(null as never, null as never, message, [], null as never));
+    expect(r.text).toMatch(/nearby places and Help Points/);
+    expect(r.text).toMatch(/you can send its live link/);
+    expect(r.text).not.toMatch(/enough verified information|make that judgement/);
+    expect(r.events.at(-1)).toEqual({ type: "done" });
+  });
+
+  it("does not intercept a specific request or safety question", () => {
+    expect(CAPABILITIES_QUESTION.test("Can you help me find a pharmacy?")).toBe(false);
+    expect(CAPABILITIES_QUESTION.test("What can you do if someone is following me?")).toBe(false);
+    expect(CAPABILITIES_QUESTION.test("Is this area safe?")).toBe(false);
+  });
+});
 
 describe("Mira (scripted engine)", () => {
   it("proposes a trip home — never starts one by itself", async () => {

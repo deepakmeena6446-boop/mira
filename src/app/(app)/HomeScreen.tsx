@@ -52,6 +52,8 @@ import { PlanOptions } from "@/components/app/PlanOptions";
 import { instantForLocal, type PlanOption } from "@/domain/plan-options";
 import { loopCheckInEligibility, planStartEligibility } from "@/domain/plan-journey";
 import { requestLocation } from "@/lib/location-store";
+import { localLoopEligibility } from "@/domain/local-check-in";
+import { startLocalCheckIn } from "@/lib/local-check-in-store";
 
 interface Place {
   id: string;
@@ -107,7 +109,7 @@ export function HomeScreen({
   places: SavedPlace[];
   contacts: Contact[];
   trip: TripView | null;
-  tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null };
+  tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null; provider?: string };
   /** Whether Mira can email trusted contacts at all (production SMTP configured). */
   emailAlerts: boolean;
 }) {
@@ -124,6 +126,7 @@ export function HomeScreen({
   const planDraft = usePlanDraft();
   const planHydrated = usePlanHydrated();
   const planActive = hasPlanWork(planDraft);
+  const osmMap = tiles.provider !== "google";
   useEffect(() => { if (planHydrated && !planActive && shouldRequestLocation && shouldAutoLocate()) void requestLocationAgain(); }, [planHydrated, planActive, shouldRequestLocation, requestLocationAgain]);
   const plan = planDraft ? intentFromDraft(planDraft) : null;
   const planOrigin = plan ? resolvedOrigin(plan) : null;
@@ -206,11 +209,11 @@ export function HomeScreen({
     if (!planHydrated || !me || planActive) return;
     let stop = false;
     (async () => {
-      const nearbyReq = api<{ places: Place[]; notes: Note[] }>("/api/geo/nearby", { body: me });
-      const r = await api<{ label: string | null; country?: CountryContext }>("/api/geo/reverse", { body: me });
+      const nearbyReq = api<{ places: Place[]; notes: Note[] }>("/api/geo/nearby", { body: { ...me, ...(osmMap ? { source: "osm" } : {}) } });
+      const r = await api<{ label: string | null; country?: CountryContext }>("/api/geo/reverse", { body: { ...me, ...(osmMap ? { source: "osm" } : {}) } });
       // Help Points after the country is known: it turns on locale-weighted classes (24-hour convenience stores in Japan).
       const iso = (r.ok ? r.data.country?.iso : null) ?? countryIso;
-      const [n, h] = await Promise.all([nearbyReq, api<{ helpPoints: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> }>("/api/geo/help", { body: { ...me, ...(iso ? { country: iso } : {}) } })]);
+      const [n, h] = await Promise.all([nearbyReq, api<{ helpPoints: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> }>("/api/geo/help", { body: { ...me, ...(iso ? { country: iso } : {}), ...(osmMap ? { source: "osm" } : {}) } })]);
       if (stop) return;
       if (r.ok) {
         setPoiArea(r.data.label);
@@ -224,7 +227,7 @@ export function HomeScreen({
       stop = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meKey, helpRetry, planHydrated, planActive]);
+  }, [meKey, helpRetry, planHydrated, planActive, osmMap]);
 
   const pick = useCallback((d: Destination) => {
     setSearchOpen(false);
@@ -246,7 +249,7 @@ export function HomeScreen({
     if (!routeBase || !dest || !routeFrom || haveMode) return;
     let stop = false;
     const want = mode;
-    void api<RouteInfo | ModeInfo>("/api/geo/route", { body: { from: routeFrom, to: { lat: dest.lat, lon: dest.lon }, ...(want === "walk" ? {} : { mode: want }) } }).then((res) => {
+    void api<RouteInfo | ModeInfo>("/api/geo/route", { body: { from: routeFrom, to: { lat: dest.lat, lon: dest.lon }, ...(want === "walk" ? {} : { mode: want }), ...(osmMap ? { source: "osm" } : {}) } }).then((res) => {
       if (stop) return;
       const answer: Routed = { data: res.ok ? res.data : null, code: res.ok ? undefined : res.code };
       setRouted((prev) => ({ base: routeBase, byMode: { ...(prev?.base === routeBase ? prev.byMode : {}), [want]: answer } }));
@@ -256,7 +259,7 @@ export function HomeScreen({
       stop = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeBase, mode, haveMode]);
+  }, [routeBase, mode, haveMode, osmMap]);
   const info = (byMode.walk?.data as RouteInfo | null | undefined) ?? null;
   const walkTooFar = byMode.walk?.code === "too_far";
   const routeLoading = Boolean(routeBase) && !haveMode;
@@ -295,9 +298,9 @@ export function HomeScreen({
   const mapPlaces = useMemo(
     () =>
       dest
-        ? (mode === "walk" ? (chosen?.helpPoints ?? []) : arrivalHelp).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, icon: HELP_ICON[p.cls] ?? "pin", strong: HELP_CLASSES[p.cls].emergency }))
-        : nearby.places.slice(0, 8).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, icon: kindIcon(p.kind) })),
-    [dest, mode, chosen, arrivalHelp, nearby.places],
+        ? (mode === "walk" ? (chosen?.helpPoints ?? []) : arrivalHelp).filter((p) => !osmMap || !p.id.startsWith("g:")).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, icon: HELP_ICON[p.cls] ?? "pin", strong: HELP_CLASSES[p.cls].emergency }))
+        : nearby.places.filter((p) => !osmMap || !p.id.startsWith("g:")).slice(0, 8).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, icon: kindIcon(p.kind) })),
+    [dest, mode, chosen, arrivalHelp, nearby.places, osmMap],
   );
   const onPlaceClick = useCallback(
     (p: { name: string; lat: number; lon: number; id: string }) => {
@@ -326,17 +329,17 @@ export function HomeScreen({
     window.addEventListener("touchend", onLift, { once: true });
     window.addEventListener("pointerup", onLift, { once: true });
     setTimeout(() => arm(0), 1500);
-    const r = await api<{ label: string | null }>("/api/geo/reverse", { body: p });
+    const r = await api<{ label: string | null }>("/api/geo/reverse", { body: { ...p, ...(osmMap ? { source: "osm" } : {}) } });
     setPressed((cur) => (cur && cur.lat === p.lat && cur.lon === p.lon ? { ...cur, name: r.ok ? r.data.label : null } : cur));
-  }, []);
+  }, [osmMap]);
 
   const onMapClick = useCallback(
     async (p: { lat: number; lon: number }) => {
       if (!pinMode) return;
-      const r = await api<{ label: string | null }>("/api/geo/reverse", { body: p });
+      const r = await api<{ label: string | null }>("/api/geo/reverse", { body: { ...p, ...(osmMap ? { source: "osm" } : {}) } });
       void pick({ name: (r.ok && r.data.label) || "Dropped pin", lat: p.lat, lon: p.lon });
     },
-    [pinMode, pick],
+    [pinMode, pick, osmMap],
   );
 
   const home = places.find((p) => /home|hostel|pg/i.test(p.label));
@@ -425,7 +428,13 @@ export function HomeScreen({
 
   const startLoopCheckIn = async () => {
     if (!plan?.loop || starting) return;
-    if (!user) return setSignIn("Sign in to start with Mira");
+    if (!user) {
+      const eligibility = localLoopEligibility(plan, Date.now());
+      if (!eligibility.ok) return toast(eligibility.reason, "error");
+      if (!startLocalCheckIn(loopEtaMinutes)) return toast("Choose a check-in time between 5 and 235 minutes.", "error");
+      router.push("/trip/local");
+      return;
+    }
     setStarting(true);
     const fix = await requestLocation();
     const eligibility = loopCheckInEligibility(plan, fix.status === "ok" && fix.point ? { ...fix.point, at: fix.at } : null, Date.now());
@@ -764,9 +773,9 @@ export function HomeScreen({
             <PlanOptions plan={plan} />
             <p className="text-sm text-ink-muted">No loop route or walking time is verified. Choose your own check-in time; this journey will not detect when you return.</p>
             <label className="block text-sm font-semibold">Check in after<select value={loopEtaMinutes} onChange={(e) => { setLoopEtaMinutes(Number(e.target.value)); setConfirmPlanStart(null); }} className="mt-1 min-h-11 w-full rounded-lg border border-line bg-surface px-3">{ETA_CHOICES.filter((minutes) => minutes <= 180).map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</select></label>
-            {activeTrip ? <Link href="/trip" className="inline-flex min-h-11 items-center text-accent-strong underline">Open active journey</Link> : confirmPlanStart === "loop" ? <div className="rounded-lg border border-line p-3"><p className="text-sm">Start a manual check-in-only loop now? Mira will request a fresh position and check that you are near the planned origin. No route or automatic arrival is available. {sharesWithCircle ? `Mira will attempt to notify ${names(circle.map((c) => c.name))}.` : "Nobody in your Circle will be notified. You can send a live link yourself."}</p><div className="mt-2 flex gap-2"><Button variant="primary" onClick={() => void startLoopCheckIn()} busy={starting} busyLabel="Checking location…">Confirm loop check-in</Button><Button variant="secondary" onClick={() => setConfirmPlanStart(null)}>Cancel</Button></div></div> : <Button variant="primary" size="lg" onClick={() => setConfirmPlanStart("loop")}><Icon name="walk" /> Start manual loop check-in</Button>}
+            {activeTrip ? <Link href="/trip" className="inline-flex min-h-11 items-center text-accent-strong underline">Open active journey</Link> : confirmPlanStart === "loop" ? <div className="rounded-lg border border-line p-3"><p className="text-sm">{user ? <>Start a manual check-in-only loop now? Mira will request a fresh position and check that you are near the planned origin. No route or automatic arrival is available. {sharesWithCircle ? `Mira will attempt to notify ${names(circle.map((c) => c.name))}.` : "Nobody in your Circle will be notified. You can send a live link yourself."}</> : <>Start a private check-in timer for {loopEtaMinutes} minutes? Mira cannot verify where you are, follow a route, detect your return or alert anyone. Keep this tab open and check in yourself. Emergency stays available.</>}</p><div className="mt-2 flex gap-2"><Button variant="primary" onClick={() => void startLoopCheckIn()} busy={starting} busyLabel="Starting…">{user ? "Confirm loop check-in" : "Confirm private check-in"}</Button><Button variant="secondary" onClick={() => setConfirmPlanStart(null)}>Cancel</Button></div></div> : <Button variant="primary" size="lg" onClick={() => setConfirmPlanStart("loop")}><Icon name="walk" /> Start manual loop check-in</Button>}
             {user && circle.length ? <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Who follows this journey">{[[true, `Share with ${names(circle.map((c) => c.name))}`], [false, "Just me"]].map(([value, label]) => <button key={String(value)} type="button" role="radio" aria-checked={shareWithCircle === value} onClick={() => setShareWithCircle(value as boolean)} className={cx("min-h-11 rounded-full border-2 px-3 text-sm font-semibold", shareWithCircle === value ? "border-accent bg-accent-soft text-accent-strong" : "border-line text-ink-muted")}>{label as string}</button>)}</div> : null}
-            <p className="text-xs text-ink-muted">{!user ? "Sign in is needed to start a live check-in; planning stays available without it." : sharesWithCircle ? circleStartLine() : "Nobody is alerted automatically. You can choose to send a live link after starting."}</p>
+            <p className="text-xs text-ink-muted">{!user ? "Without sign-in or GPS, this is a private timer in this tab. It does not monitor or notify anyone." : sharesWithCircle ? circleStartLine() : "Nobody is alerted automatically. You can choose to send a live link after starting."}</p>
           </div>
         ) : dest ? (
           <div className="animate-rise">
@@ -901,7 +910,7 @@ export function HomeScreen({
               </section>
             ) : null}
             <div className="mt-3">
-              {planActive ? plan?.mode === "walk" && chosenPlanOption ? confirmPlanStart === planRouteKey ? <div className="rounded-lg border border-line p-3"><p className="text-sm">Start this walking journey now from your current position? Mira will check that you are near the planned origin. {sharesWithCircle ? `Mira will attempt to notify ${names(circle.map((c) => c.name))}.` : "Nobody in your Circle will be notified. You can send a live link yourself."}</p><div className="mt-2 flex gap-2"><Button variant="primary" onClick={() => void startChosenPlan()} busy={starting} busyLabel="Checking location…">Confirm start</Button><Button variant="secondary" onClick={() => setConfirmPlanStart(null)}>Cancel</Button></div></div> : <Button variant="primary" size="lg" onClick={() => setConfirmPlanStart(planRouteKey)}><Icon name="walk" /> Start chosen walk</Button> : <p className="text-sm text-ink-muted">Choose a mapped walking option before starting. Future plans can start when you are at the origin and ready to go.</p> : <Button variant="primary" size="lg" onClick={() => void startTrip()} busy={starting} busyLabel="Starting…" disabled={!me || (mode !== "walk" && routeLoading)}><Icon name={mode === "walk" ? "walk" : "route"} /> Go with Mira</Button>}
+              {planActive ? plan?.mode === "walk" && chosenPlanOption ? confirmPlanStart === planRouteKey ? <div className="rounded-lg border border-line p-3"><p className="text-sm">Start this walking journey now from your current position? Mira will check that you are near the planned origin. {sharesWithCircle ? `Mira will attempt to notify ${names(circle.map((c) => c.name))}.` : "Nobody in your Circle will be notified. You can send a live link yourself."}</p><div className="mt-2 flex gap-2"><Button variant="primary" onClick={() => void startChosenPlan()} busy={starting} busyLabel="Checking location…">Confirm start</Button><Button variant="secondary" onClick={() => setConfirmPlanStart(null)}>Cancel</Button></div></div> : <Button variant="primary" size="lg" onClick={() => setConfirmPlanStart(planRouteKey)}><Icon name="walk" /> Start chosen walk</Button> : <p className="text-sm text-ink-muted">{plan?.mode === "walk" ? "Choose a mapped walking option before starting. Future plans can start when you are at the origin and ready to go." : "A future ride or transit service has not been checked. Confirm operation, pickup and last-leg access with the provider. You can edit this plan or choose walking if a mapped walk suits you."}</p> : <Button variant="primary" size="lg" onClick={() => void startTrip()} busy={starting} busyLabel="Starting…" disabled={!me || (mode !== "walk" && routeLoading)}><Icon name={mode === "walk" ? "walk" : "route"} /> Go with Mira</Button>}
               {user && circle.length ? (
                 <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Who follows this journey">
                   {[
@@ -1070,7 +1079,7 @@ export function HomeScreen({
         }}
         saved={places}
         near={planActive ? planOrigin : me}
-        osmOnly={planActive}
+        osmOnly={planActive || osmMap}
         placeholder="Search a place or address"
       />
       <UnsafeSheet

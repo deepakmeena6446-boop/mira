@@ -32,6 +32,7 @@ import type { TripView } from "@/server/trips";
 import type { SafetyNet } from "@/server/health/safety-net";
 import { requestLocation } from "@/lib/location-store";
 import type { PlanOption, PlanOptionsResult } from "@/domain/plan-options";
+import { usePlanDraft } from "@/lib/plan-store";
 
 const time = (iso: string | number) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 const names = (list: string[]) => (list.length <= 2 ? list.join(" and ") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`);
@@ -55,7 +56,7 @@ export function TripScreen({
 }: {
   initial: TripView;
   initialNet: SafetyNet;
-  tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null };
+  tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null; provider?: string };
   helpExclude?: string[];
   /** She has accepted trusted contacts and email is on: "Tell my people now" can reach someone. */
   canTell?: boolean;
@@ -63,6 +64,7 @@ export function TripScreen({
   emailAlerts?: boolean;
 }) {
   const router = useRouter();
+  const planDraft = usePlanDraft();
   const toast = useToast();
   const [trip, setTrip] = useState(initial);
   const [net, setNet] = useState(initialNet);
@@ -75,8 +77,10 @@ export function TripScreen({
   const [route, setRoute] = useState<Array<[number, number]> | null>(() => (typeof window === "undefined" ? null : tripRoute(initial.id)));
   const [help, setHelp] = useState<{ at: { lat: number; lon: number }; points: HelpPoint[]; failed?: boolean; partial?: boolean } | null>(null);
   const countryIso = useCountry().iso;
+  const osmMap = tiles.provider !== "google";
   const helpInFlight = useRef(false);
   const [focus, setFocus] = useState<RankedHelpPoint | null>(null);
+  const [helpRoute, setHelpRoute] = useState<{ id: string; option: PlanOption | null; detail: string } | null>(null);
   const [pendingChange, setPendingChange] = useState<RankedHelpPoint | null>(null);
   const [manualEtaMinutes, setManualEtaMinutes] = useState(30);
   const [reviewedRoute, setReviewedRoute] = useState<PlanOption | null>(null);
@@ -87,6 +91,7 @@ export function TripScreen({
   const walking = initial.mode === "walk" && initial.autoArrival;
   const clock = useClock(); // null during server render: times appear after hydration (the server doesn't know your zone)
   const now = clock?.getTime() ?? new Date(initial.etaAt).getTime();
+  const freshMe = me && clock && lastFixAt !== null && clock.getTime() - lastFixAt < 120_000 ? me : null;
   const [snap, setSnap] = useState<Snap>("half");
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -165,7 +170,7 @@ export function TripScreen({
   // Route from where I am to the destination, when this device doesn't already have it.
   useEffect(() => {
     if (!me || route || !walking) return;
-    void api<{ route: { geometry: Array<[number, number]>; approximate: boolean } }>("/api/geo/route", { body: { from: me, to: { lat: trip.destination.lat, lon: trip.destination.lon } } }).then((r) => {
+    void api<{ route: { geometry: Array<[number, number]>; approximate: boolean } }>("/api/geo/route", { body: { from: me, to: { lat: trip.destination.lat, lon: trip.destination.lon }, ...(osmMap ? { source: "osm" } : {}) } }).then((r) => {
       if (!r.ok) return;
       if (!r.data.route.approximate) {
         setRoute(r.data.route.geometry);
@@ -179,7 +184,7 @@ export function TripScreen({
   const hasFix = me !== null;
   useEffect(() => {
     if (!hasFix || !me) return;
-    void api<{ label: string | null; country?: CountryContext }>("/api/geo/reverse", { body: me }).then((r) => {
+    void api<{ label: string | null; country?: CountryContext }>("/api/geo/reverse", { body: { ...me, ...(osmMap ? { source: "osm" } : {}) } }).then((r) => {
       if (!r.ok) return;
       setAreaName(r.data.label);
       setCountry(r.data.country);
@@ -189,22 +194,22 @@ export function TripScreen({
 
   // Help Points around her, fetched ahead (and again once she has moved on), so "I feel unsafe" is instant.
   useEffect(() => {
-    if (!open || !me || helpInFlight.current) return;
-    if (help && !help.failed && haversine(help.at, me) < HELP_REFETCH_M) return; // a failed lookup retries on the next fix
+    if (!open || !freshMe || helpInFlight.current) return;
+    if (help && !help.failed && haversine(help.at, freshMe) < HELP_REFETCH_M) return; // a failed lookup retries on the next fix
     helpInFlight.current = true;
-    const at = me;
-    void api<{ helpPoints: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> }>("/api/geo/help", { body: { ...at, ...(countryIso ? { country: countryIso } : {}) } }).then((r) => {
+    const at = freshMe;
+    void api<{ helpPoints: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> }>("/api/geo/help", { body: { ...at, ...(countryIso ? { country: countryIso } : {}), ...(osmMap ? { source: "osm" } : {}) } }).then((r) => {
       helpInFlight.current = false;
       // The API answers 200 with evidence "failed" when the providers didn't respond: that's a failed lookup, not "none nearby".
       const failed = !r.ok || r.data.evidence?.state === "failed";
       setHelp((cur) => (failed ? (cur && !cur.failed ? cur : { at, points: [], failed: true }) : { at, points: r.data.helpPoints, partial: r.data.evidence?.state === "partial" }));
     });
-  }, [open, me, help, countryIso]);
+  }, [open, freshMe, help, countryIso, osmMap]);
   const night = isNight((clock ?? new Date()).getHours());
   const minuteKey = clock ? Math.floor(clock.getTime() / 60_000) : 0;
   const ranked = useMemo(
-    () => (me && help ? rankHelpPoints(help.points, me, { situation: "route", night, route, now: minuteKey ? localTime(new Date(minuteKey * 60_000)) : undefined, exclude }) : []),
-    [me, help, night, route, minuteKey, exclude],
+    () => (freshMe && help ? rankHelpPoints(help.points, freshMe, { situation: "route", night, route, now: minuteKey ? localTime(new Date(minuteKey * 60_000)) : undefined, exclude }) : []),
+    [freshMe, help, night, route, minuteKey, exclude],
   );
   const nextHelp = ranked[0] ?? null;
 
@@ -337,6 +342,24 @@ export function TripScreen({
     setReviewedRoute(r.data.options[0]);
   };
 
+  const reviewHelpRoute = async (point: RankedHelpPoint) => {
+    setBusy("help-route");
+    setHelpRoute(null);
+    const fix = await requestLocation();
+    if (!fix.point || fix.point.accuracy > 100 || Date.now() - fix.at > 30_000) {
+      setHelpRoute({ id: point.id, option: null, detail: "A recent, accurate position is needed to check a route to this place." });
+      setBusy(null);
+      return;
+    }
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const local = new Intl.DateTimeFormat("sv-SE", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date()).replace(" ", "T");
+    const result = await api<PlanOptionsResult>("/api/plan/options", { body: { from: { lat: fix.point.lat, lon: fix.point.lon }, to: { lat: point.lat, lon: point.lon }, departure: { local, timeZone: zone } } });
+    setBusy(null);
+    if (!result.ok) return setHelpRoute({ id: point.id, option: null, detail: "The mapped route check failed. Reachability is unknown; check directly before travelling." });
+    const option = result.data.state === "ready" ? result.data.options[0] ?? null : null;
+    setHelpRoute({ id: point.id, option, detail: option ? "Mapped walking estimate only. Access, staffing and opening remain unverified." : `${result.data.detail} Reachability is unknown.` });
+  };
+
   const left = new Date(trip.etaAt).getTime() - now;
   const mins = Math.round(Math.abs(left) / 60_000);
   const span = mins >= 90 ? `${Math.round(mins / 60)} h` : `${mins} min`;
@@ -381,6 +404,7 @@ export function TripScreen({
         <Link href="/trips" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-strong">
           Your trips
         </Link>
+        {planDraft?.legs?.length ? <Link href="/plan" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-strong">Review another planned leg</Link> : null}
       </div>
     );
   }
@@ -575,7 +599,7 @@ export function TripScreen({
         ) : null}
 
         {/* The nearest Help Point, ranked for right now */}
-        {focus ? (
+        {focus && freshMe ? (
           <div className="mt-3 rounded-[var(--radius-card)] bg-accent-soft p-4">
             <div className="flex items-start gap-3">
               <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-surface text-ink"><Icon name={HELP_ICON[focus.cls] ?? "pin"} className="size-5" /></span>
@@ -585,6 +609,7 @@ export function TripScreen({
                   {HELP_CLASSES[focus.cls].label} · roughly {focus.minutes} min by distance, route unverified · {hoursLine(focus)}
                 </p>
                 <p className="mt-1 text-xs text-ink-subtle">Staffing is not verified. Check the place directly before relying on it.</p>
+                {helpRoute?.id === focus.id ? <p role="status" className="mt-1 text-sm">{helpRoute.option ? `Mapped walk from the checked position: about ${Math.round(helpRoute.option.minutes)} min · ${helpRoute.option.evidence[0]?.status === "known" ? helpRoute.option.evidence[0].source.label : "source unknown"}. ` : ""}{helpRoute.detail}</p> : null}
               </div>
               <button type="button" aria-label="Close" onClick={() => setFocus(null)} className="grid size-11 shrink-0 place-items-center rounded-full bg-surface">
                 <Icon name="close" className="size-4" />
@@ -593,8 +618,9 @@ export function TripScreen({
             <a href={directions(focus)} target="_blank" rel="noopener noreferrer" className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-full bg-surface text-sm font-semibold text-accent-strong">
               Directions in Maps <Icon name="arrow" className="size-4" />
             </a>
+            <Button variant="secondary" className="mt-2" onClick={() => void reviewHelpRoute(focus)} busy={busy === "help-route"}>Check mapped walk to this place</Button>
             {trip.state === "active" ? <Button variant="secondary" className="mt-2" onClick={() => { setPendingChange(focus); setManualEtaMinutes(30); }}>Change journey to this place</Button> : null}
-            {pendingChange?.id === focus.id ? <div className="mt-2 rounded-lg bg-surface p-3 text-sm"><p>This changes your destination and check-in ETA. The route, opening hours and staffing have not been verified. Your existing contacts and live link stay the same; nobody new is notified.</p><label className="mt-2 block">Minutes until check-in <input type="number" min={5} max={235} value={manualEtaMinutes} onChange={(e) => setManualEtaMinutes(Number(e.target.value))} className="ml-2 w-20 rounded border border-line p-2" /></label><div className="mt-2 flex gap-2"><Button variant="primary" disabled={!Number.isInteger(manualEtaMinutes) || manualEtaMinutes < 5 || manualEtaMinutes > 235} busy={busy === "change"} onClick={() => void changeDestination({ lat: focus.lat, lon: focus.lon, name: focus.name.slice(0, 80) }, manualEtaMinutes)}>Confirm change</Button><Button variant="secondary" onClick={() => setPendingChange(null)}>Cancel</Button></div></div> : null}
+            {pendingChange?.id === focus.id ? <div className="mt-2 rounded-lg bg-surface p-3 text-sm"><p>This changes your destination and check-in ETA. {helpRoute?.id === focus.id && helpRoute.option ? "A mapped walk was checked, but current access, opening hours and staffing are unverified." : "The route, opening hours and staffing have not been verified."} Your existing contacts and live link stay the same; nobody new is notified.</p><label className="mt-2 block">Minutes until check-in <input type="number" min={5} max={235} value={manualEtaMinutes} onChange={(e) => setManualEtaMinutes(Number(e.target.value))} className="ml-2 w-20 rounded border border-line p-2" /></label><div className="mt-2 flex gap-2"><Button variant="primary" disabled={!Number.isInteger(manualEtaMinutes) || manualEtaMinutes < 5 || manualEtaMinutes > 235} busy={busy === "change"} onClick={() => void changeDestination({ lat: focus.lat, lon: focus.lon, name: focus.name.slice(0, 80) }, manualEtaMinutes, helpRoute?.id === focus.id ? helpRoute.option?.geometry ?? null : null)}>Confirm change</Button><Button variant="secondary" onClick={() => setPendingChange(null)}>Cancel</Button></div></div> : null}
           </div>
         ) : nextHelp ? (
           <button type="button" onClick={() => setFocus(nextHelp)} className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-[var(--radius-card)] px-4 py-2 text-left hover:bg-sunken">
@@ -607,7 +633,7 @@ export function TripScreen({
             </span>
             <Icon name="chevron" className="size-4" />
           </button>
-        ) : null}
+        ) : clock && lastFixAt && !freshMe ? <p role="status" className="mt-3 text-sm text-ink-muted">Your last position is too old to rank nearby Help Points. Refresh location to compare places; Emergency and calling still work.</p> : null}
 
         <p className="mt-4 text-sm text-ink-muted">
           {awake ? "Mira is keeping your screen on. " : ""}
@@ -640,7 +666,7 @@ export function TripScreen({
       <UnsafeSheet
         open={unsafe}
         onClose={() => setUnsafe(false)}
-        me={fixAge !== null && fixAge < 120 ? me : null}
+        me={freshMe}
         staleLocation={fixAge !== null && fixAge >= 120}
         helpPoints={help?.points ?? []}
         helpLoading={!help}

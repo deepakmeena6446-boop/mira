@@ -119,6 +119,8 @@ export default function PrivacyPage() {
           </Item>
           <Item icon="route" title="Your travel plans">
             <p>A plan stays in this browser tab for up to two hours after your last edit unless you clear it. Mira does not put it in your account automatically. If you choose Save plan while signed in, Mira encrypts its places, time, purpose and travel legs, keeps it for up to 30 days, and lets you open or delete it in Journeys. A current GPS origin and Google place result cannot be saved. Opening a saved plan does not start a journey or tell a contact.</p>
+            <p>Movement questions in Ask use this temporary plan for guests and signed-in people. They are not added to saved chat. Nearby, reporting and general product questions from a signed-in account still use the saved chat described below.</p>
+            <p>A guest can start a private check-in timer for an unmapped loop without GPS or an account. Only its start and due timestamps stay in this tab; it ends when you check in or expires 30 minutes after the due time. It cannot track you, detect arrival, alert anyone or keep running reliably while the screen is closed.</p>
           </Item>
           <Item icon="home" title="What Mira keeps on this phone">
             <p>
@@ -138,6 +140,7 @@ export default function PrivacyPage() {
                 ? "Mira's replies are written by Anthropic's Claude. Your message, recent chat, the time, your area name, and your saved places' and trusted contacts' names are sent to generate each reply — never your coordinates. Not sold, not used for ads."
                 : "Mira runs on a built-in script right now. When its AI is connected, messages will be processed by our AI provider to generate replies — never sold, never used for ads."}
             </p>
+            <p>For basic product measurement, Mira counts only the UTC day and a fixed outcome type when a plan gives a ready or partial answer or you confirm a journey action. No account, IP, question, route, coordinate or contact is in that counter. The counts are deleted after 30 days.</p>
           </Item>
           <Item icon="report" title="Reports">
             <p>Only a rough area (about 1 km), roughly when, and the kind of thing are kept — never your exact spot. Notes are encrypted and read only by a moderator.</p>
@@ -163,7 +166,7 @@ export default function PrivacyPage() {
             </p>
           </Item>
           <Item icon="close" title="What Mira never does">
-            <p>No ads, no selling data, no analytics trackers, no public profiles, no &ldquo;safe/unsafe&rdquo; scores or crime maps, and no tracking you didn&apos;t start.</p>
+            <p>No ads, no selling data, no third-party analytics trackers, no public profiles, no &ldquo;safe/unsafe&rdquo; scores or crime maps, and no tracking you didn&apos;t start.</p>
           </Item>
         </ul>
         <p className="mt-6 text-sm text-ink-subtle">

@@ -1,6 +1,6 @@
 # Frozen thesis versus current implementation
 
-**Phase 7 local update (2026-10-02):** This table records the original gap analysis. Go now leads with intent; a tab plan, grounded local options, plan Ask, confirmed foreground journey, remote legs and user-saved encrypted plan are implemented. Habit learning defaults off and old default-on accounts are paused for explicit review. Plan-linked community/news remains disabled. Real-device behaviour, live global providers, independent privacy/accessibility review, operations and the comparative user study remain unproven; therefore the thesis has not met release acceptance.
+**Local implementation update (2026-10-03):** This table records the original pre-vNext gap analysis, not today's shipped behaviour. Go now leads with intent; a tab plan, grounded local options, plan Ask, confirmed foreground journey, remote legs and user-saved encrypted plan are implemented. Signed-in movement questions without a plan now enter ephemeral plan Ask, but first-turn understanding and non-movement routing have gaps recorded in [20](20_ACCEPTANCE_TESTS.md). Habit learning defaults off and old default-on accounts are paused for explicit review. Plan-linked community/news remains disabled. Real-device behaviour, live global providers, independent privacy/accessibility review and operations remain unproven; therefore the full engineering and release gates have not passed.
 
 | Thesis requirement | Current implementation evidence | Gap and consequence | Required change |
 |---|---|---|---|

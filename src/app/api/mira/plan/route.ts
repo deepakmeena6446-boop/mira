@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { movementIntentSchema, planEvidenceSchema } from "@/domain/plan-contract";
 import { answerPlanQuestion } from "@/domain/plan-ask";
+import { askToolIntent } from "@/domain/ask-routing";
 import { resolvedDestination, resolvedOrigin } from "@/domain/plan-state";
 import { haversineMeters } from "@/domain/pilot";
 import { DANGER } from "@/server/providers/companion/signals";
@@ -12,6 +13,7 @@ import { clientIp, dailyKey, enforce } from "@/server/ratelimit";
 import type { MiraEvent } from "@/server/providers/companion/types";
 import { countryContext, findCountry } from "@/server/locale";
 import { statusWords } from "@/domain/country-context";
+import { recordDecisionOutcomeBestEffort } from "@/server/decision-outcomes";
 
 export const dynamic = "force-dynamic";
 const body = z.object({ message: z.string().trim().min(1).max(1000), plan: movementIntentSchema.nullable(), legs: z.array(movementIntentSchema.nullable()).max(2).optional(), countryIsos: z.array(z.string().regex(/^[A-Z]{2}$/).nullable()).max(3).optional() }).strict();
@@ -35,6 +37,30 @@ export const POST = handle(async (req: Request) => {
         if (urgent) {
           send({ type: "card", card: { type: "sos", contacts: [] } });
           send({ type: "text", delta: "If you may be in danger, use Emergency now. It opens your device dialler; Mira does not call anyone for you." });
+          send({ type: "done" });
+          return;
+        }
+        const tool = askToolIntent(message);
+        if (tool) {
+          let reply: string;
+          if (tool === "emergency_info") {
+            const countryName = /\b(?:in|for)\s+([\p{L}\p{M} .'-]{2,80})\s*[?.!]*$/iu.exec(message)?.[1]?.trim();
+            const country = countryName ? findCountry(countryName) : null;
+            const context = country ? countryContext(country.iso2) : null;
+            const primary = context?.emergency.primary;
+            reply = context
+              ? primary
+                ? `For ${context.countryName}, MIRA's reviewed emergency profile lists ${primary.number} (${primary.label}). Coverage is ${statusWords(context.emergency.status)}${context.emergency.reviewed ? `, reviewed ${context.emergency.reviewed}` : ""}. ${primary.qualification ?? "Confirm the service and region before relying on it."} ${context.emergency.source ? `Source: ${context.emergency.source.title}.` : ""} This is destination information, not your current location. Open Emergency for direct dial options.`
+                : `MIRA has no verified emergency number for ${context.countryName}. Check an official local source. Open Emergency for direct dial options at your current location.`
+              : "I cannot identify a reviewed country from that question. Open Emergency for direct dial options at your current location, or name a country to check its reviewed profile. MIRA does not call for you.";
+          } else if (tool === "nearby") {
+            reply = "Open Around to look up a named place or explicitly use your current location. A plan's destination is not your present position, and I have not checked which places are open.";
+          } else if (tool === "report") {
+            reply = "You can open Report to describe a street issue privately. Nothing has been submitted; review the details before sending.";
+          } else {
+            reply = "MIRA helps you plan and review a movement, find places where sources permit, and choose when to start or share a journey. Emergency is always direct. No action has been taken from this question.";
+          }
+          send({ type: "text", delta: reply });
           send({ type: "done" });
           return;
         }
@@ -69,9 +95,11 @@ export const POST = handle(async (req: Request) => {
         send({ type: "text", delta: [answer.text, ...travelLines, ...countryLines].join("\n\n") });
         send({ type: "card", card: { type: "plan_brief", next: answer.next, state: evidence?.state ?? "not_checked", checkedAt: evidence?.checkedAt ?? now.toISOString(), source: evidence?.source ?? null, sourceAt: evidence?.sourceAt ?? null, scope: evidence?.scope ?? null, options: evidence?.options.map(({ id, label, minutes, meters }) => ({ id, label, minutes, meters })) ?? [], daylight: evidence?.daylight ?? null } });
         send({ type: "done" });
+        if (sql) await recordDecisionOutcomeBestEffort(sql, evidence?.state === "ready" ? "plan_answer_ready" : "plan_answer_partial", now);
       } catch {
         send({ type: "text", delta: "I couldn't check the plan just now. Your plan stays in this tab; open Around to retry. Emergency remains available." });
         send({ type: "done" });
+        if (sql) await recordDecisionOutcomeBestEffort(sql, "plan_answer_partial", now);
       } finally {
         controller.close();
       }

@@ -25,6 +25,12 @@ test("active journey resumes with truthful position age and immediate support", 
   await expect(sheet.getByRole("link", { name: /Emergency call/ })).toBeVisible();
   await expect(sheet).toContainText("route unverified");
   await sheet.getByRole("button", { name: /Go to a Help Point/ }).click();
+  await owner.page.route("**/api/plan/options", async (route) => {
+    const body = route.request().postDataJSON() as { from: { lat: number; lon: number }; to: { lat: number; lon: number } };
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ state: "ready", checkedAt: new Date().toISOString(), source: "OpenStreetMap imported walking graph", sourceAt: new Date().toISOString(), scope: "test route", options: [{ id: "walk-0", label: "Mapped walk", minutes: 7, meters: 520, geometry: [[body.from.lon, body.from.lat], [body.to.lon, body.to.lat]], evidence: [{ status: "known", claim: "Mapped walking time", value: 7, scope: { kind: "route", ref: "test" }, source: { id: "osm", label: "OpenStreetMap imported walking graph", observedAt: new Date().toISOString(), expiresAt: null } }] }], daylight: { status: "unknown", claim: "Daylight", scope: { kind: "area", ref: "test" }, reason: "not_checked", retryable: false }, service: { status: "unknown", claim: "Service", scope: { kind: "route", ref: "test" }, reason: "unsupported", retryable: false }, detail: "Mapped walk." }) });
+  });
+  await owner.page.getByRole("button", { name: "Check mapped walk to this place" }).click();
+  await expect(owner.page.getByRole("status").filter({ hasText: "Mapped walk from the checked position" })).toContainText("Access, staffing and opening remain unverified");
   await owner.page.getByRole("button", { name: "Change journey to this place" }).click();
   await expect(owner.page.getByText(/Your existing contacts and live link stay the same/)).toBeVisible();
   await owner.page.getByRole("button", { name: "Confirm change" }).click();
@@ -74,7 +80,7 @@ test("S1 loop offers a manual check-in, keeps location optional until confirmed,
   await owner.ctx.grantPermissions(["geolocation"]);
   await owner.page.getByRole("button", { name: "Confirm loop check-in" }).click();
   await owner.page.waitForURL("**/trip");
-  await expect(owner.page.getByText("Sharing where you are")).toBeVisible();
+  await expect(owner.page.getByRole("heading", { name: "Sharing where you are" })).toBeVisible();
   const active = (await (await owner.page.request.get("/api/trips/current")).json()).trip;
   expect(active.autoArrival).toBe(false);
   expect(active.sharedWith).toEqual([]);

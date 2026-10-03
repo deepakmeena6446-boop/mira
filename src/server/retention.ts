@@ -7,6 +7,7 @@ import { encryptLegacyPlaces } from "@/server/account/places";
 import { purgeAuthLinks } from "@/server/account/email-auth";
 import { purgeStaleHabits } from "@/server/account/habits";
 import { purgeContributions } from "@/server/contributions/retention";
+import { purgeDecisionOutcomes } from "@/server/decision-outcomes";
 
 /** Durable (email) accounts unused for this long are deleted, with everything tied to them. */
 export const INACTIVE_ACCOUNT_DAYS = 400;
@@ -46,6 +47,7 @@ export async function purgeExpired(sql: postgres.Sql, now: Date): Promise<Record
   // Journey habits unused for over 400 days (she can also forget them any time in Me).
   const habits = await purgeStaleHabits(sql, now);
   const savedPlans = await sql`DELETE FROM saved_plans WHERE expires_at <= ${now}`;
+  const decisionOutcomes = await purgeDecisionOutcomes(sql, now);
   // ── Contributions (Contribute tab / MIRA Checks; docs/CONTRIBUTIONS.md) ─────────────
   const contributions = await purgeContributions(sql, now);
   // ── end Contributions ───────────────────────────────────────────────────────────────
@@ -67,6 +69,7 @@ export async function purgeExpired(sql: postgres.Sql, now: Date): Promise<Record
     litVotes,
     habits,
     savedPlans: savedPlans.count,
+    decisionOutcomes,
     ...contributions,
   };
 }

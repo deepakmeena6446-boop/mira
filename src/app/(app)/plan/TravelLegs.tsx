@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
 import { setPlanDraft } from "@/lib/plan-store";
-import { activatePlanLeg, intentFromDraft, intentFromLeg, newPlanLeg, resolvedDestination, resolvedOrigin, type PlanDraft, type PlanLegDraft, type PlanPlaceResolution } from "@/domain/plan-state";
+import { activatePlanLeg, intentFromDraft, intentFromLeg, newPlanLeg, resolvedDestination, resolvedOrigin, returnLegFromMain, type PlanDraft, type PlanLegDraft, type PlanPlaceResolution } from "@/domain/plan-state";
 import { instantForLocal } from "@/domain/plan-options";
 import { haversineMeters } from "@/domain/pilot";
 import { statusWords, type CountryContext } from "@/domain/country-context";
@@ -80,6 +80,7 @@ export function TravelLegs({ draft, countries }: { draft: PlanDraft; countries: 
   const countrySelect = (value: string, onChange: (iso: string | null) => void, label: string) => <label className="block text-sm font-semibold">{label}<select value={value} onChange={(e) => onChange(e.target.value || null)} className="mt-2 min-h-12 w-full rounded-lg border border-line-strong bg-canvas px-3 text-base font-normal"><option value="">Country not selected</option>{countries.map((country) => <option key={country.iso} value={country.iso}>{country.name}</option>)}</select></label>;
   const mainIntent = intentFromDraft(draft);
   const mainInstant = instantForLocal(draft.departureLocal, draft.timeZone);
+  const returnLeg = returnLegFromMain(draft);
   return <section className="space-y-4 rounded-[var(--radius-lg)] border border-line bg-surface p-5" aria-label="Travel legs">
     <h2 className="font-semibold">Travel legs and destination facts</h2>
     <p className="text-sm text-ink-muted">Build up to three separate movements in this tab. Enter local times for each departure; MIRA never assumes the phone’s current time zone for another city.</p>
@@ -102,7 +103,7 @@ export function TravelLegs({ draft, countries }: { draft: PlanDraft; countries: 
       <button type="button" disabled={!activatePlanLeg(draft, index)} onClick={() => { const next = activatePlanLeg(draft, index); if (next) { setPlanDraft(next); router.push("/around"); } }} className="min-h-11 rounded-lg border border-line px-4 text-sm font-semibold disabled:opacity-50">Review leg {index + 2} in Around</button>
       <p className="text-xs text-ink-muted">Reviewing this leg keeps the previous main leg here. It does not start a journey or notify contacts.</p>
     </div>)}
-    {legs.length < 2 ? <button type="button" onClick={() => setPlanDraft({ ...draft, legs: [...legs, newPlanLeg()], touched: true })} className="min-h-11 rounded-lg border border-line px-4 text-sm font-semibold">Add travel leg</button> : null}
+    {legs.length < 2 ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setPlanDraft({ ...draft, legs: [...legs, newPlanLeg()], touched: true })} className="min-h-11 rounded-lg border border-line px-4 text-sm font-semibold">Add travel leg</button>{returnLeg ? <button type="button" onClick={() => setPlanDraft({ ...draft, legs: [...legs, returnLeg], touched: true })} className="min-h-11 rounded-lg border border-line px-4 text-sm font-semibold">Add return leg</button> : null}</div> : null}
     <p className="text-xs text-ink-muted">This plan is temporary. Country profiles are destination facts, not a current-location emergency action. No booking, contact or journey starts from adding a leg.</p>
   </section>;
 }

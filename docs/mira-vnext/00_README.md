@@ -1,6 +1,6 @@
 # Mira vNext — canonical documentation index
 
-**Status:** Phases 0–3 and 5 passed local engineering gates on 2026-10-02. Phase 4 remains `KNOWN-RISK` because real iOS/Android checks were skipped at the user's direction; Phase 6 optional enrichment remains disabled because moderation/source operations are not ready. Phase 7 Go/Journeys/You and consent changes are implemented locally, but external validation and release gates remain open. `/plan` carries guest intent through Go, Around, map and Ask; a selected walking option starts only after confirmation and live origin check. An unmapped loop can instead start a user-timed check-in-only journey after confirmation and a fresh origin check; an additional return leg can be made the main leg for review without erasing the previous main leg. Live trip start still requires sign-in and device location at that moment. The working tree already contained unrelated modifications to Mira limits, capability replies and tests; inspect `git status` and preserve that work. [Phase results](20_ACCEPTANCE_TESTS.md).
+**Status:** The 2026-10-03 local continuation fixed first-turn Ask acknowledgment, active-plan informational routing, distinct arrival/end counters, the default production build and zero-file bundle-audit failure. The S4 arrival → check-in → return journey now passes a full local browser fixture. Go/Journeys/You and consent changes remain implemented. An unmapped loop has a signed-in live check-in path with fresh GPS or a guest private tab timer with no account, GPS, monitoring or contact alert. Live shared trip start still requires sign-in and device location. Phase 4 remains `KNOWN-RISK` for physical iOS/Android checks skipped by user direction; optional Phase 6 enrichment remains disabled. V1 is **PARTIAL** for S1's unresolved minimum, live source/operations, device and independent privacy/release evidence. Pre-existing companion provider/test work was retained. [Implementation evidence](20_ACCEPTANCE_TESTS.md).
 
 ## Source of truth, in order
 
@@ -11,14 +11,15 @@
 5. [02 current map](02_CURRENT_PRODUCT_MAP.md), [03 gaps](03_THESIS_GAP_ANALYSIS.md), [04 disposition](04_FEATURE_DISPOSITION.md), [17 technical change map](17_TECHNICAL_CHANGE_MAP.md) — migration evidence. Code is authority for current behaviour, not target direction.
 6. [22 decisions](22_DECISION_LOG.md), [23 open questions](23_OPEN_QUESTIONS.md) — rationale and truly unresolved items.
 7. [24 Phase 0 baseline](24_PHASE_0_BASELINE.md) — current scenario/API observations, contract and test evidence for the first implementation gate.
-8. [25 Phase 3 privacy review](25_PHASE_3_PRIVACY_REVIEW.md), [26 Phase 4 device protocol](26_PHASE_4_DEVICE_TEST_PROTOCOL.md) and [27 Phase 7 validation protocol](27_PHASE_7_VALIDATION_PROTOCOL.md) — engineering review and outstanding independent gates.
-9. [28 Phase 7 event schema](28_PHASE_7_EVENT_SCHEMA.md) — proposed coarse outcome fields; collection remains disabled until privacy and research approval.
+8. [25 Phase 3 privacy review](25_PHASE_3_PRIVACY_REVIEW.md) and [26 Phase 4 device protocol](26_PHASE_4_DEVICE_TEST_PROTOCOL.md) — specific privacy and physical-device checks.
 
 The founder's pasted “MIRA — THESIS MAPPING + CANONICAL PRODUCT DOCUMENTATION” brief is the authority behind `01`. If a downstream document conflicts with `01` or `15`, stop, record the conflict in `22`, and resolve it before implementation. Do not silently use a legacy document to override this hierarchy.
 
 ## How a fresh autonomous agent uses this set
 
-Read `01`, `15`, `16`, `20`, then the selected phase in `21`; follow its linked contracts and current-system paths in `17`. Record PASS / FAIL / KNOWN-RISK and update `22` for a material decision. Never infer that a proposed screen, provider, data source, or capability already exists. The implementation phase must leave the current app usable and all safety/privacy gates intact. The user explicitly waived physical-phone checks for this build session and directed continuation; [D23](22_DECISION_LOG.md) records the local-work exception. No device evidence or release gate is thereby passed.
+Read `01`, `15`, `16`, `20`, then the selected phase in `21`; follow its linked contracts and current-system paths in `17`. Record PASS / FAIL / KNOWN-RISK and update `22` for a material decision. Never infer that a proposed screen, provider, data source, or capability already exists. The implementation phase must leave the current app usable and all safety/privacy gates intact. The user explicitly waived physical-phone checks for the earlier build session and directed continuation; [D23](22_DECISION_LOG.md) records that local-work exception. No device evidence is thereby passed. External-user recruitment is not a build-completion requirement.
+
+**Execution history and next work:** [D30](22_DECISION_LOG.md) deferred new external API/partner integration for the 2026-10-02 local build only; it is not a standing instruction to defer providers again. The 2026-10-03 continuation and exact remaining provider work are recorded in [20](20_ACCEPTANCE_TESTS.md). Preserve existing integrations and never present fixture data as real-world safety evidence.
 
 ## Legacy documentation status
 

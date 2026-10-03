@@ -31,9 +31,10 @@ describe("Phase 3 deterministic plan reply", () => {
     for (const wording of ["I need to get from office to home at midnight", "How do I reach this museum from a different origin?"]) {
       const answer = answerPlanQuestion(wording, null, null);
       expect(answer.next).toBe("edit_plan");
-      expect(answer.text).toContain("named place");
-      expect(answer.text.match(/\?/g)).toHaveLength(1);
+      expect(answer.text).toMatch(/named place|starting place/);
+      expect((answer.text.match(/\?/g) ?? []).length).toBeLessThanOrEqual(1);
     }
+    expect(answerPlanQuestion("I need to get from office to home at midnight", null, null).text).toContain("office → home");
     const event = answerPlanQuestion("I'm going to a date and need a return", null, null);
     expect(event.text).toContain("plan the way there and a return separately");
     expect(event.text).not.toMatch(/danger|unsafe|relationship/i);

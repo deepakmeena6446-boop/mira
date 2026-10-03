@@ -11,8 +11,9 @@ export type { GeoPoint, GeoProvider, ModeRoute, PlaceHit, WalkRoute } from "./ty
  * Maps provider factory: Google Maps Platform when a server key is set (with the
  * OpenStreetMap placeholder as automatic fallback on any failure), else the placeholder.
  */
-export function getGeo(): GeoProvider {
+export function getGeo(source?: "osm"): GeoProvider {
   const fallback = placeholderGeo(getSql());
+  if (source === "osm") return fallback;
   const key = getEnv().GOOGLE_MAPS_SERVER_KEY;
   return key ? googleGeo(key, fallback) : fallback;
 }

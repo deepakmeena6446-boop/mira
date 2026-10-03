@@ -1,6 +1,6 @@
 # Target user-facing product architecture
 
-**Local implementation state (Phase 7):** Go/Journeys/You, contextual Ask/map links, direct Emergency, legacy `/today`, an encrypted explicit saved-plan flow and paused legacy habits are in the working tree. The active journey remains foreground-only. The figure and A–R table describe the full target; they do not assert that staffed support, route-linked community claims, turn guidance or external outcome validation exists. [Gate status](20_ACCEPTANCE_TESTS.md).
+**Local implementation state:** Go/Journeys/You, contextual Ask/map links, direct Emergency, legacy `/today`, an encrypted explicit saved-plan flow and paused legacy habits exist. The active journey remains foreground-only. The figure and A–R table describe the full target; they do not assert that staffed support, route-linked community claims or turn guidance exists. [Gate status](20_ACCEPTANCE_TESTS.md).
 
 ## Primary experience
 

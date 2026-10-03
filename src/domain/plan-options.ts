@@ -40,6 +40,20 @@ export function daylightAt(instant: Date, point: LatLon): "daylight" | "dark" | 
   return elevation > 2 ? "daylight" : elevation < -8 ? "dark" : "uncertain";
 }
 
+/** First later calculated daylight within four hours; never a route or lighting claim. */
+export function laterDaylight(local: string, timeZone: string, point: LatLon): { local: string; minutesLater: number } | null {
+  const departure = instantForLocal(local, timeZone);
+  if (!departure || Math.abs(point.lat) > 72) return null;
+  let format: Intl.DateTimeFormat;
+  try { format = new Intl.DateTimeFormat("sv-SE", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }); }
+  catch { return null; }
+  for (let minutesLater = 15; minutesLater <= 240; minutesLater += 15) {
+    const candidate = new Date(departure.getTime() + minutesLater * 60_000);
+    if (daylightAt(candidate, point) === "daylight") return { local: format.format(candidate).replace(" ", "T"), minutesLater };
+  }
+  return null;
+}
+
 export function resolvePlanOptions(input: { graph: RouteGraph | null; routes: PlannedRoutes | null; sourceAt: Date | null; checkedAt: Date; from: LatLon; to: LatLon; local: string; timeZone: string; failed?: boolean }): PlanOptionsResult {
   const { graph, routes, sourceAt, checkedAt, from, to, local, timeZone } = input;
   const scope = `${from.lat.toFixed(5)},${from.lon.toFixed(5)} → ${to.lat.toFixed(5)},${to.lon.toFixed(5)}`;

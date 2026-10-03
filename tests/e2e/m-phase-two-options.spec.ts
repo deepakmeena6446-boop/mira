@@ -46,6 +46,8 @@ test("S1 early loop calculates darkness while routing remains unavailable", asyn
   const comparison = page.getByRole("region", { name: "Plan options" });
   await expect(comparison).toContainText("Loop routing is unavailable");
   await expect(comparison).toContainText("Daylight at departure: dark");
+  await expect(comparison).toContainText("Later time option: calculated daylight");
+  await expect(comparison).toContainText("not a route or lighting check");
   await expect(comparison).toContainText("Lighting and activity on a loop are unknown");
 });
 
@@ -55,4 +57,22 @@ test("S3 missing network reports an explicit coverage gap", async ({ page }) => 
   await page.goto("/around");
   await expect(page.getByRole("region", { name: "Plan options" })).toContainText("Walking graph has not been imported for this area.");
   await expect(page.getByRole("region", { name: "Plan options" }).getByRole("button", { name: /mapped walk/ })).toHaveCount(0);
+});
+
+test("a failed mapped check keeps local daylight and offers an explicit retry", async ({ page }) => {
+  await seed(page, "walk", "2026-10-07T04:45");
+  let requests = 0;
+  await page.route("**/api/plan/options", async (route) => {
+    requests++;
+    if (requests === 1) return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: { code: "provider_failed", message: "Route source unavailable" } }) });
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(answer) });
+  });
+  await page.goto("/around");
+  const comparison = page.getByRole("region", { name: "Plan options" });
+  await expect(comparison).toContainText("Route check failed");
+  await expect(comparison).toContainText("Calculated daylight on this device: dark");
+  await expect(comparison).toContainText("Route and service remain unknown");
+  await comparison.getByRole("button", { name: "Retry mapped check" }).click();
+  await expect(comparison.getByRole("button", { name: /Shortest mapped walk/ })).toBeVisible();
+  expect(requests).toBe(2);
 });

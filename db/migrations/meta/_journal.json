@@ -155,6 +155,20 @@
       "when": 1790937600001,
       "tag": "0021_saved_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1790937600002,
+      "tag": "0022_decision_outcomes",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790996236559,
+      "tag": "0023_decision_outcome_semantics",
+      "breakpoints": true
     }
   ]
 }

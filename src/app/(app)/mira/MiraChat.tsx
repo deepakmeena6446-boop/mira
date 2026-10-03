@@ -21,8 +21,8 @@ import type { MiraCard } from "@/server/providers/companion/types";
 import { circleSharingLine } from "@/domain/companion-output";
 import { hasPlanWork, intentFromDraft, intentFromLeg, newPlanDraft } from "@/domain/plan-state";
 import { setPlanDraft, usePlanDraft, usePlanHydrated } from "@/lib/plan-store";
-import { DANGER } from "@/domain/urgent-intent";
 import { draftFromAsk } from "@/domain/plan-ask";
+import { askUsesPlan, shouldSeedPlan } from "@/domain/ask-routing";
 
 interface Msg {
   id: string;
@@ -232,7 +232,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   const planDraft = usePlanDraft();
   const planHydrated = usePlanHydrated();
   const planActive = hasPlanWork(planDraft);
-  const loc = useLocation(Boolean(user) && planHydrated && !planActive);
+  const loc = useLocation(false);
   const plan = planDraft ? intentFromDraft(planDraft) : null;
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -257,14 +257,20 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   const send = async (text: string) => {
     const message = text.trim();
     if (!message || sending) return;
-    const planFlow = planActive || !user;
-    if (planFlow && !planActive && !DANGER.test(message)) {
+    const planFlow = askUsesPlan(message, planActive, Boolean(user));
+    setSending(true);
+    if (planFlow && !planActive && shouldSeedPlan(message)) {
       const timeZone = deviceTimeZone() ?? "UTC";
-      setPlanDraft(draftFromAsk(message, newPlanDraft(new Date(), timeZone)));
+      const draft = draftFromAsk(message, newPlanDraft(new Date(), timeZone));
+      if (user && /^\s*(?:take me home|go home|going home|walk home)\s*[?.!]*\s*$/i.test(message)) {
+        const places = await api<{ places: Array<{ id: string; label: string; lat: number; lon: number }> }>("/api/me/places");
+        const home = places.ok ? places.data.places.find((place) => /^home$/i.test(place.label.trim())) : null;
+        if (home) draft.destination = { query: home.label, resolution: { source: "saved_place", name: home.label, point: { lat: home.lat, lon: home.lon }, placeId: home.id } };
+      }
+      setPlanDraft(draft);
     }
     recordUsage("mira");
     setInput("");
-    setSending(true);
     const mine: Msg = { id: `u${Date.now()}`, role: "user", text: message, cards: [] };
     const reply: Msg = { id: `a${Date.now()}`, role: "assistant", text: "", cards: [], streaming: true };
     setMsgs((m) => [...m, mine, reply]);
@@ -273,7 +279,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
       const res = await fetch(planFlow ? "/api/mira/plan" : "/api/mira", {
         method: "POST",
         headers: { "content-type": "application/json", "x-mira-request": "1" },
-        body: planFlow ? JSON.stringify({ message, plan, legs: planDraft?.legs?.map(intentFromLeg) ?? [], countryIsos: [planDraft?.destinationCountryIso ?? null, ...(planDraft?.legs?.map((leg) => leg.destinationCountryIso) ?? [])] }) : JSON.stringify({ message, context: { localTime: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), tz: deviceTimeZone(), location: planHydrated && !planActive && loc.point ? { lat: loc.point.lat, lon: loc.point.lon } : null, area: planHydrated && !planActive ? loc.area : null } }),
+        body: planFlow ? JSON.stringify({ message, plan, legs: planDraft?.legs?.map(intentFromLeg) ?? [], countryIsos: [planDraft?.destinationCountryIso ?? null, ...(planDraft?.legs?.map((leg) => leg.destinationCountryIso) ?? [])] }) : JSON.stringify({ message, context: { localTime: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), tz: deviceTimeZone(), location: planHydrated && loc.point ? { lat: loc.point.lat, lon: loc.point.lon } : null, area: planHydrated ? loc.area : null } }),
       });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => null);
@@ -344,7 +350,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
         </div>
       </header>
       <SafetyAccess emailAlerts={emailAlerts} className="z-10 border-b border-line bg-canvas px-4 py-1" />
-      {planActive ? <div className="z-10 border-b border-line bg-surface px-4 py-3 text-sm"><div className="mx-auto max-w-xl"><p className="font-semibold">Your movement plan</p><p className="text-ink-muted">{plan ? `${plan.activity} · ${plan.origin.kind === "device" ? "From here" : plan.origin.query}${plan.loop ? " · loop" : ` → ${plan.destination?.query}`} · ${plan.departure.local} (${plan.departure.timeZone})` : "Your plan is still being entered. Its details are kept in this tab."}</p>{planDraft?.legs?.length ? <p className="mt-1 text-xs">Plus {planDraft.legs.length} separate travel leg{planDraft.legs.length === 1 ? "" : "s"}; review each leg in Plan.</p> : null}<p className="mt-1 text-xs text-ink-muted">Questions about this plan use checked evidence and are not saved to chat history.</p><div className="mt-1 flex gap-4"><Link href="/plan" className="font-semibold text-accent-strong">Edit plan</Link><Link href="/around" className="font-semibold text-accent-strong">View in Around</Link></div></div></div> : null}
+      {planActive ? <div className="z-10 border-b border-line bg-surface px-4 py-3 text-sm"><div className="mx-auto max-w-xl"><p className="font-semibold">Your movement plan</p><p className="text-ink-muted">{plan ? `${plan.activity} · ${plan.origin.kind === "device" ? "From here" : plan.origin.query}${plan.loop ? " · loop" : ` → ${plan.destination?.query}`} · ${plan.departure.local} (${plan.departure.timeZone})` : "Your plan is still being entered. Its details are kept in this tab."}</p>{planDraft?.legs?.length ? <p className="mt-1 text-xs">Plus {planDraft.legs.length} separate travel leg{planDraft.legs.length === 1 ? "" : "s"}; review each leg in Plan.</p> : null}<p className="mt-1 text-xs text-ink-muted">Movement plan questions use checked evidence and are not saved to chat history. {user ? "Nearby, reporting and product questions use your existing saved chat." : "Nearby and reporting questions receive limited answers without saved chat."}</p><div className="mt-1 flex gap-4"><Link href="/plan" className="font-semibold text-accent-strong">Edit plan</Link><Link href="/around" className="font-semibold text-accent-strong">View in Around</Link></div></div></div> : null}
       {user && !loc.point ? <button type="button" onClick={() => void loc.request()} className="mx-auto min-h-11 px-4 text-sm font-semibold text-accent-strong">Use current location for nearby questions</button> : null}
 
       {/* The log isn't live (it would re-read every streamed word); each finished reply is announced once below. */}
@@ -362,6 +368,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
               </div>
             </div>
           )}
+          {user && !planActive ? <p className="text-xs text-ink-muted">Movement questions use a temporary plan and are not added to saved chat. Nearby and reporting questions use your existing chat.</p> : null}
           {msgs.map((m) =>
             m.role === "user" ? (
               <div key={m.id} className="flex justify-end animate-rise">

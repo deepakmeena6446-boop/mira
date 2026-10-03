@@ -7,6 +7,7 @@ import { requireUser } from "@/server/session/user";
 import { startTrip, startTripSchema } from "@/server/trips";
 import { workerStatus } from "@/server/health/worker";
 import { unavailable } from "@/server/http/errors";
+import { recordDecisionOutcomeBestEffort } from "@/server/decision-outcomes";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export const POST = handle(async (req: Request) => {
   if (!(await workerStatus(sql, systemClock)).healthy) throw unavailable("trips_unavailable", "Trip sharing is paused for a moment. Please try again shortly.");
   const input = await readJson(req, startTripSchema, 2048); // room for tz + savedPlaceId + a long non-Latin name
   const trip = await startTrip(sql, user, input, systemClock);
+  await recordDecisionOutcomeBestEffort(sql, "journey_started", now);
   console.log(JSON.stringify({ t: now.toISOString(), src: "web", event: "trip.started", trip: trip.id, contacts: trip.sharedWith.length }));
   return json({ trip }, 201);
 });

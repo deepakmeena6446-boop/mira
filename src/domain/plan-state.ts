@@ -22,6 +22,7 @@ export const planDraftSchema = z.object({
   version: z.literal(PLAN_CONTRACT_VERSION),
   touched: z.boolean(),
   activity: z.string().max(160),
+  timeHint: z.string().max(24).nullable().optional(),
   origin: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("named"), query: z.string().max(160), resolution: planPlaceResolutionSchema.nullable() }).strict(),
     z.object({ kind: z.literal("device"), use: z.literal("from_here"), point }).strict(),
@@ -48,6 +49,13 @@ export function newPlanDraft(now: Date, timeZone: string): PlanDraft {
 
 export function newPlanLeg(): PlanLegDraft {
   return { label: "", origin: { query: "", resolution: null }, destination: { query: "", resolution: null }, departureLocal: "", timeZone: "", mode: "walk", destinationCountryIso: null };
+}
+
+/** Prefill the reverse places only; the return's time, zone and service need fresh checks. */
+export function returnLegFromMain(draft: PlanDraft): PlanLegDraft | null {
+  const main = intentFromDraft(draft);
+  if (!main || main.loop || draft.origin.kind !== "named" || !resolvedOrigin(main) || !resolvedDestination(main)) return null;
+  return { label: `Return to ${draft.origin.query}`.slice(0, 160), origin: { ...draft.destination }, destination: { query: draft.origin.query, resolution: draft.origin.resolution }, departureLocal: "", timeZone: "", mode: draft.mode, destinationCountryIso: null };
 }
 
 export function intentFromLeg(leg: PlanLegDraft): MovementIntent | null {

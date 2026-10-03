@@ -7,6 +7,7 @@ import { plannedTimeSchema } from "@/domain/plan-contract";
 import { haversineMeters } from "@/domain/pilot";
 import { planOptionsFor } from "@/server/plan/options";
 import { ApiError } from "@/server/http/errors";
+import { recordDecisionOutcomeBestEffort } from "@/server/decision-outcomes";
 
 export const dynamic = "force-dynamic";
 const body = z.object({ from: point, to: point, departure: plannedTimeSchema }).strict();
@@ -18,5 +19,7 @@ export const POST = handle(async (req: Request) => {
   await enforce(sql, [dailyKey("ip", clientIp(req), checkedAt)], [{ bucket: "geo:route:m", max: 480, windowMs: 60_000 }], checkedAt);
   const { from, to, departure } = await readJson(req, body, 512);
   if (haversineMeters(from, to) > 25_000) throw new ApiError(400, "too_far", "That's too far for a local walking comparison.");
-  return json(await planOptionsFor(sql, from, to, departure, checkedAt));
+  const result = await planOptionsFor(sql, from, to, departure, checkedAt);
+  await recordDecisionOutcomeBestEffort(sql, result.state === "ready" ? "plan_option_ready" : "plan_option_partial", checkedAt);
+  return json(result);
 });

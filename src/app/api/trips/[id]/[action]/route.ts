@@ -7,6 +7,7 @@ import { systemClock } from "@/server/clock";
 import { requireUser } from "@/server/session/user";
 import { extendJourney, userAction } from "@/server/journey/service";
 import { changeTrip, tellMyPeopleNow, tripById, tripOwnerHash } from "@/server/trips";
+import { outcomeForTripClose, recordDecisionOutcomeBestEffort } from "@/server/decision-outcomes";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export const POST = handle(async (req: Request, ctx: RouteContext<"/api/trips/[i
   if (action === "change") {
     const input = await readJson(req, z.object({ to: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180), name: z.string().trim().min(1).max(80) }).strict(), etaMinutes: z.number().int().min(5).max(235) }).strict(), 512);
     const trip = await changeTrip(sql, user.id, id, input, systemClock);
+    await recordDecisionOutcomeBestEffort(sql, "journey_changed", systemClock.now());
     console.log(JSON.stringify({ t: systemClock.now().toISOString(), src: "web", event: "trip.changed", trip: id, by: "user" }));
     return json({ trip });
   }
@@ -37,5 +39,6 @@ export const POST = handle(async (req: Request, ctx: RouteContext<"/api/trips/[i
     await userAction(sql, owner, id, action === "arrive" ? "arrive" : "end", systemClock);
   }
   console.log(JSON.stringify({ t: systemClock.now().toISOString(), src: "web", event: `trip.${action === "arrive" ? "arrived" : action === "end" ? "ended" : "extended"}`, trip: id, by: "user" }));
+  if (action === "arrive" || action === "end") await recordDecisionOutcomeBestEffort(sql, outcomeForTripClose(action), systemClock.now());
   return json({ trip: await tripById(sql, user.id, id, systemClock.now()) });
 });
