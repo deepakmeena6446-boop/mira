@@ -21,7 +21,7 @@ test("guest retains a future named-origin plan across Around, map, Mira, back an
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ places: body.q.includes("North") ? [ORIGIN, OTHER_ORIGIN] : [DESTINATION] }) });
   });
 
-  await page.goto("/plan");
+  await page.goto("/plan/legs");
   await expect(page.getByRole("heading", { name: "Let’s make it work." })).toBeVisible();
   await page.getByLabel("What do you want to do?").fill("Run before dawn");
   await page.getByRole("textbox", { name: "From" }).fill("North Gate");
@@ -37,19 +37,19 @@ test("guest retains a future named-origin plan across Around, map, Mira, back an
   await expect(page.getByRole("status").filter({ hasText: "Places resolved" })).toBeVisible();
   await page.getByRole("button", { name: "Compare my options" }).click();
   await expect(page.getByRole("region", { name: "Plan options" })).toBeVisible();
-  await page.goto("/around");
-  await expect(page).toHaveURL(/\/around$/);
-  await expect(page.getByRole("region", { name: "Current movement plan" })).toContainText("North Gate → South Library");
-  await expect(page.getByRole("region", { name: "Current movement plan" })).toContainText("2026-10-07T04:45");
-  await page.getByRole("button", { name: "View route & map" }).click();
-  await expect(page).toHaveURL(/\/around\/map$/);
+  // The same tab plan opens in the Phase 1 decision screen (D39): named places kept, no GPS asked.
+  await page.goto("/plan");
+  await expect(page.getByRole("heading", { level: 1, name: "To South Library" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your plan", exact: true })).toContainText("North Gate → South Library");
+  await expect(page.getByRole("region", { name: "Your plan, at that time" })).toBeVisible();
+  await page.goto("/around/map");
   await expect(page.getByText("Run before dawn · North Gate → South Library")).toBeVisible();
   await page.goBack();
-  await expect(page.getByRole("region", { name: "Current movement plan" })).toContainText("North Gate");
+  await expect(page.getByRole("heading", { level: 1, name: "To South Library" })).toBeVisible();
   await page.goto("/mira");
   await expect(page.getByText("Your movement plan")).toBeVisible();
   await expect(page.getByText("Movement plan questions use checked evidence and are not saved to chat history.", { exact: false })).toBeVisible();
-  await page.goto("/plan");
+  await page.goto("/plan/legs");
   await page.reload();
   await expect(page.getByRole("textbox", { name: "From" })).toHaveValue("North Gate");
   await expect(page.getByRole("textbox", { name: "To", exact: true })).toHaveValue("South Library");
@@ -58,7 +58,7 @@ test("guest retains a future named-origin plan across Around, map, Mira, back an
   await page.goto("/around/map");
   await expect(page.getByText("Run before dawn · North Gate → South Library")).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { geoCalls: number }).geoCalls)).toBe(0);
-  await page.goto("/plan");
+  await page.goto("/plan/legs");
   expect(await page.evaluate(() => sessionStorage.getItem("mira.plan.v1"))).toContain("North Gate");
   await page.getByRole("button", { name: "Clear plan" }).click();
   await expect(page.getByRole("textbox", { name: "From" })).toHaveValue("");
@@ -66,7 +66,7 @@ test("guest retains a future named-origin plan across Around, map, Mira, back an
 });
 
 test("failed and empty place lookup preserve the guest's typed origin", async ({ page }) => {
-  await page.goto("/plan");
+  await page.goto("/plan/legs");
   let providerFailed = true;
   await page.route("**/api/geo/search", async (route) => {
     await route.fulfill(providerFailed ? { status: 503, contentType: "application/json", body: JSON.stringify({ error: { code: "provider_down", message: "Unavailable" } }) } : { status: 200, contentType: "application/json", body: JSON.stringify({ places: [] }) });
@@ -83,7 +83,7 @@ test("failed and empty place lookup preserve the guest's typed origin", async ({
 
 test("opening and leaving an untouched draft keeps the legacy map entry available", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("mira.welcomed", "1"));
-  await page.goto("/plan");
+  await page.goto("/plan/legs");
   await expect(page.getByRole("textbox", { name: "From" })).toHaveValue("");
   await page.goto("/around/map");
   await expect(page.getByRole("button", { name: /Search a place or address/ })).toBeVisible();

@@ -3,11 +3,26 @@ import { smtpConfigured } from "@/server/config/env";
 import { countryRegistry } from "@/server/locale";
 import { getSql } from "@/server/db/client";
 import { getUser } from "@/server/session/user";
+import { listPlaces } from "@/server/account/places";
+import { tileConfig } from "@/server/providers/geo/tiles";
 import { PlanScreen } from "./PlanScreen";
+import { PlanDecision, type Situation } from "./PlanDecision";
 
-export const metadata: Metadata = { title: "Plan a movement" };
+export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Plan" };
 
-export default async function PlanPage() {
-  const user = await getUser(getSql());
-  return <PlanScreen emailAlerts={smtpConfigured()} signedIn={Boolean(user)} countries={countryRegistry().map(({ iso2, name }) => ({ iso: iso2, name }))} />;
+const SITUATIONS: Situation[] = ["go", "run", "travel"];
+
+/**
+ * The decision flow (docs/phase1-ux/01 §3). `?for=go|run|travel` picks the situation. Links into the
+ * previous step-based planner (`?planStep=…`, used by journey return-leg links) still open it; it also
+ * lives at /plan/legs for return trips and multi-leg plans.
+ */
+export default async function PlanPage({ searchParams }: { searchParams: Promise<{ for?: string; planStep?: string }> }) {
+  const sql = getSql();
+  const [params, user] = await Promise.all([searchParams, getUser(sql)]);
+  if (params.planStep) return <PlanScreen emailAlerts={smtpConfigured()} signedIn={Boolean(user)} countries={countryRegistry().map(({ iso2, name }) => ({ iso: iso2, name }))} />;
+  const [places, tiles] = await Promise.all([user ? listPlaces(sql, user.id) : Promise.resolve([]), tileConfig()]);
+  const initialFor = SITUATIONS.includes(params.for as Situation) ? (params.for as Situation) : null;
+  return <PlanDecision signedIn={Boolean(user)} emailAlerts={smtpConfigured()} places={places} tiles={tiles} initialFor={initialFor} />;
 }

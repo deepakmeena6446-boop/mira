@@ -99,7 +99,8 @@ export async function newUser(browser: Browser, name: string): Promise<{ ctx: Br
   await fixtureIndiaReverse(page);
   await page.goto("/");
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("heading", { name: "What’s your plan?" })).toBeVisible();
+  // Phase 1 Home (D39): the live "Right now, around you" card leads, even before location is chosen.
+  await expect(page.getByRole("region", { name: "Right now, around you" })).toBeVisible();
   await page.goto("/me");
   await page.getByRole("button", { name: "Get started" }).click();
   await page.getByPlaceholder("Your first name").fill(name);
@@ -107,7 +108,7 @@ export async function newUser(browser: Browser, name: string): Promise<{ ctx: Br
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
   await page.goto("/");
-  await expect(page.getByText(`Hi, ${name}`)).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: new RegExp(`, ${name}$`) })).toBeVisible();
   // Legacy local-context flows opt in through the UI; root planning needs no GPS.
   await page.goto("/today");
   await page.getByRole("button", { name: "Use my location for local context" }).click();
@@ -190,6 +191,16 @@ export function dockerCompose(...args: string[]) {
 }
 
 export async function expectNoVerdictWords(page: Page) {
-  const text = await page.locator("main").innerText();
+  // "I feel unsafe" is her own feeling (the Support button), never a verdict on a place — the output guard allows it too.
+  const text = (await page.locator("main").innerText()).replace(/\bI feel unsafe\b/g, "");
   expect(text).not.toMatch(/\b(safe|safer|safest|unsafe|dangerous)\b/i);
+}
+
+/**
+ * Phase 1 journey (D39): sharing management, timing, position details and ending early sit under
+ * one "More" disclosure so the glance stays simple. Opens it if it is closed.
+ */
+export async function openJourneyMore(page: Page) {
+  const summary = page.locator("summary", { hasText: "More — sharing, timing, details" });
+  if (!(await summary.evaluate((el) => (el.parentElement as HTMLDetailsElement).open))) await summary.click();
 }

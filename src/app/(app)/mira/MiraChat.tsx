@@ -4,21 +4,24 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MiraPulse } from "@/components/app/MiraPulse";
-import { recordUsage, usageMode, type UsageMode } from "@/lib/usage-signal";
+import { recordUsage } from "@/lib/usage-signal";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { kindIcon } from "@/components/app/kinds";
 import { Button } from "@/components/ui/Button";
-import { useDaypart } from "@/lib/daypart-store";
-import type { Daypart } from "@/domain/daypart";
 import { Icon } from "@/components/ui/Icon";
 import { EmergencyPill } from "@/components/app/EmergencyPill";
-import { SafetyAccess } from "@/components/app/SafetyAccess";
 import { useToast } from "@/components/ui/Toast";
 import { cx } from "@/components/ui/cx";
+import { RootHeader } from "@/components/mira/Frame";
+import { SkyCard, skyAt } from "@/components/mira/LiveNow";
+import { EvidenceGlyph, EVIDENCE_LABEL, type EvidenceKind } from "@/components/mira/Evidence";
 import { api } from "@/lib/api-client";
-import { freshLocation, setPendingDestination, useLocation } from "@/lib/location-store";
+import { takeHandedOffAsk } from "@/lib/ask-handoff";
+import { freshLocation, setPendingDestination, useClock, useLocation, usableLocationPoint } from "@/lib/location-store";
 import type { MiraCard } from "@/server/providers/companion/types";
 import { circleSharingLine } from "@/domain/companion-output";
+import { clockIn } from "@/domain/daylight";
+import { useDaypart } from "@/lib/daypart-store";
 import { hasPlanWork, intentFromDraft, intentFromLeg, newPlanDraft } from "@/domain/plan-state";
 import { setPlanDraft, usePlanDraft, usePlanHydrated } from "@/lib/plan-store";
 import { draftFromAsk } from "@/domain/plan-ask";
@@ -34,21 +37,18 @@ interface Msg {
   failed?: boolean;
 }
 
-/** What Mira is good at, as tappable examples (signed out, they open sign-in). */
-const EXAMPLES = ["Take me home", "What's open nearby?", "I'm landing in London at 11 PM", "Find Help Points nearby", "I feel uneasy"];
-const GUEST_EXAMPLES = ["Run a loop before dawn", "Plan my late return", "I'm landing at 1:30 AM", "Plan a local destination"];
-/** After dark, the journey home and Help Points come first. */
-/** For people who mostly use Mira to contribute: the everyday observation first. */
-const CONTRIBUTOR_EXAMPLES = ["Report a broken streetlight", "What's open nearby?", "Take me home", "Find Help Points nearby", "I feel uneasy"];
-const NIGHT_EXAMPLES = ["Take me home", "I feel uneasy", "Find somewhere staffed nearby", "What's open nearby?", "I'm landing in London at 11 PM"];
-
-const INTRO: Record<Daypart, (name: string) => string> = {
-  dawn: (n) => `Morning${n}. Ask about a place, a journey, or help nearby.`,
-  day: (n) => `Hi${n}, I'm Mira. Ask me about a place, your journey, or what we know nearby.`,
-  evening: (n) => `Evening${n}. Going somewhere? I can help you check the way or share your journey.`,
-  night: (n) => `Hey${n}. I can help you get home, find a Help Point, or check what's open.`,
-};
-const MODE_LABEL = { walk: "Walk", ride: "Ride (taxi / app cab)", transit: "Public transport" } as const;
+/** After dark, the way home and help nearby lead (the theme follows the device clock or her setting). */
+const NIGHT_STARTERS: Array<{ title: string; icon: string; asks: string[] }> = [
+  { title: "Getting home", icon: "home", asks: ["Take me home", "Find somewhere staffed nearby"] },
+];
+/** Situations, not prompts: each starter is something a person is about to do. */
+const STARTERS: Array<{ title: string; icon: string; asks: string[] }> = [
+  { title: "Going out", icon: "route", asks: ["I’m walking from my hotel to a café at 10:30 PM", "Is there a better way for me to get home tonight?"] },
+  { title: "Running or walking", icon: "walk", asks: ["Can I go for a run here around 5 AM?"] },
+  { title: "Travelling", icon: "airport", asks: ["I land at 1 AM and need to get to my hotel"] },
+  { title: "Right now", icon: "pin", asks: ["What’s open nearby?", "Find Help Points nearby"] },
+];
+const MODE_LABEL = { walk: "Walk", ride: "Taxi / ride", transit: "Public transport" } as const;
 const fmtM = (m?: number) => (m === undefined ? "" : m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`);
 
 /** The phone's IANA time zone (e.g. "Europe/London"), so Mira knows her local day and time. */
@@ -67,8 +67,8 @@ function TripCardButton({ label, onStart }: { label: string; onStart: () => Prom
   const [busy, setBusy] = useState(false);
   return (
     <Button
-      className="mt-3"
-      variant="primary"
+      variant="secondary"
+      className="flex-1"
       busy={busy}
       busyLabel="Starting…"
       onClick={async () => {
@@ -77,100 +77,80 @@ function TripCardButton({ label, onStart }: { label: string; onStart: () => Prom
         setBusy(false);
       }}
     >
-      <Icon name="share" className="size-4" /> {label}
+      {label}
     </Button>
   );
 }
 
-function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
+/** One compact evidence line inside a reply card. */
+function Fact({ kind, children, label }: { kind: EvidenceKind; children: React.ReactNode; label?: string }) {
+  return (
+    <li className="flex items-start gap-2 py-1.5 text-sm">
+      <EvidenceGlyph kind={kind} className="mt-[3px]" />
+      <span className="min-w-0 flex-1">{children}</span>
+      <span className="shrink-0 text-[0.7rem] font-semibold text-ink-subtle">{label ?? EVIDENCE_LABEL[kind]}</span>
+    </li>
+  );
+}
+
+function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; onTrip: StartTrip; onComparePlace: (d: { name: string; lat: number; lon: number }) => void; onStartHere: () => void }) {
   const router = useRouter();
-  const goTo = (d: { name: string; lat: number; lon: number; kind?: string }) => {
+  const show = (d: { name: string; lat: number; lon: number; kind?: string }) => {
     setPendingDestination(d);
-    router.push("/around/map");
+    router.push("/around");
   };
+  const shell = "m-card mt-2 overflow-hidden";
   switch (card.type) {
     case "trip": {
       const mode = card.mode ?? "walk";
       return (
-        <div className="mt-2 rounded-[var(--radius-card)] border border-line bg-surface p-4">
-          <p className="text-[13px] font-medium text-ink-subtle">Share journey</p>
+        <div className={cx(shell, "p-4")}>
+          <p className="m-label">A journey Mira can follow</p>
           <p className="mt-1 text-lg font-semibold">To {card.destination.name}</p>
-          <p className="text-sm text-ink-muted">
-            {mode === "walk" ? (card.minutes ? `About ${card.minutes} min walk · ` : "") : `${MODE_LABEL[mode]} · `}
-            {card.contacts.length || card.whatsapp?.length ? circleSharingLine(card.contacts, card.email, card.whatsapp) : "Just you: nobody is alerted automatically. Send your live link after you start."}
-          </p>
-          {mode === "walk" ? (
-            <TripCardButton label="Go with Mira" onStart={() => onTrip(card.destination)} />
-          ) : (
-            // Home plans rides and public transport, and asks her for the ETA.
-            <Button className="mt-3" variant="primary" onClick={() => goTo(card.destination)}>
-              <Icon name="share" className="size-4" /> View route in Around
-            </Button>
-          )}
+          <ul className="mt-1 divide-y divide-line">
+            {mode === "walk" && card.minutes ? <Fact kind="estimate">About {card.minutes} min walk</Fact> : <Fact kind="none">{MODE_LABEL[mode]} · you set the check-in time</Fact>}
+            <Fact kind="checked">{card.contacts.length || card.whatsapp?.length ? circleSharingLine(card.contacts, card.email, card.whatsapp) : "Just you: nobody is alerted automatically. Send your live link after you start."}</Fact>
+          </ul>
+          <div className="mt-3 flex gap-2">
+            <button type="button" onClick={() => onComparePlace(card.destination)} className="mira-primary flex-1">Compare ways</button>
+            {mode === "walk" ? <TripCardButton label="Go with Mira" onStart={() => onTrip(card.destination)} /> : null}
+          </div>
+          <p className="mt-2 text-xs text-ink-muted">Nothing starts until you tap. Comparing shows lighting, Help Points and daylight first.</p>
         </div>
       );
     }
     case "places":
+    case "help_points": {
+      const rows = card.type === "places" ? card.places.map((p) => ({ key: `${p.name}-${p.lat}`, name: p.name, sub: p.kind, right: fmtM(p.distanceM), icon: kindIcon(p.kind), go: () => show({ name: p.name, lat: p.lat, lon: p.lon, kind: p.kind }) })) : card.points.map((p) => ({ key: `${p.name}-${p.lat}`, name: p.name, sub: `${p.label} · ${p.hours}`, right: `~${p.minutes} min`, icon: kindIcon(p.label), go: () => show({ name: p.name, lat: p.lat, lon: p.lon, kind: p.label }) }));
       return (
-        <div className="mt-2 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
-          <p className="px-4 pt-3 text-[13px] font-medium text-ink-subtle">{card.title}</p>
+        <div className={shell}>
+          <p className="m-label px-4 pt-3">{card.title}</p>
           <ul className="divide-y divide-line">
-            {card.places.map((p) => (
-              <li key={`${p.name}-${p.lat}`}>
-                <button type="button" onClick={() => goTo({ name: p.name, lat: p.lat, lon: p.lon, kind: p.kind })} className="flex min-h-13 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-sunken">
-                  <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink-muted">
-                    <Icon name={kindIcon(p.kind)} className="size-[18px]" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold text-mixed">{p.name}</span>
-                    <span className="block text-xs text-ink-muted">{p.kind}</span>
-                  </span>
-                  <span className="text-sm text-ink-subtle">{fmtM(p.distanceM)}</span>
+            {rows.map((r) => (
+              <li key={r.key}>
+                <button type="button" onClick={r.go} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-sunken">
+                  <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-xl bg-sunken text-ink-muted"><Icon name={r.icon} className="size-[18px]" /></span>
+                  <span className="min-w-0 flex-1"><span className="block truncate font-semibold text-mixed">{r.name}</span><span className="line-clamp-2 block text-xs text-ink-muted">{r.sub}</span></span>
+                  <span className="shrink-0 text-sm text-ink-subtle">{r.right}</span>
                 </button>
               </li>
             ))}
           </ul>
+          <p className="px-4 pb-3 pt-1 text-xs text-ink-subtle">{card.type === "help_points" ? "Listed hours from the source; staffing isn’t verified. Walking times are by distance." : "Tap a place to see what Mira knows around it."}</p>
         </div>
       );
-    case "help_points":
-      return (
-        <div className="mt-2 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
-          <p className="px-4 pt-3 text-[13px] font-medium text-ink-subtle">{card.title}</p>
-          <ul className="divide-y divide-line">
-            {card.points.map((p) => (
-              <li key={`${p.name}-${p.lat}`}>
-                <button type="button" onClick={() => goTo({ name: p.name, lat: p.lat, lon: p.lon, kind: p.label })} className="flex min-h-13 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-sunken">
-                  <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink-muted">
-                    <Icon name={kindIcon(p.label)} className="size-[18px]" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold text-mixed">{p.name}</span>
-                    <span className="block text-xs text-ink-muted">
-                      {p.label} · {p.hours}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-right text-sm text-ink-subtle">
-                    ~{p.minutes} min
-                    <span className="block text-[0.7rem]">{p.source}</span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          <p className="px-4 pb-3 pt-1 text-xs text-ink-subtle">Places where help is usually available. Walking times are estimates.</p>
-        </div>
-      );
+    }
     case "report":
       return (
-        <Link href={`/report?c=${card.category}&from=mira`} className="mt-2 flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 font-semibold">
-          <span aria-hidden className="grid size-10 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink"><Icon name="flag" className="size-5" /></span>
+        <Link href={`/report?c=${card.category}&from=mira`} className={cx(shell, "flex items-center gap-3 p-4 font-semibold")}>
+          <span aria-hidden className="grid size-10 place-items-center rounded-xl bg-people-soft text-people"><Icon name="flag" className="size-5" /></span>
           <span className="flex-1">Report {card.label} privately</span>
           <Icon name="chevron" className="size-4 text-ink-subtle" />
         </Link>
       );
     case "sos":
       return (
-        <div className="mt-2 rounded-[var(--radius-card)] bg-warm-soft p-4">
+        <div className="mt-2 rounded-[var(--radius-tile)] bg-warm-soft p-4">
           <EmergencyPill variant="block" className="w-full" />
           <p className="mt-1 text-center text-xs text-ink-subtle">Opens your phone&apos;s dialler. Mira doesn&apos;t call anyone for you.</p>
           <p className="mt-2 text-center text-sm text-ink-muted">
@@ -180,7 +160,8 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
       );
     case "trip_status":
       return (
-        <Link href="/trip" className="mt-2 flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4">
+        <Link href="/trip" className={cx(shell, "flex items-center gap-3 p-4")}>
+          <MiraPulse size={16} state="with-you" />
           <span className="flex-1">
             <span className="block font-semibold">On the way to {card.destination}</span>
             <span className="block text-sm text-ink-muted">ETA {new Date(card.etaAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
@@ -190,39 +171,36 @@ function Card({ card, onTrip }: { card: MiraCard; onTrip: StartTrip }) {
       );
     case "save_place":
       return (
-        <Link href="/me#places" className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-button)] border border-line-strong bg-surface px-5 font-semibold text-ink">
+        <Link href="/me#places" className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-full bg-surface px-5 font-semibold text-ink ring-1 ring-line-strong">
           <Icon name="home" className="size-4" /> Save my home
         </Link>
       );
-    case "plan_brief":
-      return <section className="mt-2 rounded-[var(--radius-card)] border border-line bg-surface p-4 text-sm" aria-label="Plan evidence"><h2 className="font-semibold">Plan evidence</h2><p className="mt-1">{card.state === "ready" ? `${card.options.length} mapped walking option${card.options.length === 1 ? "" : "s"}` : card.state === "not_checked" ? "Route check not started; complete the places and time first." : `Route coverage: ${card.state}`}</p>{card.source ? <p className="text-ink-muted">{card.source} · snapshot {card.sourceAt ? new Date(card.sourceAt).toLocaleDateString() : "unknown"} · checked {new Date(card.checkedAt).toLocaleString()}{card.scope ? ` · ${card.scope}` : ""}</p> : null}{card.daylight ? <p className="mt-1">Daylight: {card.daylight.status === "known" ? `${card.daylight.value} · ${card.daylight.source.label}` : `unknown (${card.daylight.reason})`}</p> : null}<Link href={card.next === "edit_plan" ? "/plan" : "/around"} className="mt-2 inline-flex min-h-11 items-center rounded-[var(--radius-button)] bg-accent px-4 font-semibold text-accent-ink">{card.next === "edit_plan" ? "Complete plan" : "Review options"}</Link><p className="mt-1 text-xs text-ink-muted">No journey starts or contact is notified from this reply.</p></section>;
+    case "plan_brief": {
+      const ready = card.state === "ready";
+      return (
+        <section className={cx(shell, "p-4")} aria-label="Plan evidence">
+          <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Plan evidence</h2><span className="text-xs text-ink-subtle">checked {new Date(card.checkedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>
+          <ul className="mt-1 divide-y divide-line">
+            {card.state === "not_checked" ? <Fact kind="pending" label="Needs you">Route check not started — places and time needed first</Fact> : ready ? <Fact kind="estimate">{card.options.length} mapped walking option{card.options.length === 1 ? "" : "s"}{card.options[0] ? ` · fastest about ${Math.round(card.options[0].minutes)} min` : ""}</Fact> : <Fact kind={card.state === "failed" ? "failed" : "none"}>Mapped walking route: {card.state === "failed" ? "the check failed" : card.state === "stale" ? "the map snapshot is too old" : "not available for this area"}</Fact>}
+            {card.daylight ? <Fact kind={card.daylight.status === "known" ? "checked" : "none"}>{card.daylight.status === "known" ? `Daylight: ${String(card.daylight.value)} · ${card.daylight.source.label}` : "Daylight not calculated yet"}</Fact> : null}
+          </ul>
+          <div className="mt-3 flex gap-2">
+            <Link href="/plan" className="mira-primary flex-1">{card.next === "edit_plan" ? "Complete plan" : "Review options"}</Link>
+            {card.state === "not_checked" ? <button type="button" onClick={onStartHere} className="min-h-12 rounded-2xl px-3 text-sm font-semibold ring-1 ring-line-strong">Start where I am</button> : null}
+          </div>
+          <p className="mt-2 text-xs text-ink-muted">The full brief adds lighting, Help Points and local updates. No journey starts and nobody is notified from this reply.</p>
+        </section>
+      );
+    }
   }
 }
 
-/** Signed out: what Mira does, why she needs an account, and what to ask. */
-function SignedOutIntro({ onSignIn, onQuestion }: { onSignIn: () => void; onQuestion: (question: string) => void }) {
+/** Signed out: what Mira does without an account, and what needs one. */
+function GuestNote({ onSignIn }: { onSignIn: () => void }) {
   return (
-    <div className="animate-rise rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--shadow-card)]">
-      <p className="text-lg font-semibold">Mira is your travel companion</p>
-      <p className="mt-2 text-ink-muted">
-        She shares your journey with people you trust, finds Help Points and what&apos;s open near you, and tells you what Mira knows — and what it doesn&apos;t — about where you are. She never guesses whether a place is safe.
-      </p>
-      <p className="mt-2 text-sm text-ink-muted">You can ask about a movement plan as a guest. Plan replies are not saved to an account. An account is needed for saved conversations and journeys.</p>
-      <p className="mt-4 text-[13px] font-medium text-ink-subtle">You could ask</p>
-      <ul className="mt-2 flex flex-wrap gap-2">
-        {GUEST_EXAMPLES.map((q) => (
-          <li key={q}>
-            <button type="button" onClick={() => onQuestion(q)} className="min-h-11 rounded-full border border-line bg-canvas px-4 text-sm font-semibold hover:border-accent/40">
-              {q}
-            </button>
-          </li>
-        ))}
-      </ul>
-      <Button className="mt-4 w-full" variant="primary" onClick={onSignIn}>
-        Sign in for saved chat
-      </Button>
-      <p className="mt-3 text-center text-xs text-ink-subtle">Emergency and &ldquo;I feel unsafe&rdquo; are above and never wait for Mira.</p>
-    </div>
+    <p className="text-[0.8125rem] text-ink-muted">
+      As a guest, Mira answers plan questions from checked evidence. <button type="button" onClick={onSignIn} className="font-semibold text-accent-strong underline">Sign in</button> for nearby places, saved chat and live journeys.
+    </p>
   );
 }
 
@@ -233,7 +211,10 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   const planHydrated = usePlanHydrated();
   const planActive = hasPlanWork(planDraft);
   const loc = useLocation(false);
+  const clock = useClock();
+  const here = usableLocationPoint(loc, clock?.getTime());
   const plan = planDraft ? intentFromDraft(planDraft) : null;
+  // Ask never requests GPS itself (D12): the context card appears only when this session already has her position.
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -251,7 +232,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   }, [user]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    if (msgs.length) endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [msgs]);
 
   const send = async (text: string) => {
@@ -320,7 +301,19 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
     setSending(false);
   };
 
+  // A question handed over from Home or a brief is asked once, as soon as the screen is ready.
+  const handed = useRef(false);
+  useEffect(() => {
+    if (handed.current || !planHydrated || (user && !loaded)) return;
+    handed.current = true;
+    const q = takeHandedOffAsk();
+    // Deferred a tick so the screen paints first; the question then streams in like any other.
+    if (q) window.setTimeout(() => void send(q), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planHydrated, loaded, user]);
+
   const startTrip: StartTrip = async (dest) => {
+    if (!user) return setSignIn(true);
     const l = await freshLocation();
     if (!l.point) return toast("Turn on location so I can start your trip.", "error");
     const r = await api("/api/trips", { body: { from: { lat: l.point.lat, lon: l.point.lon }, to: dest, share: false } });
@@ -330,97 +323,116 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
       router.refresh();
     } else toast(r.message, "error");
   };
+  // Conversation → decision: hand the place to Plan, from where she is (only if location is already on).
+  const comparePlace = (d: { name: string; lat: number; lon: number }) => {
+    const draft = newPlanDraft(new Date(), deviceTimeZone() ?? "UTC");
+    setPlanDraft({ ...draft, touched: true, activity: `Go to ${d.name}`.slice(0, 160), ...(here ? { origin: { kind: "device", use: "from_here", point: { lat: here.lat, lon: here.lon } } } : {}), destination: { query: d.name.slice(0, 160), resolution: { source: "selected_point", name: d.name, point: { lat: d.lat, lon: d.lon } } } });
+    router.push("/plan?for=go");
+  };
 
-  const firstName = user?.name.split(" ")[0];
-  const part = useDaypart() ?? "day";
-  // Chips follow how she uses Mira (device-local, day-stable); after dark the way home leads for everyone.
-  const [mode, setMode] = useState<UsageMode>("cold");
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- device storage exists only after mount
-    setMode(usageMode());
-  }, []);
-  const chips = part === "night" ? NIGHT_EXAMPLES : mode === "contribute" ? CONTRIBUTOR_EXAMPLES : EXAMPLES;
+  // "Here" in her words becomes the plan's start only when she taps this (never assumed from GPS).
+  const startHere = async () => {
+    const l = await freshLocation();
+    const draft = planDraft;
+    if (!l.point || !draft) return toast(l.status === "denied" ? "Location is off for Mira. Choose the starting place in the plan instead." : "A fresh position isn’t available. Choose the starting place in the plan instead.", "error");
+    setPlanDraft({ ...draft, origin: { kind: "device", use: "from_here", point: { lat: l.point.lat, lon: l.point.lon } } });
+    router.push("/plan");
+  };
+
+  const empty = (user ? loaded : true) && msgs.length === 0;
+  const night = useDaypart() === "night";
+  const starters = night ? [...NIGHT_STARTERS, ...STARTERS] : STARTERS;
+  const planLine = plan ? `${plan.origin.kind === "device" ? "From where you are" : plan.origin.query}${plan.loop ? " · loop" : ` → ${plan.destination?.query}`}` : planDraft?.activity || "A plan in progress";
 
   return (
     <div className="flex h-dvh flex-col bg-canvas">
-      <header className="z-10 flex items-center gap-3 border-b border-line bg-canvas px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))]">
-        <MiraPulse size={20} state={sending ? "thinking" : "observing"} />
-        <div>
-          <h1 className="text-xl font-semibold leading-tight">Mira</h1>
-          <p className="text-sm text-ink-muted">Places, journeys, and local context</p>
+      <div className="z-10 bg-canvas px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <div className="mx-auto max-w-xl">
+          <RootHeader emailAlerts={emailAlerts} leading={<MiraPulse size={22} state={sending ? "thinking" : "observing"} />} eyebrow={here ? `${loc.area ?? "Near you"}${clock ? ` · ${clockIn(clock)}` : ""}` : "Places, plans and what’s around"} title="Mira" />
+          {planActive && (plan || planDraft?.loop || planDraft?.destination.query.trim() || (planDraft?.origin.kind === "named" && planDraft.origin.query.trim())) ? (
+            <div className="mt-3 flex items-center gap-3 rounded-2xl bg-accent-soft/70 px-3 py-2.5">
+              <Icon name="route" className="size-5 shrink-0 text-accent-strong" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">Your movement plan · {planLine}</p>
+                <p className="truncate text-xs text-ink-muted">Movement plan questions use checked evidence and are not saved to chat history.</p>
+              </div>
+              <Link href="/plan" className="min-h-10 shrink-0 rounded-full bg-surface px-3 py-2 text-sm font-semibold text-accent-strong">Open</Link>
+            </div>
+          ) : null}
         </div>
-      </header>
-      <SafetyAccess emailAlerts={emailAlerts} className="z-10 border-b border-line bg-canvas px-4 py-1" />
-      {planActive ? <div className="z-10 border-b border-line bg-surface px-4 py-3 text-sm"><div className="mx-auto max-w-xl"><p className="font-semibold">Your movement plan</p><p className="text-ink-muted">{plan ? `${plan.activity} · ${plan.origin.kind === "device" ? "From here" : plan.origin.query}${plan.loop ? " · loop" : ` → ${plan.destination?.query}`} · ${plan.departure.local} (${plan.departure.timeZone})` : "Your plan is still being entered. Its details are kept in this tab."}</p>{planDraft?.legs?.length ? <p className="mt-1 text-xs">Plus {planDraft.legs.length} separate travel leg{planDraft.legs.length === 1 ? "" : "s"}; review each leg in Plan.</p> : null}<p className="mt-1 text-xs text-ink-muted">Movement plan questions use checked evidence and are not saved to chat history. {user ? "Nearby, reporting and product questions use your existing saved chat." : "Nearby and reporting questions receive limited answers without saved chat."}</p><div className="mt-1 flex gap-4"><Link href="/plan" className="font-semibold text-accent-strong">Edit plan</Link><Link href="/around" className="font-semibold text-accent-strong">View in Around</Link></div></div></div> : null}
-      {user && !loc.point ? <button type="button" onClick={() => void loc.request()} className="mx-auto min-h-11 px-4 text-sm font-semibold text-accent-strong">Use current location for nearby questions</button> : null}
+      </div>
 
       {/* The log isn't live (it would re-read every streamed word); each finished reply is announced once below. */}
-      <p className="sr-only" aria-live="polite">
-        {announce}
-      </p>
-      <div role="log" aria-live="off" aria-label="Conversation with Mira" className={cx("flex-1 overflow-y-auto px-4 pt-4", user ? "pb-44" : "pb-28")}>
-        <div className="mx-auto flex max-w-xl flex-col gap-3">
-          {!user && <SignedOutIntro onSignIn={() => setSignIn(true)} onQuestion={(question) => void send(question)} />}
-          {user && loaded && msgs.length === 0 && (
+      <p className="sr-only" aria-live="polite">{announce}</p>
+      <div role="log" aria-live="off" aria-label="Conversation with Mira" className="flex-1 overflow-y-auto px-4 pb-[calc(var(--tabbar-space)+8.5rem)] pt-3">
+        <div className="mx-auto flex max-w-xl flex-col gap-4">
+          {empty ? (
             <div className="animate-rise">
-              <div className="flex items-start gap-3">
-                <MiraPulse size={16} className="mt-[5px]" />
-                <p className="max-w-[90%] text-mixed">{INTRO[part](firstName ? ` ${firstName}` : "")}</p>
+              {here && clock ? (
+                <SkyCard state={skyAt(clock, here)} label="What Mira can see right now" eyebrow="What I can see right now" aside={loc.area ?? null} title={`${clockIn(clock)} · ${skyAt(clock, here) === "dark" ? "Dark now" : skyAt(clock, here) === "uncertain" ? "Twilight" : "Daylight"}`} strip={{ from: clock, point: here, hours: 12 }} className="mb-6" />
+              ) : null}
+              <p className="text-[1.625rem] font-semibold leading-tight tracking-[-0.035em]">Ask about a place, a time, or a plan.</p>
+              <p className="mt-2 text-[0.9375rem] text-ink-muted">{night ? "It’s late. I can help you get home, find a Help Point, or check what’s open — and I’ll say what I can’t check." : "I answer with what I can check — daylight, lit streets, Help Points open then, local updates — and say what I can’t. I never call a place good or bad."}</p>
+              <div className="mt-7 space-y-5">
+                {starters.map((g) => (
+                  <section key={g.title} aria-label={g.title}>
+                    <h2 className="m-label flex items-center gap-1.5"><Icon name={g.icon} className="size-3.5" />{g.title}</h2>
+                    <div className="mt-2 grid gap-2">
+                      {g.asks.map((q) => (
+                        <button key={q} type="button" onClick={() => void send(q)} disabled={sending} className="m-card m-press flex min-h-12 items-center gap-3 px-4 py-3 text-left text-[0.9375rem]">
+                          <span className="flex-1">{q}</span><Icon name="arrow" className="size-4 text-ink-subtle" />
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ))}
               </div>
+              {!user ? <div className="mt-5"><GuestNote onSignIn={() => setSignIn(true)} /></div> : null}
             </div>
-          )}
-          {user && !planActive ? <p className="text-xs text-ink-muted">Movement questions use a temporary plan and are not added to saved chat. Nearby and reporting questions use your existing chat.</p> : null}
+          ) : null}
           {msgs.map((m) =>
             m.role === "user" ? (
               <div key={m.id} className="flex justify-end animate-rise">
-                <p className="max-w-[80%] rounded-[var(--radius-card)] rounded-br-md bg-sunken px-4 py-2.5 text-ink text-mixed">{m.text}</p>
+                <p className="max-w-[82%] rounded-[1.25rem] rounded-br-md bg-ink px-4 py-2.5 text-canvas text-mixed">{m.text}</p>
               </div>
             ) : (
               <div key={m.id} className="flex items-start gap-3 animate-rise">
                 <MiraPulse size={16} state={m.failed ? "attention" : m.streaming && !m.text ? "thinking" : "observing"} className="mt-[5px]" />
-                <div className="min-w-0 max-w-[90%] flex-1">
-                  <div className={cx(m.failed ? "rounded-[var(--radius-card)] bg-warm-soft px-4 py-3 text-warm" : "")} role={m.failed ? "alert" : undefined}>
-                    {m.text ? <p className="text-mixed">{m.text}</p> : <span className="inline-flex gap-1" aria-label="Mira is typing"><span className="size-2 animate-bounce rounded-full bg-ink-subtle" /><span className="size-2 animate-bounce rounded-full bg-ink-subtle [animation-delay:120ms]" /><span className="size-2 animate-bounce rounded-full bg-ink-subtle [animation-delay:240ms]" /></span>}
+                <div className="min-w-0 flex-1">
+                  <div className={cx(m.failed ? "rounded-2xl bg-warm-soft px-4 py-3 text-warm" : "")} role={m.failed ? "alert" : undefined}>
+                    {m.text ? <p className="whitespace-pre-line text-[0.98rem] leading-relaxed text-mixed">{m.text}</p> : <span className="inline-flex gap-1" aria-label="Mira is checking"><span className="size-2 animate-bounce rounded-full bg-ink-subtle" /><span className="size-2 animate-bounce rounded-full bg-ink-subtle [animation-delay:120ms]" /><span className="size-2 animate-bounce rounded-full bg-ink-subtle [animation-delay:240ms]" /></span>}
                   </div>
                   {m.cards.map((c, i) => (
-                    <Card key={i} card={c} onTrip={startTrip} />
+                    <Card key={i} card={c} onTrip={startTrip} onComparePlace={comparePlace} onStartHere={() => void startHere()} />
                   ))}
                 </div>
               </div>
             ),
           )}
+          {!empty && !user ? <GuestNote onSignIn={() => setSignIn(true)} /> : null}
           <div ref={endRef} className="h-px scroll-mb-56" />
         </div>
       </div>
 
-      {(
-        <div className="fixed inset-x-0 bottom-[calc(var(--tabbar-space)+0.5rem)] z-30 px-4">
-          <div className="mx-auto max-w-xl">
-            <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
-              {chips.map((q) => (
-                <button key={q} type="button" onClick={() => send(q)} disabled={sending} className="min-h-11 shrink-0 rounded-full border border-line bg-surface px-4 text-sm font-medium hover:border-line-strong">
-                  {q}
-                </button>
-              ))}
-            </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void send(input);
-              }}
-              className="flex items-center gap-2 rounded-[var(--radius-card)] border border-line-strong bg-surface p-1.5 pl-4 shadow-[var(--shadow-float)]"
-            >
-              <label htmlFor="mira-input" className="sr-only">
-                Message Mira
-              </label>
-              <input id="mira-input" value={input} onChange={(e) => setInput(e.target.value)} maxLength={1000} placeholder="Message Mira…" autoComplete="off" className="min-h-11 flex-1 bg-transparent text-base outline-none" />
-              <button type="submit" disabled={!input.trim() || sending} aria-label="Send" className={cx("grid size-11 place-items-center rounded-full transition-colors", input.trim() ? "bg-accent text-accent-ink" : "bg-sunken text-ink-subtle")}>
-                <Icon name="send" className="size-5" />
-              </button>
-            </form>
-          </div>
+      <div className="fixed inset-x-0 bottom-[var(--tabbar-space)] z-30 bg-gradient-to-t from-canvas from-70% to-transparent px-4 pb-3 pt-5">
+        <div className="mx-auto max-w-xl">
+          {user && !here ? <button type="button" onClick={() => void loc.request()} className="mb-2 min-h-11 text-sm font-semibold text-accent-strong">Use current location for nearby questions</button> : null}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void send(input);
+            }}
+            className="flex items-center gap-2 rounded-[1.5rem] bg-surface p-1.5 pl-4 shadow-[var(--shadow-float)] ring-1 ring-line-strong focus-within:ring-2 focus-within:ring-accent"
+          >
+            <label htmlFor="mira-input" className="sr-only">Message Mira</label>
+            <input id="mira-input" value={input} onChange={(e) => setInput(e.target.value)} maxLength={1000} placeholder="Message Mira…" autoComplete="off" className="min-h-11 flex-1 bg-transparent text-base outline-none" />
+            <button type="submit" disabled={!input.trim() || sending} aria-label="Send" className={cx("grid size-11 place-items-center rounded-full transition-colors", input.trim() ? "bg-accent text-accent-ink" : "bg-sunken text-ink-subtle")}>
+              <Icon name="send" className="size-5" />
+            </button>
+          </form>
+          <p className="mt-1.5 px-2 text-[0.7rem] leading-snug text-ink-subtle">Questions may be read by the configured AI provider. Plan questions aren’t saved; other chats are kept for 30 days. <Link href="/privacy" className="underline">Data details</Link></p>
         </div>
-      )}
+      </div>
       <SignInSheet open={signIn} onClose={() => setSignIn(false)} reason="Sign in to talk to Mira" />
     </div>
   );

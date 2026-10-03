@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { GEO, newUser, openRoute } from "./helpers";
+import { GEO, newUser, openRoute, openJourneyMore } from "./helpers";
 
 /** TEST-ONLY one-acquisition fixture. Static Chromium GPS can time out for maximumAge:0
  * while a watch holds its previous fix; reconfiguring CDP mid-request can reject it with code2.
@@ -24,6 +24,7 @@ test("active journey resumes with truthful position age and immediate support", 
   await openRoute(owner.page);
   await owner.page.getByRole("button", { name: /Go with Mira/ }).click();
   await owner.page.waitForURL("**/trip");
+  await openJourneyMore(owner.page);
   await expect(owner.page.getByRole("status").filter({ hasText: "Last position shared" })).toBeVisible();
   await expect(owner.page.getByText("Only people you send your live link to can follow.")).toBeVisible();
   await owner.page.evaluate(() => {
@@ -37,6 +38,7 @@ test("active journey resumes with truthful position age and immediate support", 
   });
   await expect(owner.page.getByRole("status").filter({ hasText: "Foreground location is on" })).toBeVisible();
   await owner.page.reload();
+  await openJourneyMore(owner.page);
   await expect(owner.page.getByRole("status").filter({ hasText: "Last position shared" })).toBeVisible();
   await owner.page.getByRole("button", { name: "I feel unsafe" }).click();
   const sheet = owner.page.getByRole("dialog", { name: "Right now" });

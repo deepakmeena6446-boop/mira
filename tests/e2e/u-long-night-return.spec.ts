@@ -64,7 +64,7 @@ test("S4 a saved midnight return survives a real three-hour draft expiry and nee
     legs: [{ label: RETURN, origin: place(VENUE, 28.70), destination: place(HOME, 28.69), departureLocal: format(midnight), timeZone: ZONE, mode: "walk", timeKind: "depart_at", constraints: "Confirm late access directly", destinationCountryIso: "IN" }],
   };
   await page.evaluate((draft) => sessionStorage.setItem("mira.plan.v1", JSON.stringify({ savedAt: Date.now(), draft })), draft);
-  await page.goto("/plan");
+  await page.goto("/plan/legs");
   await page.getByRole("button", { name: "Return & legs" }).click();
   await expect(page.getByRole("region", { name: "Keep this return plan" })).toContainText("expires two hours");
   const savedResponse = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/me/plans" && response.request().method() === "POST");
@@ -104,7 +104,7 @@ test("S4 a saved midnight return survives a real three-hour draft expiry and nee
   await expect(choice).toContainText(ZONE);
   expect(effects).toEqual([]); expect(gpsCalls()).toBe(0);
   await choice.getByRole("button", { name: `Review saved return: ${RETURN}`, exact: true }).click();
-  await expect(page).toHaveURL(/\/plan\?planStep=options$/);
+  await expect(page).toHaveURL(/\/plan(\/legs)?\?planStep=options$/);
   await expect(page.getByRole("button", { name: /Fixture midnight return/ })).toHaveAttribute("aria-pressed", "true");
   expect(comparisons.length).toBeGreaterThan(beforeRestore);
   expect(comparisons.at(-1)).toMatchObject({ activity: RETURN, origin: { kind: "named", query: VENUE }, destination: { query: HOME }, departure: { local: format(midnight), timeZone: ZONE } });

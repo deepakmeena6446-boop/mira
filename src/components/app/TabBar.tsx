@@ -6,10 +6,17 @@ import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 
 /**
- * V1 stable roots: Go · Journeys · You. Map, Ask and contribution are contextual.
- * Trip and emergency controls remain available in context, without turning them into tabs.
+ * Phase 1 roots (docs/phase1-ux/01 §2): Home · Mira · Around · Journeys. Plan is a flow opened from a
+ * situation, Profile is the avatar on Home, and Support (I feel unsafe · Emergency) sits on every root.
+ * `NEXT_PUBLIC_MIRA_GO_ENTRY=go` restores Go · Journeys · You; `=legacy` the five-tab Today.
  */
 const TABS = [
+  { href: "/", label: "Home", icon: "home", match: ["/", "/today", "/plan"] },
+  { href: "/mira", label: "Mira", icon: "sparkle", match: ["/mira"] },
+  { href: "/around", label: "Around", icon: "pin", match: ["/around", "/contribute", "/report"] },
+  { href: "/trips", label: "Journeys", icon: "route", match: ["/trips", "/trip"] },
+] as const;
+const GO_TABS = [
   { href: "/", label: "Go", icon: "home", match: ["/", "/today", "/plan", "/around", "/mira", "/contribute", "/report"] },
   { href: "/trips", label: "Journeys", icon: "route", match: ["/trips", "/trip"] },
   { href: "/me", label: "You", icon: "user", match: ["/me", "/circle", "/inbox", "/privacy"] },
@@ -32,10 +39,11 @@ function active(path: string, match: readonly string[]) {
  */
 export function TabBar() {
   const path = usePathname() ?? "/";
-  const tabs = process.env.NEXT_PUBLIC_MIRA_GO_ENTRY === "legacy" ? LEGACY_TABS : TABS;
+  const entry = process.env.NEXT_PUBLIC_MIRA_GO_ENTRY;
+  const tabs = entry === "legacy" ? LEGACY_TABS : entry === "go" ? GO_TABS : TABS;
   return (
     <nav aria-label="Main" className="mira-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
-      <ul className={cx("mx-auto grid h-[var(--tabbar-h)] max-w-xl", tabs.length === 3 ? "grid-cols-3" : "grid-cols-5")}>
+      <ul className={cx("mx-auto grid h-[var(--tabbar-h)] max-w-xl", tabs.length === 3 ? "grid-cols-3" : tabs.length === 4 ? "grid-cols-4" : "grid-cols-5")}>
         {tabs.map((t) => {
           const on = active(path, t.match);
           return (
