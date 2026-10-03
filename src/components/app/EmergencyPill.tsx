@@ -11,17 +11,18 @@ import { emergencyActions, emergencyStatusNote, noNumberReason, type CountryCont
 /** Cited country actions only. A direct dial is reserved for a verified all-service number;
  * service-specific and unknown profiles open a deterministic options sheet. No model call.
  */
-export function EmergencyPill({ className, variant = "pill" }: { className?: string; variant?: "pill" | "block" | "link" }) {
+export function EmergencyPill({ className, variant = "pill" }: { className?: string; variant?: "pill" | "quiet" | "block" | "link" }) {
   const country = useCountry();
   const actions = emergencyActions(country);
   const direct = actions.length === 1 && actions[0].scope === "all" ? actions[0] : null;
   const [explain, setExplain] = useState(false);
   const styles = {
     pill: "inline-flex min-h-12 shrink-0 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-sm font-semibold text-ink shadow-[var(--shadow-float)]",
+    quiet: "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[0.8125rem] font-semibold text-ink ring-[1.5px] ring-ink/80",
     block: "flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-button)] bg-ink px-3 text-[0.95rem] font-semibold text-canvas",
     link: "font-semibold text-ink underline",
   }[variant];
-  const icon = variant === "link" ? null : <Icon name="phone" className={variant === "block" ? "size-5" : "size-4"} />;
+  const icon = variant === "link" ? null : <Icon name="phone" className={variant === "block" ? "size-5" : variant === "quiet" ? "size-3.5" : "size-4"} />;
 
   if (direct) {
     return <a href={`tel:${direct.number}`} aria-label={`Emergency call, ${direct.number}`} className={cx(styles, className)}>{icon}<span>{variant === "link" ? `call ${direct.number}` : `Emergency ${direct.number}`}</span></a>;

@@ -35,6 +35,15 @@
 
   /* Lighting evidence glyphs (icons only, ≥ 3:1). */
   --color-light: #b7791f;
+
+  /* Phase 1 evidence grammar (docs/phase1-ux/01 §1). Daylight/lighting facts and community facts get their
+   * own calm tints so a brief reads at a glance; neither ever means good or bad. */
+  --color-dusk: #9a5b14;
+  --color-dusk-soft: #fbf1e3;
+  --color-people: #5b4bc4;
+  --color-people-soft: #efedfc;
+  --radius-tile: 1.25rem;
+  --radius-sheet: 1.75rem;
   --color-scrim: rgb(17 19 18 / 0.4);
 
   --color-glass-edge: rgb(255 255 255 / 0.7);
@@ -111,6 +120,10 @@
   --color-error: #ff8a80;
   --color-error-soft: #3b1d22;
   --color-light: #f2c45a;
+  --color-dusk: #f2c27a;
+  --color-dusk-soft: #33281a;
+  --color-people: #b9adff;
+  --color-people-soft: #29254a;
   --color-scrim: rgb(0 0 0 / 0.55);
   --color-glass-edge: rgb(255 255 255 / 0.06);
   --shadow-float: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 12px rgb(0 0 0 / 0.45);
@@ -523,3 +536,29 @@
 .mira-option-title strong { font-size:1.05rem; }
 .mira-journey-number { font-size:clamp(3rem,10vw,5rem); font-weight:650; letter-spacing:-.065em; line-height:1; }
 @media (prefers-reduced-motion:reduce) { .mira-primary { transition:none; } .mira-primary:active { transform:none; } }
+
+/*
+ * Phase 1 product language (docs/phase1-ux/01). Root screens share one frame; the action bar sits in the
+ * thumb zone above the tab bar (or the bottom edge when the tab bar is hidden); the journey dock floats
+ * just above the tab bar while a journey is open.
+ */
+.m-screen { min-height: 100dvh; padding: max(0.75rem, env(safe-area-inset-top)) 1rem calc(var(--tabbar-space) + 2rem); }
+.m-screen-inner { margin-inline: auto; width: 100%; max-width: 36rem; }
+.m-display { font-size: clamp(1.75rem, 7.4vw, 2.125rem); line-height: 1.12; font-weight: 650; letter-spacing: -0.035em; }
+.m-title { font-size: 1.25rem; line-height: 1.3; font-weight: 650; letter-spacing: -0.02em; }
+.m-meta { font-size: 0.8125rem; line-height: 1.35; color: var(--color-ink-muted); }
+.m-label { font-size: 0.75rem; font-weight: 650; letter-spacing: 0.02em; color: var(--color-ink-subtle); }
+.m-card { border-radius: var(--radius-tile); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-line); }
+.m-press { transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-state) ease; }
+.m-press:active { transform: scale(0.985); }
+.m-actionbar { position: fixed; inset-inline: 0; bottom: var(--tabbar-space); z-index: 30; padding: 1.25rem 1rem 0.75rem; background: linear-gradient(to top, var(--color-canvas) 72%, transparent); }
+:root[data-journey="open"] .m-actionbar, .m-actionbar[data-edge] { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+.m-dock { position: fixed; inset-inline: 0; bottom: calc(var(--tabbar-space) + 0.5rem); z-index: 35; padding-inline: 0.75rem; pointer-events: none; }
+.m-dock > * { pointer-events: auto; }
+.m-scroll-x { display: flex; gap: 0.5rem; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
+.m-scroll-x::-webkit-scrollbar { display: none; }
+@media (min-width: 1024px) {
+  .m-actionbar { left: var(--rail-w); }
+  .m-dock { left: var(--rail-w); bottom: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) { .m-press:active { transform: none; } }
