@@ -68,7 +68,9 @@ export async function tileConfig(): Promise<TileConfig> {
     const [day, night] = await Promise.all([googleSession(key, "day"), googleSession(key, "night")]);
     if (day) {
       const url = (s: string) => `https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${s}&key=${encodeURIComponent(key)}`;
-      return { styleUrl: null, nightStyleUrl: null, url: url(day), nightUrl: night ? url(night) : null, attribution: `Map data ©${new Date().getFullYear()} Google`, provider: "google" };
+      // WorldMap obtains the complete, camera-specific copyright from the viewport endpoint.
+      // A generic year/Google string cannot substitute for that required attribution.
+      return { styleUrl: null, nightStyleUrl: null, url: url(day), nightUrl: night ? url(night) : null, attribution: "", provider: "google" };
     }
   }
   const styleUrl = env.MAP_STYLE_URL ?? null;

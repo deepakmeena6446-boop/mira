@@ -1,29 +1,29 @@
 @import "tailwindcss";
 
 /*
- * Community-first palette: warm paper, jade for trust and active controls, solar orange for
- * human warmth. Evidence and failure still have separate semantic colours.
+ * Movement companion: off-white canvas, navy typography and cobalt actions.
+ * Semantic colours describe operations, never the safety of a place or route.
  */
 @theme {
-  --color-canvas: #fff7ef;
+  --color-canvas: #f6f7fb;
   --color-surface: #ffffff;
-  --color-sunken: #f4eee6;
-  --color-ink: #24312e;
-  --color-ink-muted: #56665e;
-  --color-ink-subtle: #68776f;
-  --color-line: #e9dfd3;
-  --color-line-strong: #c9d9d2;
+  --color-sunken: #edf0f7;
+  --color-ink: #14213d;
+  --color-ink-muted: #52617b;
+  --color-ink-subtle: #66728a;
+  --color-line: #e0e5ef;
+  --color-line-strong: #b9c5da;
 
-  --color-accent: #17665b;
-  --color-accent-strong: #12554b;
-  --color-accent-soft: #e4f2e8;
+  --color-accent: #315bf4;
+  --color-accent-strong: #2448cb;
+  --color-accent-soft: #e9eeff;
   --color-accent-ink: #ffffff;
 
   /* Retired hues, aliased so nothing breaks: peach → sunken, mint (confirmed) → accent. */
   --color-peach: #a95c25;
   --color-peach-soft: #ffebd0;
-  --color-mint: #17665b;
-  --color-mint-soft: #e4f2e8;
+  --color-mint: #315bf4;
+  --color-mint-soft: #e9eeff;
 
   /* Attention: something needs her. Never "danger". */
   --color-warm: #a95c25;
@@ -62,8 +62,8 @@
 :root {
   --glass-bg: rgb(255 255 255 / 0.9);
   --pin-bg: #ffffff;
-  --map-route: #17665b;
-  --map-route-glow: #5fa89e;
+  --map-route: #315bf4;
+  --map-route-glow: #8ca7ff;
   --map-route-alt: #6b6961;
   --map-unknown: #7a776f;
   --map-lit: #ffc94d;
@@ -81,31 +81,31 @@
   color-scheme: light;
 }
 :root[data-daypart="dawn"] {
-  --color-canvas: #fff4e8;
-  --color-sunken: #f5e9db;
+  --color-canvas: #f6f7fb;
+  --color-sunken: #edf0f7;
 }
 :root[data-daypart="evening"] {
-  --color-canvas: #fff1e4;
-  --color-sunken: #f3e5d7;
+  --color-canvas: #f6f7fb;
+  --color-sunken: #edf0f7;
 }
 :root[data-daypart="night"] {
   color-scheme: dark;
-  --color-canvas: #111312;
-  --color-surface: #1a1c1b;
-  --color-sunken: #232625;
-  --color-ink: #eceeea;
-  --color-ink-muted: #aeb3ad;
-  --color-ink-subtle: #8e938d;
-  --color-line: #2a2e2c;
-  --color-line-strong: #3a3f3c;
-  --color-accent: #88ccb3;
-  --color-accent-strong: #a4dfc9;
-  --color-accent-soft: #19352c;
-  --color-accent-ink: #0b1f1c;
-  --color-peach: #aeb3ad;
-  --color-peach-soft: #232625;
-  --color-mint: #7cc4b9;
-  --color-mint-soft: #17302c;
+  --color-canvas: #0d1426;
+  --color-surface: #151f35;
+  --color-sunken: #202c43;
+  --color-ink: #f0f3fc;
+  --color-ink-muted: #b7c3d9;
+  --color-ink-subtle: #99aac6;
+  --color-line: #2c3952;
+  --color-line-strong: #44526d;
+  --color-accent: #9cb4ff;
+  --color-accent-strong: #becdff;
+  --color-accent-soft: #22335d;
+  --color-accent-ink: #101b37;
+  --color-peach: #b7c3d9;
+  --color-peach-soft: #202c43;
+  --color-mint: #9cb4ff;
+  --color-mint-soft: #22335d;
   --color-warm: #f2b872;
   --color-warm-soft: #352615;
   --color-error: #ff8a80;
@@ -116,11 +116,11 @@
   --shadow-float: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 12px rgb(0 0 0 / 0.45);
   --shadow-sheet: 0 -6px 24px rgb(0 0 0 / 0.5);
   --glass-bg: rgb(26 28 27 / 0.9);
-  --pin-bg: #232625;
-  --map-route: #7cc4b9;
-  --map-route-glow: #2f6f66;
-  --map-route-alt: #8e938d;
-  --map-unknown: #8e938d;
+  --pin-bg: #202c43;
+  --map-route: #9cb4ff;
+  --map-route-glow: #3555a2;
+  --map-route-alt: #99aac6;
+  --map-unknown: #99aac6;
   --map-me: #60a5fa;
 }
 
@@ -500,3 +500,26 @@
     --rail-w: 0px;
   }
 }
+
+/* Flagship mobile workspace. Shared primitives keep contextual tools in one visual language. */
+.mira-wordmark { display:inline-flex; align-items:center; gap:.35rem; font-size:1.5rem; font-weight:750; letter-spacing:-.07em; color:var(--color-ink); }
+.mira-wordmark span { color:var(--color-accent); font-size:1.2rem; }
+.mira-eyebrow { font-size:.68rem; font-weight:650; text-transform:uppercase; letter-spacing:.14em; color:var(--color-ink-muted); }
+.mira-primary { display:inline-flex; min-height:3rem; align-items:center; justify-content:center; gap:.65rem; padding:.8rem 1.15rem; border-radius:1rem; background:var(--color-accent); color:var(--color-accent-ink); font-weight:650; transition:transform 150ms ease,background 150ms ease; }
+.mira-primary:active { transform:scale(.98); }
+.mira-primary:disabled { opacity:.45; }
+.mira-composer { padding:1.1rem; border:1px solid var(--color-line-strong); border-radius:1.6rem; background:var(--color-surface); box-shadow:0 10px 40px rgb(31 49 103 / .06); }
+.mira-composer:focus-within { border-color:var(--color-accent); }
+.mira-composer textarea { width:100%; resize:vertical; min-height:5rem; background:transparent; font-size:1.1rem; line-height:1.5; outline:none; padding:.2rem; }
+.mira-composer textarea::placeholder { color:var(--color-ink-subtle); }
+.mira-intent-chip { display:inline-flex; min-height:3rem; align-items:center; gap:.5rem; padding:.7rem .85rem; border:1px solid var(--color-line); border-radius:999px; font-size:.8rem; font-weight:550; background:var(--color-surface); }
+.mira-journey-hero { border:1px solid var(--color-line); border-radius:1.75rem; padding:1.5rem; background:var(--color-surface); }
+.mira-plan-steps { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,7rem),1fr)); gap:.5rem; }
+.mira-plan-step { display:flex; min-width:0; min-height:3rem; align-items:center; gap:.6rem; overflow-wrap:anywhere; border-bottom:2px solid transparent; font-size:.82rem; color:var(--color-ink-muted); }
+.mira-plan-step[aria-current=step] { border-color:var(--color-accent); color:var(--color-accent-strong); font-weight:650; }
+.mira-option { width:100%; min-height:6rem; padding:1rem; border:1px solid var(--color-line); border-radius:1.2rem; background:var(--color-surface); text-align:left; }
+.mira-option[aria-pressed=true] { border:2px solid var(--color-accent); padding:calc(1rem - 1px); background:var(--color-accent-soft); }
+.mira-option-title { display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+.mira-option-title strong { font-size:1.05rem; }
+.mira-journey-number { font-size:clamp(3rem,10vw,5rem); font-weight:650; letter-spacing:-.065em; line-height:1; }
+@media (prefers-reduced-motion:reduce) { .mira-primary { transition:none; } .mira-primary:active { transform:none; } }

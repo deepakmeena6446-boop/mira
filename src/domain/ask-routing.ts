@@ -1,5 +1,13 @@
 import { DANGER } from "./urgent-intent";
 
+/** These actions never wait for account, network, quota or model work. */
+export function immediateSupportIntent(message: string): "urgent" | "unease" | null {
+  if (/\b(?:sos)\b/i.test(message)) return "urgent";
+  if (DANGER.test(message)) return "urgent";
+  if (/\b(?:feel(?:ing)?\s+(?:unsafe|uneasy|uncomfortable)|(?:i(?:'m| am)?\s+)?uneasy|not\s+(?:feeling\s+)?comfortable|something feels wrong|need\s+(?:support|options)\s+(?:now|right now))\b/i.test(message)) return "unease";
+  return null;
+}
+
 export type AskToolIntent = "emergency_info" | "nearby" | "report" | "product";
 
 /** Explicit information/tool questions take precedence over a tab's movement plan. */
@@ -13,7 +21,7 @@ export function askToolIntent(message: string): AskToolIntent | null {
 
 /** Existing nearby, reporting and product-help tools remain on the companion path for accounts. */
 export function askUsesPlan(message: string, _hasPlan: boolean, signedIn: boolean): boolean {
-  if (DANGER.test(message)) return true;
+  if (immediateSupportIntent(message)) return true;
   const tool = askToolIntent(message);
   if (tool === "emergency_info") return true; // reviewed facts, ephemeral, never the movement reply
   if (tool) return !signedIn;
@@ -22,5 +30,5 @@ export function askUsesPlan(message: string, _hasPlan: boolean, signedIn: boolea
 
 /** Generic product or urgent questions never seed a movement draft. */
 export function shouldSeedPlan(message: string): boolean {
-  return !DANGER.test(message) && !askToolIntent(message) && /\b(?:plan\w*|go|going|walk\w*|run\w*|loop|travel\w*|trip|route|commut\w*|home|arriv\w*|land\w*|airport|station|hotel|return\w*|venue|event|date|from .+ to )\b/i.test(message);
+  return !immediateSupportIntent(message) && !askToolIntent(message) && /\b(?:plan\w*|go|going|walk\w*|run\w*|loop|travel\w*|trip|route|commut\w*|home|arriv\w*|land\w*|airport|station|hotel|return\w*|venue|event|date|dinner|appointment|meeting|from .+ to )\b/i.test(message);
 }

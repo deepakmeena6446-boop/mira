@@ -1,3 +1,4 @@
+import { chosenRecipientIds } from "../helpers/recipient-choice";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 
@@ -100,10 +101,10 @@ describe("MIRA 2.0 accounts, trips, Mira (placeholders)", () => {
     await acceptInviteFor(accepted);
     switchJar(owner);
 
-    const res = await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" }, share: true }));
+    const res = await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" }, recipientIds: await chosenRecipientIds() }));
     expect(res.status).toBe(201);
     const { trip } = await res.json();
-    expect(trip.sharedWith).toEqual([{ name: "Riya", notified: true, viaEmail: true, whatsapp: null }]); // email contact: MIRA emailed; no WhatsApp number
+    expect(trip.sharedWith).toMatchObject([{ name: "Riya", notified: true, viaEmail: true, whatsapp: null, linkDelivery: "sent" }]); // email contact: MIRA emailed; no WhatsApp number
     expect(trip.shareUrl).toMatch(/\/t\/[A-Za-z0-9_-]+$/); // the traveller's own link
     const shareMail = (await mailsTo(accepted)).find((m) => m.Subject.includes("sharing a trip"));
     expect(shareMail).toBeTruthy();
@@ -143,7 +144,7 @@ describe("MIRA 2.0 accounts, trips, Mira (placeholders)", () => {
     await contactsPOST(jsonRequest("/api/me/contacts", { name: "Didi", email }));
     await acceptInviteFor(email);
     switchJar(owner);
-    const { trip } = await (await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Hostel" }, share: true }))).json();
+    const { trip } = await (await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Hostel" }, recipientIds: await chosenRecipientIds() }))).json();
 
     await signIn("Stranger");
     const steal = await tripActionPOST(jsonRequest(`/api/trips/${trip.id}/end`, {}), { params: Promise.resolve({ id: trip.id, action: "end" }) });

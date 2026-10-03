@@ -7,7 +7,7 @@ import { useOverlay } from "@/lib/use-overlay";
 import { useClock } from "@/lib/location-store";
 import { useCountry } from "@/lib/locale-store";
 import { HELP_CLASSES, SOURCE_NAME, helpWeightsFor, hoursLine, isNight, rankHelpPoints, type HelpClass, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
-import { localTime } from "@/domain/opening-hours";
+import { localTimeInZone } from "@/domain/opening-hours";
 import { Icon } from "@/components/ui/Icon";
 import { HELP_ICON } from "./kinds";
 
@@ -53,13 +53,13 @@ export function HelpNearSheet({
     const at = minuteKey ? new Date(minuteKey * 60_000) : null;
     return rankHelpPoints(points, me, {
       situation: "nearby",
-      night: isNight((at ?? new Date()).getHours()),
-      now: at ? localTime(at) : undefined,
+      night: (() => { const local = localTimeInZone(at ?? new Date(), locale.timezone); return local ? isNight(Math.floor(local.minute / 60)) : true; })(),
+      timeZone: locale.timezone,
       at: at?.getTime(),
       exclude,
       weights,
     });
-  }, [points, me, minuteKey, exclude, weights]);
+  }, [points, me, minuteKey, exclude, weights, locale.timezone]);
   if (!open) return null;
   const classes = [...new Set(ranked.map((p) => p.cls))];
   const filtered = only && classes.includes(only) ? ranked.filter((p) => p.cls === only) : ranked;
@@ -111,7 +111,7 @@ export function HelpNearSheet({
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold">{p.name}</span>
                       <span className="block truncate text-xs text-ink-muted">
-                        {HELP_CLASSES[p.cls].label} · about {p.minutes} min · {hoursLine(p)}
+                        {HELP_CLASSES[p.cls].label} · roughly {p.minutes} min by distance, route unverified · {hoursLine(p)}
                       </span>
                     </span>
                     <Icon name="chevron" className="size-4 text-ink-subtle" />

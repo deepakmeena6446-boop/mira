@@ -87,6 +87,18 @@ export function localTime(d: Date): LocalTime {
   return { day: (d.getDay() + 6) % 7, minute: d.getHours() * 60 + d.getMinutes() };
 }
 
+/** Place-local clock; an unavailable/invalid zone cannot establish listed-open hours. */
+export function localTimeInZone(date: Date, timeZone: string | null | undefined): LocalTime | null {
+  if (!timeZone) return null;
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
+    const get = (type: string) => parts.find((part) => part.type === type)?.value;
+    const day = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(get("weekday") ?? "");
+    const hour = Number(get("hour")), minute = Number(get("minute"));
+    return day >= 0 && Number.isFinite(hour) && Number.isFinite(minute) ? { day, minute: hour * 60 + minute } : null;
+  } catch { return null; }
+}
+
 export type OpenState =
   | { state: "open"; closesAt: number | null } // closesAt: minutes from local midnight today (may exceed 1440), null = 24h
   | { state: "closing"; closesAt: number } // open now, but closes before she'd get there

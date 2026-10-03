@@ -1,0 +1,13 @@
+{
+  "recordedAt": "2026-10-03T12:19:13.344007+00:00",
+  "url": "http://localhost:3300",
+  "buildId": "D8JbGmC-cOV5rEFvrqwN9",
+  "readiness": {
+    "status": "ready"
+  },
+  "servedHtmlBuildMatched": true,
+  "database": "isolated localhost mira_e2e only",
+  "alerts": "local Mailpit; real push keys explicitly blank",
+  "providerEvidence": "imported pilot archive or labelled manual/fixture paths; no live service or safety proof",
+  "physicalPhones": "UNKNOWN"
+}

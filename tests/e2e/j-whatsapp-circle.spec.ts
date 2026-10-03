@@ -14,10 +14,13 @@ test("a WhatsApp contact gets a one-tap live link on the journey screen", async 
   await expect(page.getByText("WhatsApp +91 •••• ••3210")).toBeVisible();
 
   await openRoute(page);
-  await page.getByRole("radio", { name: /Share with Priya/ }).click();
+  await expect(page.getByRole("checkbox", { name: /Priya/ })).not.toBeChecked();
+  await page.getByRole("checkbox", { name: /Priya/ }).check();
   await expect(page.getByText(/send Priya your live link on WhatsApp in one tap/).first()).toBeVisible();
   await page.getByRole("button", { name: /Go with Mira/ }).click();
   await page.waitForURL("**/trip");
+  const current = (await (await page.request.get("/api/trips/current")).json()).trip;
+  expect(current.sharedWith).toEqual([expect.objectContaining({ name: "Priya", viaEmail: false, linkDelivery: "not_attempted" })]);
   const send = page.getByRole("link", { name: /Send to Priya/ });
   await expect(send).toBeVisible();
   const href = (await send.getAttribute("href"))!;

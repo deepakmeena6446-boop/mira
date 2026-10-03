@@ -81,7 +81,7 @@ describe("journey context card", () => {
   });
 
   it("shows miles in the UK", () => {
-    setCountry({ ...UNKNOWN_COUNTRY, iso: "GB" });
+    setCountry({ ...UNKNOWN_COUNTRY, iso: "GB" }, { point: { lat: 51.5, lon: -0.12 }, checkedAt: Date.now() });
     render(<RouteOptions options={[option(lighting(71, 22)), option(lighting(31, 47), [], 21, 1750)]} selected={0} onSelect={() => {}} />);
     expect(document.body.textContent).toMatch(/18 min · 1\.0 mi/);
   });

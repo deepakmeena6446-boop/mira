@@ -126,7 +126,7 @@ describe("journey context: route, Help Points, options, safety net", () => {
     expect(notes).toHaveLength(1);
   });
 
-  it("a missed-arrival alert that reached only some contacts says who may not have been told", async () => {
+  it("partial provider acceptance records each recipient and never claims all emails were accepted", async () => {
     await beat();
     await signIn("Partial Alert");
     const { trip } = await (await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" }, share: false }))).json();
@@ -140,9 +140,16 @@ describe("journey context: route, Help Points, options, safety net", () => {
     const mailer = { send: async (m: { to: string }) => (m.to.startsWith("priya") ? { ok: true as const } : { ok: false as const, definite: true }) };
     await processJourneys(getSql(), systemClock, mailer as never);
     const [after] = await getSql()`SELECT alert_state FROM journeys WHERE id = ${trip.id}`;
-    expect(after.alert_state).toBe("sent"); // someone was reached…
+    expect(after.alert_state).toBe("unconfirmed");
+    const delivered = await getSql()`SELECT c.name, tc.alert_delivery FROM trip_contacts tc JOIN contacts c ON c.id = tc.contact_id WHERE tc.journey_id = ${trip.id} ORDER BY c.name`;
+    expect(delivered).toEqual([{ name: "Priya", alert_delivery: "sent" }, { name: "Ravi", alert_delivery: "failed" }]);
+    const current = await (await currentGET()).json();
+    expect(current.trip.sharedWith).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "Priya", alertDelivery: "sent" }),
+      expect.objectContaining({ name: "Ravi", alertDelivery: "failed" }),
+    ]));
     const notes = await getSql()`SELECT body FROM notifications WHERE user_id = ${j.user_id} AND kind = 'trip_alert_failed'`;
-    expect(notes).toHaveLength(1); // …and the traveller is told exactly who may not have been
+    expect(notes).toHaveLength(1); // The owner is told whose provider acceptance failed; receipt is unknown for everyone.
     expect(notes[0].body).toContain("Ravi");
     expect(notes[0].body).not.toContain("Priya");
   });

@@ -1,0 +1,74 @@
+[WebServer] (node:76706) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:76734) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:76735) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:76842) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:76863) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:76864) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:76882) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:76873) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] {"t":"2026-10-03T12:11:18.380Z","src":"config","event":"config.warning","message":"No GOOGLE_MAPS_SERVER_KEY: search, routes and Help Points use the OpenStreetMap fallback (thin outside mapped areas)."}
+[WebServer] {"t":"2026-10-03T12:11:18.382Z","src":"config","event":"config.warning","message":"No OVERPASS_URL: the OpenStreetMap lighting source and OSM Help Points are unavailable."}
+[WebServer] {"t":"2026-10-03T12:11:18.382Z","src":"config","event":"config.warning","message":"No MAPILLARY_TOKEN: the street-imagery lighting source is unavailable."}
+[WebServer] {"t":"2026-10-03T12:11:18.382Z","src":"config","event":"config.warning","message":"No ANTHROPIC_API_KEY: Mira answers with the scripted companion; ambiguous Safety update headlines are left out."}
+[WebServer] (node:76903) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] {"t":"2026-10-03T12:11:18.485Z","src":"config","event":"config.warning","message":"No GOOGLE_MAPS_SERVER_KEY: search, routes and Help Points use the OpenStreetMap fallback (thin outside mapped areas)."}
+[WebServer] {"t":"2026-10-03T12:11:18.485Z","src":"config","event":"config.warning","message":"No OVERPASS_URL: the OpenStreetMap lighting source and OSM Help Points are unavailable."}
+[WebServer] {"t":"2026-10-03T12:11:18.485Z","src":"config","event":"config.warning","message":"No MAPILLARY_TOKEN: the street-imagery lighting source is unavailable."}
+[WebServer] {"t":"2026-10-03T12:11:18.485Z","src":"config","event":"config.warning","message":"No ANTHROPIC_API_KEY: Mira answers with the scripted companion; ambiguous Safety update headlines are left out."}
+[WebServer] {"t":"2026-10-03T12:11:19.124Z","src":"config","event":"config.warning","message":"No GOOGLE_MAPS_SERVER_KEY: search, routes and Help Points use the OpenStreetMap fallback (thin outside mapped areas)."}
+[WebServer] {"t":"2026-10-03T12:11:19.124Z","src":"config","event":"config.warning","message":"No OVERPASS_URL: the OpenStreetMap lighting source and OSM Help Points are unavailable."}
+[WebServer] {"t":"2026-10-03T12:11:19.124Z","src":"config","event":"config.warning","message":"No MAPILLARY_TOKEN: the street-imagery lighting source is unavailable."}
+[WebServer] {"t":"2026-10-03T12:11:19.124Z","src":"config","event":"config.warning","message":"No ANTHROPIC_API_KEY: Mira answers with the scripted companion; ambiguous Safety update headlines are left out."}
+
+Running 34 tests using 1 worker
+
+(node:76904) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] {"t":"2026-10-03T12:11:22.065Z","src":"web","event":"safety_updates.fetch","state":"ready","precision":"city","country":"IN","windowDays":7,"retrieved":4,"inWindow":4,"included":3,"ambiguous":0,"classified":0,"unassessed":0,"excluded":1,"clusters":2}
+  ✓   1 [mobile] › tests/e2e/o-phase-four-journey.spec.ts:22:1 › active journey resumes with truthful position age and immediate support (11.4s)
+  ✓   2 [mobile] › tests/e2e/o-phase-four-journey.spec.ts:79:1 › a selected plan requires a separate start confirmation and proximity check (4.5s)
+  ✓   3 [mobile] › tests/e2e/o-phase-four-journey.spec.ts:108:1 › S1 loop offers a manual check-in, keeps location optional until confirmed, then starts without a route (3.6s)
+  ✓   4 [mobile] › tests/e2e/p-phase-five-travel.spec.ts:13:1 › S5 late remote arrival retains named places and gives honest destination coverage and transfer handoff (945ms)
+  ✓   5 [mobile] › tests/e2e/p-phase-five-travel.spec.ts:50:1 › S6 two extra city legs keep distinct time zones, expose partial/unknown country gaps and search failure (1.2s)
+  ✓   6 [mobile] › tests/e2e/p-phase-five-travel.spec.ts:97:1 › S4 event return can be selected for review without losing the arrival leg or sharing (561ms)
+  ✓   7 [mobile] › tests/e2e/p-phase-five-travel.spec.ts:116:1 › S4 reverse leg prefill needs a new departure and retains the explicitly chosen editable zone (277ms)
+  ✓   8 [mobile] › tests/e2e/p-phase-five-travel.spec.ts:133:1 › S4 arrival check-in and explicit return are two private confirmed journeys (5.7s)
+  ✓   9 [mobile] › tests/e2e/q-phase-seven-go.spec.ts:4:1 › guest Go opens plan, Ask and map without requesting GPS, with an explicit map location choice and immediate Emergency (1.1s)
+  ✓  10 [mobile] › tests/e2e/q-phase-seven-go.spec.ts:43:1 › signed-in person explicitly saves, opens and deletes a plan without starting a journey (2.4s)
+  ✓  11 [mobile] › tests/e2e/q-phase-seven-go.spec.ts:68:1 › first-screen night-out intent keeps event arrival and midnight return separate without guessing a date or GPS (336ms)
+  ✓  12 [mobile] › tests/e2e/r-guest-loop-checkin.spec.ts:26:1 › S1 first-time guest chooses a mapped 4:45 AM run loop without GPS, progresses, reloads and confirms arrival (1.2s)
+  ✓  13 [mobile] › tests/e2e/r-guest-loop-checkin.spec.ts:90:1 › S4 no-GPS night out completes arrival then reviews and explicitly starts a separate private midnight return (1.4s)
+  ✓  14 [mobile] › tests/e2e/r-guest-loop-checkin.spec.ts:140:1 › missing loop provider keeps a guest manual check-in usable and ending early never claims arrival (706ms)
+  ✓  15 [mobile] › tests/e2e/r-guest-loop-checkin.spec.ts:171:1 › missing place and service providers keep an arrival deadline usable through explicitly confirmed manual planning (536ms)
+  ✓  16 [mobile] › tests/e2e/r-guest-loop-checkin.spec.ts:204:1 › an active missing-provider manual journey changes only after origin confirmation and keeps its original start (1.3s)
+  ✓  17 [mobile] › tests/e2e/u-long-night-return.spec.ts:28:1 › S4 a saved midnight return survives a real three-hour draft expiry and needs a fresh private start (1.6s)
+(node:77137) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  18 [desktop] › tests/e2e/o-phase-four-journey.spec.ts:22:1 › active journey resumes with truthful position age and immediate support (7.6s)
+  ✓  19 [desktop] › tests/e2e/o-phase-four-journey.spec.ts:79:1 › a selected plan requires a separate start confirmation and proximity check (3.1s)
+  ✓  20 [desktop] › tests/e2e/o-phase-four-journey.spec.ts:108:1 › S1 loop offers a manual check-in, keeps location optional until confirmed, then starts without a route (1.9s)
+  ✓  21 [desktop] › tests/e2e/p-phase-five-travel.spec.ts:13:1 › S5 late remote arrival retains named places and gives honest destination coverage and transfer handoff (1.1s)
+  ✓  22 [desktop] › tests/e2e/p-phase-five-travel.spec.ts:50:1 › S6 two extra city legs keep distinct time zones, expose partial/unknown country gaps and search failure (1.1s)
+  ✓  23 [desktop] › tests/e2e/p-phase-five-travel.spec.ts:97:1 › S4 event return can be selected for review without losing the arrival leg or sharing (727ms)
+  ✓  24 [desktop] › tests/e2e/p-phase-five-travel.spec.ts:116:1 › S4 reverse leg prefill needs a new departure and retains the explicitly chosen editable zone (488ms)
+  ✓  25 [desktop] › tests/e2e/p-phase-five-travel.spec.ts:133:1 › S4 arrival check-in and explicit return are two private confirmed journeys (2.8s)
+  ✓  26 [desktop] › tests/e2e/q-phase-seven-go.spec.ts:4:1 › guest Go opens plan, Ask and map without requesting GPS, with an explicit map location choice and immediate Emergency (929ms)
+  ✓  27 [desktop] › tests/e2e/q-phase-seven-go.spec.ts:43:1 › signed-in person explicitly saves, opens and deletes a plan without starting a journey (1.7s)
+  ✓  28 [desktop] › tests/e2e/q-phase-seven-go.spec.ts:68:1 › first-screen night-out intent keeps event arrival and midnight return separate without guessing a date or GPS (326ms)
+  ✓  29 [desktop] › tests/e2e/r-guest-loop-checkin.spec.ts:26:1 › S1 first-time guest chooses a mapped 4:45 AM run loop without GPS, progresses, reloads and confirms arrival (1.3s)
+  ✓  30 [desktop] › tests/e2e/r-guest-loop-checkin.spec.ts:90:1 › S4 no-GPS night out completes arrival then reviews and explicitly starts a separate private midnight return (1.3s)
+  ✓  31 [desktop] › tests/e2e/r-guest-loop-checkin.spec.ts:140:1 › missing loop provider keeps a guest manual check-in usable and ending early never claims arrival (859ms)
+  ✓  32 [desktop] › tests/e2e/r-guest-loop-checkin.spec.ts:171:1 › missing place and service providers keep an arrival deadline usable through explicitly confirmed manual planning (535ms)
+  ✓  33 [desktop] › tests/e2e/r-guest-loop-checkin.spec.ts:204:1 › an active missing-provider manual journey changes only after origin confirmation and keeps its original start (2.0s)
+  ✓  34 [desktop] › tests/e2e/u-long-night-return.spec.ts:28:1 › S4 a saved midnight return survives a real three-hour draft expiry and needs a fresh private start (2.0s)
+
+  34 passed (1.3m)

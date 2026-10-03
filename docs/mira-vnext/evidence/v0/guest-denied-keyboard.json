@@ -1,0 +1,114 @@
+[
+  {
+    "view": "mobile",
+    "keyboard": [
+      {
+        "inDialog": true,
+        "text": ""
+      },
+      {
+        "inDialog": true,
+        "text": "Share where I am liveReview named recipients first. Nobody is contacted by opening this action."
+      },
+      {
+        "inDialog": true,
+        "text": " Call someone"
+      },
+      {
+        "inDialog": true,
+        "text": "Emergency options"
+      },
+      {
+        "inDialog": true,
+        "text": " Talk to Mira"
+      },
+      {
+        "inDialog": true,
+        "text": "I'm okay now"
+      },
+      {
+        "inDialog": true,
+        "text": "Emergency options"
+      },
+      {
+        "inDialog": true,
+        "text": ""
+      },
+      {
+        "inDialog": true,
+        "text": "Share where I am liveReview named recipients first. Nobody is contacted by opening this action."
+      },
+      {
+        "inDialog": true,
+        "text": " Call someone"
+      },
+      {
+        "inDialog": true,
+        "text": "Emergency options"
+      },
+      {
+        "inDialog": true,
+        "text": " Talk to Mira"
+      }
+    ],
+    "restored": "I feel unsafe",
+    "gps": 1,
+    "options": "Mapped run loop\n27 min\n4.4 km\nDepart 2026-10-03 04:45 · arrive about 2026-10-03 05:12\n© OpenStreetMap contributors (ODbL), imported walking graph; distance at 6.0 min/km assumed pace · mapped estimate\nMapped run loop\n26 min\n4.2 km\nDepart 2026-10-03 04:45 · arrive about 2026-10-03 05:11\n© OpenStreetMap contributors (ODbL), imported walking graph; distance at 6.0 min/km assumed pace · mapped estimate"
+  },
+  {
+    "view": "desktop",
+    "keyboard": [
+      {
+        "inDialog": true,
+        "text": ""
+      },
+      {
+        "inDialog": true,
+        "text": "Share where I am liveReview named recipients first. Nobody is contacted by opening this action."
+      },
+      {
+        "inDialog": true,
+        "text": " Call someone"
+      },
+      {
+        "inDialog": true,
+        "text": "Emergency options"
+      },
+      {
+        "inDialog": true,
+        "text": " Talk to Mira"
+      },
+      {
+        "inDialog": true,
+        "text": "I'm okay now"
+      },
+      {
+        "inDialog": true,
+        "text": "Emergency options"
+      },
+      {
+        "inDialog": true,
+        "text": ""
+      },
+      {
+        "inDialog": true,
+        "text": "Share where I am liveReview named recipients first. Nobody is contacted by opening this action."
+      },
+      {
+        "inDialog": true,
+        "text": " Call someone"
+      },
+      {
+        "inDialog": true,
+        "text": "Emergency options"
+      },
+      {
+        "inDialog": true,
+        "text": " Talk to Mira"
+      }
+    ],
+    "restored": "I feel unsafe",
+    "gps": 1,
+    "options": "Mapped run loop\n27 min\n4.4 km\nDepart 2026-10-03 04:45 · arrive about 2026-10-03 05:12\n© OpenStreetMap contributors (ODbL), imported walking graph; distance at 6.0 min/km assumed pace · mapped estimate\nMapped run loop\n26 min\n4.2 km\nDepart 2026-10-03 04:45 · arrive about 2026-10-03 05:11\n© OpenStreetMap contributors (ODbL), imported walking graph; distance at 6.0 min/km assumed pace · mapped estimate"
+  }
+]

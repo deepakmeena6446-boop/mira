@@ -43,7 +43,7 @@ export function TabBar() {
               <Link
                 href={t.href}
                 aria-current={on ? "page" : undefined}
-                className={cx("flex h-full flex-col items-center justify-center gap-0.5 text-[0.72rem] font-medium transition-colors duration-150", on ? "text-accent" : "text-ink-muted hover:text-ink")}
+                className={cx("flex min-h-12 h-full flex-col items-center justify-center gap-1 text-[0.72rem] font-medium transition-colors duration-150", on ? "text-accent" : "text-ink-muted hover:text-ink")}
               >
                 {on ? <span aria-hidden className="absolute inset-x-5 top-0 h-0.5 rounded-b-full bg-accent" /> : null}
                 <Icon name={t.icon} className="size-[22px]" />

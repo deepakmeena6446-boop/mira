@@ -1,3 +1,4 @@
+import { localTimeInZone } from "@/domain/opening-hours";
 import { haversineMeters } from "./pilot";
 import { clock12, localTime, openState, openedAt, type LocalTime, type OpenState, type Schedule } from "./opening-hours";
 
@@ -93,6 +94,8 @@ export interface HelpPoint {
    */
   openNow?: boolean;
   checkedAt?: number;
+  /** Checked IANA zone for this place, if the source supplies one. */
+  timezone?: string | null;
   /** On a route: metres from the start of the route to the point nearest this place. */
   alongM?: number;
 }
@@ -351,6 +354,8 @@ export interface RankOptions {
   route?: LonLat[] | null;
   /** The device's local time (the device is where the place is). Without it, hours are "not known". */
   now?: LocalTime;
+  /** Explicit null means the place zone is unknown; never substitute the device zone. */
+  timeZone?: string | null;
   /** The device's epoch ms, to judge freshness of a source's "open now" (defaults to the current time when `now` is given). */
   at?: number;
   /** Classes she chose not to see (e.g. police). */
@@ -399,7 +404,9 @@ export function rankHelpPoints(points: HelpPoint[], from: { lat: number; lon: nu
     .map(({ p, w }) => {
       const info = HELP_CLASSES[p.cls];
       const minutes = walkMinutesTo(from, p);
-      const hoursNow = hoursState(p, opts.now, minutes, at);
+      const checkedZone = p.timezone ?? opts.timeZone;
+      const placeTime = checkedZone !== undefined ? localTimeInZone(new Date(at ?? Date.now()), checkedZone) ?? undefined : opts.now;
+      const hoursNow = hoursState(p, placeTime, minutes, at);
       const unknown = hoursNow.kind === "unknown" || hoursNow.kind === "listed";
       const mayBeClosed = opts.night && info.hoursMatter && unknown;
       const ahead = route ? projectOnRoute(p, route).alongM >= myAlong - 50 : null;

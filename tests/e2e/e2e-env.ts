@@ -29,6 +29,10 @@ export function e2eServerEnv(): Record<string, string> {
     ANTHROPIC_API_KEY: "",
     GOOGLE_MAPS_SERVER_KEY: "",
     GOOGLE_MAPS_BROWSER_KEY: "",
+    // Never inherit real push credentials or contact browser push services in fixtures.
+    VAPID_PUBLIC_KEY: "",
+    VAPID_PRIVATE_KEY: "",
+    VAPID_SUBJECT: "",
     // No live third-party lookups in E2E (Next would otherwise fill these from .env.local).
     PLACE_SEARCH_URL: "",
     OVERPASS_URL: "",

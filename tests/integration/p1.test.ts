@@ -1,3 +1,4 @@
+import { chosenRecipientIds } from "../helpers/recipient-choice";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/headers", async () => (await import("../helpers/cookie-jar")).nextHeadersMock);
@@ -173,7 +174,7 @@ describe("P1: durable accounts, journeys, check-on-me, push, Location Context", 
     switchJar(owner);
     const { trip } = await (await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" }, share: false }))).json();
     expect(trip.sharedWith).toEqual([]);
-    const r = await (await action(trip.id, "checkon")).json();
+    const r = await (await tripActionPOST(jsonRequest(`/api/trips/${trip.id}/checkon`, { recipientIds: await chosenRecipientIds() }), { params: Promise.resolve({ id: trip.id, action: "checkon" }) })).json();
     expect(r).toMatchObject({ told: ["Mum"], failed: [] });
     expect(r.trip.checkRequestedAt).toBeTruthy();
     const mail = (await mailsTo(email)).find((m) => m.Subject.includes("asked you to check on them"))!;

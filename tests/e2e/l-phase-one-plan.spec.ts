@@ -22,7 +22,7 @@ test("guest retains a future named-origin plan across Around, map, Mira, back an
   });
 
   await page.goto("/plan");
-  await expect(page.getByRole("heading", { name: "Plan a movement" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Let’s make it work." })).toBeVisible();
   await page.getByLabel("What do you want to do?").fill("Run before dawn");
   await page.getByRole("textbox", { name: "From" }).fill("North Gate");
   await page.getByRole("button", { name: "Find" }).first().click();
@@ -35,7 +35,9 @@ test("guest retains a future named-origin plan across Around, map, Mira, back an
   await page.getByLabel("Planned local time").fill("2026-10-07T04:45");
   await page.getByLabel("Time zone (IANA)").fill("Asia/Kolkata");
   await expect(page.getByRole("status").filter({ hasText: "Places resolved" })).toBeVisible();
-  await page.getByRole("button", { name: "View in Around" }).click();
+  await page.getByRole("button", { name: "Compare my options" }).click();
+  await expect(page.getByRole("region", { name: "Plan options" })).toBeVisible();
+  await page.goto("/around");
   await expect(page).toHaveURL(/\/around$/);
   await expect(page.getByRole("region", { name: "Current movement plan" })).toContainText("North Gate → South Library");
   await expect(page.getByRole("region", { name: "Current movement plan" })).toContainText("2026-10-07T04:45");
@@ -46,7 +48,7 @@ test("guest retains a future named-origin plan across Around, map, Mira, back an
   await expect(page.getByRole("region", { name: "Current movement plan" })).toContainText("North Gate");
   await page.goto("/mira");
   await expect(page.getByText("Your movement plan")).toBeVisible();
-  await expect(page.getByText("Questions about this plan use checked evidence", { exact: false })).toBeVisible();
+  await expect(page.getByText("Movement plan questions use checked evidence and are not saved to chat history.", { exact: false })).toBeVisible();
   await page.goto("/plan");
   await page.reload();
   await expect(page.getByRole("textbox", { name: "From" })).toHaveValue("North Gate");

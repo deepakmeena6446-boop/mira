@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/Toast";
 import { cx } from "@/components/ui/cx";
 import { api } from "@/lib/api-client";
 import { freshLocation } from "@/lib/location-store";
-import { resetLocalPersonalisation } from "@/lib/usage-signal";
+import { clearDevicePersonalState } from "@/lib/clear-device-personal-state";
 import type { SavedPlace } from "@/server/account/places";
 import { MAX_SAVED_PLACES } from "@/domain/limits";
 import type { Contact } from "@/server/account/contacts";
@@ -289,7 +289,7 @@ export function MeScreen({
                         const r = await api("/api/auth/signout", { body: {} });
                         setBusy(null);
                         if (!r.ok) return toast(r.message, "error");
-                        resetLocalPersonalisation();
+                        clearDevicePersonalState();
                         router.push("/");
                         router.refresh();
                       }}
@@ -320,7 +320,7 @@ export function MeScreen({
                         const r = await api("/api/me", { method: "DELETE" });
                         setBusy(null);
                         if (!r.ok) return toast(`Your account wasn't deleted: ${r.message}`, "error");
-                        resetLocalPersonalisation();
+                        clearDevicePersonalState();
                         router.push("/");
                         router.refresh();
                       }}

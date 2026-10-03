@@ -31,10 +31,6 @@ export function TodayScreen({ name, places, trip, emailAlerts }: { name: string 
     return () => { live = false; };
   }, [name]);
   const active = trip && (trip.state === "active" || trip.state === "missed") ? trip : null;
-  useEffect(() => {
-    if (name) return;
-    try { if (!localStorage.getItem("mira.welcomed")) router.replace("/welcome"); } catch { /* storage blocked: remain on Today */ }
-  }, [name, router]);
   useEffect(() => { if (shouldRequestLocation && shouldAutoLocate()) void requestLocationAgain(); }, [shouldRequestLocation, requestLocationAgain]);
   const enableLocation = () => { rememberLocationChoice(true); void loc.request(); };
   return <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">

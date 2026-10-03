@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { db, newUser, openRoute, testClientIp } from "./helpers";
+import { db, fixtureClockedGps, newUser, openRoute, testClientIp } from "./helpers";
 
 test.describe("When something feels wrong — instant, deterministic help", () => {
   test("Today: 'I feel unsafe' shows every action at once, with no Mira call, and walks to a Help Point", async ({ browser }) => {
@@ -26,7 +26,7 @@ test.describe("When something feels wrong — instant, deterministic help", () =
     expect(renderedAt).not.toBeNull();
     expect(renderedAt!).toBeLessThan(300); // the audit's target: options visible < 300 ms, no model, no round trip
     const sheet = page.getByRole("dialog", { name: "Right now" });
-    await expect(sheet.getByRole("link", { name: /Emergency call, 112/ })).toHaveAttribute("href", "tel:112");
+    await expect(sheet.getByLabel("Immediate Emergency action").getByRole("link", { name: /Emergency call, 112/ })).toHaveAttribute("href", "tel:112");
     await expect(sheet.getByRole("link", { name: /Talk to Mira/ })).toBeVisible();
     expect(miraCalls).toEqual([]);
     await expect(sheet).not.toContainText(/\b(safe place|you are safe|safest)\b/i);
@@ -52,7 +52,7 @@ test.describe("When something feels wrong — instant, deterministic help", () =
     await page.getByRole("button", { name: "I feel unsafe" }).click();
     const sheet = page.getByRole("dialog", { name: "Right now" });
     await expect(sheet.getByRole("button", { name: /Send my live link/ })).toBeVisible();
-    await expect(sheet.getByRole("link", { name: /Emergency call, 112/ })).toHaveAttribute("href", "tel:112");
+    await expect(sheet.getByLabel("Immediate Emergency action").getByRole("link", { name: /Emergency call, 112/ })).toHaveAttribute("href", "tel:112");
     await sheet.getByRole("button", { name: /Go to a Help Point/ }).click();
     await expect(page.getByRole("link", { name: /Directions in Maps/ })).toBeVisible();
     await page.getByRole("button", { name: "End trip without arriving" }).click();
@@ -87,6 +87,7 @@ test.describe("After — one tiny factual contribution", () => {
     const { ctx, page } = await newUser(browser, "Noor");
     const night = new Date();
     night.setHours(22, 30, 0, 0); // device clock only; the server keeps real time
+    await fixtureClockedGps(page);
     await page.clock.setFixedTime(night);
     await openRoute(page);
     await page.getByRole("button", { name: /Go with Mira/ }).click();
@@ -109,12 +110,10 @@ test.describe("Degraded states are honest", () => {
     const ctx = await browser.newContext({ permissions: [], extraHTTPHeaders: { "x-forwarded-for": testClientIp() } });
     const page = await ctx.newPage();
     await page.goto("/");
-    await page.waitForURL("**/welcome");
-    await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await page.getByRole("button", { name: "Use my location" }).click();
-    await page.waitForURL((u) => u.pathname === "/"); // no account needed to look around
+    await expect(page.getByRole("heading", { name: "What’s your plan?" })).toBeVisible();
     await page.goto("/today");
     await expect(page.getByRole("button", { name: /Use my location for local context|Location is off for Mira/ })).toBeVisible();
+    await page.getByRole("button", { name: "Use my location for local context" }).click();
     // Country not known (location off): Emergency is still one tap away, without an invented dial number.
     await page.getByRole("button", { name: "Emergency options" }).first().click();
     const options = page.getByRole("dialog", { name: "Emergency call options" });

@@ -1,3 +1,4 @@
+import { chosenRecipientIds } from "../helpers/recipient-choice";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 
@@ -60,7 +61,7 @@ async function saveHome(): Promise<string> {
 }
 
 async function start(body: Record<string, unknown>) {
-  return tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" }, share: true, ...body }));
+  return tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" }, recipientIds: body.share === false ? [] : await chosenRecipientIds(), ...body }));
 }
 
 const action = (id: string, a: string) => tripActionPOST(jsonRequest(`/api/trips/${id}/${a}`, {}), { params: Promise.resolve({ id, action: a }) });

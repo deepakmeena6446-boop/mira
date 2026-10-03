@@ -4,12 +4,12 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Mira",
     short_name: "Mira",
-    description: "Know a place, move with support, and help the next person with trusted local safety information.",
+    description: "Compare routes and timing, keep your return plan, and get practical support while you move.",
     start_url: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#fff7ef",
-    theme_color: "#17665b",
+    background_color: "#f6f7fb",
+    theme_color: "#315bf4",
     icons: [
       { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },

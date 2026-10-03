@@ -1,0 +1,135 @@
+
+> mira@0.1.0 prebuild
+> node scripts/copy-maplibre-worker.mjs
+
+
+> mira@0.1.0 build
+> next build --webpack && npm run worker:build
+
+▲ Next.js 16.3.6 (webpack)
+- Environments: .env.local
+✓ Running next.config.ts took 147ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 3.7s
+  Running TypeScript ...
+  Finished TypeScript in 5.9s ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/11) ...
+  Generating static pages using 7 workers (2/11) 
+  Generating static pages using 7 workers (5/11) 
+  Generating static pages using 7 workers (8/11) 
+✓ Generating static pages using 7 workers (11/11) in 437ms
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /admin
+├ ƒ /admin/login
+├ ƒ /admin/releases
+├ ƒ /admin/reports
+├ ƒ /admin/reports/[id]
+├ ƒ /api/admin/login
+├ ƒ /api/admin/logout
+├ ƒ /api/admin/releases
+├ ƒ /api/admin/releases/[id]
+├ ƒ /api/admin/reports
+├ ƒ /api/admin/reports/[id]
+├ ƒ /api/auth/demo
+├ ƒ /api/auth/eligibility
+├ ƒ /api/auth/email
+├ ƒ /api/auth/email/confirm
+├ ƒ /api/auth/google/callback
+├ ƒ /api/auth/google/start
+├ ƒ /api/auth/options
+├ ƒ /api/auth/signout
+├ ƒ /api/community/nearby
+├ ƒ /api/contribute
+├ ƒ /api/contribute/check/[id]
+├ ƒ /api/contribute/correction
+├ ƒ /api/geo/help
+├ ƒ /api/geo/nearby
+├ ƒ /api/geo/reverse
+├ ƒ /api/geo/route
+├ ƒ /api/geo/search
+├ ƒ /api/geo/tiles
+├ ƒ /api/health/live
+├ ƒ /api/health/ready
+├ ƒ /api/invites/accept
+├ ƒ /api/lighting/vote
+├ ƒ /api/me
+├ ƒ /api/me/contacts
+├ ƒ /api/me/contacts/[id]
+├ ƒ /api/me/habits
+├ ƒ /api/me/habits/suggestion
+├ ƒ /api/me/notifications
+├ ƒ /api/me/places
+├ ƒ /api/me/places/[id]
+├ ƒ /api/me/plans
+├ ƒ /api/me/plans/[id]
+├ ƒ /api/me/prefs
+├ ƒ /api/me/push
+├ ƒ /api/mira
+├ ƒ /api/mira/intent
+├ ƒ /api/mira/plan
+├ ƒ /api/plan/country
+├ ƒ /api/plan/options
+├ ƒ /api/reports
+├ ƒ /api/safety-updates
+├ ƒ /api/t/[token]
+├ ƒ /api/trips
+├ ƒ /api/trips/[id]/[action]
+├ ƒ /api/trips/[id]/location
+├ ƒ /api/trips/current
+├ ƒ /around
+├ ƒ /around/map
+├ ƒ /auth/link
+├ ƒ /auth/link/[token]
+├ ƒ /circle
+├ ƒ /contribute
+├ ○ /daypart.js
+├ ƒ /inbox
+├ ƒ /invite
+├ ƒ /invite/[token]
+├ ○ /manifest.webmanifest
+├ ƒ /me
+├ ƒ /mira
+├ ○ /opengraph-image
+├ ƒ /plan
+├ ƒ /privacy
+├ ƒ /report
+├ ƒ /t/[token]
+├ ƒ /terms
+├ ƒ /today
+├ ƒ /trip
+├ ƒ /trip/local
+├ ƒ /trips
+└ ƒ /welcome
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+> mira@0.1.0 worker:build
+> node scripts/build-worker.mjs
+
+
+  dist/worker.mjs      139.5kb
+  dist/worker.mjs.map  446.5kb
+
+⚡ Done in 19ms
+
+  dist/migrate.mjs      2.0kb
+  dist/migrate.mjs.map  3.8kb
+
+⚡ Done in 1ms
+
+  dist/pilot-import.mjs      22.9kb
+  dist/pilot-import.mjs.map  48.6kb
+
+⚡ Done in 2ms

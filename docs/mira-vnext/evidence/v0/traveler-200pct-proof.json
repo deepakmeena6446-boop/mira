@@ -1,0 +1,92 @@
+[
+  {
+    "mode": "mobile",
+    "buildId": "D8JbGmC-cOV5rEFvrqwN9",
+    "htmlBuildIdMatched": true,
+    "bounds": {
+      "clientWidth": 390,
+      "scrollWidth": 390,
+      "clientHeight": 844,
+      "panel": {
+        "x": 0,
+        "y": 67.53125,
+        "width": 390,
+        "height": 776.46875,
+        "top": 67.53125,
+        "right": 390,
+        "bottom": 844,
+        "left": 0
+      },
+      "headerClose": {
+        "x": 254,
+        "y": 107.53125,
+        "width": 96,
+        "height": 96,
+        "top": 107.53125,
+        "right": 350,
+        "bottom": 203.53125,
+        "left": 254
+      },
+      "emergency": {
+        "x": 40,
+        "y": 227.53125,
+        "width": 310,
+        "height": 96,
+        "top": 227.53125,
+        "right": 350,
+        "bottom": 323.53125,
+        "left": 40
+      },
+      "staleCopy": true
+    },
+    "focusTrapped": true,
+    "pageErrors": [],
+    "externalMaps": "intentionally blocked; no live map/provider evidence",
+    "pass": true
+  },
+  {
+    "mode": "desktop",
+    "buildId": "D8JbGmC-cOV5rEFvrqwN9",
+    "htmlBuildIdMatched": true,
+    "bounds": {
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "clientHeight": 900,
+      "panel": {
+        "x": 192,
+        "y": 36,
+        "width": 896,
+        "height": 828,
+        "top": 36,
+        "right": 1088,
+        "bottom": 864,
+        "left": 192
+      },
+      "headerClose": {
+        "x": 952,
+        "y": 76,
+        "width": 96,
+        "height": 96,
+        "top": 76,
+        "right": 1048,
+        "bottom": 172,
+        "left": 952
+      },
+      "emergency": {
+        "x": 232,
+        "y": 196,
+        "width": 816,
+        "height": 96,
+        "top": 196,
+        "right": 1048,
+        "bottom": 292,
+        "left": 232
+      },
+      "staleCopy": true
+    },
+    "focusTrapped": true,
+    "pageErrors": [],
+    "externalMaps": "intentionally blocked; no live map/provider evidence",
+    "pass": true
+  }
+]

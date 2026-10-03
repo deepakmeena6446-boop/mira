@@ -22,7 +22,7 @@ import { circleSharingLine } from "@/domain/companion-output";
 import { hasPlanWork, intentFromDraft, intentFromLeg, newPlanDraft } from "@/domain/plan-state";
 import { setPlanDraft, usePlanDraft, usePlanHydrated } from "@/lib/plan-store";
 import { draftFromAsk } from "@/domain/plan-ask";
-import { askUsesPlan, shouldSeedPlan } from "@/domain/ask-routing";
+import { askUsesPlan, shouldSeedPlan, immediateSupportIntent } from "@/domain/ask-routing";
 
 interface Msg {
   id: string;
@@ -257,6 +257,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   const send = async (text: string) => {
     const message = text.trim();
     if (!message || sending) return;
+    if (immediateSupportIntent(message)) { window.dispatchEvent(new Event("mira:need-options")); return; }
     const planFlow = askUsesPlan(message, planActive, Boolean(user));
     setSending(true);
     if (planFlow && !planActive && shouldSeedPlan(message)) {

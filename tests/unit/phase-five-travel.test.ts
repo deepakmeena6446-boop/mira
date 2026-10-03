@@ -46,4 +46,15 @@ describe("Phase 5 remote travel contracts", () => {
     expect(instantForLocal("2026-10-25T01:30", "Europe/London")).toBeNull();
     expect(instantForLocal("2026-10-03T01:30", "Mars/Base")).toBeNull();
   });
+
+  it("reviews a complete later leg while preserving an independently unfinished main leg", () => {
+    const base = { ...newPlanDraft(now, "UTC"), activity: "Unfinished first transfer", departureLocal: "", origin: { kind: "named" as const, query: "Terminal still being chosen", resolution: null } };
+    const place = (query: string, lat: number) => ({ query, resolution: { source: "search" as const, name: query, point: { lat, lon: 77.2 } } });
+    const later = { ...newPlanLeg(), label: "Fictional station to venue", origin: place("Station", 28.69), destination: place("Venue", 28.70), departureLocal: "2026-10-03T09:00", timeZone: "Asia/Kolkata" };
+    const selected = activatePlanLeg({ ...base, legs: [later] }, 0)!;
+    expect(selected.activity).toBe(later.label);
+    expect(selected.legs?.[0]).toMatchObject({ label: base.activity, origin: { query: base.origin.query, resolution: null }, departureLocal: "" });
+    expect(intentFromLeg(selected.legs![0])).toBeNull();
+    expect(() => planDraftSchema.parse(selected)).not.toThrow();
+  });
 });

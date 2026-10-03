@@ -1,3 +1,4 @@
+import { chosenRecipientIds } from "../helpers/recipient-choice";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/headers", async () => (await import("../helpers/cookie-jar")).nextHeadersMock);
@@ -65,7 +66,7 @@ describe("Circle on WhatsApp: she sends her link in one tap; MIRA never claims i
   it("gives each WhatsApp contact their own live link on a shared journey, and never counts them as notified", async () => {
     await signIn("Meera");
     await contactsPOST(jsonRequest("/api/me/contacts", { name: "Ravi", phone: "+44 20 7946 0958" }));
-    const { trip } = await (await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" }, share: true }))).json();
+    const { trip } = await (await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" }, recipientIds: await chosenRecipientIds() }))).json();
     expect(trip.sharedWith).toHaveLength(1);
     const [ravi] = trip.sharedWith;
     expect(ravi).toMatchObject({ name: "Ravi", notified: false, viaEmail: false });
@@ -98,7 +99,7 @@ describe("Circle on WhatsApp: she sends her link in one tap; MIRA never claims i
     expect(trip.sharedWith).toEqual([]);
     await action(trip.id, "end");
 
-    const shared = await (await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" }, share: true }))).json();
+    const shared = await (await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Home" }, recipientIds: await chosenRecipientIds() }))).json();
     await getSql()`UPDATE journeys SET eta_at = now() - interval '20 minutes' WHERE id = ${shared.trip.id}`;
     const sends: string[] = [];
     await processJourneys(getSql(), systemClock, { send: async (m: { to: string }) => (sends.push(m.to), { ok: true as const }) } as never);

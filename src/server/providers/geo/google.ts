@@ -8,7 +8,7 @@ import { coordinateBearingGeoUrl } from "./coordinate-url";
 import { scheduleFromGoogle } from "@/domain/opening-hours";
 import { GOOGLE_HELP_TYPES, helpClassFromGoogle, type HelpClass, type HelpPoint } from "@/domain/help-points";
 import type { TravelMode } from "@/domain/travel-mode";
-import type { GeoPoint, GeoProvider, HelpHours, HelpLookupOptions, ModeRoute, PlaceHit, WalkRoute } from "./types";
+import type { GeoPoint, GeoProvider, HelpHours, HelpLookupOptions, ModeRoute, PlaceHit, WalkRoute, PlannedRouteTime, RouteLookupOptions } from "./types";
 import { errCode } from "@/server/log/err-code";
 
 /**
@@ -118,41 +118,67 @@ export function decodePolyline(encoded: string): Array<[number, number]> {
   return out;
 }
 
-type GRoute = { distanceMeters?: number; duration?: string; polyline?: { encodedPolyline?: string } };
+type GRoute = { distanceMeters?: number; duration?: string; polyline?: { encodedPolyline?: string }; legs?: { steps?: { distanceMeters?: number; navigationInstruction?: { instructions?: string; maneuver?: string } }[] }[] };
 
 /** MIRA's travel modes → Routes API travel modes. */
 const ROUTES_MODE: Record<TravelMode, "WALK" | "DRIVE" | "TRANSIT"> = { walk: "WALK", ride: "DRIVE", transit: "TRANSIT" };
+/** Current Routes API temporal support. Estimates are never operating-service verification.
+ * https://developers.google.com/maps/documentation/routes/reference/rest/v2/TopLevel/computeRoutes
+ */
+export const GOOGLE_ROUTE_CAPABILITIES: NonNullable<GeoProvider["routeCapabilities"]> = {
+  walk: { departureTime: false, arrivalTime: false, pastDays: 0, futureDays: null, maneuvers: true, mapDisplay: "google", verifiesOperatingService: false },
+  ride: { departureTime: true, arrivalTime: false, pastDays: 0, futureDays: null, maneuvers: true, mapDisplay: "google", verifiesOperatingService: false },
+  transit: { departureTime: true, arrivalTime: true, pastDays: 7, futureDays: 100, maneuvers: true, mapDisplay: "google", verifiesOperatingService: false },
+};
+
+export function googleRouteTimeEligible(mode: TravelMode, time: PlannedRouteTime, now = Date.now()): boolean {
+  const capability = GOOGLE_ROUTE_CAPABILITIES[mode];
+  if (!(time.kind === "arrive_by" ? capability.arrivalTime : capability.departureTime)) return false;
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(time.instant)) return false;
+  const instant = Date.parse(time.instant);
+  return Number.isFinite(instant) && instant >= now - capability.pastDays * 86_400_000 && (capability.futureDays === null || instant <= now + capability.futureDays * 86_400_000);
+}
 
 /**
- * Routes API computeRoutes, fastest first (up to three). Field mask: distance, duration and
- * polyline only (Essentials SKU). DRIVE asks for TRAFFIC_UNAWARE, the cheapest routing
- * preference; TRANSIT takes none. An empty list is a normal answer (no transit here).
+ * Routes API computeRoutes, fastest first (up to three). Legacy DRIVE uses
+ * TRAFFIC_UNAWARE; an explicit planned driving time uses TRAFFIC_AWARE (Pro SKU).
+ * Requested features determine billing; a field mask alone does not establish the SKU.
+ * https://developers.google.com/maps/documentation/routes/usage-and-billing
+ * TRANSIT takes no routing preference. An empty list is a normal answer.
  */
-async function computeRoutes(key: string, a: GeoPoint, b: GeoPoint, mode: TravelMode, alternatives: boolean): Promise<WalkRoute[]> {
+async function computeRoutes(key: string, a: GeoPoint, b: GeoPoint, mode: TravelMode, alternatives: boolean, opts?: RouteLookupOptions): Promise<Array<WalkRoute & Partial<ModeRoute>>> {
+  if (opts?.plannedTime && !googleRouteTimeEligible(mode, opts.plannedTime)) return [];
   if (!takeGoogleCall()) throw new GoogleBudgetExceeded();
   const travelMode = ROUTES_MODE[mode];
+  const checkedAt = new Date().toISOString();
   const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
     method: "POST",
-    headers: { "content-type": "application/json", "x-goog-api-key": key, "x-goog-fieldmask": "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline" },
+    headers: { "content-type": "application/json", "x-goog-api-key": key, "x-goog-fieldmask": `routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline${opts?.plannedTime ? ",fallbackInfo" : ""}${opts?.includeManeuvers ? ",routes.legs.steps.distanceMeters,routes.legs.steps.navigationInstruction" : ""}` },
     body: JSON.stringify({
       origin: { location: { latLng: { latitude: a.lat, longitude: a.lon } } },
       destination: { location: { latLng: { latitude: b.lat, longitude: b.lon } } },
       travelMode,
-      ...(travelMode === "DRIVE" ? { routingPreference: "TRAFFIC_UNAWARE" } : {}),
+      ...(travelMode === "DRIVE" ? { routingPreference: opts?.plannedTime ? "TRAFFIC_AWARE" : "TRAFFIC_UNAWARE" } : {}),
+      ...(opts?.plannedTime ? { [opts.plannedTime.kind === "arrive_by" ? "arrivalTime" : "departureTime"]: opts.plannedTime.instant } : {}),
       computeAlternativeRoutes: alternatives,
       languageCode: "en",
     }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`routes_${res.status}`);
-  return (((await res.json()) as { routes?: GRoute[] }).routes ?? [])
-    .filter((r) => r.polyline?.encodedPolyline)
+  const payload = await res.json() as { routes?: GRoute[]; fallbackInfo?: unknown };
+  return (payload.routes ?? [])
+    .filter((r) => r.polyline?.encodedPolyline && Number.isFinite(r.distanceMeters) && r.distanceMeters! > 0 && /^\d+(?:\.\d+)?s$/.test(r.duration ?? "") && Number(r.duration!.slice(0, -1)) > 0)
     .map((r) => ({
-      meters: r.distanceMeters ?? 0,
-      minutes: Math.max(1, Math.round(Number((r.duration ?? "0s").replace("s", "")) / 60)),
+      meters: r.distanceMeters!,
+      minutes: Math.max(1, Math.round(Number(r.duration!.slice(0, -1)) / 60)),
       geometry: decodePolyline(r.polyline!.encodedPolyline!),
       approximate: false,
+      ...(opts?.plannedTime || opts?.includeManeuvers ? { sourceCheckedAt: checkedAt, operatingService: "unverified" as const } : {}),
+      ...(opts?.plannedTime ? { plannedTime: opts.plannedTime, timeEligible: !payload.fallbackInfo } : {}),
+      ...(opts?.includeManeuvers ? { maneuvers: (r.legs ?? []).flatMap((leg) => leg.steps ?? []).slice(0, 200).filter((step) => Boolean(step.navigationInstruction?.instructions)).map((step) => ({ instruction: step.navigationInstruction!.instructions!.slice(0, 1_000), maneuver: step.navigationInstruction?.maneuver ?? null, meters: Number.isFinite(step.distanceMeters) ? Math.max(0, step.distanceMeters!) : 0 })) } : {}),
     }))
+    .filter((route) => route.geometry.length >= 2 && route.geometry.every(([lon, lat]) => Number.isFinite(lon) && Number.isFinite(lat) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180))
     .sort((x, y) => x.minutes - y.minutes)
     .slice(0, 3);
 }
@@ -270,6 +296,7 @@ export function googleGeo(key: string, fallback: GeoProvider): GeoProvider {
       }
   };
   return {
+    routeCapabilities: GOOGLE_ROUTE_CAPABILITIES,
     async search(q, near, opts) {
       const text = q.trim().slice(0, 80);
       if (text.length < 2) return [];
@@ -342,14 +369,15 @@ export function googleGeo(key: string, fallback: GeoProvider): GeoProvider {
       }
     },
 
-    async routes(a, b, mode): Promise<ModeRoute[]> {
+    async routes(a, b, mode, opts): Promise<ModeRoute[]> {
       try {
         // Ride / transit: one route. She's setting when to expect to arrive, not comparing drives.
-        const found = await computeRoutes(key, a, b, mode, mode === "walk");
+        const found = await computeRoutes(key, a, b, mode, mode === "walk", opts);
         if (mode === "walk" && !found.length) throw new Error("routes_none");
         return found.slice(0, mode === "walk" ? 3 : 1).map((r) => ({ ...r, provider: "google" as const }));
       } catch (err) {
         warn(`routes_${mode}`, err);
+        if (opts?.plannedTime) return []; // A current-time fallback cannot satisfy a planned-time check.
         return fallback.routes(a, b, mode); // walk: the OSM router; ride / transit: none ("not known")
       }
     },

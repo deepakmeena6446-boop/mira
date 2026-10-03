@@ -37,13 +37,13 @@ test.describe("Mobile extras — long-press report, inbox, time of day, installa
     const owner = await newUser(browser, "Kiran");
     const address = await addContact(owner.page, "Maa", "maa");
     const contact = await acceptContactInvite(browser, address);
-    await owner.page.goto("/");
+    await owner.page.goto("/today");
     await expect(owner.page.getByRole("link", { name: "Updates, 2 new" })).toBeVisible(); // welcome + accepted
     await owner.page.getByRole("link", { name: /Updates/ }).click();
     await expect(owner.page.getByRole("heading", { name: "Updates" })).toBeVisible();
     await expect(owner.page.getByText("Maa accepted your invite")).toBeVisible();
     await expect(owner.page.getByText("Welcome to MIRA, Kiran")).toBeVisible();
-    await owner.page.goto("/");
+    await owner.page.goto("/today");
     await expect(owner.page.getByRole("link", { name: "Updates", exact: true })).toBeVisible(); // read now
     await owner.ctx.close();
     await contact.ctx.close();
@@ -55,7 +55,7 @@ test.describe("Mobile extras — long-press report, inbox, time of day, installa
     await page.clock.setFixedTime(new Date("2026-09-25T22:40:00+05:30"));
     await page.goto("/welcome");
     await expect(page.locator("html")).toHaveAttribute("data-daypart", "night");
-    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#111312");
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#0d1426");
     await page.clock.setFixedTime(new Date("2026-09-25T07:10:00+05:30"));
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute("data-daypart", "dawn");
@@ -84,9 +84,8 @@ test.describe("Mobile extras — long-press report, inbox, time of day, installa
     const { installabilityErrors } = await cdp.send("Page.getInstallabilityErrors");
     expect(installabilityErrors).toEqual([]);
     // The offline cache holds no personal pages — only the offline page and static files.
-    await page.waitForFunction(async () => (await caches.keys()).includes("mira-shell-v3"));
-    const cached = await page.evaluate(async () => (await (await caches.open("mira-shell-v3")).keys()).map((r) => new URL(r.url).pathname).sort());
-    expect(cached).toEqual(["/daypart.js", "/icon.svg", "/manifest.webmanifest", "/offline.html"]);
+    await expect.poll(() => page.evaluate(async () => (await caches.keys()).sort())).toEqual(["mira-shell-v5"]);
+    await expect.poll(() => page.evaluate(async () => (await (await caches.open("mira-shell-v5")).keys()).map((r) => new URL(r.url).pathname).sort())).toEqual(["/daypart.js", "/icon.svg", "/manifest.webmanifest", "/offline.html"]);
     // Offline, a navigation gets the offline page (never someone's cached home screen).
     await page.context().setOffline(true);
     await page.goto("/me").catch(() => {});

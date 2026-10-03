@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process";
 import postgres from "postgres";
 import { expect, type APIRequestContext, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { E2E_BASE, E2E_DB, E2E_ADMIN_PASSWORD, MAILPIT_API } from "./e2e-env";
+import type { CountryContext } from "../../src/domain/country-context";
 
 export const db = postgres(E2E_DB, { max: 2, onnotice: () => {} });
 
@@ -15,6 +16,39 @@ export const GEO = { latitude: 28.6951, longitude: 77.2143 };
 export const DEST = "Vishwavidyalaya Metro Gate No. 3";
 
 export const SAME_ORIGIN = { origin: E2E_BASE, "x-mira-request": "1" };
+
+/** TEST-ONLY reverse fixture: the country lookup itself is deterministic, while its emergency
+ * facts come from MIRA's reviewed registry. This is not proof that a live geocoder located India.
+ * Keep unknown-country and denied-location tests outside this signed-in legacy helper.
+ */
+export async function fixtureIndiaReverse(page: Page) {
+  const reviewed = await page.request.post(`${E2E_BASE}/api/plan/country`, { headers: SAME_ORIGIN, data: { iso: "IN" } });
+  expect(reviewed.ok()).toBe(true);
+  const country = await reviewed.json() as CountryContext;
+  expect(country).toMatchObject({ iso: "IN", emergency: { primary: { number: "112", scope: "all" } } });
+  await page.route("**/api/geo/reverse", (route) => {
+    // Match the real endpoint's strict request boundary; this fixture must not conceal invalid GPS fields.
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    const valid = Object.keys(body).every((key) => ["lat", "lon", "source"].includes(key)) && typeof body.lat === "number" && typeof body.lon === "number" && (body.source === undefined || body.source === "osm");
+    return valid ? route.fulfill({ json: { label: "Deterministic India reverse fixture — test only", precise: false, country } }) : route.fulfill({ status: 400, json: { error: "invalid_body", message: "Fixture enforces the real reverse coordinate contract." } });
+  });
+}
+
+/** TEST-ONLY: a shifted browser clock needs equally shifted fictional GPS timestamps.
+ * Otherwise the native OS timestamp correctly becomes stale relative to the simulated date.
+ */
+export async function fixtureClockedGps(page: Page) {
+  await page.addInitScript((point) => {
+    const position = (): GeolocationPosition => {
+      const coords = { ...point, accuracy: 10, altitude: null, altitudeAccuracy: null, heading: null, speed: null };
+      const timestamp = Date.now();
+      return { coords: { ...coords, toJSON: () => coords }, timestamp, toJSON: () => ({ coords, timestamp }) };
+    };
+    Object.defineProperty(navigator.geolocation, "getCurrentPosition", { configurable: true, value: (ok: PositionCallback) => ok(position()) });
+    Object.defineProperty(navigator.geolocation, "watchPosition", { configurable: true, value: (ok: PositionCallback) => { ok(position()); return window.setInterval(() => ok(position()), 1000); } });
+    Object.defineProperty(navigator.geolocation, "clearWatch", { configurable: true, value: (id: number) => window.clearInterval(id) });
+  }, GEO);
+}
 
 export async function apiReport(request: APIRequestContext, body: Record<string, unknown>) {
   return request.post("/api/reports", { headers: SAME_ORIGIN, data: { idempotencyKey: crypto.randomUUID(), ...body } });
@@ -62,12 +96,10 @@ export function testClientIp(): string {
 export async function newUser(browser: Browser, name: string): Promise<{ ctx: BrowserContext; page: Page }> {
   const ctx = await browser.newContext({ geolocation: GEO, permissions: ["geolocation"], extraHTTPHeaders: { "x-forwarded-for": testClientIp() } });
   const page = await ctx.newPage();
+  await fixtureIndiaReverse(page);
   await page.goto("/");
-  await page.waitForURL("**/welcome");
-  await expect(page.getByRole("heading", { name: "Know more. Move freely. Together." })).toBeVisible();
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
-  await page.getByRole("button", { name: "Use my location" }).click();
-  await page.waitForURL((u) => u.pathname === "/"); // Home, signed out
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { name: "What’s your plan?" })).toBeVisible();
   await page.goto("/me");
   await page.getByRole("button", { name: "Get started" }).click();
   await page.getByPlaceholder("Your first name").fill(name);
@@ -75,7 +107,12 @@ export async function newUser(browser: Browser, name: string): Promise<{ ctx: Br
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
   await page.goto("/");
-  await expect(page.getByText(new RegExp(name)).first()).toBeVisible();
+  await expect(page.getByText(`Hi, ${name}`)).toBeVisible();
+  // Legacy local-context flows opt in through the UI; root planning needs no GPS.
+  await page.goto("/today");
+  await page.getByRole("button", { name: "Use my location for local context" }).click();
+  await expect(page.getByRole("link", { name: /Emergency call, 112/ }).first()).toBeVisible();
+  await page.goto("/");
   return { ctx, page };
 }
 
@@ -85,8 +122,8 @@ export async function addContact(page: Page, name: string, tag: string): Promise
   await page.goto("/circle");
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Name").last().fill(name);
-  await page.getByLabel("Email").fill(address);
-  await page.getByRole("button", { name: "Send invite" }).click();
+  await page.getByLabel("Email (optional)", { exact: true }).fill(address);
+  await page.getByRole("button", { name: "Save and send invite", exact: true }).click();
   await expect(page.getByText("Invited")).toBeVisible();
   return address;
 }

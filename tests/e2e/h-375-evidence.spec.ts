@@ -37,7 +37,7 @@ test("375 px Help Points, Emergency, arrival and Contribute remain usable", asyn
   await page.getByRole("dialog", { name: "Help Points near you" }).getByRole("button", { name: "Close", exact: true }).click();
   await expect(page.getByRole("link", { name: "Emergency call, 112" })).toHaveAttribute("href", "tel:112");
   await page.getByRole("button", { name: "I feel unsafe" }).click();
-  await expect(page.getByRole("dialog", { name: "Right now" }).getByRole("link", { name: "Emergency call, 112" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Right now" }).getByLabel("Immediate Emergency action").getByRole("link", { name: "Emergency call, 112" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   await page.getByRole("button", { name: "I'm okay now" }).click();
   await page.goto("/contribute");

@@ -57,7 +57,7 @@ describe("shared Ask routing", () => {
   it("prefills a return's places but leaves departure and country unasserted", () => {
     const draft = { ...newPlanDraft(new Date("2026-10-02T12:00:00Z"), "Asia/Kolkata"), activity: "Event arrival", origin: { kind: "named" as const, query: "Office", resolution: { source: "search" as const, name: "Office", point: { lat: 28.69, lon: 77.21 } } }, destination: { query: "Venue", resolution: { source: "search" as const, name: "Venue", point: { lat: 28.691, lon: 77.211 } } }, departureLocal: "2026-10-02T18:00" };
     const leg = returnLegFromMain(draft);
-    expect(leg).toMatchObject({ label: "Return to Office", origin: { query: "Venue" }, destination: { query: "Office" }, departureLocal: "", timeZone: "", destinationCountryIso: null });
+    expect(leg).toMatchObject({ label: "Return to Office", origin: { query: "Venue" }, destination: { query: "Office" }, departureLocal: "", timeZone: "Asia/Kolkata", destinationCountryIso: null });
     expect(returnLegFromMain({ ...draft, loop: true })).toBeNull();
   });
 

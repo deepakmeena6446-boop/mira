@@ -25,7 +25,8 @@ describe("Circle notification claims", () => {
   it("describes attempts and results for accepted contacts, not guaranteed delivery", () => {
     show(true, [accepted, invited]);
     expect(screen.getByText(/Mum is eligible for a live-link email/)).toBeInTheDocument();
-    expect(screen.getByText(/attempts to email accepted contacts/)).toBeInTheDocument();
-    expect(screen.getByText(/provider accepted or rejected/)).toBeInTheDocument();
+    expect(screen.getByText(/attempts to email selected accepted recipients/)).toBeInTheDocument();
+    expect(screen.getByText(/acceptance does not confirm receipt/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/When you start a journey, Mira opens WhatsApp/);
   });
 });

@@ -1,0 +1,233 @@
+{
+  "schemaVersion": 1,
+  "build": {
+    "id": "gStoIa1bKg6Wnjq0-gLUu",
+    "status": "Historical local production build used before the final desktop header fix."
+  },
+  "kind": "simulated-native-gps-acquisition-diagnostic",
+  "scenario": "static native acquisition + same point reconfiguration while request pending",
+  "limits": [
+    "Playwright simulated GPS fixtures, not personal locations or physical-phone behavior.",
+    "Native get/watch callbacks were observed without changing their position values or acquisition options.",
+    "The second variant explicitly reconfigured the same simulated GEO point; it can interrupt native acquisition with code 2.",
+    "Fictional local account, no selected contact recipients, no contact alerts or database reset.",
+    "Route options were a deterministic fixture; no live route, service, staffing, opening, or safety outcome is established.",
+    "No cookies or bearer credentials retained."
+  ],
+  "finding": "Static simulated GPS returned a fresh-looking watch point but explicit maximumAge:0 acquisition timed out with code 3. Emitting the same simulated point while get was pending interrupted it with code 2. Production freshness checks were preserved. The O route-review regression now labels its one-acquisition failed→fresh callbacks as deterministic fixtures.",
+  "probe": {
+    "evidence": "Simulated native browser GPS; fictional account, no selected contacts. No physical phone or live route claims.",
+    "records": [
+      {
+        "kind": "get request",
+        "options": {
+          "enableHighAccuracy": true,
+          "timeout": 12000,
+          "maximumAge": 0
+        },
+        "now": 1791027871043,
+        "visibility": "visible",
+        "path": "/today"
+      },
+      {
+        "kind": "get success",
+        "options": {
+          "enableHighAccuracy": true,
+          "timeout": 12000,
+          "maximumAge": 0
+        },
+        "lat": 28.6951,
+        "lon": 77.2143,
+        "accuracy": 0,
+        "timestamp": 1791027868897,
+        "now": 1791027871056,
+        "age": 2159,
+        "visibility": "visible",
+        "path": "/today"
+      },
+      {
+        "kind": "get request",
+        "options": {
+          "enableHighAccuracy": true,
+          "timeout": 12000,
+          "maximumAge": 0
+        },
+        "now": 1791027871221,
+        "visibility": "visible",
+        "path": "/around/map"
+      },
+      {
+        "kind": "get success",
+        "options": {
+          "enableHighAccuracy": true,
+          "timeout": 12000,
+          "maximumAge": 0
+        },
+        "lat": 28.6951,
+        "lon": 77.2143,
+        "accuracy": 0,
+        "timestamp": 1791027868897,
+        "now": 1791027871233,
+        "age": 2336,
+        "visibility": "visible",
+        "path": "/around/map"
+      },
+      {
+        "kind": "watch success",
+        "options": {
+          "enableHighAccuracy": true,
+          "maximumAge": 15000
+        },
+        "lat": 28.6951,
+        "lon": 77.2143,
+        "accuracy": 0,
+        "timestamp": 1791027868897,
+        "now": 1791027871239,
+        "age": 2342,
+        "visibility": "visible",
+        "path": "/around/map"
+      },
+      {
+        "kind": "started",
+        "now": 1791027873287
+      },
+      {
+        "kind": "watch success",
+        "options": {
+          "enableHighAccuracy": true,
+          "maximumAge": 10000
+        },
+        "lat": 28.6951,
+        "lon": 77.2143,
+        "accuracy": 0,
+        "timestamp": 1791027868897,
+        "now": 1791027873304,
+        "age": 4407,
+        "visibility": "visible",
+        "path": "/trip"
+      },
+      {
+        "kind": "watch success",
+        "options": {
+          "enableHighAccuracy": true,
+          "maximumAge": 10000
+        },
+        "lat": 28.6951,
+        "lon": 77.2143,
+        "accuracy": 0,
+        "timestamp": 1791027868897,
+        "now": 1791027873306,
+        "age": 4409,
+        "visibility": "visible",
+        "path": "/trip"
+      },
+      {
+        "kind": "watch success",
+        "options": {
+          "enableHighAccuracy": true,
+          "maximumAge": 10000
+        },
+        "lat": 28.6951,
+        "lon": 77.2143,
+        "accuracy": 0,
+        "timestamp": 1791027868897,
+        "now": 1791027873487,
+        "age": 4590,
+        "visibility": "visible",
+        "path": "/trip"
+      },
+      {
+        "kind": "after reload",
+        "now": 1791027873518,
+        "status": "Foreground location is on while this journey screen is visible. Last device position 4 seconds ago. Device reported about 0 m accuracy. Last position shared 0 seconds ago. Browsers may stop updates when locked; missed check-ins still depend on the background service."
+      },
+      {
+        "kind": "get request",
+        "options": {
+          "enableHighAccuracy": true,
+          "timeout": 12000,
+          "maximumAge": 0
+        },
+        "now": 1791027873749,
+        "visibility": "visible",
+        "path": "/trip"
+      },
+      {
+        "kind": "get error",
+        "options": {
+          "enableHighAccuracy": true,
+          "timeout": 12000,
+          "maximumAge": 0
+        },
+        "code": 3,
+        "message": "Timeout expired",
+        "now": 1791027885748
+      },
+      {
+        "kind": "final status",
+        "now": 1791027886185,
+        "url": "http://localhost:3300/trip",
+        "body": "Skip to content\nVishwa Vidyalaya\nVishwavidyalaya Metro Gate No. 1\nVishwavidyalaya Metro Gate No. 2\nVishwavidyalaya Metro Gate No. 3\nViswanathan Chest Hospital\nPink Booth\nOpenFreeMap © OpenMapTiles Data from OpenStreetMap\n\nWalk in progress\n\nTo Vishwavidyalaya Metro Gate No. 3 · walking\nI feel unsafe\nEmergency 112\n\nDevice position · 4s ago · update sent 0s ago\n\nI'm here\n\nForeground location is on while this journey screen is visible. Last device position 4 seconds ago. Device reported about 0 m accuracy. Last position shared 0 seconds ago. Browsers may stop updates when locked; missed check-ins still depend on the background service.\n\nOnly people you send your live link to can follow.\nNobody is alerted automatically if you don't arrive — choose someone for this journey for that.\n\nExpected in\n\n9 min\n\nETA 5:23 PM, with time to spare · 70 m to go\n\nYour planned route stays on this phone · 10 Help Points along it\n\nReview route from here\nReview check-in timing\nSend my live link\n+10 min\nManage who follows\n\nVishwa Vidyalaya\n\nMetro / train station · roughly 1 min by distance, route unverified · Hours not known\n\nStaffing is not verified. Check the place directly before relying on it.\n\nA recent, accurate position is needed to check a route to this place.\n\nDirections in Maps\nCheck mapped walk to this placeChange journey to this place\n\nYour location updates while this screen is open. If you close Mira, a valid journey link can show only the last uploaded position. Receipt and viewing are unknown. Tap “I'm here” when you arrive if Mira hasn't noticed.\n\nEnd trip without arriving"
+      },
+      {
+        "kind": "get request",
+        "options": {
+          "enableHighAccuracy": true,
+          "timeout": 12000,
+          "maximumAge": 0
+        },
+        "now": 1791027886286,
+        "visibility": "visible",
+        "path": "/trip"
+      },
+      {
+        "kind": "emit same fictional acquisition after request pending",
+        "now": 1791027886287,
+        "GEO": {
+          "latitude": 28.6951,
+          "longitude": 77.2143
+        }
+      },
+      {
+        "kind": "get error",
+        "options": {
+          "enableHighAccuracy": true,
+          "timeout": 12000,
+          "maximumAge": 0
+        },
+        "code": 2,
+        "message": "",
+        "now": 1791027886301
+      },
+      {
+        "kind": "watch error",
+        "options": {
+          "enableHighAccuracy": true,
+          "maximumAge": 10000
+        },
+        "code": 2,
+        "message": "",
+        "now": 1791027886303
+      },
+      {
+        "kind": "watch success",
+        "options": {
+          "enableHighAccuracy": true,
+          "maximumAge": 10000
+        },
+        "lat": 28.6951,
+        "lon": 77.2143,
+        "accuracy": 0,
+        "timestamp": 1791027886288,
+        "now": 1791027886304,
+        "age": 16,
+        "visibility": "visible",
+        "path": "/trip"
+      },
+      {
+        "kind": "error",
+        "message": "TimeoutError: locator.waitFor: Timeout 15000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('status').filter({ hasText: /Mapped walk from the checked position|recent, accurate position|mapped route check failed/ }) to be visible\u001b[22m\n"
+      }
+    ]
+  }
+}

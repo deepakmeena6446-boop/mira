@@ -6,8 +6,7 @@
 <title>Offline · MIRA</title>
 <script src="/daypart.js"></script>
 <style>
-  :root { --bg: #f6f5f1; --ink: #1a1a18; --muted: #55534d; --card: #fff; --accent: #1d6b63; }
-  :root[data-daypart="night"] { --bg: #111312; --ink: #eceeea; --muted: #aeb3ad; --card: #1a1c1b; --accent: #7cc4b9; }
+  :root { --bg: #f6f7fb; --ink: #14213d; --muted: #52617b; --card: #fff; --accent: #315bf4; }
   html, body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   main { max-width: 26rem; margin: 0 auto; padding: max(3rem, env(safe-area-inset-top)) 1.25rem 2rem; text-align: center; }
   .orb { width: 28px; height: 28px; margin: 2rem auto 1.5rem; border-radius: 50%; border: 2px solid var(--accent); background: radial-gradient(circle, var(--accent) 0 30%, transparent 32%); }
@@ -15,7 +14,6 @@
   p { color: var(--muted); margin: .5rem 0; }
   .card { background: var(--card); border-radius: 1.5rem; padding: 1rem 1.25rem; margin-top: 1.5rem; text-align: left; }
   a.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 1.5rem; margin-top: 1.5rem; border-radius: 999px; background: var(--accent); color: #fff; font-weight: 700; text-decoration: none; }
-  :root[data-daypart="night"] a.btn { color: #140f2e; }
 </style>
 </head>
 <body>
@@ -24,8 +22,8 @@
   <h1>You're offline</h1>
   <p>MIRA needs a connection to show the map and share trips.</p>
   <div class="card">
-    <p><strong>On a trip?</strong> Your contacts still see your last shared spot, and I'll still check in at your ETA.</p>
-    <p><strong>In danger?</strong> Call <a href="tel:112" style="color:inherit;font-weight:700">112</a> — calls work without data.</p>
+    <p><strong>On a trip?</strong> Live updates are unavailable. If you explicitly shared a journey, recipients may see an older position while its link remains valid. Delivery and check-in alerts are not guaranteed; contact someone directly if needed.</p>
+    <p><strong>In danger?</strong> MIRA cannot determine your current country on this offline page. Use your phone’s emergency call screen or dial a local emergency number you know. Calls require an available phone service; MIRA does not call or dispatch help.</p>
   </div>
   <a class="btn" href="/">Try again</a>
 </main>

@@ -1,0 +1,27 @@
+
+> mira@0.1.0 check
+> npm run lint && npm run typecheck && npm test
+
+
+> mira@0.1.0 lint
+> eslint .
+
+
+> mira@0.1.0 typecheck
+> next typegen && tsc --noEmit
+
+Generating route types...
+✓ Types generated successfully
+
+> mira@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.1 /Users/jarvis/Developer/MIRA
+
+
+ Test Files  106 passed (106)
+      Tests  967 passed (967)
+   Start at  17:38:08
+   Duration  55.82s (tests 53%, setup 21%, environment 14%, import 7%, transform 6%)
+

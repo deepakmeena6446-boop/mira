@@ -25,7 +25,7 @@ export async function recordArrivalHabit(sql: Db, journeyId: string, now: Date):
     JOIN saved_places sp ON sp.id = j.saved_place_id AND sp.user_id = j.user_id
     WHERE j.id = ${journeyId} AND j.state = 'arrived' AND j.start_hour IS NOT NULL`;
   if (!j) return false;
-  const shared = await sql<{ contact_id: string }[]>`SELECT contact_id FROM trip_contacts WHERE journey_id = ${journeyId} ORDER BY contact_id`;
+  const shared = await sql<{ contact_id: string }[]>`SELECT contact_id FROM trip_contacts WHERE journey_id = ${journeyId} AND revoked_at IS NULL ORDER BY contact_id`;
   const ids = shared.map((s) => s.contact_id);
   const day = dayIn(now, j.tz);
   await sql`

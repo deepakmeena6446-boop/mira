@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "simulated-browser-gps-cache-regression",
+  "build": {
+    "idPrefix": "KSuy",
+    "status": "Superseded local production build, before the explicit maximumAge: 0 repair."
+  },
+  "environment": {
+    "baseUrl": "http://localhost:3300",
+    "database": "Dedicated local E2E database; no reset performed by this probe.",
+    "browser": "Isolated Playwright Chromium contexts; product retry used a 390 × 844 mobile viewport."
+  },
+  "limits": {
+    "location": "All coordinates came from simulated Playwright geolocation fixtures. These are neither personal locations nor physical-phone evidence.",
+    "nativeProbe": "Read-only native browser geolocation acquisitions with maximumAge 30000 and 0; no source mutation.",
+    "productProbe": "Fictional local demo account and deterministic fictional route fixture. No trip POST was observed, no contact recipients were selected, and no contact alerts were sent.",
+    "providers": "No proof of a live route, operating transport, open place, or safety outcome.",
+    "credentials": "Session cookies and bearer credentials are excluded. Authentication responses are recorded as status codes only."
+  },
+  "finding": "After a wrong-origin acquisition, changing simulated geolocation did not invalidate the native cached fix. The next confirmation with maximumAge 30000 received the same wrong point and timestamp and correctly failed proximity checks. A native maximumAge 0 acquisition returned the corrected point.",
+  "repairStatus": "Root subsequently changed explicit requestLocation acquisition to maximumAge 0. This historical probe does not claim verification of the rebuilt application.",
+  "command": "node /private/tmp/mira-location-retry-probe.cjs",
+  "probe": {
+    "at": "2026-10-03T11:11:55.147Z",
+    "raw": [
+      {
+        "step": "initial",
+        "fix": {
+          "lat": 28.6951,
+          "lon": 77.2143,
+          "accuracy": 0,
+          "timestamp": 1791025915282,
+          "age": 564
+        }
+      },
+      {
+        "step": "bad cached",
+        "fix": {
+          "lat": 28.6951,
+          "lon": 77.2143,
+          "accuracy": 0,
+          "timestamp": 1791025915282,
+          "age": 787
+        }
+      },
+      {
+        "step": "corrected cached",
+        "fix": {
+          "lat": 28.6951,
+          "lon": 77.2143,
+          "accuracy": 0,
+          "timestamp": 1791025915282,
+          "age": 808
+        }
+      },
+      {
+        "step": "corrected force fresh",
+        "fix": {
+          "lat": 28.6951,
+          "lon": 77.2143,
+          "accuracy": 0,
+          "timestamp": 1791025916083,
+          "age": 13
+        }
+      }
+    ],
+    "product": {
+      "eligibility": 200,
+      "auth": 201,
+      "badGps": [
+        {
+          "options": {
+            "enableHighAccuracy": true,
+            "timeout": 12000,
+            "maximumAge": 30000
+          },
+          "lat": 28.8,
+          "lon": 77.3,
+          "accuracy": 0,
+          "timestamp": 1791025918123,
+          "age": 56
+        }
+      ],
+      "retryUrl": "http://localhost:3300/around/map",
+      "retryGps": [
+        {
+          "options": {
+            "enableHighAccuracy": true,
+            "timeout": 12000,
+            "maximumAge": 30000
+          },
+          "lat": 28.8,
+          "lon": 77.3,
+          "accuracy": 0,
+          "timestamp": 1791025918123,
+          "age": 56
+        },
+        {
+          "options": {
+            "enableHighAccuracy": true,
+            "timeout": 12000,
+            "maximumAge": 30000
+          },
+          "lat": 28.8,
+          "lon": 77.3,
+          "accuracy": 0,
+          "timestamp": 1791025918123,
+          "age": 122
+        }
+      ],
+      "starts": [],
+      "body": "Skip to content\nMira — where are you going?\nOpenFreeMap © OpenMapTiles Data from OpenStreetMap\n\nFictional retry walk · Fictional start → Fictional destination\n\n2026-10-03T16:41 (Asia/Kolkata) · Current map data only; planned-time service is not checked.\n\nEdit plan\n\nGood afternoon, Fictional\n\n4:41 PM\n\n1\nFR\nI feel unsafe\nEmergency options\nFictional destination\nWalk\nRide / car\nTransit\n\nYOUR OPTIONS\n\nChoose your way there\n\nDepart at 2026-10-03 16:41 · Asia/Kolkata\n\nShortest mapped walk\n15 min\n1.0 km\nEvidence unavailable\nDaylight at departure\n\nNot checked. Lighting, activity and access are checked separately.\n\nSources, freshness and limits\n\nSelected route overview · use mapped segment details or open the map\n\nExplore map\nOpen navigation provider ↗\nHow would you like to move?\nPrivate manual journey\n\nRoute review, manual progress and check-in in this tab. No GPS, monitoring, contact alerts or automatic arrival.\n\nUse foreground location\n\nEstimated 15 minutes · Asia/Kolkata\n\nNo accepted email or WhatsApp contacts available. This journey stays private.\n\nSelected email contacts receive delivery attempts. WhatsApp requires you to send.\n\nStart Shortest mapped walk now? Foreground location will be used. Nobody is notified.\n\nConfirm start\nCancel\n\nA fresh, accurate position near your chosen origin is needed. Retry or use the private manual journey.\n\nNobody is alerted automatically. On the next screen, send your live link by message: they see your latest spot and ETA until you arrive.\n\nSafety updates near there · Delhi\n\n2 recent women-safety updates from the past 7 days\n\nOfficial advisories 1 · News reports 1 · Community reports: not in the beta\n\nView updates\nSave this place\n🏠 Home\n🎓 College\n💼 Work\n⭐ Favourite\nGo\nJourneys\nYou",
+      "cachedProbe": {
+        "lat": 28.8,
+        "lon": 77.3,
+        "accuracy": 0,
+        "timestamp": 1791025918123,
+        "age": 5154
+      },
+      "freshProbe": {
+        "lat": 28.6951,
+        "lon": 77.2143,
+        "accuracy": 0,
+        "timestamp": 1791025918213,
+        "age": 5068
+      }
+    }
+  }
+}

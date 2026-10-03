@@ -1,0 +1,5 @@
+
+> mira@0.1.0 audit:bundle
+> node scripts/audit-bundle.mjs
+
+Client bundle audit passed: 120 files, 14 patterns, no secrets found.

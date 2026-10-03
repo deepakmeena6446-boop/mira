@@ -36,10 +36,15 @@ test.describe("Mira — the companion (placeholder engine)", () => {
   test("points to Emergency when someone says they're in danger, and never claims to be help itself", async ({ browser }) => {
     const { ctx, page } = await newUser(browser, "Sana");
     await openMira(page);
+    const processing: string[] = [];
+    page.on("request", (request) => { if (request.method() === "POST" && new URL(request.url()).pathname.startsWith("/api/mira")) processing.push(request.url()); });
     await page.getByPlaceholder("Message Mira…").fill("someone is following me, I'm scared");
     await page.getByRole("button", { name: "Send" }).click();
-    await expect(page.getByRole("log").getByText(/If you may be in danger, use Emergency now/)).toBeVisible();
-    await expect(page.getByRole("log").getByRole("button", { name: "Emergency options" })).toBeVisible();
+    const support = page.getByRole("dialog", { name: "Right now", exact: true });
+    await expect(support.getByLabel("Immediate Emergency action").getByRole("button", { name: "Emergency options" })).toBeVisible();
+    await expect(support.getByRole("button", { name: "Call someone", exact: true })).toBeVisible();
+    expect(processing).toEqual([]); // Urgent intent opens local support before chat/model processing.
+    await support.getByRole("button", { name: "Close", exact: true }).click();
     await page.getByPlaceholder("Message Mira…").fill("who are you");
     await page.getByRole("button", { name: "Send" }).click();
     await expect(page.getByRole("log").getByText(/I'm not an emergency service/)).toBeVisible();

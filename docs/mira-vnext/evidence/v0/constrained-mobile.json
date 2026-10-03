@@ -1,0 +1,773 @@
+{
+  "buildId": "prTOEWN5prBgnuy93S4hs",
+  "recordedAt": "2026-10-03T10:20:14.846Z",
+  "method": "Isolated guest Chromium mobile contexts, service workers blocked, CPU throttling rate 4 via CDP, external requests blocked, no GPS permission or request. Browser-only fixed 4:45 AM clock. AI intent response intercepted with hints:null; immediate support APIs intentionally disconnected.",
+  "limitations": [
+    "These are one-host local timings including automation overhead and concurrent local work, not an SLA or physical-phone measurements.",
+    "390\u00d7480 resize is a keyboard-size approximation, not physical keyboard/IME proof. Explicit page scrolling is used to expose body actions above the fixed tab bar when needed.",
+    "No live route, open place, operating service or safety outcome is checked.",
+    "No database reset, server lifecycle action, account, journey, contact or alert creation."
+  ],
+  "cases": [
+    {
+      "name": "default-motion",
+      "reducedMotion": "no-preference",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "cpuThrottlingRate": 4,
+      "screenshots": [
+        "constrained-default-motion-first-screen-844.png",
+        "constrained-default-motion-composer-480.png",
+        "constrained-default-motion-editable-plan-844.png",
+        "constrained-default-motion-urgent-844.png",
+        "constrained-default-motion-urgent-480.png",
+        "constrained-default-motion-emergency-480.png"
+      ],
+      "pageErrors": [],
+      "consoleErrors": [
+        {
+          "stage": "disconnected-urgent-844",
+          "text": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "stage": "disconnected-urgent-844",
+          "text": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "stage": "disconnected-urgent-844",
+          "text": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "stage": "disconnected-urgent-480",
+          "text": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "stage": "disconnected-urgent-480",
+          "text": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "stage": "disconnected-urgent-480",
+          "text": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        }
+      ],
+      "apiRequests": [
+        {
+          "stage": "editable-plan",
+          "path": "/api/mira/intent",
+          "method": "POST"
+        },
+        {
+          "stage": "disconnected-urgent-844",
+          "path": "/api/me",
+          "method": "GET"
+        },
+        {
+          "stage": "disconnected-urgent-844",
+          "path": "/api/me/contacts",
+          "method": "GET"
+        },
+        {
+          "stage": "disconnected-urgent-844",
+          "path": "/api/trips/current",
+          "method": "GET"
+        },
+        {
+          "stage": "disconnected-urgent-480",
+          "path": "/api/me",
+          "method": "GET"
+        },
+        {
+          "stage": "disconnected-urgent-480",
+          "path": "/api/me/contacts",
+          "method": "GET"
+        },
+        {
+          "stage": "disconnected-urgent-480",
+          "path": "/api/trips/current",
+          "method": "GET"
+        }
+      ],
+      "checks": [
+        "Typed origin, 30-minute loop and 4:45 hint retained; date/time zone unresolved and editable; named-origin edit preserved intent",
+        "Disconnected immediate help and Emergency reachable at390\u00d7844; focus trapped and restored",
+        "Disconnected immediate help and Emergency reachable at390\u00d7480; focus trapped and restored"
+      ],
+      "timingsMs": {
+        "navigationToVisibleEditableComposer": 1340,
+        "submitToVisiblePlan": 479,
+        "tapToVisibleEmergency844": 131,
+        "tapToVisibleEmergency480": 98
+      },
+      "firstScreenText": "Skip to content\nmira\n\u2197\nYour movement companion\n\nGO SOMEWHERE. FEEL PREPARED.\n\nWhat\u2019s your plan?\n\nCompare routes and timing. Make a plan, move with it, and get support along the way.\n\nYour movement plan\nEnter places instead\nLet\u2019s plan\n\nSubmitted text may be interpreted by the configured AI provider. Movement planning is not saved to account chat history. Data details\n\nNight out \u2192 home\nEarly run\nLate arrival\n\nBuilt for women\u2019s everyday movement and travel. Start without an account or location permission.\n\nI feel unsafe\nEmergency options\nGo\nJourneys\nYou",
+      "mediaReducedMotion": false,
+      "composerFocusKeptOnResize": true,
+      "composerBounds": {
+        "box": {
+          "x": 38.59375,
+          "y": 304.265625,
+          "width": 312.8125,
+          "height": 85.546875
+        },
+        "view": {
+          "width": 390,
+          "height": 480,
+          "scrollWidth": 390,
+          "visualHeight": 480
+        },
+        "explicitPageScroll": 0,
+        "navigation": {
+          "x": 0,
+          "y": 423,
+          "width": 390,
+          "height": 57
+        }
+      },
+      "planActionBounds": {
+        "box": {
+          "x": 213.015625,
+          "y": 360.8125,
+          "width": 138.390625,
+          "height": 49.59375
+        },
+        "view": {
+          "width": 390,
+          "height": 480,
+          "scrollWidth": 390,
+          "visualHeight": 480
+        },
+        "explicitPageScroll": 35,
+        "navigation": {
+          "x": 0,
+          "y": 423,
+          "width": 390,
+          "height": 57
+        }
+      },
+      "planContext": {
+        "version": 2,
+        "touched": true,
+        "activity": "A 30-minute run from Fictional North Gate at 4:45 AM",
+        "timeHint": "4:45 AM",
+        "returnTimeHint": null,
+        "journeyMode": "manual",
+        "recipientIds": [],
+        "origin": {
+          "kind": "named",
+          "query": "Fictional North Gate entrance",
+          "resolution": null
+        },
+        "destination": {
+          "query": "",
+          "resolution": null
+        },
+        "loop": true,
+        "departureLocal": "",
+        "timeZone": "",
+        "mode": "walk",
+        "constraints": "",
+        "timeKind": "depart_at",
+        "loopTarget": {
+          "kind": "duration",
+          "value": 30
+        },
+        "destinationCountryIso": null,
+        "legs": []
+      },
+      "urgentOpenerBounds844": {
+        "box": {
+          "x": 69.828125,
+          "y": 656.25,
+          "width": 111.90625,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 844,
+          "scrollWidth": 390,
+          "visualHeight": 844
+        },
+        "explicitPageScroll": 0,
+        "navigation": {
+          "x": 0,
+          "y": 787,
+          "width": 390,
+          "height": 57
+        }
+      },
+      "emergencyBounds844": {
+        "box": {
+          "x": 20,
+          "y": 223.625,
+          "width": 350,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 844,
+          "scrollWidth": 390,
+          "visualHeight": 844
+        },
+        "explicitPageScroll": 0,
+        "navigation": null
+      },
+      "closeBounds844": {
+        "box": {
+          "x": 322,
+          "y": 163.625,
+          "width": 48,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 844,
+          "scrollWidth": 390,
+          "visualHeight": 844
+        },
+        "explicitPageScroll": 0,
+        "navigation": null
+      },
+      "urgentText844": "Right now\n\n4:45 AM\n\nEmergency options\n\nHere's what you can do right now.\n\nTurn on location to see Help Points near you.\n\nShare where I am live\nReview named recipients first. Nobody is contacted by opening this action.\nCall someone\nEmergency options\n\nMIRA couldn't determine which country you're in, so it can't show a local emergency number.\n\nTalk to Mira\nI'm okay now\n\nEmergency opens your phone's dialler: Mira doesn't call or alert anyone for you.",
+      "focusTrap844": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "editedOriginBounds480": {
+        "box": {
+          "x": 41,
+          "y": 216.265625,
+          "width": 244.921875,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 480,
+          "scrollWidth": 390,
+          "visualHeight": 480
+        },
+        "explicitPageScroll": 0,
+        "navigation": {
+          "x": 0,
+          "y": 423,
+          "width": 390,
+          "height": 57
+        }
+      },
+      "urgentOpenerBounds480": {
+        "box": {
+          "x": 69.828125,
+          "y": 292.25,
+          "width": 111.90625,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 480,
+          "scrollWidth": 390,
+          "visualHeight": 480
+        },
+        "explicitPageScroll": 0,
+        "navigation": {
+          "x": 0,
+          "y": 423,
+          "width": 390,
+          "height": 57
+        }
+      },
+      "emergencyBounds480": {
+        "box": {
+          "x": 20,
+          "y": 118.40625,
+          "width": 350,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 480,
+          "scrollWidth": 390,
+          "visualHeight": 480
+        },
+        "explicitPageScroll": 0,
+        "navigation": null
+      },
+      "closeBounds480": {
+        "box": {
+          "x": 322,
+          "y": 58.40625,
+          "width": 48,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 480,
+          "scrollWidth": 390,
+          "visualHeight": 480
+        },
+        "explicitPageScroll": 0,
+        "navigation": null
+      },
+      "urgentText480": "Right now\n\n4:45 AM\n\nEmergency options\n\nHere's what you can do right now.\n\nTurn on location to see Help Points near you.\n\nShare where I am live\nReview named recipients first. Nobody is contacted by opening this action.\nCall someone\nEmergency options\n\nMIRA couldn't determine which country you're in, so it can't show a local emergency number.\n\nTalk to Mira\nI'm okay now\n\nEmergency opens your phone's dialler: Mira doesn't call or alert anyone for you.",
+      "focusTrap480": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "unknownCountryText": "Emergency call options\n\nMIRA couldn't determine which country you're in, so it can't show a local emergency number. If you know the local number, use your phone's dialler.\n\nClose",
+      "nestedCloseBounds480": {
+        "box": {
+          "x": 20,
+          "y": 412,
+          "width": 350,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 480,
+          "scrollWidth": 390,
+          "visualHeight": 480
+        },
+        "explicitPageScroll": 0,
+        "navigation": null
+      },
+      "nestedFocusReturned": true,
+      "gpsCalls": 0,
+      "locationChoice": null,
+      "finalPlanContext": {
+        "version": 2,
+        "touched": true,
+        "activity": "A 30-minute run from Fictional North Gate at 4:45 AM",
+        "timeHint": "4:45 AM",
+        "returnTimeHint": null,
+        "journeyMode": "manual",
+        "recipientIds": [],
+        "origin": {
+          "kind": "named",
+          "query": "Fictional North Gate entrance",
+          "resolution": null
+        },
+        "destination": {
+          "query": "",
+          "resolution": null
+        },
+        "loop": true,
+        "departureLocal": "",
+        "timeZone": "",
+        "mode": "walk",
+        "constraints": "",
+        "timeKind": "depart_at",
+        "loopTarget": {
+          "kind": "duration",
+          "value": 30
+        },
+        "destinationCountryIso": null,
+        "legs": []
+      },
+      "result": "PASS"
+    },
+    {
+      "name": "reduced-motion",
+      "reducedMotion": "reduce",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "cpuThrottlingRate": 4,
+      "screenshots": [
+        "constrained-reduced-motion-first-screen-844.png",
+        "constrained-reduced-motion-composer-480.png",
+        "constrained-reduced-motion-editable-plan-844.png",
+        "constrained-reduced-motion-urgent-844.png",
+        "constrained-reduced-motion-urgent-480.png",
+        "constrained-reduced-motion-emergency-480.png"
+      ],
+      "pageErrors": [],
+      "consoleErrors": [
+        {
+          "stage": "disconnected-urgent-844",
+          "text": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "stage": "disconnected-urgent-844",
+          "text": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "stage": "disconnected-urgent-844",
+          "text": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "stage": "disconnected-urgent-480",
+          "text": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "stage": "disconnected-urgent-480",
+          "text": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "stage": "disconnected-urgent-480",
+          "text": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        }
+      ],
+      "apiRequests": [
+        {
+          "stage": "editable-plan",
+          "path": "/api/mira/intent",
+          "method": "POST"
+        },
+        {
+          "stage": "disconnected-urgent-844",
+          "path": "/api/me",
+          "method": "GET"
+        },
+        {
+          "stage": "disconnected-urgent-844",
+          "path": "/api/me/contacts",
+          "method": "GET"
+        },
+        {
+          "stage": "disconnected-urgent-844",
+          "path": "/api/trips/current",
+          "method": "GET"
+        },
+        {
+          "stage": "disconnected-urgent-480",
+          "path": "/api/me",
+          "method": "GET"
+        },
+        {
+          "stage": "disconnected-urgent-480",
+          "path": "/api/me/contacts",
+          "method": "GET"
+        },
+        {
+          "stage": "disconnected-urgent-480",
+          "path": "/api/trips/current",
+          "method": "GET"
+        }
+      ],
+      "checks": [
+        "Typed origin, 30-minute loop and 4:45 hint retained; date/time zone unresolved and editable; named-origin edit preserved intent",
+        "Disconnected immediate help and Emergency reachable at390\u00d7844; focus trapped and restored",
+        "Disconnected immediate help and Emergency reachable at390\u00d7480; focus trapped and restored"
+      ],
+      "timingsMs": {
+        "navigationToVisibleEditableComposer": 757,
+        "submitToVisiblePlan": 337,
+        "tapToVisibleEmergency844": 217,
+        "tapToVisibleEmergency480": 100
+      },
+      "firstScreenText": "Skip to content\nmira\n\u2197\nYour movement companion\n\nGO SOMEWHERE. FEEL PREPARED.\n\nWhat\u2019s your plan?\n\nCompare routes and timing. Make a plan, move with it, and get support along the way.\n\nYour movement plan\nEnter places instead\nLet\u2019s plan\n\nSubmitted text may be interpreted by the configured AI provider. Movement planning is not saved to account chat history. Data details\n\nNight out \u2192 home\nEarly run\nLate arrival\n\nBuilt for women\u2019s everyday movement and travel. Start without an account or location permission.\n\nI feel unsafe\nEmergency options\nGo\nJourneys\nYou",
+      "mediaReducedMotion": true,
+      "composerFocusKeptOnResize": true,
+      "composerBounds": {
+        "box": {
+          "x": 38.59375,
+          "y": 304.265625,
+          "width": 312.8125,
+          "height": 85.546875
+        },
+        "view": {
+          "width": 390,
+          "height": 480,
+          "scrollWidth": 390,
+          "visualHeight": 480
+        },
+        "explicitPageScroll": 0,
+        "navigation": {
+          "x": 0,
+          "y": 423,
+          "width": 390,
+          "height": 57
+        }
+      },
+      "planActionBounds": {
+        "box": {
+          "x": 213.015625,
+          "y": 360.8125,
+          "width": 138.390625,
+          "height": 49.59375
+        },
+        "view": {
+          "width": 390,
+          "height": 480,
+          "scrollWidth": 390,
+          "visualHeight": 480
+        },
+        "explicitPageScroll": 35,
+        "navigation": {
+          "x": 0,
+          "y": 423,
+          "width": 390,
+          "height": 57
+        }
+      },
+      "planContext": {
+        "version": 2,
+        "touched": true,
+        "activity": "A 30-minute run from Fictional North Gate at 4:45 AM",
+        "timeHint": "4:45 AM",
+        "returnTimeHint": null,
+        "journeyMode": "manual",
+        "recipientIds": [],
+        "origin": {
+          "kind": "named",
+          "query": "Fictional North Gate entrance",
+          "resolution": null
+        },
+        "destination": {
+          "query": "",
+          "resolution": null
+        },
+        "loop": true,
+        "departureLocal": "",
+        "timeZone": "",
+        "mode": "walk",
+        "constraints": "",
+        "timeKind": "depart_at",
+        "loopTarget": {
+          "kind": "duration",
+          "value": 30
+        },
+        "destinationCountryIso": null,
+        "legs": []
+      },
+      "urgentOpenerBounds844": {
+        "box": {
+          "x": 69.828125,
+          "y": 656.25,
+          "width": 111.90625,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 844,
+          "scrollWidth": 390,
+          "visualHeight": 844
+        },
+        "explicitPageScroll": 0,
+        "navigation": {
+          "x": 0,
+          "y": 787,
+          "width": 390,
+          "height": 57
+        }
+      },
+      "emergencyBounds844": {
+        "box": {
+          "x": 20,
+          "y": 223.625,
+          "width": 350,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 844,
+          "scrollWidth": 390,
+          "visualHeight": 844
+        },
+        "explicitPageScroll": 0,
+        "navigation": null
+      },
+      "closeBounds844": {
+        "box": {
+          "x": 322,
+          "y": 163.625,
+          "width": 48,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 844,
+          "scrollWidth": 390,
+          "visualHeight": 844
+        },
+        "explicitPageScroll": 0,
+        "navigation": null
+      },
+      "urgentText844": "Right now\n\n4:45 AM\n\nEmergency options\n\nHere's what you can do right now.\n\nTurn on location to see Help Points near you.\n\nShare where I am live\nReview named recipients first. Nobody is contacted by opening this action.\nCall someone\nEmergency options\n\nMIRA couldn't determine which country you're in, so it can't show a local emergency number.\n\nTalk to Mira\nI'm okay now\n\nEmergency opens your phone's dialler: Mira doesn't call or alert anyone for you.",
+      "focusTrap844": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "editedOriginBounds480": {
+        "box": {
+          "x": 41,
+          "y": 216.265625,
+          "width": 244.921875,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 480,
+          "scrollWidth": 390,
+          "visualHeight": 480
+        },
+        "explicitPageScroll": 0,
+        "navigation": {
+          "x": 0,
+          "y": 423,
+          "width": 390,
+          "height": 57
+        }
+      },
+      "urgentOpenerBounds480": {
+        "box": {
+          "x": 69.828125,
+          "y": 292.25,
+          "width": 111.90625,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 480,
+          "scrollWidth": 390,
+          "visualHeight": 480
+        },
+        "explicitPageScroll": 0,
+        "navigation": {
+          "x": 0,
+          "y": 423,
+          "width": 390,
+          "height": 57
+        }
+      },
+      "emergencyBounds480": {
+        "box": {
+          "x": 20,
+          "y": 118.40625,
+          "width": 350,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 480,
+          "scrollWidth": 390,
+          "visualHeight": 480
+        },
+        "explicitPageScroll": 0,
+        "navigation": null
+      },
+      "closeBounds480": {
+        "box": {
+          "x": 322,
+          "y": 58.40625,
+          "width": 48,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 480,
+          "scrollWidth": 390,
+          "visualHeight": 480
+        },
+        "explicitPageScroll": 0,
+        "navigation": null
+      },
+      "urgentText480": "Right now\n\n4:45 AM\n\nEmergency options\n\nHere's what you can do right now.\n\nTurn on location to see Help Points near you.\n\nShare where I am live\nReview named recipients first. Nobody is contacted by opening this action.\nCall someone\nEmergency options\n\nMIRA couldn't determine which country you're in, so it can't show a local emergency number.\n\nTalk to Mira\nI'm okay now\n\nEmergency opens your phone's dialler: Mira doesn't call or alert anyone for you.",
+      "focusTrap480": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "unknownCountryText": "Emergency call options\n\nMIRA couldn't determine which country you're in, so it can't show a local emergency number. If you know the local number, use your phone's dialler.\n\nClose",
+      "nestedCloseBounds480": {
+        "box": {
+          "x": 20,
+          "y": 412,
+          "width": 350,
+          "height": 48
+        },
+        "view": {
+          "width": 390,
+          "height": 480,
+          "scrollWidth": 390,
+          "visualHeight": 480
+        },
+        "explicitPageScroll": 0,
+        "navigation": null
+      },
+      "nestedFocusReturned": true,
+      "gpsCalls": 0,
+      "locationChoice": null,
+      "finalPlanContext": {
+        "version": 2,
+        "touched": true,
+        "activity": "A 30-minute run from Fictional North Gate at 4:45 AM",
+        "timeHint": "4:45 AM",
+        "returnTimeHint": null,
+        "journeyMode": "manual",
+        "recipientIds": [],
+        "origin": {
+          "kind": "named",
+          "query": "Fictional North Gate entrance",
+          "resolution": null
+        },
+        "destination": {
+          "query": "",
+          "resolution": null
+        },
+        "loop": true,
+        "departureLocal": "",
+        "timeZone": "",
+        "mode": "walk",
+        "constraints": "",
+        "timeKind": "depart_at",
+        "loopTarget": {
+          "kind": "duration",
+          "value": 30
+        },
+        "destinationCountryIso": null,
+        "legs": []
+      },
+      "result": "PASS"
+    }
+  ],
+  "command": "node /private/tmp/mira-final-constrained-mobile.mjs",
+  "result": "PASS: both motion preferences at 390\u00d7844 and 390\u00d7480 with CPU rate 4",
+  "reproductionSteps": [
+    "Use an isolated guest Chromium context with no geolocation permission, service workers blocked, CDP Emulation.setCPUThrottlingRate rate4, and external requests blocked.",
+    "Fix browser Date to 2026-10-03 04:45 Asia/Kolkata and intercept the intent interpreter with hints:null.",
+    "Open Go, fill a fictional30-minute run from Fictional North Gate at4:45AM, focus textarea, shorten viewport to390\u00d7480, and scroll action above fixed navigation before submit.",
+    "Assert editable named origin, loop30,4:45hint and unknown date/time zone; edit origin without resolving a real place.",
+    "Disconnect all API routes, open immediate support at844 and480 heights, inspect Emergency/Close bounds, cycle Tab12 times, open nested Emergency options, and check Escape focus restoration.",
+    "Repeat with prefers-reduced-motion:reduce; assert zero GPS calls, no location consent and no pageerrors."
+  ]
+}

@@ -1,52 +1,52 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
-import { daylightAt, instantForLocal, laterDaylight, type PlanOption, type PlanOptionsResult } from "@/domain/plan-options";
+import { daylightAt, instantForLocal, planOptionsKey, planSelectionContext, type PlanOption, type PlanOptionsResult } from "@/domain/plan-options";
+import { currentPlanDraft, setPlanDraft, usePlanDraft } from "@/lib/plan-store";
 import type { MovementIntent } from "@/domain/plan-contract";
-import { resolvedDestination, resolvedOrigin } from "@/domain/plan-state";
+import { resolvedOrigin } from "@/domain/plan-state";
+import { Icon } from "@/components/ui/Icon";
 
-const unknownText = (reason: string) => ({ not_checked: "Not checked", no_data: "No data in checked source", provider_failed: "Source check failed", stale: "Source is too old", conflicting: "Too close to sunrise or sunset to call", unsupported: "No verified planned-time service source" }[reason] ?? "Unknown");
+const unknownText = (reason: string) => ({ not_checked: "Not checked", no_data: "No data in checked source", provider_failed: "Source check failed", stale: "Source is too old", conflicting: "Calculation is ambiguous", unsupported: "No eligible planned-time service source" }[reason] ?? "Unknown");
 let chosenInTab: { key: string; index: number } | null = null;
-
-export function PlanOptions({ plan, onRoute, onChoice }: { plan: MovementIntent; onRoute?: (geometry: [number, number][] | null) => void; onChoice?: (option: PlanOption | null, key: string) => void }) {
+export function clearPlanOptionChoice() { chosenInTab = null; }
+export function PlanOptions({ plan, onRoute, onChoice, onTimeChoice }: { plan: MovementIntent; onRoute?: (geometry: [number, number][] | null) => void; onChoice?: (option: PlanOption | null, key: string) => void; onTimeChoice?: (local: string) => void }) {
+  const draft = usePlanDraft();
   const from = resolvedOrigin(plan);
-  const to = plan.loop && from ? { name: "Starting point", ...from } : resolvedDestination(plan);
-  const key = from && to ? JSON.stringify({ from, to: { lat: to.lat, lon: to.lon }, departure: plan.departure, mode: plan.mode }) : "";
+  const key = planOptionsKey(plan);
   const [result, setResult] = useState<{ key: string; data: PlanOptionsResult | null; error: string | null } | null>(null);
   const [selected, setSelected] = useState(0);
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     if (!key) return;
-    const { from, to, departure } = JSON.parse(key) as { from: { lat: number; lon: number }; to: { lat: number; lon: number }; departure: MovementIntent["departure"] };
-    const request = { from, to, departure };
     let live = true;
-    void api<PlanOptionsResult>("/api/plan/options", { body: request }).then((reply) => {
-      if (live) { setResult({ key, data: reply.ok ? reply.data : null, error: reply.ok ? null : reply.message }); setSelected(chosenInTab?.key === key && reply.ok ? Math.min(chosenInTab.index, Math.max(0, reply.data.options.length - 1)) : 0); }
+    void api<PlanOptionsResult>("/api/plan/options", { body: { intent: plan } }).then((reply) => {
+      if (live) { setResult({ key, data: reply.ok ? reply.data : null, error: reply.ok ? null : reply.message }); const selection = currentPlanDraft()?.selection; const stored = selection?.context === planSelectionContext(plan) && reply.ok ? reply.data.options.findIndex((option) => option.id === selection.optionId) : -1; setSelected(stored >= 0 ? stored : chosenInTab?.key === key && reply.ok ? Math.min(chosenInTab.index, Math.max(0, reply.data.options.length - 1)) : 0); }
     });
     return () => { live = false; };
+    // The canonical key includes every field affecting this response.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, retry]);
   const current = result?.key === key ? result : null;
-  const picked = current?.data?.options[selected] ?? null;
+  const data = current?.data;
+  const picked = data?.options[selected] ?? null;
+  const daylight = picked?.daylight ?? data?.daylight;
+  const selectionUnavailable = Boolean(data && draft?.selection?.context === planSelectionContext(plan) && !data.options.some((option) => option.id === draft.selection?.optionId));
+  useEffect(() => { onRoute?.(picked?.geometry.length && data?.state === "ready" ? picked.geometry : null); }, [onRoute, picked, data]);
+  useEffect(() => { onChoice?.(data?.state === "ready" ? picked : null, key); }, [onChoice, picked, data, key]);
   const localInstant = from ? instantForLocal(plan.departure.local, plan.departure.timeZone) : null;
   const localDaylight = from && localInstant && Math.abs(from.lat) <= 72 ? daylightAt(localInstant, from) : null;
-  const retryButton = <button type="button" onClick={() => { setResult(null); setRetry((value) => value + 1); }} className="mt-2 min-h-11 rounded-lg border border-line px-4 font-semibold">Retry mapped check</button>;
-  useEffect(() => { onRoute?.(picked?.geometry.length && current?.data?.state === "ready" ? picked.geometry : null); }, [onRoute, picked, current]);
-  useEffect(() => { onChoice?.(current?.data?.state === "ready" ? picked : null, key); }, [onChoice, picked, current, key]);
-  if (plan.loop) {
-    const later = from && current?.data?.daylight.status === "known" && current.data.daylight.value === "dark" ? laterDaylight(plan.departure.local, plan.departure.timeZone, from) : null;
-    return <section aria-label="Plan options" className="rounded-lg border border-line bg-surface p-4 text-sm"><h2 className="font-semibold">Plan options</h2><p className="mt-2">Loop routing is unavailable. Choose a destination to compare mapped walking paths, or choose a different departure time.</p>{!from ? <p role="status" className="mt-2">Choose a named starting place first.</p> : !current ? <p role="status" className="mt-2">Calculating daylight at your starting place…</p> : current.error ? <div role="status" className="mt-2"><p>Mapped check failed: {current.error}. {localDaylight ? `Calculated daylight on this device: ${localDaylight} (approximate solar calculation; weather and shade excluded).` : "Daylight is unknown."} Lighting and activity remain unknown.</p>{retryButton}</div> : current.data ? <div className="mt-2"><p>Daylight at departure: {current.data.daylight.status === "known" ? `${current.data.daylight.value} · ${current.data.daylight.source.label} · calculated ${new Date(current.data.daylight.source.observedAt).toLocaleString()}` : unknownText(current.data.daylight.reason)}</p>{later ? <p className="mt-2">Later time option: calculated daylight by about {later.local.replace("T", " ")} ({plan.departure.timeZone}), {later.minutesLater} minutes later. This is an approximate solar calculation, not a route or lighting check.</p> : null}<p>Lighting and activity on a loop are unknown. Running time is unknown. Planned ride and transit service is unverified.</p></div> : null}</section>;
-  }
-  if (!from || !to) return <section aria-label="Plan options" className="rounded-lg border border-line bg-surface p-4 text-sm"><h2 className="font-semibold">Plan options</h2><p role="status" className="mt-2">Choose both named places before comparing routes. Your current location will not be substituted.</p></section>;
-  return <section aria-label="Plan options" className="rounded-lg border border-line bg-surface p-4 text-sm">
-    <h2 className="font-semibold">{plan.mode === "walk" ? "Compare mapped walks" : "Mapped walking reference"}</h2>
-    <p className="mt-1 text-ink-muted">{plan.departure.local} ({plan.departure.timeZone}) · {plan.origin.kind === "device" ? "From here" : plan.origin.query} → {plan.destination?.query}</p>
-    {plan.mode !== "walk" ? <p className="mt-2 text-sm text-ink-muted">You selected {plan.mode}. The paths below are walking estimates only. {plan.mode === "ride" ? "Driver, pickup and last-leg access" : "Service hours, stops and last-leg access"} are unverified for this time; confirm with the operator or provider.</p> : null}
-    {!current ? <p role="status" className="mt-3">Checking the imported walking graph…</p> : current.error ? <div role="status" className="mt-3"><p>Route check failed: {current.error}. {localDaylight ? `Calculated daylight on this device: ${localDaylight} (approximate solar calculation; weather and shade excluded).` : "Daylight is unknown."} Route and service remain unknown.</p>{retryButton}</div> : current.data ? <>
-      <p role="status" className="mt-3">{current.data.detail}</p>
-      {current.data.options.length ? <ol className="mt-3 space-y-2" aria-label="Walking options">{current.data.options.map((option, index) => <li key={option.id}><button type="button" aria-pressed={selected === index} onClick={() => { chosenInTab = { key, index }; setSelected(index); }} className="min-h-11 w-full rounded-lg border border-line-strong p-3 text-left aria-pressed:border-accent"><strong>{option.label}</strong><span className="block">About {Math.round(option.minutes)} min · {(option.meters / 1000).toFixed(1)} km</span><span className="block text-xs text-ink-muted">{option.evidence[0].status === "known" ? `${option.evidence[0].source.label} · imported ${new Date(option.evidence[0].source.observedAt).toLocaleDateString()} · route scope ${current.data?.scope}` : "Source unknown"}</span></button></li>)}</ol> : null}
-      <dl className="mt-3 space-y-2 border-t border-line pt-3"><div><dt className="font-semibold">Daylight at departure</dt><dd>{current.data.daylight.status === "known" ? `${current.data.daylight.value} · ${current.data.daylight.source.label} · calculated ${new Date(current.data.daylight.source.observedAt).toLocaleString()} · near origin` : unknownText(current.data.daylight.reason)}</dd></div><div><dt className="font-semibold">Ride or transit at planned time</dt><dd>{current.data.service.status === "unknown" ? unknownText(current.data.service.reason) : String(current.data.service.value)}</dd></div><div><dt className="font-semibold">Lighting and opening hours</dt><dd>Not verified for the planned time. Check directly before relying on a place.</dd></div></dl>
-      <p className="mt-3 text-xs text-ink-muted">Mapped distance does not establish safety, accessibility, live conditions or service availability. Route geometry follows mapped graph edges only; access from each selected place to the graph may need checking.</p>
+  return <section aria-label="Plan options" className="space-y-4">
+    <header><p className="mira-eyebrow">Your options</p><h2 className="mt-1 text-xl font-semibold">{plan.mode !== "walk" ? "Make the transfer work" : plan.loop ? "Choose your way around" : "Choose your way there"}</h2><p className="mt-1 text-sm text-ink-muted">{plan.timeKind === "arrive_by" ? "Arrive by" : "Depart at"} {plan.departure.local.replace("T", " ")} · {plan.departure.timeZone}</p></header>
+    {!key ? <p role="status">Choose the named places you mean. Your current location will not be substituted.</p> : !current ? <div role="status" className="rounded-2xl bg-sunken p-4">Checking mapped routes and daylight…</div> : current.error ? <div role="status" className="rounded-2xl border border-line bg-surface p-4"><p>Route check failed: {current.error}. {localDaylight ? `Calculated daylight: ${localDaylight} (approximate).` : "Daylight is unknown."} Your plan stays here.</p><button type="button" onClick={() => setRetry((n) => n + 1)} className="mira-intent-chip mt-3">Retry mapped check</button></div> : data ? <>
+      {selectionUnavailable ? <p role="status" className="rounded-2xl bg-warm-soft p-4 text-sm">Your previous route choice is no longer in this checked response. Review and choose an available option before starting.</p> : null}
+      {plan.loop && plan.loopTarget?.kind === "duration" && picked && Math.abs(picked.minutes - plan.loopTarget.value) > 2 ? <p role="status" className="rounded-2xl bg-sunken p-4 text-sm">You requested {plan.loopTarget.value} minutes. This mapped option is about {Math.round(picked.minutes)} minutes at your assumed pace. This choice does not match your target exactly; review this difference or edit the target.</p> : null}
+      {data.options.length ? <ol className="space-y-3" aria-label="Walking options">{data.options.map((option, index) => <li key={option.id}><button type="button" aria-pressed={selected === index} onClick={() => { chosenInTab = { key, index }; const draft = currentPlanDraft(); if (draft) setPlanDraft({ ...draft, selection: { optionId: option.id, context: planSelectionContext(plan) } }); setSelected(index); }} className="mira-option"><span className="mira-option-title"><strong>{option.label}</strong><Icon name={selected === index ? "check" : "route"} className="size-5" /></span><span className="mt-3 flex items-baseline gap-3"><span className="text-2xl font-semibold">{Math.round(option.minutes)} <span className="text-sm font-normal">min</span></span><span className="text-sm text-ink-muted">{(option.meters / 1000).toFixed(1)} km</span></span>{option.departureLocal ? <span className="mt-2 block text-sm">Depart {option.departureLocal.replace("T", " ")}{option.arrivalLocal ? ` · arrive about ${option.arrivalLocal.replace("T", " ")}` : ""}</span> : null}<span className="mt-2 block text-xs text-ink-muted">{option.evidence[0]?.status === "known" ? `${option.evidence[0].source.label} · mapped estimate` : "Evidence unavailable"}</span></button></li>)}</ol> : <div role="status" className="rounded-2xl border border-line bg-surface p-4"><p>{data.detail}</p><p className="mt-2 text-sm text-ink-muted">You can keep the named plan, confirm the route directly and start a manual check-in journey.</p>{data.state === "failed" || data.state === "stale" ? <button type="button" onClick={() => setRetry((n) => n + 1)} className="mira-intent-chip mt-3">Retry mapped check</button> : null}</div>}
+      <div className="rounded-2xl bg-sunken p-4 text-sm"><strong>Daylight {plan.timeKind === "arrive_by" ? "at estimated departure" : "at departure"}</strong><p className="mt-1">{daylight?.status === "known" ? `${daylight.value} · approximate solar calculation` : unknownText(daylight?.reason ?? "not_checked")}. Lighting, activity and access are checked separately.</p></div>
+      {data.timeAlternatives?.map((time) => <div key={time.local} className="rounded-2xl border border-line p-4 text-sm"><strong>Later time option</strong><p className="mt-1">Calculated daylight by about {time.local.replace("T", " ")} ({time.timeZone}), {time.minutesLater} minutes later. Lighting remains unknown.</p>{onTimeChoice ? <button type="button" onClick={() => onTimeChoice(time.local)} className="mira-intent-chip mt-2">Compare this departure</button> : null}</div>)}
+      {data.manualPlan ? <div className="rounded-2xl border border-line p-4 text-sm"><strong>{plan.mode === "ride" ? "Ride / car" : "Transit"}: confirm directly</strong><ul className="mt-2 list-disc space-y-1 pl-4">{data.manualPlan.nextSteps.map((step) => <li key={step}>{step}</li>)}</ul></div> : null}
+      {data.constraints?.length ? <div className="rounded-2xl border border-line p-4 text-sm"><strong>Your requirements</strong>{data.constraints.map((constraint) => <p key={constraint.text} className="mt-2">{constraint.text}: {constraint.reason}</p>)}</div> : null}
+      <details className="text-sm text-ink-muted"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Sources, freshness and limits</summary><p>{data.detail}</p><p className="mt-2">{data.source ?? "Source unavailable"} · {data.sourceAt ? `snapshot ${new Date(data.sourceAt).toLocaleDateString()}` : "snapshot unknown"} · checked {new Date(data.checkedAt).toLocaleString()} · {data.scope ?? "scope unknown"}</p><p className="mt-2">{data.service.status === "unknown" ? unknownText(data.service.reason) : String(data.service.value)}. Mapped distance does not establish safety, accessibility or operating service. Opening hours, lighting and staffing remain unverified unless separately shown.</p>{picked?.steps?.length ? <ol className="mt-3 list-decimal space-y-2 pl-5" aria-label="Mapped route reference">{picked.steps.map((step, i) => <li key={i}>{step.name || step.highway || "Mapped pedestrian segment"} · {Math.round(step.lengthM)} m</li>)}</ol> : null}</details>
     </> : null}
   </section>;
 }

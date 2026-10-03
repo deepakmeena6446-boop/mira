@@ -169,6 +169,13 @@
       "when": 1790996236559,
       "tag": "0023_decision_outcome_semantics",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790996236560,
+      "tag": "0024_trip_recipient_delivery",
+      "breakpoints": true
     }
   ]
 }

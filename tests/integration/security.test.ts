@@ -1,3 +1,4 @@
+import { chosenRecipientIds } from "../helpers/recipient-choice";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -149,7 +150,7 @@ describe("privacy red-line audit", () => {
     bodies.push(await (await routePOST(jsonRequest("/api/geo/route", { from: "bad" }))).json());
     // The contact's live view of a shared trip.
     await demoPOST(jsonRequest("/api/auth/demo", { name: "Audit User" }));
-    const { trip } = await (await tripsPOST(jsonRequest("/api/trips", { from, to: { ...to, name: "Home" }, share: true }))).json();
+    const { trip } = await (await tripsPOST(jsonRequest("/api/trips", { from, to: { ...to, name: "Home" }, recipientIds: await chosenRecipientIds() }))).json();
     const token = trip.shareUrl.split("/t/")[1];
     switchJar(newJar());
     bodies.push(await (await sharedGET(getRequest(`/api/t/${token}`), { params: Promise.resolve({ token }) })).json());

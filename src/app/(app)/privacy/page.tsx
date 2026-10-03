@@ -72,8 +72,8 @@ export default function PrivacyPage() {
           </Item>
           <Item icon="share" title="Trips you share">
             <p>
-              Each trusted contact on a journey (one who accepted your email invite, or one you saved with a WhatsApp number) gets their own live link. They see your first name, destination, latest position and ETA until you arrive. After
-              that, the link shows only that you arrived (for 30 minutes), then nothing. Remove a contact and their link stops working at once. For WhatsApp contacts, Mira only opens WhatsApp with the message ready: you send it, from your own WhatsApp, and Mira never sees the chat or knows whether it was sent.
+              Only recipients you select and confirm for a shared journey get a live link. They see your first name, destination, latest uploaded position and ETA until you arrive. After
+              that, the link shows only that you arrived (for 30 minutes), then nothing. Revoke a recipient on that journey or remove the contact and their link stops working. You can also revoke the link you send yourself. For WhatsApp recipients, you tap Send link to open WhatsApp with the message ready: you send it, from your own WhatsApp, and Mira never sees the chat or knows whether it was sent.
             </p>
             <p>&ldquo;Share link&rdquo; on the trip screen lets you send a live link to anyone you choose yourself — they can follow until you arrive.</p>
             <p>
@@ -85,6 +85,9 @@ export default function PrivacyPage() {
               The planned route of a journey stays on your phone (for Help Points ahead and the lighting question), not on Mira&apos;s server, and is cleared when
               you&apos;re done.
             </p>
+          </Item>
+          <Item icon="route" title="Private manual journeys">
+            <p>A private manual journey uses no GPS, account journey record, monitoring or contact alerts. The chosen plan and route remain in this tab. Session storage keeps start and due times, an option identifier, a context fingerprint and your manual progress/check-in time; it does not store an extra copy of the route geometry. Route guidance is reconstructed from a matching, unexpired plan after refresh and may be unavailable offline. The private journey expires 30 minutes after its due time; arrival, ending, sign-out or account deletion clears its device state. A private check-in neither sends a message nor confirms arrival.</p>
           </Item>
           <Item icon="bell" title="Notifications">
             <p>
@@ -120,6 +123,10 @@ export default function PrivacyPage() {
           <Item icon="route" title="Your travel plans">
             <p>A plan stays in this browser tab for up to two hours after your last edit unless you clear it. Mira does not put it in your account automatically. If you choose Save plan while signed in, Mira encrypts its places, time, purpose and travel legs, keeps it for up to 30 days, and lets you open or delete it in Journeys. A current GPS origin and Google place result cannot be saved. Opening a saved plan does not start a journey or tell a contact.</p>
             <p>Movement questions in Ask use this temporary plan for guests and signed-in people. They are not added to saved chat. Nearby, reporting and general product questions from a signed-in account still use the saved chat described below.</p>
+            <p>{providerModes().companion === "claude"
+              ? "When you submit a new movement intention, Mira may send that one submitted text to Anthropic's Claude to extract the places, travel mode and time hints you wrote. This includes any names, addresses or purpose you type. Mira does not add your device location, account, saved places, contacts or chat history to that request."
+              : "New movement intentions currently use built-in extraction rules. If configured AI is connected, submitting one may send that one text, including any names, addresses or purpose you type, to Anthropic's Claude; the composer discloses this before you submit."}</p>
+            <p>Mira does not save intent-extraction text to its database, chat history or application logs. It keeps coarse rate-limit and daily usage counters. An AI failure can use built-in rules after the text has already been sent. The two-hour tab expiry applies to your draft, not to an AI provider&apos;s handling of a submitted request. Checked travel answers come from route and place evidence, and extracting hints never starts a journey, shares it or confirms a place or time.</p>
             <p>A guest can start a private check-in timer for an unmapped loop without GPS or an account. Only its start and due timestamps stay in this tab; it ends when you check in or expires 30 minutes after the due time. It cannot track you, detect arrival, alert anyone or keep running reliably while the screen is closed.</p>
           </Item>
           <Item icon="home" title="What Mira keeps on this phone">
@@ -131,7 +138,7 @@ export default function PrivacyPage() {
           </Item>
           <Item icon="sparkle" title="Chatting with Mira">
             <p>
-              Your chat is saved to your account for 30 days so Mira can follow the conversation. Mira&apos;s replies are saved without area names, walking times or
+              Signed-in nearby, reporting and general product chat is saved to your account for 30 days so Mira can follow the conversation. Movement planning follows the temporary-plan handling above. Mira&apos;s replies are saved without area names, walking times or
               nearby places. <strong className="text-ink">Your own messages are saved exactly as you typed them</strong>, so don&apos;t type addresses you&apos;d rather not
               keep. Clear it any time in You.
             </p>

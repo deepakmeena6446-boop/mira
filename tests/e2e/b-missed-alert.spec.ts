@@ -6,11 +6,15 @@ async function shareTrip(browser: Browser, name: string, accept: boolean) {
   const address = await addContact(owner.page, "Didi", "didi");
   const contact = accept ? await acceptContactInvite(browser, address) : null;
   await openRoute(owner.page);
-  if (accept) await owner.page.getByRole("radio", { name: /Share with Didi/ }).click();
+  if (accept) {
+    await expect(owner.page.getByRole("checkbox", { name: /Didi/ })).not.toBeChecked();
+    await owner.page.getByRole("checkbox", { name: /Didi/ }).check();
+  } else await expect(owner.page.getByRole("checkbox", { name: /Didi/ })).toHaveCount(0);
   await owner.page.getByRole("button", { name: /Go with Mira/ }).click();
   await owner.page.waitForURL("**/trip");
-  const [row] = await db`SELECT id FROM journeys ORDER BY created_at DESC LIMIT 1`;
-  return { owner, contact, address, id: row.id as string };
+  const { trip } = await (await owner.page.request.get("/api/trips/current")).json();
+  expect(trip.sharedWith.map((recipient: { name: string }) => recipient.name)).toEqual(accept ? ["Didi"] : []);
+  return { owner, contact, address, id: trip.id as string };
 }
 
 /** TEST-ONLY: move the ETA into the past so the real worker process sees a missed arrival. */
@@ -29,7 +33,10 @@ test.describe("Missed arrival — alerts go only to accepted contacts, exactly o
     expect(r.alert_state).toBe("sent");
     await t.owner.page.reload();
     await expect(t.owner.page.getByText(/Are you okay\?/)).toBeVisible();
-    await expect(t.owner.page.getByText(/let your contacts know/)).toBeVisible();
+    await expect(t.owner.page.getByText(/provider accepted the missed-check-in message for Didi/)).toBeVisible();
+    await expect(t.owner.page.getByText(/Receipt is unknown/).first()).toBeVisible();
+    const current = (await (await t.owner.page.request.get("/api/trips/current")).json()).trip;
+    expect(current.sharedWith).toEqual([expect.objectContaining({ name: "Didi", alertDelivery: "sent" })]);
 
     await new Promise((res) => setTimeout(res, 25_000)); // another worker cycle: no second alert
     const alerts = (await mailsTo(t.address)).filter((m) => m.Subject.includes("missed"));
@@ -56,15 +63,17 @@ test.describe("Missed arrival — alerts go only to accepted contacts, exactly o
     await t.owner.ctx.close();
   });
 
-  test("a delivery failure is shown as unconfirmed, never as sent", async ({ browser }) => {
+  test("a rejected email attempt names the recipient and never claims provider acceptance", async ({ browser }) => {
     const t = await shareTrip(browser, "Ira", true);
     dockerCompose("stop", "mailpit");
     try {
       const r = await missArrival(t.id);
       expect(r.alert_state).toBe("failed");
       await t.owner.page.reload();
-      await expect(t.owner.page.getByText(/couldn't confirm the message went out/)).toBeVisible();
-      await expect(t.owner.page.getByText(/let your contacts know/)).toHaveCount(0);
+      await expect(t.owner.page.getByText(/Email was rejected or unconfirmed for Didi/)).toBeVisible();
+      await expect(t.owner.page.getByText(/provider accepted the missed-check-in message/)).toHaveCount(0);
+      const current = (await (await t.owner.page.request.get("/api/trips/current")).json()).trip;
+      expect(current.sharedWith).toEqual([expect.objectContaining({ name: "Didi", alertDelivery: "failed" })]);
     } finally {
       dockerCompose("start", "mailpit");
       await waitFor(async () => (await fetch("http://127.0.0.1:8025/api/v1/info").catch(() => null))?.ok ?? false, 30_000);

@@ -1,0 +1,853 @@
+[
+  {
+    "mode": "mobile",
+    "name": "signature-arrival-return",
+    "state": "PASS",
+    "steps": [
+      "Open /",
+      "Submit Dinner at 9. I\u2019ll leave around midnight and head home.",
+      "Inspect arrival hint, empty places/date/zone",
+      "Open Return & legs"
+    ],
+    "evidence": {
+      "text": "Skip to content\nmira\n\u2197\nNew plan\n\nYOUR MOVEMENT, CONNECTED\n\nLet\u2019s make it work.\n\nDinner at 9. I\u2019ll leave around midnight and head home.\n\n1\nPlan\n2\nOptions\n3\nReturn & legs\n\nYou mentioned a return around midnight. Confirm its date and local time below.\n\nYour return and next legs\n\nKeep up to three movements together. Review and confirm each journey separately.\n\nLeg 1 \u00b7 Dinner at 9. I\u2019ll leave around midnight and head home.\n\nOrigin needed \u2192 Destination needed\n\nConfirm the main leg\u2019s local time and zone in Plan.\n\nDestination facts for leg 1\n\nReturn requested: midnight. This is separate from the event\u2019s arrival time. Confirm the return date and local time; neither has been guessed.\n\nAdd travel leg\n\nTemporary in this tab. Destination facts do not set your current Emergency location. No booking, contact message or journey starts from adding a leg.\n\nI feel unsafe\nEmergency options\n\nTemporary in this tab \u00b7 expires two hours after the last edit \u00b7 saving and sharing are your choice.\n\nGo\nJourneys\nYou",
+      "fixture": "Only intent endpoint response fixture; deterministic immediate UI draft also inspected"
+    }
+  },
+  {
+    "mode": "mobile",
+    "name": "named-ambiguity-and-denied-location",
+    "state": "PASS",
+    "steps": [
+      "Open Plan step",
+      "Enter fictional airport origin; Find returns two candidates",
+      "Choose explicit first candidate",
+      "Attempt From here with denied GPS",
+      "Check named origin remains",
+      "Select fictional hotel destination; choose London local late arrival"
+    ],
+    "evidence": {
+      "origin": "Fictional Arrival Terminal",
+      "geoCalls": 1,
+      "text": "Skip to content\nmira\n\u2197\nNew plan\n\nYOUR MOVEMENT, CONNECTED\n\nLet\u2019s make it work.\n\nDinner at 9. I\u2019ll leave around midnight and head home.\n\n1\nPlan\n2\nOptions\n3\nReturn & legs\n\nReady to compare the available options.\n\nWhat do you want to do?\nFrom\nFind\n\nSelected: Fictional Arrival Terminal\n\nUse named origin\nFrom here\n\nA fresh, accurate location wasn\u2019t available. Enter a named origin instead.\n\nYou mentioned 9 (AM/PM unspecified). Choose the date and time zone below; Mira has not assumed either.\n\nReturn to my starting point (loop)\nTo\nFind\n\nSelected: Fictional Lantern Hotel\n\nTiming\nDepart at\nArrive by\nPlanned local time\nTime zone (IANA)\nMode\nWalk\nRide / car\nTransit\nRequirements & accessibility\nCurrent plan\n\nDinner at 9. I\u2019ll leave around midnight and head home. \u00b7 Fictional Arrival Terminal \u2192 Fictional Lantern Hotel \u00b7 2026-10-03T23:30 (Europe/London) \u00b7 Walk\n\nPlaces resolved. Compare the available routes, timing and explicit unknowns.\n\nCompare my options\nSave plan\nClear plan\nI feel unsafe\nEmergency options\n\nTemporary in this tab \u00b7 expires two hours after the last edit \u00b7 saving and sharing are your choice.\n\nGo\nJourneys\nYou",
+      "fixture": "Fictional search candidates, denied browser geolocation; device zone Asia/Kolkata"
+    }
+  },
+  {
+    "mode": "mobile",
+    "name": "dst-and-failed-route",
+    "state": "PASS",
+    "steps": [
+      "Set 2026-11-01 01:30 America/New_York",
+      "Compare options against actual local API validation",
+      "Return to Plan and restore London late arrival",
+      "Simulate failed route response and retry"
+    ],
+    "evidence": {
+      "ambiguous": "YOUR OPTIONS\n\nChoose your way there\n\nArrive by 2026-11-01 01:30 \u00b7 America/New_York\n\nThis local time is ambiguous or unavailable in the chosen time zone. Choose another time before comparing.\n\nYou can keep the named plan, confirm the route directly and start a manual check-in journey.\n\nDaylight at estimated departure\n\nNo eligible planned-time service source. Lighting, activity and access are checked separately.\n\nSources, freshness and limits",
+      "failed": "YOUR OPTIONS\n\nChoose your way there\n\nArrive by 2026-10-03 23:30 \u00b7 Europe/London\n\nRoute check failed: Something went wrong on our side. Please try again.. Calculated daylight: dark (approximate). Your plan stays here.\n\nRetry mapped check",
+      "fixture": "DST actual local validation; mapped route success/failure are explicit deterministic fixtures"
+    }
+  },
+  {
+    "mode": "mobile",
+    "name": "independent-leg-retention",
+    "state": "PASS",
+    "steps": [
+      "Open Return & legs",
+      "Add travel leg",
+      "Resolve fictional Tokyo origin/destination",
+      "Set independent 2026-10-04 09:00 Asia/Tokyo departure",
+      "Finish editor, reload; inspect both legs"
+    ],
+    "evidence": {
+      "text": "Your return and next legs\n\nKeep up to three movements together. Review and confirm each journey separately.\n\nLeg 1 \u00b7 Dinner at 9. I\u2019ll leave around midnight and head home.\n\nFictional Arrival Terminal \u2192 Fictional Lantern Hotel\n\nArrive by 2026-10-03 23:30 (Europe/London)\n\nDestination facts for leg 1\n\nReturn requested: midnight. This is separate from the event\u2019s arrival time. Confirm the return date and local time; neither has been guessed.\n\nLeg 2 \u00b7 Fictional next morning transfer\n\nFictional Tokyo Station \u2192 Fictional Tokyo Garden\n\nPlaces and timing complete \u00b7 2026-10-04 09:00 (Asia/Tokyo) \u00b7 Walk. Route review is separate.\n\nEdit leg 2\nReview leg 2 options\n\nReview keeps the previous main leg and choices here. It does not start, save or share a journey.\n\nAdd travel leg\nAdd return leg\n\nTemporary in this tab. Destination facts do not set your current Emergency location. No booking, contact message or journey starts from adding a leg.",
+      "storage": {
+        "savedAt": 1791018431476,
+        "draft": {
+          "version": 2,
+          "touched": true,
+          "activity": "Dinner at 9. I\u2019ll leave around midnight and head home.",
+          "timeHint": "9 (AM/PM unspecified)",
+          "returnTimeHint": "midnight",
+          "journeyMode": "manual",
+          "recipientIds": [],
+          "origin": {
+            "kind": "named",
+            "query": "Fictional Arrival Terminal",
+            "resolution": {
+              "source": "search",
+              "point": {
+                "lat": 51.4701,
+                "lon": -0.4501
+              },
+              "placeId": "audit-airport",
+              "name": "Fictional Arrival Terminal"
+            }
+          },
+          "destination": {
+            "query": "Fictional Lantern Hotel",
+            "resolution": {
+              "source": "search",
+              "point": {
+                "lat": 51.4781,
+                "lon": -0.4301
+              },
+              "placeId": "audit-hotel",
+              "name": "Fictional Lantern Hotel"
+            }
+          },
+          "loop": false,
+          "departureLocal": "2026-10-03T23:30",
+          "timeZone": "Europe/London",
+          "mode": "walk",
+          "constraints": "",
+          "timeKind": "arrive_by",
+          "destinationCountryIso": null,
+          "legs": [
+            {
+              "label": "Fictional next morning transfer",
+              "origin": {
+                "query": "Fictional Tokyo Station",
+                "resolution": {
+                  "source": "search",
+                  "point": {
+                    "lat": 35.6811,
+                    "lon": 139.7671
+                  },
+                  "placeId": "audit-station",
+                  "name": "Fictional Tokyo Station"
+                }
+              },
+              "destination": {
+                "query": "Fictional Tokyo Garden",
+                "resolution": {
+                  "source": "search",
+                  "point": {
+                    "lat": 35.6911,
+                    "lon": 139.7771
+                  },
+                  "placeId": "audit-garden",
+                  "name": "Fictional Tokyo Garden"
+                }
+              },
+              "departureLocal": "2026-10-04T09:00",
+              "timeZone": "Asia/Tokyo",
+              "mode": "walk",
+              "destinationCountryIso": "JP",
+              "timeKind": "depart_at",
+              "constraints": ""
+            }
+          ]
+        }
+      },
+      "fixture": "Fictional place results; tab persistence observed"
+    }
+  },
+  {
+    "mode": "mobile",
+    "name": "support-stale-focus-zoom",
+    "state": "FAIL",
+    "steps": [
+      "Open Plan, inject 3-minute-old fictional GPS fix",
+      "Try From here; open I feel unsafe",
+      "Double root text size; inspect header Emergency and horizontal overflow",
+      "Tab 15 times; open nested Emergency, Escape closes nested only",
+      "Browser Back closes support"
+    ],
+    "evidence": {
+      "immediate": {
+        "x": 64,
+        "y": 361.53125,
+        "width": 291,
+        "height": 96
+      },
+      "overflow": {
+        "innerWidth": 507,
+        "clientWidth": 390,
+        "scrollWidth": 507,
+        "dialogWidth": 507,
+        "dialogScrollWidth": 507
+      },
+      "oversized": [
+        {
+          "tag": "NAV",
+          "cls": "mira-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]",
+          "width": 507,
+          "text": "GoJourneysYou"
+        },
+        {
+          "tag": "UL",
+          "cls": "mx-auto grid h-[var(--tabbar-h)] max-w-xl grid-cols-3",
+          "width": 507,
+          "text": "GoJourneysYou"
+        },
+        {
+          "tag": "DIV",
+          "cls": "mira-toasts pointer-events-none fixed inset-x-0 bottom-[calc(var(--tabbar-space)+1rem)] z-50 flex flex-col items-center gap-2 px-4",
+          "width": 507,
+          "text": ""
+        },
+        {
+          "tag": "DIV",
+          "cls": "fixed inset-0 z-50 flex items-end justify-center bg-scrim animate-fade sm:items-center",
+          "width": 507,
+          "text": "Right now2:37 PMEmergency optionsHere's what you can do right now.Your last"
+        },
+        {
+          "tag": "DIV",
+          "cls": "max-h-[92dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-[var(--radius-lg)] bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[var(--radius-lg)]",
+          "width": 507,
+          "text": "Right now2:37 PMEmergency optionsHere's what you can do right now.Your last"
+        },
+        {
+          "tag": "DIV",
+          "cls": "flex items-start gap-3",
+          "width": 427,
+          "text": "Right now2:37 PMEmergency options"
+        },
+        {
+          "tag": "P",
+          "cls": "mt-3 text-[1.0625rem] font-medium leading-snug",
+          "width": 427,
+          "text": "Here's what you can do right now."
+        },
+        {
+          "tag": "DIV",
+          "cls": "mt-3",
+          "width": 427,
+          "text": "Your last position is too old to rank nearby places. Refresh location; call"
+        },
+        {
+          "tag": "P",
+          "cls": "rounded-[var(--radius-card)] bg-sunken p-4 text-sm text-ink-muted",
+          "width": 427,
+          "text": "Your last position is too old to rank nearby places. Refresh location; call"
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "mt-3 flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-line p-4 text-left",
+          "width": 427,
+          "text": "Share where I am liveReview named recipients first. Nobody is contacted by "
+        },
+        {
+          "tag": "DIV",
+          "cls": "mt-3 grid grid-cols-2 gap-3",
+          "width": 427,
+          "text": "Call someoneEmergency options"
+        },
+        {
+          "tag": "P",
+          "cls": "mt-2 text-xs text-ink-muted",
+          "width": 427,
+          "text": "MIRA couldn't determine which country you're in, so it can't show a local e"
+        },
+        {
+          "tag": "DIV",
+          "cls": "mt-4 grid gap-2 text-sm",
+          "width": 427,
+          "text": "Talk to MiraI'm okay now"
+        },
+        {
+          "tag": "A",
+          "cls": "inline-flex min-h-11 items-center gap-1.5 self-start rounded-full px-1 font-semibold text-accent-strong",
+          "width": 427,
+          "text": "Talk to Mira"
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "min-h-12 w-full rounded-[var(--radius-button)] border border-line-strong bg-surface font-semibold text-ink hover:bg-sunken",
+          "width": 427,
+          "text": "I'm okay now"
+        },
+        {
+          "tag": "P",
+          "cls": "mt-3 text-xs leading-relaxed text-ink-subtle",
+          "width": 427,
+          "text": "Emergency opens your phone's dialler: Mira doesn't call or alert anyone for"
+        }
+      ],
+      "focus": [
+        {
+          "name": "Emergency options",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Share where I am liveReview named recipients first. Nobody is contacted by opening this action.",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Call someone",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Emergency options",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Talk to Mira",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "I'm okay now",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Emergency options",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Share where I am liveReview named recipients first. Nobody is contacted by opening this action.",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Call someone",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Emergency options",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Talk to Mira",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "I'm okay now",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Emergency options",
+          "dialog": "unsafe-h"
+        }
+      ],
+      "text": "Skip to content\nmira\n\u2197\nNew plan\n\nYOUR MOVEMENT, CONNECTED\n\nLet\u2019s make it work.\n\nDinner at 9. I\u2019ll leave around midnight and head home.\n\n1\nPlan\n2\nOptions\n3\nReturn & legs\n\nReady to compare the available options.\n\nWhat do you want to do?\nFrom\nFind\n\nSelected: Fictional Arrival Terminal\n\nUse named origin\nFrom here\n\nA fresh, accurate location wasn\u2019t available. Enter a named origin instead.\n\nYou mentioned 9 (AM/PM unspecified). Choose the date and time zone below; Mira has not assumed either.\n\nReturn to my starting point (loop)\nTo\nFind\n\nSelected: Fictional Lantern Hotel\n\nTiming\nDepart at\nArrive by\nPlanned local time\nTime zone (IANA)\nMode\nWalk\nRide / car\nTransit\nRequirements & accessibility\nCurrent plan\n\nDinner at 9. I\u2019ll leave around midnight and head home. \u00b7 Fictional Arrival Terminal \u2192 Fictional Lantern Hotel \u00b7 2026-10-03T23:30 (Europe/London) \u00b7 Walk\n\nPlaces resolved. Compare the available routes, timing and explicit unknowns.\n\nCompare my options\nSave plan\nClear plan\nI feel unsafe\nEmergency options\n\nTemporary in this tab \u00b7 expires two hours after the last edit \u00b7 saving and sharing are your choice.\n\nGo\nJourneys\nYou",
+      "fixture": "3-minute-old fictional GPS; 200% root text is an emulated accessibility check, not physical phone evidence",
+      "issues": [
+        "200% text causes horizontal document/support overflow"
+      ]
+    }
+  },
+  {
+    "mode": "mobile",
+    "name": "support-before-network",
+    "state": "PASS",
+    "steps": [
+      "Clear plan; type I feel uncomfortable on Go",
+      "Abort all API requests",
+      "Submit; support must open without intent/model request",
+      "Open unknown-country Emergency"
+    ],
+    "evidence": {
+      "elapsedMs": 79,
+      "text": "Emergency call options\n\nMIRA couldn't determine which country you're in, so it can't show a local emergency number. If you know the local number, use your phone's dialler.\n\nClose",
+      "fixture": "API disconnection simulation; no dialing or contact actions"
+    }
+  },
+  {
+    "mode": "mobile",
+    "name": "console-and-requests",
+    "state": "OBSERVED",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+      "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+      "Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+      "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+    ],
+    "apiRequests": [
+      {
+        "path": "/api/mira/intent",
+        "method": "POST",
+        "body": "{\"message\":\"Dinner at 9. I\u2019ll leave around midnight and head home.\"}"
+      },
+      {
+        "path": "/api/geo/search",
+        "method": "POST",
+        "body": "{\"q\":\"Airport\",\"near\":null,\"deep\":true,\"source\":\"osm\"}"
+      },
+      {
+        "path": "/api/geo/search",
+        "method": "POST",
+        "body": "{\"q\":\"No matching fictional place\",\"near\":null,\"deep\":true,\"source\":\"osm\"}"
+      },
+      {
+        "path": "/api/geo/search",
+        "method": "POST",
+        "body": "{\"q\":\"Hotel\",\"near\":null,\"deep\":true,\"source\":\"osm\"}"
+      },
+      {
+        "path": "/api/geo/search",
+        "method": "POST",
+        "body": "{\"q\":\"Hotel\",\"near\":null,\"deep\":true,\"source\":\"osm\"}"
+      },
+      {
+        "path": "/api/plan/options",
+        "method": "POST",
+        "body": "{\"intent\":{\"version\":2,\"activity\":\"Dinner at 9. I\u2019ll leave around midnight and head home.\",\"origin\":{\"kind\":\"named\",\"query\":\"Fictional Arrival Terminal\",\"resolution\":{\"source\":\"search\",\"point\":{\"lat\":51.4701,\"lon\":-0.4501},\"placeId\":\"audit-airport\"}},\"destination\":{\"kind\":\"named\",\"query\":\"Fictional Lantern Hotel\",\"resolution\":{\"source\":\"search\",\"point\":{\"lat\":51.4781,\"lon\":-0.4301},\"placeId\":\"audit-hotel\"}},\"loop\":false,\"departure\":{\"local\":\"2026-11-01T01:30\",\"timeZone\":\"America/New_York\"},\"mode\":\"walk\",\"constraints\":[],\"timeKind\":\"arrive_by\"}}"
+      },
+      {
+        "path": "/api/plan/options",
+        "method": "POST",
+        "body": "{\"intent\":{\"version\":2,\"activity\":\"Dinner at 9. I\u2019ll leave around midnight and head home.\",\"origin\":{\"kind\":\"named\",\"query\":\"Fictional Arrival Terminal\",\"resolution\":{\"source\":\"search\",\"point\":{\"lat\":51.4701,\"lon\":-0.4501},\"placeId\":\"audit-airport\"}},\"destination\":{\"kind\":\"named\",\"query\":\"Fictional Lantern Hotel\",\"resolution\":{\"source\":\"search\",\"point\":{\"lat\":51.4781,\"lon\":-0.4301},\"placeId\":\"audit-hotel\"}},\"loop\":false,\"departure\":{\"local\":\"2026-10-03T23:30\",\"timeZone\":\"Europe/London\"},\"mode\":\"walk\",\"constraints\":[],\"timeKind\":\"arrive_by\"}}"
+      },
+      {
+        "path": "/api/plan/options",
+        "method": "POST",
+        "body": "{\"intent\":{\"version\":2,\"activity\":\"Dinner at 9. I\u2019ll leave around midnight and head home.\",\"origin\":{\"kind\":\"named\",\"query\":\"Fictional Arrival Terminal\",\"resolution\":{\"source\":\"search\",\"point\":{\"lat\":51.4701,\"lon\":-0.4501},\"placeId\":\"audit-airport\"}},\"destination\":{\"kind\":\"named\",\"query\":\"Fictional Lantern Hotel\",\"resolution\":{\"source\":\"search\",\"point\":{\"lat\":51.4781,\"lon\":-0.4301},\"placeId\":\"audit-hotel\"}},\"loop\":false,\"departure\":{\"local\":\"2026-10-03T23:30\",\"timeZone\":\"Europe/London\"},\"mode\":\"walk\",\"constraints\":[],\"timeKind\":\"arrive_by\"}}"
+      },
+      {
+        "path": "/api/geo/search",
+        "method": "POST",
+        "body": "{\"q\":\"Station\",\"near\":null,\"deep\":true,\"source\":\"osm\"}"
+      },
+      {
+        "path": "/api/geo/search",
+        "method": "POST",
+        "body": "{\"q\":\"Garden\",\"near\":null,\"deep\":true,\"source\":\"osm\"}"
+      },
+      {
+        "path": "/api/plan/country",
+        "method": "POST",
+        "body": "{\"iso\":\"JP\"}"
+      },
+      {
+        "path": "/api/me",
+        "method": "GET",
+        "body": null
+      },
+      {
+        "path": "/api/me/contacts",
+        "method": "GET",
+        "body": null
+      },
+      {
+        "path": "/api/trips/current",
+        "method": "GET",
+        "body": null
+      },
+      {
+        "path": "/api/me",
+        "method": "GET",
+        "body": null
+      },
+      {
+        "path": "/api/me/contacts",
+        "method": "GET",
+        "body": null
+      },
+      {
+        "path": "/api/trips/current",
+        "method": "GET",
+        "body": null
+      }
+    ],
+    "geoCalls": 0
+  },
+  {
+    "mode": "mobile",
+    "name": "offline-reload",
+    "state": "OBSERVED",
+    "text": "You're offline\n\nMIRA needs a connection to show the map and share trips.\n\nOn a trip? Live updates are unavailable. If you explicitly shared a journey, recipients may see an older position while its link remains valid. Delivery and check-in alerts are not guaranteed; contact someone directly if needed.\n\nIn danger? MIRA cannot determine your current country on this offline page. Use your phone\u2019s emergency call screen or dial a local emergency number you know. Calls require an available phone service; MIRA does not call or dispatch help.\n\nTry again",
+    "universal112": false,
+    "monitorPromise": false,
+    "evidence": "Actual local service-worker fallback; no provider fixture and no phone-network evidence"
+  },
+  {
+    "mode": "desktop",
+    "name": "signature-arrival-return",
+    "state": "PASS",
+    "steps": [
+      "Open /",
+      "Submit Dinner at 9. I\u2019ll leave around midnight and head home.",
+      "Inspect arrival hint, empty places/date/zone",
+      "Open Return & legs"
+    ],
+    "evidence": {
+      "text": "Skip to content\nmira\n\u2197\nNew plan\n\nYOUR MOVEMENT, CONNECTED\n\nLet\u2019s make it work.\n\nDinner at 9. I\u2019ll leave around midnight and head home.\n\n1\nPlan\n2\nOptions\n3\nReturn & legs\n\nYou mentioned a return around midnight. Confirm its date and local time below.\n\nYour return and next legs\n\nKeep up to three movements together. Review and confirm each journey separately.\n\nLeg 1 \u00b7 Dinner at 9. I\u2019ll leave around midnight and head home.\n\nOrigin needed \u2192 Destination needed\n\nConfirm the main leg\u2019s local time and zone in Plan.\n\nDestination facts for leg 1\n\nReturn requested: midnight. This is separate from the event\u2019s arrival time. Confirm the return date and local time; neither has been guessed.\n\nAdd travel leg\n\nTemporary in this tab. Destination facts do not set your current Emergency location. No booking, contact message or journey starts from adding a leg.\n\nI feel unsafe\nEmergency options\n\nTemporary in this tab \u00b7 expires two hours after the last edit \u00b7 saving and sharing are your choice.\n\nMAKE THE NEXT MOVE CLEAR\n\nYour places, timing and choices. Together.\n\nChoose the named places you mean. The map appears here after they resolve; planning works without location permission.\n\nGo\nJourneys\nYou",
+      "fixture": "Only intent endpoint response fixture; deterministic immediate UI draft also inspected"
+    }
+  },
+  {
+    "mode": "desktop",
+    "name": "named-ambiguity-and-denied-location",
+    "state": "PASS",
+    "steps": [
+      "Open Plan step",
+      "Enter fictional airport origin; Find returns two candidates",
+      "Choose explicit first candidate",
+      "Attempt From here with denied GPS",
+      "Check named origin remains",
+      "Select fictional hotel destination; choose London local late arrival"
+    ],
+    "evidence": {
+      "origin": "Fictional Arrival Terminal",
+      "geoCalls": 1,
+      "text": "Skip to content\nmira\n\u2197\nNew plan\n\nYOUR MOVEMENT, CONNECTED\n\nLet\u2019s make it work.\n\nDinner at 9. I\u2019ll leave around midnight and head home.\n\n1\nPlan\n2\nOptions\n3\nReturn & legs\n\nReady to compare the available options.\n\nWhat do you want to do?\nFrom\nFind\n\nSelected: Fictional Arrival Terminal\n\nUse named origin\nFrom here\n\nA fresh, accurate location wasn\u2019t available. Enter a named origin instead.\n\nYou mentioned 9 (AM/PM unspecified). Choose the date and time zone below; Mira has not assumed either.\n\nReturn to my starting point (loop)\nTo\nFind\n\nSelected: Fictional Lantern Hotel\n\nTiming\nDepart at\nArrive by\nPlanned local time\nTime zone (IANA)\nMode\nWalk\nRide / car\nTransit\nRequirements & accessibility\nCurrent plan\n\nDinner at 9. I\u2019ll leave around midnight and head home. \u00b7 Fictional Arrival Terminal \u2192 Fictional Lantern Hotel \u00b7 2026-10-03T23:30 (Europe/London) \u00b7 Walk\n\nPlaces resolved. Compare the available routes, timing and explicit unknowns.\n\nCompare my options\nSave plan\nClear plan\nI feel unsafe\nEmergency options\n\nTemporary in this tab \u00b7 expires two hours after the last edit \u00b7 saving and sharing are your choice.\n\nYOUR PLAN, ON THE MAP\n\nNamed places\n\nFictional Arrival Terminal \u2192 Fictional Lantern Hotel\n\nRoute not checked. No current position is shown. This map does not establish access, lighting or operating service.\n\nGo\nJourneys\nYou",
+      "fixture": "Fictional search candidates, denied browser geolocation; device zone Asia/Kolkata"
+    }
+  },
+  {
+    "mode": "desktop",
+    "name": "dst-and-failed-route",
+    "state": "PASS",
+    "steps": [
+      "Set 2026-11-01 01:30 America/New_York",
+      "Compare options against actual local API validation",
+      "Return to Plan and restore London late arrival",
+      "Simulate failed route response and retry"
+    ],
+    "evidence": {
+      "ambiguous": "YOUR OPTIONS\n\nChoose your way there\n\nArrive by 2026-11-01 01:30 \u00b7 America/New_York\n\nThis local time is ambiguous or unavailable in the chosen time zone. Choose another time before comparing.\n\nYou can keep the named plan, confirm the route directly and start a manual check-in journey.\n\nDaylight at estimated departure\n\nNo eligible planned-time service source. Lighting, activity and access are checked separately.\n\nSources, freshness and limits",
+      "failed": "YOUR OPTIONS\n\nChoose your way there\n\nArrive by 2026-10-03 23:30 \u00b7 Europe/London\n\nRoute check failed: Something went wrong on our side. Please try again.. Calculated daylight: dark (approximate). Your plan stays here.\n\nRetry mapped check",
+      "fixture": "DST actual local validation; mapped route success/failure are explicit deterministic fixtures"
+    }
+  },
+  {
+    "mode": "desktop",
+    "name": "independent-leg-retention",
+    "state": "PASS",
+    "steps": [
+      "Open Return & legs",
+      "Add travel leg",
+      "Resolve fictional Tokyo origin/destination",
+      "Set independent 2026-10-04 09:00 Asia/Tokyo departure",
+      "Finish editor, reload; inspect both legs"
+    ],
+    "evidence": {
+      "text": "Your return and next legs\n\nKeep up to three movements together. Review and confirm each journey separately.\n\nLeg 1 \u00b7 Dinner at 9. I\u2019ll leave around midnight and head home.\n\nFictional Arrival Terminal \u2192 Fictional Lantern Hotel\n\nArrive by 2026-10-03 23:30 (Europe/London)\n\nDestination facts for leg 1\n\nReturn requested: midnight. This is separate from the event\u2019s arrival time. Confirm the return date and local time; neither has been guessed.\n\nLeg 2 \u00b7 Fictional next morning transfer\n\nFictional Tokyo Station \u2192 Fictional Tokyo Garden\n\nPlaces and timing complete \u00b7 2026-10-04 09:00 (Asia/Tokyo) \u00b7 Walk. Route review is separate.\n\nEdit leg 2\nReview leg 2 options\n\nReview keeps the previous main leg and choices here. It does not start, save or share a journey.\n\nAdd travel leg\nAdd return leg\n\nTemporary in this tab. Destination facts do not set your current Emergency location. No booking, contact message or journey starts from adding a leg.",
+      "storage": {
+        "savedAt": 1791018438867,
+        "draft": {
+          "version": 2,
+          "touched": true,
+          "activity": "Dinner at 9. I\u2019ll leave around midnight and head home.",
+          "timeHint": "9 (AM/PM unspecified)",
+          "returnTimeHint": "midnight",
+          "journeyMode": "manual",
+          "recipientIds": [],
+          "origin": {
+            "kind": "named",
+            "query": "Fictional Arrival Terminal",
+            "resolution": {
+              "source": "search",
+              "point": {
+                "lat": 51.4701,
+                "lon": -0.4501
+              },
+              "placeId": "audit-airport",
+              "name": "Fictional Arrival Terminal"
+            }
+          },
+          "destination": {
+            "query": "Fictional Lantern Hotel",
+            "resolution": {
+              "source": "search",
+              "point": {
+                "lat": 51.4781,
+                "lon": -0.4301
+              },
+              "placeId": "audit-hotel",
+              "name": "Fictional Lantern Hotel"
+            }
+          },
+          "loop": false,
+          "departureLocal": "2026-10-03T23:30",
+          "timeZone": "Europe/London",
+          "mode": "walk",
+          "constraints": "",
+          "timeKind": "arrive_by",
+          "destinationCountryIso": null,
+          "legs": [
+            {
+              "label": "Fictional next morning transfer",
+              "origin": {
+                "query": "Fictional Tokyo Station",
+                "resolution": {
+                  "source": "search",
+                  "point": {
+                    "lat": 35.6811,
+                    "lon": 139.7671
+                  },
+                  "placeId": "audit-station",
+                  "name": "Fictional Tokyo Station"
+                }
+              },
+              "destination": {
+                "query": "Fictional Tokyo Garden",
+                "resolution": {
+                  "source": "search",
+                  "point": {
+                    "lat": 35.6911,
+                    "lon": 139.7771
+                  },
+                  "placeId": "audit-garden",
+                  "name": "Fictional Tokyo Garden"
+                }
+              },
+              "departureLocal": "2026-10-04T09:00",
+              "timeZone": "Asia/Tokyo",
+              "mode": "walk",
+              "destinationCountryIso": "JP",
+              "timeKind": "depart_at",
+              "constraints": ""
+            }
+          ]
+        }
+      },
+      "fixture": "Fictional place results; tab persistence observed"
+    }
+  },
+  {
+    "mode": "desktop",
+    "name": "support-stale-focus-zoom",
+    "state": "PASS",
+    "steps": [
+      "Open Plan, inject 3-minute-old fictional GPS fix",
+      "Try From here; open I feel unsafe",
+      "Double root text size; inspect header Emergency and horizontal overflow",
+      "Tab 15 times; open nested Emergency, Escape closes nested only",
+      "Browser Back closes support"
+    ],
+    "evidence": {
+      "immediate": {
+        "x": 577.46875,
+        "y": 76,
+        "width": 358.53125,
+        "height": 96
+      },
+      "overflow": {
+        "innerWidth": 1280,
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "dialogWidth": 1280,
+        "dialogScrollWidth": 1280
+      },
+      "oversized": [],
+      "focus": [
+        {
+          "name": "Emergency options",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Share where I am liveReview named recipients first. Nobody is contacted by opening this action.",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Call someone",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Emergency options",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Talk to Mira",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "I'm okay now",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Emergency options",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Share where I am liveReview named recipients first. Nobody is contacted by opening this action.",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Call someone",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Emergency options",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Talk to Mira",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "I'm okay now",
+          "dialog": "unsafe-h"
+        },
+        {
+          "name": "Emergency options",
+          "dialog": "unsafe-h"
+        }
+      ],
+      "text": "Skip to content\nmira\n\u2197\nNew plan\n\nYOUR MOVEMENT, CONNECTED\n\nLet\u2019s make it work.\n\nDinner at 9. I\u2019ll leave around midnight and head home.\n\n1\nPlan\n2\nOptions\n3\nReturn & legs\n\nReady to compare the available options.\n\nWhat do you want to do?\nFrom\nFind\n\nSelected: Fictional Arrival Terminal\n\nUse named origin\nFrom here\n\nA fresh, accurate location wasn\u2019t available. Enter a named origin instead.\n\nYou mentioned 9 (AM/PM unspecified). Choose the date and time zone below; Mira has not assumed either.\n\nReturn to my starting point (loop)\nTo\nFind\n\nSelected: Fictional Lantern Hotel\n\nTiming\nDepart at\nArrive by\nPlanned local time\nTime zone (IANA)\nMode\nWalk\nRide / car\nTransit\nRequirements & accessibility\nCurrent plan\n\nDinner at 9. I\u2019ll leave around midnight and head home. \u00b7 Fictional Arrival Terminal \u2192 Fictional Lantern Hotel \u00b7 2026-10-03T23:30 (Europe/London) \u00b7 Walk\n\nPlaces resolved. Compare the available routes, timing and explicit unknowns.\n\nCompare my options\nSave plan\nClear plan\nI feel unsafe\nEmergency options\n\nTemporary in this tab \u00b7 expires two hours after the last edit \u00b7 saving and sharing are your choice.\n\nYOUR PLAN, ON THE MAP\n\nNamed places\n\nFictional Arrival Terminal \u2192 Fictional Lantern Hotel\n\nFictional Arrival Terminal\nOpenFreeMap \u00a9 OpenMapTiles Data from OpenStreetMap\n\nRoute not checked. No current position is shown. This map does not establish access, lighting or operating service.\n\nGo\nJourneys\nYou",
+      "fixture": "3-minute-old fictional GPS; 200% root text is an emulated accessibility check, not physical phone evidence"
+    }
+  },
+  {
+    "mode": "desktop",
+    "name": "support-before-network",
+    "state": "PASS",
+    "steps": [
+      "Clear plan; type I feel uncomfortable on Go",
+      "Abort all API requests",
+      "Submit; support must open without intent/model request",
+      "Open unknown-country Emergency"
+    ],
+    "evidence": {
+      "elapsedMs": 115,
+      "text": "Emergency call options\n\nMIRA couldn't determine which country you're in, so it can't show a local emergency number. If you know the local number, use your phone's dialler.\n\nClose",
+      "fixture": "API disconnection simulation; no dialing or contact actions"
+    }
+  },
+  {
+    "mode": "desktop",
+    "name": "console-and-requests",
+    "state": "OBSERVED",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+      "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+      "Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+      "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+    ],
+    "apiRequests": [
+      {
+        "path": "/api/mira/intent",
+        "method": "POST",
+        "body": "{\"message\":\"Dinner at 9. I\u2019ll leave around midnight and head home.\"}"
+      },
+      {
+        "path": "/api/geo/search",
+        "method": "POST",
+        "body": "{\"q\":\"Airport\",\"near\":null,\"deep\":true,\"source\":\"osm\"}"
+      },
+      {
+        "path": "/api/geo/search",
+        "method": "POST",
+        "body": "{\"q\":\"No matching fictional place\",\"near\":null,\"deep\":true,\"source\":\"osm\"}"
+      },
+      {
+        "path": "/api/geo/search",
+        "method": "POST",
+        "body": "{\"q\":\"Hotel\",\"near\":null,\"deep\":true,\"source\":\"osm\"}"
+      },
+      {
+        "path": "/api/geo/search",
+        "method": "POST",
+        "body": "{\"q\":\"Hotel\",\"near\":null,\"deep\":true,\"source\":\"osm\"}"
+      },
+      {
+        "path": "/api/geo/tiles",
+        "method": "GET",
+        "body": null
+      },
+      {
+        "path": "/api/geo/tiles",
+        "method": "GET",
+        "body": null
+      },
+      {
+        "path": "/api/plan/options",
+        "method": "POST",
+        "body": "{\"intent\":{\"version\":2,\"activity\":\"Dinner at 9. I\u2019ll leave around midnight and head home.\",\"origin\":{\"kind\":\"named\",\"query\":\"Fictional Arrival Terminal\",\"resolution\":{\"source\":\"search\",\"point\":{\"lat\":51.4701,\"lon\":-0.4501},\"placeId\":\"audit-airport\"}},\"destination\":{\"kind\":\"named\",\"query\":\"Fictional Lantern Hotel\",\"resolution\":{\"source\":\"search\",\"point\":{\"lat\":51.4781,\"lon\":-0.4301},\"placeId\":\"audit-hotel\"}},\"loop\":false,\"departure\":{\"local\":\"2026-11-01T01:30\",\"timeZone\":\"America/New_York\"},\"mode\":\"walk\",\"constraints\":[],\"timeKind\":\"arrive_by\"}}"
+      },
+      {
+        "path": "/api/plan/options",
+        "method": "POST",
+        "body": "{\"intent\":{\"version\":2,\"activity\":\"Dinner at 9. I\u2019ll leave around midnight and head home.\",\"origin\":{\"kind\":\"named\",\"query\":\"Fictional Arrival Terminal\",\"resolution\":{\"source\":\"search\",\"point\":{\"lat\":51.4701,\"lon\":-0.4501},\"placeId\":\"audit-airport\"}},\"destination\":{\"kind\":\"named\",\"query\":\"Fictional Lantern Hotel\",\"resolution\":{\"source\":\"search\",\"point\":{\"lat\":51.4781,\"lon\":-0.4301},\"placeId\":\"audit-hotel\"}},\"loop\":false,\"departure\":{\"local\":\"2026-10-03T23:30\",\"timeZone\":\"Europe/London\"},\"mode\":\"walk\",\"constraints\":[],\"timeKind\":\"arrive_by\"}}"
+      },
+      {
+        "path": "/api/plan/options",
+        "method": "POST",
+        "body": "{\"intent\":{\"version\":2,\"activity\":\"Dinner at 9. I\u2019ll leave around midnight and head home.\",\"origin\":{\"kind\":\"named\",\"query\":\"Fictional Arrival Terminal\",\"resolution\":{\"source\":\"search\",\"point\":{\"lat\":51.4701,\"lon\":-0.4501},\"placeId\":\"audit-airport\"}},\"destination\":{\"kind\":\"named\",\"query\":\"Fictional Lantern Hotel\",\"resolution\":{\"source\":\"search\",\"point\":{\"lat\":51.4781,\"lon\":-0.4301},\"placeId\":\"audit-hotel\"}},\"loop\":false,\"departure\":{\"local\":\"2026-10-03T23:30\",\"timeZone\":\"Europe/London\"},\"mode\":\"walk\",\"constraints\":[],\"timeKind\":\"arrive_by\"}}"
+      },
+      {
+        "path": "/api/geo/search",
+        "method": "POST",
+        "body": "{\"q\":\"Station\",\"near\":null,\"deep\":true,\"source\":\"osm\"}"
+      },
+      {
+        "path": "/api/geo/search",
+        "method": "POST",
+        "body": "{\"q\":\"Garden\",\"near\":null,\"deep\":true,\"source\":\"osm\"}"
+      },
+      {
+        "path": "/api/plan/country",
+        "method": "POST",
+        "body": "{\"iso\":\"JP\"}"
+      },
+      {
+        "path": "/api/geo/tiles",
+        "method": "GET",
+        "body": null
+      },
+      {
+        "path": "/api/geo/tiles",
+        "method": "GET",
+        "body": null
+      },
+      {
+        "path": "/api/me",
+        "method": "GET",
+        "body": null
+      },
+      {
+        "path": "/api/me/contacts",
+        "method": "GET",
+        "body": null
+      },
+      {
+        "path": "/api/trips/current",
+        "method": "GET",
+        "body": null
+      },
+      {
+        "path": "/api/geo/tiles",
+        "method": "GET",
+        "body": null
+      },
+      {
+        "path": "/api/me",
+        "method": "GET",
+        "body": null
+      },
+      {
+        "path": "/api/me/contacts",
+        "method": "GET",
+        "body": null
+      },
+      {
+        "path": "/api/trips/current",
+        "method": "GET",
+        "body": null
+      }
+    ],
+    "geoCalls": 0
+  },
+  {
+    "mode": "desktop",
+    "name": "offline-reload",
+    "state": "OBSERVED",
+    "text": "You're offline\n\nMIRA needs a connection to show the map and share trips.\n\nOn a trip? Live updates are unavailable. If you explicitly shared a journey, recipients may see an older position while its link remains valid. Delivery and check-in alerts are not guaranteed; contact someone directly if needed.\n\nIn danger? MIRA cannot determine your current country on this offline page. Use your phone\u2019s emergency call screen or dial a local emergency number you know. Calls require an available phone service; MIRA does not call or dispatch help.\n\nTry again",
+    "universal112": false,
+    "monitorPromise": false,
+    "evidence": "Actual local service-worker fallback; no provider fixture and no phone-network evidence"
+  }
+]

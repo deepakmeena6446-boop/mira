@@ -2,9 +2,10 @@
 
 import { iconSvg } from "@/components/ui/icon-paths";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Map as MlMap, GeoJSONSource, MapMouseEvent, MapTouchEvent, Marker } from "maplibre-gl";
 import { useDaypart } from "@/lib/daypart-store";
+import { googleAttributionSession, type ViewportAttribution } from "./google-viewport-attribution";
 
 export interface LngLat {
   lat: number;
@@ -139,6 +140,15 @@ export function WorldMap({
   const night = useDaypart() === "night";
   const styleUrl = (night && tiles.nightStyleUrl) || tiles.styleUrl;
   const rasterUrl = (night && tiles.nightUrl) || tiles.url;
+  const google = tiles.provider === "google";
+  const [credit, setCredit] = useState<ViewportAttribution & { tileUrl: string }>({ status: "pending", tileUrl: "" });
+  const credited = google && credit.tileUrl === rasterUrl && credit.status === "ready";
+  const retryCreditRef = useRef<(() => void) | null>(null);
+  // Commit the complete returned credit and the matching map together. Camera invalidation hides
+  // immediately, even before React renders; a stale fetch never gets to reveal newer map content.
+  useLayoutEffect(() => {
+    if (ref.current) ref.current.style.visibility = !google || credited ? "visible" : "hidden";
+  }, [google, credited, credit]);
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
   const clickRef = useRef(onMapClick);
@@ -161,6 +171,7 @@ export function WorldMap({
   useEffect(() => {
     let cancelled = false;
     let ro: ResizeObserver | undefined;
+    let attribution: ReturnType<typeof googleAttributionSession> | undefined;
     (async () => {
       try {
         const ml = await import("maplibre-gl");
@@ -171,7 +182,7 @@ export function WorldMap({
           container: ref.current,
           style: styleUrl ?? {
             version: 8,
-            sources: { base: { type: "raster", tiles: [rasterUrl], tileSize: 256, maxzoom: 22, attribution: tiles.attribution } },
+            sources: { base: { type: "raster", tiles: [rasterUrl], tileSize: 256, maxzoom: 22, attribution: google ? "" : tiles.attribution } },
             layers: [{ id: "base", type: "raster", source: "base" }],
           },
           // Until she's located: the whole world, not any one country's capital (flies to her once known).
@@ -223,7 +234,28 @@ export function WorldMap({
           fire(e.lngLat.lat, e.lngLat.lng);
         });
         let loaded = false;
-        map.on("error", () => !loaded && readyRef.current?.(false));
+        if (google) {
+          attribution = googleAttributionSession(rasterUrl, (state) => {
+            if (cancelled) return;
+            if (state.status !== "ready" && ref.current) ref.current.style.visibility = "hidden";
+            setCredit({ ...state, tileUrl: rasterUrl });
+            readyRef.current?.(loaded && state.status === "ready");
+          });
+          const refresh = () => {
+            if (!loaded || cancelled) return;
+            const bounds = map.getBounds();
+            void attribution!.refresh({ north: bounds.getNorth(), south: bounds.getSouth(), east: bounds.getEast(), west: bounds.getWest(), zoom: map.getZoom() });
+          };
+          retryCreditRef.current = refresh;
+          map.on("movestart", () => attribution?.invalidate());
+          map.on("moveend", refresh);
+        }
+        map.on("error", () => {
+          if (!loaded) {
+            readyRef.current?.(false);
+            if (google) setCredit({ status: "unavailable", tileUrl: rasterUrl });
+          }
+        });
         map.on("moveend", () => declutter(map, markersRef.current));
         ro = new ResizeObserver(() => map.resize());
         ro.observe(ref.current);
@@ -256,16 +288,20 @@ export function WorldMap({
           map.addLayer({ id: "me-halo", type: "circle", source: "points", filter: ["==", ["get", "kind"], "me"], paint: { "circle-radius": 22, "circle-color": meColor, "circle-opacity": 0.22 } });
           map.addLayer({ id: "me", type: "circle", source: "points", filter: ["==", ["get", "kind"], "me"], paint: { "circle-radius": 8, "circle-color": meColor, "circle-stroke-color": ring, "circle-stroke-width": 3 } });
           map.addLayer({ id: "dest", type: "circle", source: "points", filter: ["==", ["get", "kind"], "dest"], paint: { "circle-radius": 9, "circle-color": routeColor, "circle-stroke-color": ring, "circle-stroke-width": 4 } });
-          readyRef.current?.(true);
+          if (google) retryCreditRef.current?.();
+          else readyRef.current?.(true);
           setReady(true);
         });
       } catch {
         readyRef.current?.(false);
+        if (google && !cancelled) setCredit({ status: "unavailable", tileUrl: rasterUrl });
       }
     })();
     const markers = markersRef.current;
     return () => {
       cancelled = true;
+      attribution?.dispose();
+      retryCreditRef.current = null;
       setReady(false); // a rebuilt map (e.g. night style) must re-add overlays and pins
       ro?.disconnect();
       markers.forEach((m) => m.remove());
@@ -274,7 +310,7 @@ export function WorldMap({
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rasterUrl, styleUrl]);
+  }, [rasterUrl, styleUrl, google]);
 
   // Data layers.
   useEffect(() => {
@@ -428,11 +464,16 @@ export function WorldMap({
   return (
     <div className={className ?? "absolute inset-0"}>
       {/* A labelled region (not role="img"), so the place pins inside stay reachable by screen readers. */}
-      <div ref={ref} role="region" aria-label={label} className="h-full w-full bg-sunken" />
+      <div ref={ref} role="region" aria-label={label} aria-hidden={google && !credited ? true : undefined} className="h-full w-full bg-sunken" style={{ visibility: google && !credited ? "hidden" : "visible" }} />
+      {google && !credited ? (
+        <div role="status" className="absolute left-3 right-3 z-10 rounded-xl bg-surface p-3 text-sm" style={{ top: padding.top + 10 }}>
+          {credit.tileUrl === rasterUrl && credit.status === "unavailable" ? <><p>Map unavailable. You can still review your route and places below.</p>{ready ? <button type="button" className="mt-2 underline" onClick={() => retryCreditRef.current?.()}>Retry map</button> : null}</> : "Loading map…"}
+        </div>
+      ) : null}
       {/* Google Map Tiles terms: the official Google Maps logo, unmodified, 16–19 px tall with ≥ 10 px
           clear space, visible on the map (the sheet covers the bottom). Outlined variants are the ones
           for busy backgrounds: light outline on the day map, dark outline on the night map. */}
-      {tiles.provider === "google" ? (
+      {credited ? (
         // eslint-disable-next-line @next/next/no-img-element -- a fixed-size vendor mark; next/image adds nothing here
         <img
           src={night ? "/attribution/google-maps-dark-outline.svg" : "/attribution/google-maps-light-outline.svg"}
@@ -444,6 +485,7 @@ export function WorldMap({
           style={{ top: padding.top + 10 }}
         />
       ) : null}
+      {credited ? <p className="pointer-events-none absolute left-3 right-3 z-10 whitespace-pre-wrap break-words rounded bg-surface px-2 py-1 text-[11px] leading-snug text-ink" style={{ top: padding.top + 38 }}>{credit.copyright}</p> : null}
     </div>
   );
 }

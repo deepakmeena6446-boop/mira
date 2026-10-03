@@ -12,13 +12,13 @@ const deva = Noto_Sans_Devanagari({ subsets: ["devanagari"], variable: "--font-d
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_BASE_URL ?? "http://localhost:3100"),
-  title: { default: "Mira — together, safer", template: "%s · Mira" },
-  description: "Know a place, move with support, and help the next person with trusted local safety information.",
+  title: { default: "Mira — your movement companion", template: "%s · Mira" },
+  description: "Compare routes and timing, plan your journey, and get support along the way.",
   applicationName: "Mira",
   appleWebApp: { capable: true, title: "Mira", statusBarStyle: "default" },
   formatDetection: { telephone: false, address: false, email: false },
   icons: { icon: "/icon.svg", apple: "/apple-icon.png" },
-  openGraph: { title: "Mira — together, safer", description: "Know a place, move with support, and help the next person with trusted local safety information.", siteName: "Mira", type: "website" },
+  openGraph: { title: "Mira — your movement companion", description: "Compare routes and timing, plan your journey, and get support along the way.", siteName: "Mira", type: "website" },
 };
 
 export const viewport: Viewport = {

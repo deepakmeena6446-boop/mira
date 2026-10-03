@@ -1,0 +1,177 @@
+{
+  "recordedAt": "2026-10-03T12:11:45.339Z",
+  "buildId": "D8JbGmC-cOV5rEFvrqwN9",
+  "readiness": {
+    "httpStatus": 200,
+    "body": {
+      "status": "ready"
+    }
+  },
+  "method": "Read-only isolated Chromium contexts, local clock fixtures at noon and 04:45 in Asia/Kolkata; explicit prior GPS opt-out fixture mira.location.skip=1; no GPS or account permissions, service workers blocked, external requests blocked.",
+  "limitations": [
+    "Browser viewport emulation, not physical-phone or physical keyboard/IME evidence.",
+    "First-screen screenshots do not establish live provider coverage, route conditions, operating services, external-user comprehension or safety outcomes."
+  ],
+  "cases": [
+    {
+      "name": "mobile-day",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "clock": "2026-10-03T12:00:00+05:30",
+      "pageErrors": [],
+      "consoleErrors": [],
+      "externalRequests": [],
+      "apiRequests": [],
+      "httpStatus": 200,
+      "renderedHtmlContainsBuildId": true,
+      "text": "Skip to content\nmira\n↗\nYour movement companion\n\nGO SOMEWHERE. FEEL PREPARED.\n\nWhat’s your plan?\n\nCompare routes and timing. Make a plan, move with it, and get support along the way.\n\nYour movement plan\nEnter places instead\nLet’s plan\n\nSubmitted text may be interpreted by the configured AI provider. Movement planning is not saved to account chat history. Data details\n\nNight out → home\nEarly run\nLate arrival\n\nBuilt for women’s everyday movement and travel. Start without an account or location permission.\n\nI feel unsafe\nEmergency options\nGo\nJourneys\nYou",
+      "colors": {
+        "daypart": "day",
+        "canvas": "#f6f7fb",
+        "ink": "#14213d",
+        "accent": "#315bf4",
+        "themeColor": "#f6f7fb",
+        "bodyBackground": "rgb(246, 247, 251)"
+      },
+      "gpsCalls": 0,
+      "locationChoice": "1",
+      "composerBox": {
+        "x": 38.59375,
+        "y": 304.265625,
+        "width": 312.8125,
+        "height": 85.546875
+      },
+      "planActionBox": {
+        "x": 213.015625,
+        "y": 395.8125,
+        "width": 138.390625,
+        "height": 49.59375
+      },
+      "screenshot": "delivered-go-mobile-day.png",
+      "fullScreenshot": "delivered-go-mobile-day-full.png",
+      "result": "PASS"
+    },
+    {
+      "name": "mobile-night",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "clock": "2026-10-03T04:45:00+05:30",
+      "pageErrors": [],
+      "consoleErrors": [],
+      "externalRequests": [],
+      "apiRequests": [],
+      "httpStatus": 200,
+      "renderedHtmlContainsBuildId": true,
+      "text": "Skip to content\nmira\n↗\nYour movement companion\n\nGO SOMEWHERE. FEEL PREPARED.\n\nWhat’s your plan?\n\nCompare routes and timing. Make a plan, move with it, and get support along the way.\n\nYour movement plan\nEnter places instead\nLet’s plan\n\nSubmitted text may be interpreted by the configured AI provider. Movement planning is not saved to account chat history. Data details\n\nNight out → home\nEarly run\nLate arrival\n\nBuilt for women’s everyday movement and travel. Start without an account or location permission.\n\nI feel unsafe\nEmergency options\nGo\nJourneys\nYou",
+      "colors": {
+        "daypart": "night",
+        "canvas": "#0d1426",
+        "ink": "#f0f3fc",
+        "accent": "#9cb4ff",
+        "themeColor": "#0d1426",
+        "bodyBackground": "rgb(13, 20, 38)"
+      },
+      "gpsCalls": 0,
+      "locationChoice": "1",
+      "composerBox": {
+        "x": 38.59375,
+        "y": 304.265625,
+        "width": 312.8125,
+        "height": 85.546875
+      },
+      "planActionBox": {
+        "x": 213.015625,
+        "y": 395.8125,
+        "width": 138.390625,
+        "height": 49.59375
+      },
+      "screenshot": "delivered-go-mobile-night.png",
+      "fullScreenshot": "delivered-go-mobile-night-full.png",
+      "result": "PASS"
+    },
+    {
+      "name": "desktop-day",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "clock": "2026-10-03T12:00:00+05:30",
+      "pageErrors": [],
+      "consoleErrors": [],
+      "externalRequests": [],
+      "apiRequests": [],
+      "httpStatus": 200,
+      "renderedHtmlContainsBuildId": true,
+      "text": "Skip to content\nmira\n↗\nYour movement companion\n\nGO SOMEWHERE. FEEL PREPARED.\n\nWhat’s your plan?\n\nCompare routes and timing. Make a plan, move with it, and get support along the way.\n\nYour movement plan\nEnter places instead\nLet’s plan\n\nSubmitted text may be interpreted by the configured AI provider. Movement planning is not saved to account chat history. Data details\n\nNight out → home\nEarly run\nLate arrival\n\nBuilt for women’s everyday movement and travel. Start without an account or location permission.\n\nI feel unsafe\nEmergency options\nGo\nJourneys\nYou",
+      "colors": {
+        "daypart": "day",
+        "canvas": "#f6f7fb",
+        "ink": "#14213d",
+        "accent": "#315bf4",
+        "themeColor": "#f6f7fb",
+        "bodyBackground": "rgb(246, 247, 251)"
+      },
+      "gpsCalls": 0,
+      "locationChoice": "1",
+      "composerBox": {
+        "x": 366.59375,
+        "y": 339.09375,
+        "width": 634.8125,
+        "height": 85.546875
+      },
+      "planActionBox": {
+        "x": 863.015625,
+        "y": 430.640625,
+        "width": 138.390625,
+        "height": 49.59375
+      },
+      "screenshot": "delivered-go-desktop-day.png",
+      "fullScreenshot": "delivered-go-desktop-day-full.png",
+      "result": "PASS"
+    },
+    {
+      "name": "desktop-night",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "clock": "2026-10-03T04:45:00+05:30",
+      "pageErrors": [],
+      "consoleErrors": [],
+      "externalRequests": [],
+      "apiRequests": [],
+      "httpStatus": 200,
+      "renderedHtmlContainsBuildId": true,
+      "text": "Skip to content\nmira\n↗\nYour movement companion\n\nGO SOMEWHERE. FEEL PREPARED.\n\nWhat’s your plan?\n\nCompare routes and timing. Make a plan, move with it, and get support along the way.\n\nYour movement plan\nEnter places instead\nLet’s plan\n\nSubmitted text may be interpreted by the configured AI provider. Movement planning is not saved to account chat history. Data details\n\nNight out → home\nEarly run\nLate arrival\n\nBuilt for women’s everyday movement and travel. Start without an account or location permission.\n\nI feel unsafe\nEmergency options\nGo\nJourneys\nYou",
+      "colors": {
+        "daypart": "night",
+        "canvas": "#0d1426",
+        "ink": "#f0f3fc",
+        "accent": "#9cb4ff",
+        "themeColor": "#0d1426",
+        "bodyBackground": "rgb(13, 20, 38)"
+      },
+      "gpsCalls": 0,
+      "locationChoice": "1",
+      "composerBox": {
+        "x": 366.59375,
+        "y": 339.09375,
+        "width": 634.8125,
+        "height": 85.546875
+      },
+      "planActionBox": {
+        "x": 863.015625,
+        "y": 430.640625,
+        "width": 138.390625,
+        "height": 49.59375
+      },
+      "screenshot": "delivered-go-desktop-night.png",
+      "fullScreenshot": "delivered-go-desktop-night-full.png",
+      "result": "PASS"
+    }
+  ]
+}

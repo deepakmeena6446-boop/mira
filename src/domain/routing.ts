@@ -139,7 +139,7 @@ class MinHeap {
 }
 
 /** A* with a haversine heuristic. `cost` defaults to edge length; it may only increase it. */
-export function shortestPath(g: RouteGraph, from: number, to: number, cost: (e: RouteEdge) => number = (e) => e.lengthM): number[] | null {
+export function shortestPath(g: RouteGraph, from: number, to: number, cost: (e: RouteEdge) => number = (e) => e.lengthM, maxVisited = Infinity): number[] | null {
   if (from === to) return [];
   const target = g.nodes.get(to);
   if (!target || !g.nodes.has(from)) return null;
@@ -149,10 +149,11 @@ export function shortestPath(g: RouteGraph, from: number, to: number, cost: (e: 
   const heap = new MinHeap();
   heap.push(h(from), from);
   const closed = new Set<number>();
-  while (heap.size) {
+  let reached = false;
+  while (heap.size && closed.size < maxVisited) {
     const { v } = heap.pop()!;
     if (closed.has(v)) continue;
-    if (v === to) break;
+    if (v === to) { reached = true; break; }
     closed.add(v);
     const dv = dist.get(v)!;
     for (const eid of g.out.get(v) ?? []) {
@@ -165,7 +166,7 @@ export function shortestPath(g: RouteGraph, from: number, to: number, cost: (e: 
       }
     }
   }
-  if (!via.has(to)) return null;
+  if (!reached || !via.has(to)) return null;
   const path: number[] = [];
   let cur = to;
   while (cur !== from) {
@@ -243,9 +244,62 @@ export function routeSteps(g: RouteGraph, path: number[]): RouteStep[] {
 
 export interface PlannedRoutes {
   ok: boolean;
-  reason?: "not_near_walkway" | "no_connected_path" | "same_place";
-  routes: Array<{ path: number[]; lengthM: number; minutes: number; label: "Shortest" | "Alternate" }>;
+  reason?: "not_near_walkway" | "no_connected_path" | "same_place" | "loop_target_unavailable";
+  routes: Array<{ path: number[]; lengthM: number; minutes: number; label: "Shortest" | "Alternate" | "Loop" | "Out-and-back" }>;
   snap?: { from: SnapCandidate; to: SnapCandidate };
+}
+
+/** Bounded pedestrian candidates entirely on directed imported edges. No invented closing segment. */
+export function planPedestrianLoops(g: RouteGraph, origin: LatLon, targetMeters: number): PlannedRoutes {
+  const start = snapCandidates(g, origin)[0];
+  if (!start) return { ok: false, reason: "not_near_walkway", routes: [] };
+  if (!Number.isFinite(targetMeters) || targetMeters < 500 || targetMeters > 20_000) return { ok: false, reason: "loop_target_unavailable", routes: [] };
+  const distances = new Map<number, number>([[start.node, 0]]);
+  const via = new Map<number, number>();
+  const settled = new Set<number>();
+  const heap = new MinHeap();
+  heap.push(0, start.node);
+  // Work/memory limits do not imply that unvisited paths do not exist.
+  while (heap.size && settled.size < 4_000) {
+    const next = heap.pop()!;
+    if (settled.has(next.v) || next.k > targetMeters * 0.8) continue;
+    settled.add(next.v);
+    for (const id of g.out.get(next.v) ?? []) {
+      const edge = g.edges[id];
+      const distance = next.k + edge.lengthM;
+      if (distance > targetMeters * 0.8 || distance >= (distances.get(edge.to) ?? Infinity)) continue;
+      distances.set(edge.to, distance); via.set(edge.to, id); heap.push(distance, edge.to);
+    }
+  }
+  const candidates = [...settled].filter((node) => node !== start.node && distances.get(node)! >= targetMeters * 0.2)
+    .sort((a, b) => Math.abs(distances.get(a)! * 2 - targetMeters) - Math.abs(distances.get(b)! * 2 - targetMeters) || a - b).slice(0, 16);
+  const found: PlannedRoutes["routes"] = [];
+  const seen = new Set<string>();
+  for (const node of candidates) {
+    const outward: number[] = [];
+    let current = node;
+    while (current !== start.node) { const id = via.get(current); if (id === undefined) break; outward.push(id); current = g.edges[id].from; }
+    if (current !== start.node || !outward.length) continue;
+    outward.reverse();
+    const used = new Set(outward.map((id) => segmentKey(g.edges[id])));
+    const shortestReturn = shortestPath(g, node, start.node, undefined, 4_000);
+    const alternateReturn = shortestPath(g, node, start.node, (edge) => edge.lengthM * (used.has(segmentKey(edge)) ? 3 : 1), 4_000);
+    for (const returning of [alternateReturn, shortestReturn]) {
+      if (!returning?.length) continue;
+      const path = [...outward, ...returning]; const lengthM = pathLength(g, path);
+      if (lengthM < targetMeters * 0.65 || lengthM > targetMeters * 1.35) continue;
+      const key = [...new Set(path.map((id) => segmentKey(g.edges[id])))].sort().join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const label = distinctShare(g, outward, returning) >= ALT_MIN_DISTINCT_SHARE ? "Loop" : "Out-and-back";
+      found.push({ path, lengthM, minutes: walkingMinutes(lengthM), label });
+    }
+  }
+  found.sort((a, b) => Number(b.label === "Loop") - Number(a.label === "Loop") || Math.abs(a.lengthM - targetMeters) - Math.abs(b.lengthM - targetMeters));
+  const first = found[0];
+  if (!first) return { ok: false, reason: "loop_target_unavailable", routes: [] };
+  const second = found.slice(1).find((candidate) => distinctShare(g, first.path, candidate.path) >= ALT_MIN_DISTINCT_SHARE);
+  return { ok: true, routes: second ? [first, second] : [first], snap: { from: start, to: start } };
 }
 
 export function planRoutes(g: RouteGraph, a: LatLon, b: LatLon): PlannedRoutes {

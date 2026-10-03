@@ -23,7 +23,6 @@ import { setLocation, useClock } from "@/lib/location-store";
 import { shareLiveLink } from "@/lib/share";
 import { clearTripRoutes, keepTripRoute, tripRoute } from "@/lib/trip-route";
 import { HELP_CLASSES, hoursLine, isNight, rankHelpPoints, type HelpClass, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
-import { localTime } from "@/domain/opening-hours";
 import { setCountry, useCountry, type CountryContext } from "@/lib/locale-store";
 import { MISS_GRACE_MS } from "@/domain/journey";
 import { journeyNoun, modeWords } from "@/domain/travel-prefs";
@@ -32,10 +31,18 @@ import type { TripView } from "@/server/trips";
 import type { SafetyNet } from "@/server/health/safety-net";
 import { requestLocation } from "@/lib/location-store";
 import type { PlanOption, PlanOptionsResult } from "@/domain/plan-options";
-import { usePlanDraft } from "@/lib/plan-store";
+import { setPlanDraft, usePlanDraft } from "@/lib/plan-store";
+import { activatePlanLeg, intentFromLeg, resolvedDestination, resolvedOrigin } from "@/domain/plan-state";
+import { instantForLocal } from "@/domain/plan-options";
+import { RecipientPicker } from "@/components/app/RecipientPicker";
+import { SavedReturnReview } from "@/components/app/SavedReturnReview";
+import type { Contact } from "@/server/account/contacts";
+import { localTimeInZone } from "@/domain/opening-hours";
+import type { AlertState } from "@/domain/journey";
 
 const time = (iso: string | number) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 const names = (list: string[]) => (list.length <= 2 ? list.join(" and ") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`);
+const deliveryLabel = (state: AlertState | undefined) => state === "sent" ? "accepted by email provider; receipt unknown" : state === "failed" ? "email rejected" : state === "claimed" ? "email attempt in progress" : state === "unconfirmed" ? "email acceptance unconfirmed" : "no email attempted";
 
 function haversine(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
   const r = Math.PI / 180;
@@ -51,7 +58,6 @@ export function TripScreen({
   initialNet,
   tiles,
   helpExclude = [],
-  canTell = false,
   emailAlerts = false,
 }: {
   initial: TripView;
@@ -76,7 +82,8 @@ export function TripScreen({
   // The planned route lives on this device only (kept when the journey was started from the route sheet).
   const [route, setRoute] = useState<Array<[number, number]> | null>(() => (typeof window === "undefined" ? null : tripRoute(initial.id)));
   const [help, setHelp] = useState<{ at: { lat: number; lon: number }; points: HelpPoint[]; failed?: boolean; partial?: boolean } | null>(null);
-  const countryIso = useCountry().iso;
+  const country = useCountry();
+  const countryIso = country.iso;
   const osmMap = tiles.provider !== "google";
   const helpInFlight = useRef(false);
   const [focus, setFocus] = useState<RankedHelpPoint | null>(null);
@@ -91,11 +98,23 @@ export function TripScreen({
   const walking = initial.mode === "walk" && initial.autoArrival;
   const clock = useClock(); // null during server render: times appear after hydration (the server doesn't know your zone)
   const now = clock?.getTime() ?? new Date(initial.etaAt).getTime();
-  const freshMe = me && clock && lastFixAt !== null && clock.getTime() - lastFixAt < 120_000 ? me : null;
+  const freshMe = me && clock && lastFixAt !== null && clock.getTime() - lastFixAt >= -10_000 && clock.getTime() - lastFixAt < 120_000 && lastAccuracyM !== null && lastAccuracyM <= 100 ? me : null;
   const [snap, setSnap] = useState<Snap>("half");
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [awake, setAwake] = useState(false);
+  const [sharingOpen, setSharingOpen] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contactsState, setContactsState] = useState<"idle" | "loading" | "ready" | "failed">("idle");
+  const [recipientIds, setRecipientIds] = useState<string[]>([]);
+  const [revokeConfirm, setRevokeConfirm] = useState<string | "owner" | null>(null);
+  const shareActionKey = useRef<string | null>(null);
+  const tellActionKey = useRef<string | null>(null);
+  const changeAction = useRef<{ proposal: string; key: string } | null>(null);
+  const latestPosition = useRef<{ point: { lat: number; lon: number }; at: number } | null>(null);
+  const countryLookup = useRef<{ point: { lat: number; lon: number }; at: number } | null>(null);
+  const countryLookupBusy = useRef(false);
+  const [resume, setResume] = useState(0);
   // Health of live sharing while the screen is open: GPS permission/availability, and whether uploads reach Mira.
   const [gps, setGps] = useState<"ok" | "denied" | "lost">("ok");
   const [uploadFailing, setUploadFailing] = useState(false);
@@ -125,6 +144,17 @@ export function TripScreen({
     return () => clearInterval(p);
   }, [refresh]);
 
+  useEffect(() => {
+    if (!sharingOpen || contactsState !== "idle") return;
+    let active = true;
+    void api<{ contacts: Contact[] }>("/api/me").then((result) => {
+      if (!active) return;
+      setContactsState(result.ok ? "ready" : "failed");
+      if (result.ok) setContacts(result.data.contacts ?? []);
+    });
+    return () => { active = false; };
+  }, [sharingOpen, contactsState]);
+
   const sharedOk = trip.sharedWith.filter((c) => c.notified);
   const onWhatsApp = trip.sharedWith.filter((c) => c.whatsapp);
   // Which WhatsApp chats she opened on this device (a convenience, per journey): "opened", never "sent".
@@ -149,7 +179,8 @@ export function TripScreen({
       return next;
     });
   const upload = useCallback(
-    async (p: { lat: number; lon: number; accuracy: number }) => {
+    async (p: { lat: number; lon: number; accuracy: number; at: number }) => {
+      if (!Number.isFinite(p.at) || Date.now() - p.at < -10_000 || Date.now() - p.at >= 120_000 || !Number.isFinite(p.accuracy) || p.accuracy > 100) { setGps("lost"); return; }
       lastSent.current = { at: Date.now(), lat: p.lat, lon: p.lon };
       const r = await api<{ arrived: boolean }>(`/api/trips/${trip.id}/location`, { body: { lat: p.lat, lon: p.lon, accuracy: Math.round(p.accuracy) } });
       if (!r.ok) {
@@ -180,17 +211,23 @@ export function TripScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me !== null]);
 
-  // Where she is in words, and the emergency number for this country (once per journey screen).
-  const hasFix = me !== null;
+  // A current jurisdiction is bound to a fresh fix, refreshed after movement, resumption or TTL.
   useEffect(() => {
-    if (!hasFix || !me) return;
-    void api<{ label: string | null; country?: CountryContext }>("/api/geo/reverse", { body: { ...me, ...(osmMap ? { source: "osm" } : {}) } }).then((r) => {
-      if (!r.ok) return;
+    if (!open || !visible || !freshMe || countryLookupBusy.current) return;
+    const previous = countryLookup.current;
+    const checkedAt = Date.now();
+    if (previous && haversine(previous.point, freshMe) < 250 && checkedAt - previous.at < (countryIso ? 60_000 : 10_000)) return;
+    const point = { ...freshMe };
+    countryLookup.current = { point, at: checkedAt };
+    countryLookupBusy.current = true;
+    void api<{ label: string | null; country?: CountryContext }>("/api/geo/reverse", { body: { ...point, ...(osmMap ? { source: "osm" } : {}) } }).then((r) => {
+      countryLookupBusy.current = false;
+      const latest = latestPosition.current;
+      if (!r.ok || !latest || Date.now() - latest.at >= 120_000 || haversine(latest.point, point) > 250) return;
       setAreaName(r.data.label);
-      setCountry(r.data.country);
+      setCountry(r.data.country, { point, checkedAt: latest.at });
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasFix]);
+  }, [open, visible, freshMe, countryIso, osmMap, now, resume]);
 
   // Help Points around her, fetched ahead (and again once she has moved on), so "I feel unsafe" is instant.
   useEffect(() => {
@@ -205,11 +242,12 @@ export function TripScreen({
       setHelp((cur) => (failed ? (cur && !cur.failed ? cur : { at, points: [], failed: true }) : { at, points: r.data.helpPoints, partial: r.data.evidence?.state === "partial" }));
     });
   }, [open, freshMe, help, countryIso, osmMap]);
-  const night = isNight((clock ?? new Date()).getHours());
+  const placeTime = localTimeInZone(clock ?? new Date(), country.timezone);
+  const night = placeTime ? isNight(Math.floor(placeTime.minute / 60)) : false;
   const minuteKey = clock ? Math.floor(clock.getTime() / 60_000) : 0;
   const ranked = useMemo(
-    () => (freshMe && help ? rankHelpPoints(help.points, freshMe, { situation: "route", night, route, now: minuteKey ? localTime(new Date(minuteKey * 60_000)) : undefined, exclude }) : []),
-    [freshMe, help, night, route, minuteKey, exclude],
+    () => (freshMe && help ? rankHelpPoints(help.points, freshMe, { situation: "route", night, route, now: minuteKey ? localTimeInZone(new Date(minuteKey * 60_000), country.timezone) ?? undefined : undefined, timeZone: country.timezone, at: minuteKey ? minuteKey * 60_000 : undefined, exclude }) : []),
+    [freshMe, help, night, route, minuteKey, exclude, country.timezone],
   );
   const nextHelp = ranked[0] ?? null;
 
@@ -217,12 +255,14 @@ export function TripScreen({
   useEffect(() => {
     if (!open || !("geolocation" in navigator)) return;
     const onFix = (pos: GeolocationPosition) => {
-      const p = { lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy };
+      const p = { lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy, at: pos.timestamp };
+      setLocation(p, pos.timestamp);
+      if (!Number.isFinite(pos.timestamp) || Date.now() - pos.timestamp < -10_000 || Date.now() - pos.timestamp >= 120_000 || !Number.isFinite(p.accuracy) || p.accuracy > 100) { latestPosition.current = null; setLastFixAt(Number.isFinite(pos.timestamp) ? pos.timestamp : null); setLastAccuracyM(null); setGps("lost"); return; }
+      latestPosition.current = { point: p, at: pos.timestamp };
       setGps("ok");
       setMe({ lat: p.lat, lon: p.lon });
-      setLastFixAt(Date.now());
+      setLastFixAt(pos.timestamp);
       setLastAccuracyM(p.accuracy);
-      setLocation(p);
       const last = lastSent.current;
       // Every 20 s, or sooner after 50 m — but never more than every 8 s: in a fast ride 50 m passes in
       // 2 s, which would hit the server's 30/min limit and show "Can't reach Mira" for nothing.
@@ -231,8 +271,12 @@ export function TripScreen({
       void upload(p);
     };
     const onError = (e: GeolocationPositionError) => {
-      if (e.code === e.PERMISSION_DENIED) setGps("denied");
-      else if (e.code === e.POSITION_UNAVAILABLE) setGps("lost");
+      if (e.code === e.PERMISSION_DENIED || e.code === e.POSITION_UNAVAILABLE) {
+        latestPosition.current = null;
+        setLastAccuracyM(null);
+        setLocation(null);
+        setGps(e.code === e.PERMISSION_DENIED ? "denied" : "lost");
+      }
       // TIMEOUT just means no new fix yet (e.g. standing still) — not a problem.
     };
     // No timeout: a phone standing still at a bus stop may not produce new fixes for a while.
@@ -245,7 +289,7 @@ export function TripScreen({
     const onVisibility = () => {
       const shown = document.visibilityState === "visible";
       setVisible(shown);
-      if (shown) { startWatch(); void refresh(); } else stopWatch();
+      if (shown) { countryLookup.current = null; setResume((value) => value + 1); startWatch(); void refresh(); } else stopWatch();
     };
     onVisibility();
     document.addEventListener("visibilitychange", onVisibility);
@@ -255,7 +299,7 @@ export function TripScreen({
       if (document.visibilityState !== "visible") return;
       if (lastSent.current && Date.now() - lastSent.current.at < 55_000) return;
       navigator.geolocation.getCurrentPosition(
-        (pos) => void upload({ lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+        onFix,
         onError,
         { enableHighAccuracy: true, maximumAge: 30_000, timeout: 15_000 },
       );
@@ -311,11 +355,26 @@ export function TripScreen({
     if (r === "failed") toast("Couldn't copy the link on this device.", "error");
   };
 
+  const sharingAction = async (action: "share" | "revoke" | "link", body: object) => {
+    setBusy(`sharing-${action}`);
+    const result = await api<{ trip: TripView }>(`/api/trips/${trip.id}/${action}`, { body });
+    setBusy(null);
+    if (!result.ok) return toast(result.message, "error");
+    setTrip(result.data.trip);
+    setRevokeConfirm(null);
+    if (action === "share") { setRecipientIds([]); shareActionKey.current = null; toast("Recipient choices saved. Check each delivery result below."); }
+    else if (action === "revoke") toast("That live link has stopped working.");
+    else toast("A new private link is ready. Nobody was contacted.");
+  };
+
   const changeDestination = async (to: { lat: number; lon: number; name: string }, etaMinutes: number, geometry: [number, number][] | null = null) => {
     setBusy("change");
-    const r = await api<{ trip: TripView }>(`/api/trips/${trip.id}/change`, { body: { to, etaMinutes } });
+    const proposal = JSON.stringify({ to, etaMinutes });
+    if (changeAction.current?.proposal !== proposal) changeAction.current = { proposal, key: crypto.randomUUID() };
+    const r = await api<{ trip: TripView }>(`/api/trips/${trip.id}/change`, { body: { to, etaMinutes, idempotencyKey: changeAction.current.key } });
     setBusy(null);
     if (!r.ok) return toast(r.message, "error");
+    changeAction.current = null;
     clearTripRoutes();
     setRoute(geometry);
     if (geometry) keepTripRoute(trip.id, geometry);
@@ -364,6 +423,15 @@ export function TripScreen({
   const mins = Math.round(Math.abs(left) / 60_000);
   const span = mins >= 90 ? `${Math.round(mins / 60)} h` : `${mins} min`;
   const distance = me ? haversine(me, trip.destination) : null;
+  const returnIndex = planDraft?.legs?.findIndex((leg) => {
+    const intent = intentFromLeg(leg);
+    const from = intent ? resolvedOrigin(intent) : null;
+    const to = intent ? resolvedDestination(intent) : null;
+    const priorOrigin = planDraft.origin.kind === "named" ? planDraft.origin.resolution?.point : null;
+    return Boolean(from && to && priorOrigin && haversine(from, trip.destination) <= 150 && haversine(to, priorOrigin) <= 150) || /^return\b/i.test(leg.label);
+  }) ?? -1;
+  const returnLeg = returnIndex >= 0 ? planDraft?.legs?.[returnIndex] : null;
+  const returnPlan = planDraft && returnLeg && instantForLocal(returnLeg.departureLocal, returnLeg.timeZone) ? activatePlanLeg(planDraft, returnIndex) : null;
 
   if (!open) {
     return (
@@ -381,6 +449,12 @@ export function TripScreen({
             ? `Glad you're at ${trip.destination.name}. ${sharedOk.length ? `${names(sharedOk.map((c) => c.name))} can see you arrived.` : "Your live link now just says you arrived."}`
             : "Live sharing is off."}
         </p>
+        {trip.state === "arrived" ? <section className="mt-5 w-full max-w-sm rounded-[var(--radius-card)] border border-line bg-surface p-4 text-left" aria-label="Return journey">
+          <h2 className="font-semibold">Your way back</h2>
+          {returnPlan ? <><p className="mt-2 text-sm text-ink-muted">{returnPlan.origin.kind === "named" ? returnPlan.origin.query : "Origin"} → {returnPlan.destination.query} · {returnPlan.departureLocal.replace("T", " ")} ({returnPlan.timeZone}).</p><Button className="mt-3" variant="primary" onClick={() => { clearTripRoutes(); setPlanDraft(returnPlan); router.push("/plan?planStep=options"); }}>Review return journey</Button></> : <><p className="mt-2 text-sm text-ink-muted">Keep the event plan and confirm the return places, local date and time.</p><Link href="/plan?planStep=return" className="mt-2 inline-flex min-h-11 items-center font-semibold text-accent-strong">Plan the return journey</Link></>}
+          <p className="mt-2 text-xs text-ink-muted">Review only. Starting and any contact sharing require a new confirmation.</p>
+          {!returnPlan ? <SavedReturnReview /> : null}
+        </section> : null}
         {/* The one question after a journey (or nothing): its own slot, extended in AfterArrival. */}
         <AfterArrival trip={trip} route={route} hour={clock ? clock.getHours() : null} onDone={() => clearTripRoutes()} />
         <p className="mt-6 max-w-sm text-sm text-ink-subtle">
@@ -404,7 +478,7 @@ export function TripScreen({
         <Link href="/trips" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-strong">
           Your trips
         </Link>
-        {planDraft?.legs?.length ? <Link href="/plan" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-strong">Review another planned leg</Link> : null}
+        {trip.state !== "arrived" && planDraft?.legs?.length ? <Link href="/plan?planStep=return" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-strong">Review another planned leg</Link> : null}
       </div>
     );
   }
@@ -416,7 +490,10 @@ export function TripScreen({
   const attention = netDown || gps !== "ok" || uploadFailing || trip.state === "missed" || trip.sharedWith.some((c) => c.viaEmail && !c.notified);
   const next = journeyNextAction({ missed: trip.state === "missed", whatsapp: onWhatsApp.map((c) => c.name), opened, following: sharedOk.length, canShare: Boolean(trip.shareUrl) });
   // Honest alert behaviour: only claim an automatic email when email works, someone accepted and got the link, and the worker is up.
-  const alertsOn = emailAlerts && sharedOk.length > 0 && !netDown;
+  const alertsOn = emailAlerts && trip.sharedWith.some((contact) => contact.viaEmail) && !netDown;
+  const emailRecipients = trip.sharedWith.filter((contact) => contact.viaEmail);
+  const acceptedAlerts = emailRecipients.filter((contact) => contact.alertDelivery === "sent");
+  const uncertainAlerts = emailRecipients.filter((contact) => contact.alertDelivery === "unconfirmed" || contact.alertDelivery === "failed");
   const noun = journeyNoun(trip.autoArrival ? trip.mode : "other");
   const modeLine = trip.mode === "other" ? "" : modeWords(trip.mode).short;
   const aheadCount = ranked.filter((p) => p.ahead).length;
@@ -436,13 +513,17 @@ export function TripScreen({
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-2 text-sm font-semibold text-accent-strong">
               <MiraPulse size={12} state={trip.state === "missed" ? "attention" : "with-you"} />
-              {sharedOk.length ? "Sharing live" : `${noun[0].toUpperCase()}${noun.slice(1)} in progress`}
+              {trip.sharedWith.length ? "Sharing enabled" : `${noun[0].toUpperCase()}${noun.slice(1)} in progress`}
             </p>
             <h1 className="truncate font-semibold">{trip.autoArrival ? `To ${trip.destination.name}${modeLine ? ` · ${modeLine}` : ""}` : "Sharing where you are"}</h1>
           </div>
         </div>
         <div className="pointer-events-auto mx-auto mt-2 max-w-xl">
           <HelpCluster onUnsafe={() => setUnsafe(true)} />
+        </div>
+        <div className="pointer-events-auto mt-2 rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-sm">
+          <p className="text-xs text-ink-muted">{!visible ? "Updates paused while hidden" : fixAge === null ? "Waiting for a device position" : !freshMe ? `Last known position · ${fixAge}s old` : `Device position · ${fixAge}s ago`}{uploadFailing ? " · upload failed" : sharedAge === null ? " · nothing sent yet" : ` · update sent ${sharedAge}s ago`}</p>
+          <Button variant="primary" className="mt-2 w-full" onClick={() => void act("arrive")} busy={busy === "arrive"}>{trip.autoArrival ? "I'm here" : "I'm okay — stop sharing"}</Button>
         </div>
         </div>
       </div>
@@ -466,7 +547,7 @@ export function TripScreen({
           <div role="status" className="mb-4 rounded-[var(--radius-card)] bg-warm-soft p-4">
             <p className="font-semibold text-warm">{gps === "denied" ? "Location is off for Mira" : gps === "lost" ? "Can't get your location right now" : "Can't reach Mira right now"}</p>
             <p className="mt-1 text-sm text-ink-muted">
-              {sharedOk.length ? "Your contacts are seeing your last spot. " : ""}
+              {sharedAge !== null && (trip.shareUrl || trip.sharedWith.length) ? "A valid journey link can show your last uploaded position. Receipt and viewing are unknown. " : ""}
               {gps === "denied" ? "Turn location back on for this site in your browser settings." : gps === "lost" ? "It usually comes back once you're outdoors or have signal." : "Check your connection — Mira keeps trying."}
               {alertsOn ? " If you miss check-in, Mira still attempts an email after your ETA; sending can fail." : ""}
             </p>
@@ -485,11 +566,11 @@ export function TripScreen({
             <p className="font-semibold">Are you okay? Tap &ldquo;I&apos;m here&rdquo; if you&apos;ve arrived.</p>
             <p className="mt-1 text-sm text-ink-muted">
               {trip.alert === "sent"
-                ? "I've let your contacts know you haven't checked in."
+                ? `The email provider accepted the missed-check-in message for ${names(acceptedAlerts.length ? acceptedAlerts.map((contact) => contact.name) : emailRecipients.map((contact) => contact.name))}. Receipt is unknown.`
                 : trip.alert === "claimed"
                   ? "I'm letting your contacts know now…"
                   : trip.alert === "failed" || trip.alert === "unconfirmed"
-                    ? "I tried to reach your contacts but couldn't confirm the message went out."
+                    ? `${acceptedAlerts.length ? `The provider accepted email for ${names(acceptedAlerts.map((contact) => contact.name))}. ` : ""}${uncertainAlerts.length ? `Email was rejected or unconfirmed for ${names(uncertainAlerts.map((contact) => contact.name))}. ` : "The email attempt could not be confirmed. "}Call or message them directly.`
                     : onWhatsApp.length
                       ? "Nobody was notified automatically — Mira can't send WhatsApp for you. Use “Send to …” above, or call someone."
                       : "Nobody was notified — either no contact on this trip has accepted your invite, or email isn't available right now."}{" "}
@@ -502,9 +583,9 @@ export function TripScreen({
         <div className="flex items-start gap-3">
           <MiraPulse size={16} state={attention ? "attention" : "with-you"} className="mt-[5px]" />
           <p className="min-w-0 flex-1 text-sm text-ink-muted">
-            <span className="block text-[1.0625rem] font-medium leading-snug text-ink">{sharedOk.length ? `${names(sharedOk.map((c) => c.name))} can see where you are until you ${trip.autoArrival ? "arrive" : "stop sharing"}.` : "Only people you send your live link to can follow."}</span>{" "}
+            <span className="block text-[1.0625rem] font-medium leading-snug text-ink">{sharedOk.length ? `The email provider accepted a journey link for ${names(sharedOk.map((c) => c.name))}. Receipt and viewing are unknown.` : "Only people you send your live link to can follow."}</span>{" "}
             {alertsOn
-              ? `If you haven't ${trip.autoArrival ? "arrived" : "checked in"} ${Math.round(MISS_GRACE_MS / 60_000)} min after ${trip.autoArrival ? "your ETA" : "your sharing time ends"}, Mira emails ${sharedOk.length === 1 ? "them" : "them all"}.`
+              ? `If you haven't ${trip.autoArrival ? "arrived" : "checked in"} ${Math.round(MISS_GRACE_MS / 60_000)} min after ${trip.autoArrival ? "your ETA" : "your sharing time ends"}, Mira attempts an email to ${names(emailRecipients.map((contact) => contact.name))}. Sending can fail; receipt is unknown.`
               : !emailAlerts
                 ? `Nobody is alerted automatically if you don't ${trip.autoArrival ? "arrive" : "check in"} — Mira can't send email alerts yet. Your live link is how people follow you.`
                 : netDown
@@ -512,9 +593,9 @@ export function TripScreen({
                   : (
                       <>
                         Nobody is alerted automatically if you don&apos;t {trip.autoArrival ? "arrive" : "check in"} —{" "}
-                        <Link href="/circle" className="font-semibold text-accent-strong">
-                          add someone in Circle
-                        </Link>{" "}
+                        <button type="button" onClick={() => setSharingOpen(true)} className="font-semibold text-accent-strong underline">
+                          choose someone for this journey
+                        </button>{" "}
                         for that.
                       </>
                     )}
@@ -537,6 +618,7 @@ export function TripScreen({
             </p>
           ) : null}
           {walking ? <div className="mt-3 rounded-[var(--radius-card)] bg-sunken p-3 text-sm"><Button variant="secondary" onClick={() => void reviewCurrentRoute()} busy={busy === "route-review"}>Review route from here</Button>{routeReviewMessage ? <p role="status" className="mt-2">{routeReviewMessage}</p> : null}{reviewedRoute ? <div className="mt-2"><p>A mapped walk from your latest position is about {Math.round(reviewedRoute.minutes)} min. Source: {reviewedRoute.evidence[0]?.status === "known" ? reviewedRoute.evidence[0].source.label : "unknown"}. Check actual access and conditions yourself.</p><Button variant="primary" onClick={() => void changeDestination(trip.destination, Math.min(235, Math.max(5, Math.ceil(reviewedRoute.minutes * 1.25) + 5)), reviewedRoute.geometry)} busy={busy === "change"}>Confirm route and ETA update</Button></div> : null}</div> : null}
+          <details id="journey-timing-review" className="mt-3 rounded-[var(--radius-card)] bg-sunken p-3 text-sm"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Review check-in timing</summary><p>This is your remaining-time estimate. Destination and recipients stay the same; no route or operating service is confirmed by changing it.</p><label className="mt-3 block font-semibold">Minutes from now until check-in<input type="number" min={5} max={235} value={manualEtaMinutes} onChange={(event) => setManualEtaMinutes(Number(event.target.value))} className="mt-2 min-h-12 w-full rounded-xl border border-line-strong bg-surface px-3" /></label><Button variant="primary" className="mt-3" disabled={!Number.isInteger(manualEtaMinutes) || manualEtaMinutes < 5 || manualEtaMinutes > 235} busy={busy === "change"} onClick={() => void changeDestination(trip.destination, manualEtaMinutes, route)}>Confirm check-in time change</Button></details>
         </div>
 
 
@@ -546,11 +628,7 @@ export function TripScreen({
             <Button variant="primary" size="lg" onClick={share} disabled={!trip.shareUrl}>
               <Icon name="share" className="size-5" /> Send my live link
             </Button>
-          ) : (
-            <Button variant="primary" size="lg" onClick={() => act("arrive")} busy={busy === "arrive"} busyLabel={trip.autoArrival ? "Saving…" : "Stopping…"}>
-              <Icon name="check" /> {trip.autoArrival ? <>I&apos;m here</> : <>I&apos;m okay — stop sharing</>}
-            </Button>
-          )}
+          ) : null}
           {/* Her WhatsApp contacts: each one tap, their own link, message ready. Mira opens WhatsApp; she presses Send. */}
           {onWhatsApp.length ? (
             <div>
@@ -577,11 +655,6 @@ export function TripScreen({
             </div>
           ) : null}
           <div className="grid grid-cols-2 gap-2.5">
-            {next.kind === "arrive" ? null : (
-              <Button variant="secondary" onClick={() => act("arrive")} busy={busy === "arrive"} busyLabel={trip.autoArrival ? "Saving…" : "Stopping…"} className="col-span-2">
-                <Icon name="check" className="size-4" /> {trip.autoArrival ? <>I&apos;m here</> : <>I&apos;m okay — stop sharing</>}
-              </Button>
-            )}
             {next.kind === "share" ? null : (
               <Button variant="secondary" onClick={share} disabled={!trip.shareUrl}>
                 <Icon name="share" className="size-4" /> Send my live link
@@ -594,9 +667,32 @@ export function TripScreen({
         </div>
         {trip.checkRequestedAt && clock && clock.getTime() - new Date(trip.checkRequestedAt).getTime() < 30 * 60_000 ? (
           <p role="status" className="mt-3 rounded-2xl bg-mint-soft px-4 py-3 text-sm">
-            You asked {sharedOk.length ? names(sharedOk.map((c) => c.name)) : "your people"} to check on you at {time(trip.checkRequestedAt)}. Mira didn&apos;t contact anyone else.
+            Check-in request at {time(trip.checkRequestedAt)}. {trip.sharedWith.filter((contact) => contact.checkDelivery === "sent").length ? `Email accepted for ${names(trip.sharedWith.filter((contact) => contact.checkDelivery === "sent").map((contact) => contact.name))}; receipt is unknown. ` : "No email acceptance is confirmed. "}Mira didn&apos;t contact anyone else.
           </p>
         ) : null}
+
+        <section aria-label="Journey sharing" className="mt-4 rounded-[var(--radius-card)] border border-line p-3">
+          <Button variant="secondary" onClick={() => setSharingOpen((value) => !value)}>{sharingOpen ? "Hide sharing controls" : "Manage who follows"}</Button>
+          {sharingOpen ? <div className="mt-3 space-y-3">
+            <p className="text-sm text-ink-muted">Only the people selected for this journey have their own links. Removing a link here keeps their saved contact.</p>
+            {trip.sharedWith.length ? <ul className="space-y-3">{trip.sharedWith.map((contact) => <li key={contact.id} className="rounded-lg bg-sunken p-3 text-sm">
+              <p className="font-semibold">{contact.name}</p>
+              <p>Live-link email: {deliveryLabel(contact.linkDelivery)}.</p>
+              <p>Missed check-in: {deliveryLabel(contact.alertDelivery)}.</p>
+              {contact.checkDelivery !== "none" ? <p>Chosen check-in request: {deliveryLabel(contact.checkDelivery)}.</p> : null}
+              {contact.whatsapp ? <p>You send their WhatsApp link yourself; Mira cannot confirm Send.</p> : null}
+              {revokeConfirm === contact.id ? <div className="mt-2 flex gap-2"><Button variant="danger" busy={busy === "sharing-revoke"} onClick={() => void sharingAction("revoke", { contactId: contact.id })}>Confirm remove {contact.name}&apos;s journey link</Button><Button variant="ghost" onClick={() => setRevokeConfirm(null)}>Keep link</Button></div> : <Button variant="secondary" className="mt-2" onClick={() => setRevokeConfirm(contact.id)}>Remove {contact.name}&apos;s journey link</Button>}
+            </li>)}</ul> : <p className="text-sm">No selected recipients. Nobody receives automatic contact emails.</p>}
+            {contactsState === "failed" ? <div role="status"><p>Contact choices could not load. Existing links are unchanged.</p><Button variant="secondary" onClick={() => setContactsState("idle")}>Retry contact choices</Button></div> : contactsState !== "ready" ? <p role="status">Loading contact choices…</p> : <>
+              <RecipientPicker contacts={contacts.filter((contact) => !trip.sharedWith.some((recipient) => recipient.id === contact.id))} selectedIds={recipientIds} onChange={(ids) => { setRecipientIds(ids); shareActionKey.current = null; }} disabled={busy === "sharing-share"} />
+              {recipientIds.length ? <><p className="text-sm">Confirm live links for {names(contacts.filter((contact) => recipientIds.includes(contact.id)).map((contact) => contact.name))}? Mira attempts accepted-contact emails; WhatsApp still requires Send.</p><Button variant="primary" busy={busy === "sharing-share"} onClick={() => { shareActionKey.current ??= crypto.randomUUID(); void sharingAction("share", { recipientIds, idempotencyKey: shareActionKey.current }); }}>Confirm chosen recipients</Button></> : null}
+            </>}
+            <div className="rounded-lg border border-line p-3 text-sm">
+              <p>Your copied live link can be forwarded by its recipient. Invalidate it to stop everyone using that copy; selected contacts&apos; individual links stay unchanged.</p>
+              {!trip.shareUrl ? <Button variant="secondary" className="mt-2" busy={busy === "sharing-link"} onClick={() => void sharingAction("link", {})}>Create a new private live link</Button> : revokeConfirm === "owner" ? <div className="mt-2 flex gap-2"><Button variant="danger" busy={busy === "sharing-revoke"} onClick={() => void sharingAction("revoke", { ownerLink: true })}>Confirm invalidate copied live link</Button><Button variant="ghost" onClick={() => setRevokeConfirm(null)}>Keep link</Button></div> : <Button variant="secondary" className="mt-2" onClick={() => setRevokeConfirm("owner")}>Invalidate copied live link</Button>}
+            </div>
+          </div> : null}
+        </section>
 
         {/* The nearest Help Point, ranked for right now */}
         {focus && freshMe ? (
@@ -638,7 +734,7 @@ export function TripScreen({
         <p className="mt-4 text-sm text-ink-muted">
           {awake ? "Mira is keeping your screen on. " : ""}
           Your location updates while this screen is open.{" "}
-          {sharedOk.length ? "If you close Mira, they'll see your last spot. " : ""}
+          {sharedAge !== null && (trip.shareUrl || trip.sharedWith.length) ? "If you close Mira, a valid journey link can show only the last uploaded position. Receipt and viewing are unknown. " : ""}
           {trip.autoArrival ? <>Tap &ldquo;I&apos;m here&rdquo; when you arrive if Mira hasn&apos;t noticed.</> : null}
         </p>
 
@@ -665,6 +761,7 @@ export function TripScreen({
 
       <UnsafeSheet
         open={unsafe}
+        change={{ label: "Review route or timing", detail: "Keep this journey and recipients. Review first; a change needs your confirmation.", onReview: () => { setUnsafe(false); setSnap("half"); window.setTimeout(() => { const review = document.getElementById("journey-timing-review") as HTMLDetailsElement | null; if (review) { review.open = true; review.scrollIntoView({ block: "nearest" }); review.querySelector("summary")?.focus(); } }, 0); } }}
         onClose={() => setUnsafe(false)}
         me={freshMe}
         staleLocation={fixAge !== null && fixAge >= 120}
@@ -679,17 +776,19 @@ export function TripScreen({
           setSnap("half");
         }}
         goLabel="Show"
-        share={trip.shareUrl ? { label: "Send my live link", detail: "Anyone you send it to sees where you are until you arrive.", onShare: share } : null}
+        share={trip.shareUrl ? { label: "Send my live link", detail: "A valid link can show your last uploaded position until sharing stops. Receipt and viewing are unknown.", onShare: share } : null}
         tell={
-          canTell
+          trip.sharedWith.length > 0 && (emailAlerts && emailRecipients.length > 0 || onWhatsApp.length > 0)
             ? {
-                names: trip.sharedWith.length ? trip.sharedWith.map((c) => c.name) : ["your trusted contacts"],
-                email: emailAlerts && (trip.sharedWith.length ? trip.sharedWith.some((c) => c.viaEmail) : true),
+                names: trip.sharedWith.map((c) => c.name),
+                email: emailAlerts && emailRecipients.length > 0,
                 onTell: async () => {
-                  const r = await api<{ told: string[]; failed: string[]; whatsapp: Array<{ name: string; url: string }>; trip: TripView }>(`/api/trips/${trip.id}/checkon`, { body: {} });
+                  tellActionKey.current ??= crypto.randomUUID();
+                  const r = await api<{ told: string[]; failed: string[]; unconfirmed: string[]; whatsapp: Array<{ name: string; url: string }>; trip: TripView }>(`/api/trips/${trip.id}/checkon`, { body: { idempotencyKey: tellActionKey.current } });
                   if (!r.ok) return { error: r.message };
                   setTrip(r.data.trip);
-                  return { told: r.data.told, failed: r.data.failed, whatsapp: r.data.whatsapp };
+                  tellActionKey.current = null;
+                  return { told: r.data.told, failed: [...r.data.failed, ...r.data.unconfirmed], whatsapp: r.data.whatsapp };
                 },
               }
             : null

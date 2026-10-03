@@ -1,0 +1,44 @@
+[WebServer] (node:73255) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:73276) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:73277) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:73286) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:73307) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:73308) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:73326) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:73317) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] {"t":"2026-10-03T11:48:08.475Z","src":"config","event":"config.warning","message":"No GOOGLE_MAPS_SERVER_KEY: search, routes and Help Points use the OpenStreetMap fallback (thin outside mapped areas)."}
+[WebServer] {"t":"2026-10-03T11:48:08.476Z","src":"config","event":"config.warning","message":"No OVERPASS_URL: the OpenStreetMap lighting source and OSM Help Points are unavailable."}
+[WebServer] {"t":"2026-10-03T11:48:08.476Z","src":"config","event":"config.warning","message":"No MAPILLARY_TOKEN: the street-imagery lighting source is unavailable."}
+[WebServer] {"t":"2026-10-03T11:48:08.476Z","src":"config","event":"config.warning","message":"No ANTHROPIC_API_KEY: Mira answers with the scripted companion; ambiguous Safety update headlines are left out."}
+[WebServer] (node:73347) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] {"t":"2026-10-03T11:48:08.676Z","src":"config","event":"config.warning","message":"No GOOGLE_MAPS_SERVER_KEY: search, routes and Help Points use the OpenStreetMap fallback (thin outside mapped areas)."}
+[WebServer] {"t":"2026-10-03T11:48:08.677Z","src":"config","event":"config.warning","message":"No OVERPASS_URL: the OpenStreetMap lighting source and OSM Help Points are unavailable."}
+[WebServer] {"t":"2026-10-03T11:48:08.677Z","src":"config","event":"config.warning","message":"No MAPILLARY_TOKEN: the street-imagery lighting source is unavailable."}
+[WebServer] {"t":"2026-10-03T11:48:08.677Z","src":"config","event":"config.warning","message":"No ANTHROPIC_API_KEY: Mira answers with the scripted companion; ambiguous Safety update headlines are left out."}
+[WebServer] {"t":"2026-10-03T11:48:09.239Z","src":"config","event":"config.warning","message":"No GOOGLE_MAPS_SERVER_KEY: search, routes and Help Points use the OpenStreetMap fallback (thin outside mapped areas)."}
+[WebServer] {"t":"2026-10-03T11:48:09.239Z","src":"config","event":"config.warning","message":"No OVERPASS_URL: the OpenStreetMap lighting source and OSM Help Points are unavailable."}
+[WebServer] {"t":"2026-10-03T11:48:09.239Z","src":"config","event":"config.warning","message":"No MAPILLARY_TOKEN: the street-imagery lighting source is unavailable."}
+[WebServer] {"t":"2026-10-03T11:48:09.239Z","src":"config","event":"config.warning","message":"No ANTHROPIC_API_KEY: Mira answers with the scripted companion; ambiguous Safety update headlines are left out."}
+
+Running 4 tests using 1 worker
+
+(node:73349) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] {"t":"2026-10-03T11:48:12.058Z","src":"web","event":"safety_updates.fetch","state":"ready","precision":"city","country":"IN","windowDays":7,"retrieved":4,"inWindow":4,"included":3,"ambiguous":0,"classified":0,"unassessed":0,"excluded":1,"clusters":2}
+  ✓  1 [mobile] › tests/e2e/o-phase-four-journey.spec.ts:22:1 › active journey resumes with truthful position age and immediate support (16.9s)
+  ✓  2 [mobile] › tests/e2e/q-phase-seven-go.spec.ts:4:1 › guest Go opens plan, Ask and map without requesting GPS, with an explicit map location choice and immediate Emergency (1.8s)
+(node:73502) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  3 [desktop] › tests/e2e/o-phase-four-journey.spec.ts:22:1 › active journey resumes with truthful position age and immediate support (9.9s)
+  ✓  4 [desktop] › tests/e2e/q-phase-seven-go.spec.ts:4:1 › guest Go opens plan, Ask and map without requesting GPS, with an explicit map location choice and immediate Emergency (1.6s)
+
+  4 passed (36.1s)

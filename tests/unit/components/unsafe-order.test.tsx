@@ -34,6 +34,7 @@ describe("I feel unsafe — the action order is frozen", () => {
         exclude={[]}
       />,
     );
+    expect(screen.getByLabelText("Immediate Emergency action").querySelector("button, a")).toHaveTextContent(/Emergency/);
     const names = [...screen.getByRole("dialog", { name: "Right now" }).querySelectorAll("button, a")].map((el) => (el.getAttribute("aria-label") ?? el.textContent ?? "").replace(/\s+/g, " ").trim());
     const order = [/^Close$/, /Go to a Help Point/, /Place b/, /Place c/, /Tell my people now/, /Share my journey live/, /Call someone/, /Emergency|call/i, /Copy/, /Talk to Mira/, /I'm okay now/];
     let at = -1;

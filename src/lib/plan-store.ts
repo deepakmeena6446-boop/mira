@@ -2,6 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import { newPlanDraft, parsePlanSession, PLAN_SESSION_TTL_MS, planDraftSchema, serializePlanSession, type PlanDraft } from "@/domain/plan-state";
+import { clearLocalJourneyGuidance } from "@/lib/local-check-in-store";
 
 const KEY = "mira.plan.v1";
 let draft: PlanDraft | null = null;
@@ -9,6 +10,8 @@ let hydrated = false;
 let expiryTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((listener) => listener());
+/** Read at action boundaries to reject an async interpretation after the person edits. */
+export function currentPlanDraft() { return draft; }
 function scheduleExpiry(remainingMs: number) {
   if (expiryTimer) clearTimeout(expiryTimer);
   expiryTimer = setTimeout(clearPlanDraft, remainingMs);
@@ -41,6 +44,7 @@ export function clearPlanDraft() {
   draft = null;
   hydrated = true;
   try { sessionStorage.removeItem(KEY); } catch { /* memory-only fallback */ }
+  clearLocalJourneyGuidance();
   emit();
 }
 

@@ -1,3 +1,4 @@
+import { chosenRecipientIds } from "../helpers/recipient-choice";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 
@@ -62,7 +63,7 @@ async function overdueSharedTrip(owner: string, email: string): Promise<string> 
   switchJar(contactJar);
   expect((await (await acceptPOST(jsonRequest("/api/invites/accept", {}))).json()).status).toBe("accepted");
   switchJar(jar);
-  const { trip } = await (await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Hostel" }, share: true }))).json();
+  const { trip } = await (await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Hostel" }, recipientIds: await chosenRecipientIds() }))).json();
   await getSql()`UPDATE journeys SET created_at = now() - interval '40 minutes', eta_at = now() - interval '11 minutes' WHERE id = ${trip.id}`;
   return trip.id as string;
 }

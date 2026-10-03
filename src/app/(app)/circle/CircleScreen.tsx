@@ -39,7 +39,7 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
       <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-[calc(var(--tabbar-space)+2rem)] text-center">
         <MiraOrb size={80} />
         <h1 className="mt-6 text-3xl font-semibold">Your circle</h1>
-        <p className="mt-2 max-w-sm text-ink-muted">Save the people who should know you got there. When you start a journey, you send them your live link on WhatsApp in one tap. Contact email depends on availability and their acceptance.</p>
+        <p className="mt-2 max-w-sm text-ink-muted">Save the people who should know you got there. Select recipients when confirming a shared journey, then send each live link from the journey screen. Contact email depends on availability and their acceptance.</p>
         <Button className="mt-7 max-w-xs" variant="hero" size="lg" onClick={() => setSignIn(true)}>
           Get started
         </Button>
@@ -76,7 +76,7 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
           <h1 className="text-[1.75rem] font-semibold tracking-tight">Your circle</h1>
           {onWhatsApp.length ? (
             <p className="mt-1 text-ink-muted">
-              <span className="font-semibold text-ink">{list(onWhatsApp)}</span> {onWhatsApp.length === 1 ? "is" : "are"} one tap away on WhatsApp: when you start a journey, send them your live link from the journey screen. Mira opens WhatsApp; you press Send.
+              <span className="font-semibold text-ink">{list(onWhatsApp)}</span> {onWhatsApp.length === 1 ? "is" : "are"} available for WhatsApp sharing. Select recipients when confirming a shared journey, then tap Send link on the journey screen. Mira opens WhatsApp; you press Send.
             </p>
           ) : null}
           <details className="mt-1 text-sm text-ink-muted">
@@ -119,7 +119,7 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
                 WhatsApp number
               </label>
               <input id="c-phone" type="tel" inputMode="tel" autoComplete="tel" value={cPhone} maxLength={32} onChange={(e) => setCPhone(e.target.value)} placeholder={country.callingCode ? `${country.callingCode} 98765 43210` : "+91 98765 43210"} className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
-              <p className="mt-1 text-sm text-ink-muted">When you start a journey, Mira opens WhatsApp with your live link ready for them — you press Send.</p>
+              <p className="mt-1 text-sm text-ink-muted">Choose this person when confirming a shared journey. Then tap Send link on the journey screen to open WhatsApp; you press Send.</p>
               <label className="mt-3 block text-sm font-semibold" htmlFor="c-email">
                 Email <span className="font-normal text-ink-muted">(optional)</span>
               </label>
@@ -189,7 +189,7 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
         </Section>
 
         <p className="px-1 text-sm text-ink-muted">
-          On a journey, <strong>Tell my people now</strong> (in &ldquo;I feel unsafe&rdquo;) opens WhatsApp for each contact with a number, asking them to check on you, and {emailAlerts ? "attempts to email accepted contacts who are available for that journey with a live link. The screen shows which attempts the provider accepted or rejected." : "cannot email contacts while contact email is unavailable."} Mira never contacts anyone else.{" "}
+          On a journey, <strong>Tell my people now</strong> (in &ldquo;I feel unsafe&rdquo;) prepares messages for the recipients you selected for that journey. You open each WhatsApp message and press Send. It {emailAlerts ? "attempts to email selected accepted recipients with a live link. The screen shows provider acceptance or failure; acceptance does not confirm receipt." : "cannot email contacts while contact email is unavailable."} Mira never contacts anyone else.{" "}
           <Link href="/privacy" className="font-semibold text-accent-strong">
             Privacy
           </Link>

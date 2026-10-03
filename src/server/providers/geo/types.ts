@@ -40,6 +40,28 @@ export interface WalkRoute {
 /** A route for any travel mode, with who computed it ("estimate" = straight line, no provider route). */
 export interface ModeRoute extends WalkRoute {
   provider: "google" | "osm" | "estimate";
+  sourceCheckedAt?: string;
+  plannedTime?: PlannedRouteTime;
+  /** An estimate for this requested time; never confirmation that a service operates. */
+  timeEligible?: boolean;
+  operatingService?: "unverified";
+  maneuvers?: RouteManeuver[];
+}
+
+export interface PlannedRouteTime {
+  instant: string; // explicit RFC3339 instant, converted from the person's local time/zone
+  kind: "depart_at" | "arrive_by";
+}
+export interface RouteManeuver { instruction: string; maneuver: string | null; meters: number }
+export interface RouteLookupOptions { plannedTime?: PlannedRouteTime; includeManeuvers?: boolean }
+export interface RouteCapability {
+  departureTime: boolean;
+  arrivalTime: boolean;
+  pastDays: number;
+  futureDays: number | null;
+  maneuvers: boolean;
+  mapDisplay: "google" | "osm";
+  verifiesOperatingService: false;
 }
 
 /** Everything MIRA needs from a maps provider. Mapbox implements this later. */
@@ -59,7 +81,8 @@ export interface GeoProvider {
    * provider route, or none when the provider has none (transit often doesn't exist, or isn't
    * covered): an empty list means "not known", never an error and never a guess.
    */
-  routes(a: GeoPoint, b: GeoPoint, mode: TravelMode): Promise<ModeRoute[]>;
+  routes(a: GeoPoint, b: GeoPoint, mode: TravelMode, opts?: RouteLookupOptions): Promise<ModeRoute[]>;
+  routeCapabilities?: Record<TravelMode, RouteCapability>;
   /** Nearby places, optionally limited to kinds (metro, bus, pharmacy, health, police, food, shop, toilets, finance). */
   nearby(p: GeoPoint, radiusM: number, kinds?: string[]): Promise<PlaceHit[]>;
   /**

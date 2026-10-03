@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useOverlay } from "@/lib/use-overlay";
 import { useClock } from "@/lib/location-store";
 import { HELP_CLASSES, SOURCE_NAME, helpWeightsFor, hoursLine, hoursShort, isNight, rankHelpPoints, type HelpClass, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
-import { localTime } from "@/domain/opening-hours";
+import { localTimeInZone } from "@/domain/opening-hours";
 import { useCountry } from "@/lib/locale-store";
 import { EmergencyPill } from "@/components/app/EmergencyPill";
 import { emergencyStatusNote, otherEmergencyNumbers } from "@/domain/country-context";
@@ -17,6 +17,11 @@ export interface UnsafeShareAction {
   label: string;
   detail: string;
   onShare: () => void | Promise<void>;
+}
+export interface UnsafeChangeAction {
+  label: string;
+  detail: string;
+  onReview: () => void;
 }
 
 /**
@@ -57,6 +62,7 @@ export function UnsafeSheet({
   exclude,
   onTrip,
   staleLocation = false,
+  change,
 }: {
   open: boolean;
   onClose: () => void;
@@ -80,11 +86,14 @@ export function UnsafeSheet({
   exclude?: readonly HelpClass[];
   onTrip?: boolean;
   staleLocation?: boolean;
+  /** Review only: a separate confirmation is required to change any active journey. */
+  change?: UnsafeChangeAction | null;
 }) {
   useOverlay(open, onClose);
   const now = useClock();
   const locale = useCountry();
-  const night = isNight((now ?? new Date()).getHours());
+  const placeClock = localTimeInZone(now ?? new Date(), locale.timezone);
+  const night = placeClock ? isNight(Math.floor(placeClock.minute / 60)) : true;
   const minuteKey = now ? Math.floor(now.getTime() / 60_000) : 0;
   const weights = useMemo(() => helpWeightsFor(locale.iso), [locale.iso]);
   const ranked = useMemo(
@@ -94,13 +103,13 @@ export function UnsafeSheet({
             situation: "unsafe",
             night,
             route,
-            now: minuteKey ? localTime(new Date(minuteKey * 60_000)) : undefined,
+            timeZone: locale.timezone,
             at: minuteKey ? minuteKey * 60_000 : undefined,
             exclude,
             weights,
           })
         : [],
-    [helpPoints, me, night, route, minuteKey, exclude, weights],
+    [helpPoints, me, night, route, minuteKey, exclude, weights, locale.timezone],
   );
   const [first, ...more] = ranked;
   if (!open) return null;
@@ -116,10 +125,10 @@ export function UnsafeSheet({
     <div role="dialog" aria-modal="true" aria-labelledby="unsafe-h" className="fixed inset-0 z-50 flex items-end justify-center bg-scrim animate-fade sm:items-center" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[92dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-[var(--radius-lg)] bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[var(--radius-lg)]"
+        className="max-h-[92dvh] min-w-0 w-full max-w-[min(28rem,100vw)] overflow-x-hidden overflow-y-auto overscroll-contain rounded-t-[var(--radius-lg)] bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[var(--radius-lg)]"
       >
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
+        <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3" aria-label="Immediate support actions">
+          <div className="min-w-0 break-words">
             <h2 id="unsafe-h" className="text-xl font-semibold">
               Right now
             </h2>
@@ -127,10 +136,11 @@ export function UnsafeSheet({
               {[area ? `Near ${area.replace(/^Near /, "")}` : null, now ? now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : null].filter(Boolean).join(" · ") || "Here's what you can do"}
             </p>
           </div>
-          <button type="button" aria-label="Close" onClick={onClose} className="grid size-11 shrink-0 place-items-center rounded-full bg-sunken">
+          <button type="button" aria-label="Close" onClick={onClose} className="grid size-12 shrink-0 place-items-center rounded-full bg-sunken">
             <Icon name="close" className="size-4" />
           </button>
-        </div>
+          <div className="col-span-2 min-w-0" aria-label="Immediate Emergency action"><EmergencyPill className="w-full max-w-full justify-center [white-space:normal] [&>span]:min-w-0 [&>span]:break-words" /></div>
+        </header>
 
         {/* A calm lead: the nearest place with people, in one line (deterministic; no AI, no wait). */}
         <p className="mt-3 text-[1.0625rem] font-medium leading-snug">
@@ -187,6 +197,8 @@ export function UnsafeSheet({
           ) : null}
         </div>
 
+        {change ? <button type="button" onClick={change.onReview} className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-card)] border border-line p-4 text-left"><Icon name="route" className="shrink-0" /><span className="min-w-0"><span className="block font-semibold">{change.label}</span><span className="block text-sm text-ink-muted">{change.detail}</span></span></button> : null}
+
         {/* 2. Tell people */}
         {tell ? <TellMyPeople tell={tell} /> : peopleLoading ? <p role="status" className="mt-3 text-sm text-ink-muted">Checking your Circle…</p> : null}
         {share ? (
@@ -202,10 +214,11 @@ export function UnsafeSheet({
         ) : null}
 
         {/* 3. Call */}
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="mt-3 grid min-w-0 grid-cols-1 gap-3 min-[480px]:grid-cols-2">
           <CallSomeone />
-          <EmergencyPill variant="block" />
+          <EmergencyPill variant="block" className="min-w-0 [white-space:normal] [&>span]:min-w-0 [&>span]:break-words" />
         </div>
+
         {/* Partly verified, region-dependent or unverified: say so beside the call options. */}
         {emergencyStatusNote(locale) ? <p className="mt-2 text-xs text-ink-muted">{emergencyStatusNote(locale)}</p> : null}
         {/* Other official numbers for this country (e.g. Japan: 119 for ambulance and fire), from the same cited profile. */}
@@ -290,7 +303,7 @@ function CallSomeone() {
   };
   if (!typing) {
     return (
-      <button type="button" onClick={() => void pick()} className="flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[0.95rem] font-semibold">
+      <button type="button" onClick={() => void pick()} className="flex min-h-14 min-w-0 items-center justify-center gap-2 whitespace-normal rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-[0.95rem] font-semibold">
         <Icon name="phone" className="size-5" /> Call someone
       </button>
     );
@@ -301,7 +314,7 @@ function CallSomeone() {
         e.preventDefault();
         if (clean.length >= 3) window.location.href = `tel:${clean}`;
       }}
-      className="col-span-2 row-start-1 flex gap-2"
+      className="row-start-1 grid min-w-0 grid-cols-1 gap-2 min-[480px]:grid-cols-[minmax(0,1fr)_auto]"
     >
       <label htmlFor="call-num" className="sr-only">
         Phone number to call
@@ -346,8 +359,8 @@ function TellMyPeople({ tell }: { tell: UnsafeTellAction }) {
           </>
         ) : null}
         <p className={state.whatsapp.length ? "mt-3" : ""}>
-          {state.told.length ? <strong>Emailed {state.told.join(" and ")}. </strong> : null}
-          {state.told.length ? "They can see where you are and were asked to check on you. " : ""}
+          {state.told.length ? <strong>Email accepted for {state.told.join(" and ")}; receipt is unknown. </strong> : null}
+          {state.told.length ? "The email includes your live link and asks them to check on you. " : ""}
           {state.failed.length ? `Couldn't reach ${state.failed.join(", ")} by email — call them, or send your live link. ` : ""}
           Mira didn&apos;t contact anyone else.
         </p>

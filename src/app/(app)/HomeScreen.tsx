@@ -31,29 +31,27 @@ import type { EvidenceState } from "@/domain/evidence-state";
 import { setCountry, useCountry, type CountryContext } from "@/lib/locale-store";
 import { InstallCard } from "@/components/pwa/InstallCard";
 import { useFlag } from "@/lib/flags";
-import { useOverlay } from "@/lib/use-overlay";
+import { closeOverlayThen, useOverlay } from "@/lib/use-overlay";
 import { Button } from "@/components/ui/Button";
 import { cx } from "@/components/ui/cx";
 import { Icon } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api-client";
 import { SafetyUpdatesSection } from "@/components/app/SafetyUpdates";
-import { shareLiveLink } from "@/lib/share";
 import { keepTripRoute } from "@/lib/trip-route";
 import { suggestionQuery, tripStartExtras } from "@/lib/trip-start";
 import type { HabitSuggestion } from "@/domain/habits";
-import { clearPendingDestination, greetingFor, peekPendingDestination, setArea, setPendingReportSpot, shouldAutoLocate, useClock, useLocation, watchWhileVisible, type PickedSpot } from "@/lib/location-store";
+import { clearPendingDestination, greetingFor, peekPendingDestination, rememberLocationChoice, setArea, setPendingReportSpot, shouldAutoLocate, useClock, useLocation, watchWhileVisible, type PickedSpot } from "@/lib/location-store";
 import type { SavedPlace } from "@/server/account/places";
 import type { Contact } from "@/server/account/contacts";
 import type { TripView } from "@/server/trips";
 import { hasPlanWork, intentFromDraft, resolvedDestination, resolvedOrigin } from "@/domain/plan-state";
 import { setPlanDraft, usePlanDraft, usePlanHydrated } from "@/lib/plan-store";
 import { PlanOptions } from "@/components/app/PlanOptions";
-import { instantForLocal, type PlanOption } from "@/domain/plan-options";
-import { loopCheckInEligibility, planStartEligibility } from "@/domain/plan-journey";
-import { requestLocation } from "@/lib/location-store";
-import { localLoopEligibility } from "@/domain/local-check-in";
-import { startLocalCheckIn } from "@/lib/local-check-in-store";
+import { PlanJourneyControls } from "@/components/app/PlanJourneyControls";
+import { RecipientPicker } from "@/components/app/RecipientPicker";
+import { locationUsable, currentLocation, usableLocationPoint } from "@/lib/location-store";
+import { planOptionsKey, type PlanOption } from "@/domain/plan-options";
 
 interface Place {
   id: string;
@@ -131,13 +129,11 @@ export function HomeScreen({
   const plan = planDraft ? intentFromDraft(planDraft) : null;
   const planOrigin = plan ? resolvedOrigin(plan) : null;
   const planDestination: Destination | null = plan ? resolvedDestination(plan) : null;
-  const planRouteKey = plan && planOrigin && planDestination ? JSON.stringify({ from: planOrigin, to: { lat: planDestination.lat, lon: planDestination.lon }, departure: plan.departure, mode: plan.mode }) : "";
+  const planRouteKey = plan ? planOptionsKey(plan) : "";
   const [planGeometry, setPlanGeometry] = useState<[number, number][] | null>(null);
   const [planChoice, setPlanChoice] = useState<{ key: string; option: PlanOption } | null>(null);
   const chosenPlanOption = planChoice?.key === planRouteKey ? planChoice.option : null;
   const choosePlan = useCallback((option: PlanOption | null, key: string) => setPlanChoice(option ? { key, option } : null), []);
-  const [confirmPlanStart, setConfirmPlanStart] = useState<string | null>(null);
-  const [loopEtaMinutes, setLoopEtaMinutes] = useState(30);
   const [initialDest] = useState(() => peekPendingDestination());
   useEffect(() => { if (initialDest) clearPendingDestination(initialDest); }, [initialDest]);
   const [poiArea, setPoiArea] = useState<string | null>(null);
@@ -179,23 +175,13 @@ export function HomeScreen({
   const countryIso = useCountry().iso;
   const units = distanceUnits(countryIso);
   const exclude = useMemo(() => (user?.helpExclude ?? []) as HelpClass[], [user?.helpExclude]);
-  const accepted = contacts.filter((c) => c.status === "accepted" && c.isDefault);
   const [shareWithCircle, setShareWithCircle] = useState(false);
+  const [recipientIds, setRecipientIds] = useState<string[]>([]);
   // "Like usual" — only when her own finished journeys back it up (>= 3 to this saved place around this hour).
   const [habit, setHabit] = useState<HabitSuggestion | null>(null);
   const chromeRef = useRef<HTMLDivElement>(null);
   useChromeTop(chromeRef);
   const wide = useWide();
-
-  // First visit: show the short onboarding once (per-device convenience flag only).
-  useEffect(() => {
-    if (user || !planHydrated || planActive) return;
-    try {
-      if (!localStorage.getItem("mira.welcomed")) router.replace("/welcome");
-    } catch {
-      /* storage unavailable: stay on home */
-    }
-  }, [user, router, planHydrated, planActive]);
 
   // Keep the dot live while Home is on screen (paused when the app is hidden).
   const located = loc.status === "ok";
@@ -204,7 +190,7 @@ export function HomeScreen({
   const area = loc.area ?? poiArea;
 
   // Where am I, what's around, and the Help Points near me (fetched ahead, so "I feel unsafe" is instant).
-  const meKey = me ? `${me.lat.toFixed(3)},${me.lon.toFixed(3)}` : "";
+  const meKey = me ? `${me.lat.toFixed(3)},${me.lon.toFixed(3)}|${Math.floor(loc.at / 60_000)}` : "";
   useEffect(() => {
     if (!planHydrated || !me || planActive) return;
     let stop = false;
@@ -217,7 +203,7 @@ export function HomeScreen({
       if (stop) return;
       if (r.ok) {
         setPoiArea(r.data.label);
-        setCountry(r.data.country); // emergency numbers + helplines for the country she is in
+        if (locationUsable(currentLocation()) && currentLocation().point && Math.abs(currentLocation().point!.lat - me.lat) < .001 && Math.abs(currentLocation().point!.lon - me.lon) < .001) setCountry(r.data.country, { point: me, checkedAt: loc.at }); // emergency numbers + helplines for the country she is in
       }
       if (n.ok) setNearby(n.data);
       setNearbyFailed(!n.ok);
@@ -348,8 +334,8 @@ export function HomeScreen({
   const activeTrip = trip && (trip.state === "active" || trip.state === "missed") ? trip : null;
   const invited = contacts.filter((c) => c.status === "invited");
   // Her Circle for a journey: accepted email contacts Mira emails (when email is on), and contacts she sends her link on WhatsApp.
-  const emailed = emailAlerts ? accepted : [];
-  const onWhatsApp = contacts.filter((c) => c.phone && c.isDefault);
+  const emailed = emailAlerts ? contacts.filter((c) => recipientIds.includes(c.id) && c.status === "accepted") : [];
+  const onWhatsApp = contacts.filter((c) => recipientIds.includes(c.id) && c.phone);
   const circle = [...new Map([...emailed, ...onWhatsApp].map((c) => [c.id, c])).values()];
   const sharesWithCircle = Boolean(user && circle.length && shareWithCircle);
   /** Who follows this journey and how, in her words — WhatsApp is a tap she makes; email is an attempt Mira makes. */
@@ -367,6 +353,7 @@ export function HomeScreen({
     if (!user) return setSignIn("Sign in to start with Mira");
     const target = to ?? dest;
     if (!target || !me || starting) return;
+    if (!locationUsable(currentLocation())) return toast("Refresh your location before starting.", "error");
     const picked = !to && option > 0 ? chosen : null;
     setStarting(true);
     const walking = to || mode === "walk";
@@ -376,7 +363,7 @@ export function HomeScreen({
       body: {
         from: me,
         to: { lat: target.lat, lon: target.lon, name: target.name.slice(0, 80) },
-        share: sharesWithCircle,
+        share: sharesWithCircle, recipientIds: sharesWithCircle ? recipientIds : [],
         ...(walking ? (picked ? { routeMinutes: picked.route.minutes } : {}) : { mode, etaMinutes: tripEta }),
         ...tripStartExtras(saved?.id),
       },
@@ -397,65 +384,6 @@ export function HomeScreen({
     }
   };
 
-  const startChosenPlan = async () => {
-    if (!plan || !chosenPlanOption || starting) return;
-    if (!user) return setSignIn("Sign in to start with Mira");
-    const target = resolvedDestination(plan);
-    if (!target) return;
-    const planned = instantForLocal(plan.departure.local, plan.departure.timeZone);
-    if (!planned || Math.abs(planned.getTime() - Date.now()) > 30 * 60_000) return toast("Edit the plan's departure to now before starting.", "error");
-    setStarting(true);
-    const fix = await requestLocation();
-    const eligibility = planStartEligibility(plan, chosenPlanOption, fix.status === "ok" && fix.point ? { ...fix.point, at: fix.at } : null, Date.now());
-    if (!eligibility.ok) { setStarting(false); return toast(eligibility.reason, "error"); }
-    const result = await api<{ trip: TripView }>("/api/trips", { body: {
-      from: { lat: fix.point!.lat, lon: fix.point!.lon },
-      to: { lat: target.lat, lon: target.lon, name: target.name.slice(0, 80) },
-      routeMinutes: Math.max(1, Math.round(chosenPlanOption.minutes)),
-      share: sharesWithCircle,
-    } });
-    setStarting(false);
-    if (result.ok) {
-      keepTripRoute(result.data.trip.id, chosenPlanOption.geometry);
-      recordUsage("journey");
-      haptic("journey-start");
-      router.push("/trip");
-      router.refresh();
-    } else if (result.code === "trip_active") {
-      router.push("/trip");
-    } else toast(result.message, "error");
-  };
-
-  const startLoopCheckIn = async () => {
-    if (!plan?.loop || starting) return;
-    if (!user) {
-      const eligibility = localLoopEligibility(plan, Date.now());
-      if (!eligibility.ok) return toast(eligibility.reason, "error");
-      if (!startLocalCheckIn(loopEtaMinutes)) return toast("Choose a check-in time between 5 and 235 minutes.", "error");
-      router.push("/trip/local");
-      return;
-    }
-    setStarting(true);
-    const fix = await requestLocation();
-    const eligibility = loopCheckInEligibility(plan, fix.status === "ok" && fix.point ? { ...fix.point, at: fix.at } : null, Date.now());
-    if (!eligibility.ok) { setStarting(false); return toast(eligibility.reason, "error"); }
-    const result = await api<{ trip: TripView }>("/api/trips", { body: {
-      from: { lat: fix.point!.lat, lon: fix.point!.lon },
-      mode: "walk",
-      etaMinutes: loopEtaMinutes,
-      tz: plan.departure.timeZone,
-      share: sharesWithCircle,
-    } });
-    setStarting(false);
-    if (result.ok) {
-      recordUsage("journey");
-      haptic("journey-start");
-      router.push("/trip");
-      router.refresh();
-    } else if (result.code === "trip_active") router.push("/trip");
-    else toast(result.message, "error");
-  };
-
   const savePlace = async (label: string, emoji: string) => {
     if (!user) return setSignIn("Sign in to save places");
     if (!dest || saving) return;
@@ -470,68 +398,8 @@ export function HomeScreen({
   };
 
   // "I feel unsafe": the share action depends on what's already known — never asks for anything Mira has.
-  const unsafeShare: UnsafeShareAction = activeTrip?.shareUrl
-    ? {
-        label: "Send my live link",
-        detail: `Anyone you send it to sees you until you arrive at ${activeTrip.destination.name}.`,
-        onShare: async () => {
-          const r = await shareLiveLink(activeTrip.shareUrl!, activeTrip.destination.name);
-          if (r === "copied") toast("Live link copied — paste it in WhatsApp or a message.");
-          if (r === "failed") toast("Couldn't share the link on this device.", "error");
-        },
-      }
-    : !user
-      ? { label: "Share my journey live", detail: "Sign in, then send a live link to anyone.", onShare: () => (setUnsafe(false), setSignIn("Sign in to start with Mira")) }
-      : dest || home
-        ? {
-            label: `Share my journey to ${dest ? dest.name : home!.label}`,
-            detail: "Starts a live journey now. Then send the link to anyone you choose.",
-            onShare: () => {
-              setUnsafe(false);
-              void startTrip(dest ? undefined : { name: home!.label, lat: home!.lat, lon: home!.lon });
-            },
-          }
-        : me
-          ? {
-              // No destination to ask for in this moment: share where she is, now, and send the link from the journey screen.
-              label: "Share where I am, live",
-              detail: "Starts sharing your location now. Then send the link to anyone you choose; it stops when you say you're okay.",
-              onShare: async () => {
-                setUnsafe(false);
-                const r = await api<{ trip: TripView }>("/api/trips", { body: { from: me, share: sharesWithCircle, etaMinutes: 30 } });
-                if (r.ok) recordUsage("journey");
-                if (r.ok || r.code === "trip_active") {
-                  router.push("/trip");
-                  router.refresh();
-                } else toast(r.message, "error");
-              },
-            }
-          : { label: "Share my journey live", detail: "Turn on location, then send a live link to anyone.", onShare: () => (setUnsafe(false), void loc.request()) };
-  // "Tell my people now": emails her accepted contacts at once. With no journey running, it first
-  // starts one that just shares where she is (no destination), so they have a live link to open.
-  const tellAction: UnsafeTellAction | null =
-    user && circle.length && me
-      ? {
-          names: circle.map((c) => c.name),
-          email: emailed.length > 0,
-          onTell: async () => {
-            let tripId = activeTrip?.id ?? null;
-            if (!tripId) {
-              const r = await api<{ trip: TripView }>("/api/trips", { body: { from: me, share: true, etaMinutes: 30 } });
-              if (!r.ok && r.code !== "trip_active") return { error: r.message };
-              tripId = r.ok ? r.data.trip.id : null;
-              if (!tripId) {
-                const cur = await api<{ trip: TripView | null }>("/api/trips/current");
-                tripId = cur.ok ? (cur.data.trip?.id ?? null) : null;
-              }
-            }
-            if (!tripId) return { error: "Couldn't start sharing right now. Send your live link or call them." };
-            const t = await api<{ told: string[]; failed: string[]; whatsapp: Array<{ name: string; url: string }> }>(`/api/trips/${tripId}/checkon`, { body: {} });
-            router.refresh();
-            return t.ok ? t.data : { error: t.message };
-          },
-        }
-      : null;
+  const unsafeShare: UnsafeShareAction = { label: activeTrip ? "Manage journey sharing" : "Review sharing choices", detail: "Review recipients before any start or notification.", onShare: () => closeOverlayThen(() => setUnsafe(false), () => router.push(activeTrip ? "/trip" : "/plan")) };
+  const tellAction: UnsafeTellAction | null = activeTrip?.sharedWith.length ? { names: activeTrip.sharedWith.map((c) => c.name), email: emailAlerts && activeTrip.sharedWith.some((c) => c.viaEmail), onTell: async () => { const r = await api<{ told: string[]; failed: string[]; whatsapp: Array<{ name: string; url: string }> }>(`/api/trips/${activeTrip.id}/checkon`, { body: {} }); return r.ok ? r.data : { error: r.message }; } } : null;
   const unsafeHelp = useMemo(() => dedupeHelpPoints([...(chosen?.helpPoints ?? []), ...(nearHelp?.points ?? [])]), [chosen, nearHelp]);
 
   // One sentence, and only what's true: who follows, and whether anyone is alerted.
@@ -686,14 +554,14 @@ export function HomeScreen({
           <div className="mt-2">
             <HelpCluster onUnsafe={() => setUnsafe(true)} />
           </div>
-          </div>
-          {loc.status === "denied" || loc.status === "unavailable" ? (
-            <button type="button" onClick={() => loc.request()} className="mt-2 w-full rounded-2xl bg-warm-soft px-4 py-2.5 text-left text-sm font-semibold text-warm">
-              {loc.status === "denied"
+          {loc.status === "idle" || loc.status === "denied" || loc.status === "unavailable" ? (
+            <button type="button" onClick={() => { rememberLocationChoice(true); void loc.request(); }} className="mt-2 min-h-12 w-full rounded-2xl bg-warm-soft px-4 py-2.5 text-left text-sm font-semibold text-warm">
+              {loc.status === "idle" ? "Use my location for local context" : loc.status === "denied"
                 ? "Location is off for Mira, so it can't show the way from here or Help Points near you. Allow it in your browser's site settings (the icon next to the address), then tap here. Search still works."
                 : "Can't find you right now → Tap to try again"}
             </button>
           ) : null}
+          </div>
           {pinMode ? (
             <div className="pointer-events-auto mt-2 flex items-center gap-2 rounded-2xl bg-ink py-1.5 pl-4 pr-1.5 text-sm font-semibold text-canvas">
               <span className="flex-1">Tap the map to choose a spot</span>
@@ -770,12 +638,9 @@ export function HomeScreen({
         {planActive && plan?.loop && plan.mode === "walk" && planOrigin ? (
           <div className="space-y-3">
             <h2 className="text-lg font-semibold">Loop from {plan.origin.kind === "named" ? plan.origin.query : "here"}</h2>
-            <PlanOptions plan={plan} />
-            <p className="text-sm text-ink-muted">No loop route or walking time is verified. Choose your own check-in time; this journey will not detect when you return.</p>
-            <label className="block text-sm font-semibold">Check in after<select value={loopEtaMinutes} onChange={(e) => { setLoopEtaMinutes(Number(e.target.value)); setConfirmPlanStart(null); }} className="mt-1 min-h-11 w-full rounded-lg border border-line bg-surface px-3">{ETA_CHOICES.filter((minutes) => minutes <= 180).map((minutes) => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</select></label>
-            {activeTrip ? <Link href="/trip" className="inline-flex min-h-11 items-center text-accent-strong underline">Open active journey</Link> : confirmPlanStart === "loop" ? <div className="rounded-lg border border-line p-3"><p className="text-sm">{user ? <>Start a manual check-in-only loop now? Mira will request a fresh position and check that you are near the planned origin. No route or automatic arrival is available. {sharesWithCircle ? `Mira will attempt to notify ${names(circle.map((c) => c.name))}.` : "Nobody in your Circle will be notified. You can send a live link yourself."}</> : <>Start a private check-in timer for {loopEtaMinutes} minutes? Mira cannot verify where you are, follow a route, detect your return or alert anyone. Keep this tab open and check in yourself. Emergency stays available.</>}</p><div className="mt-2 flex gap-2"><Button variant="primary" onClick={() => void startLoopCheckIn()} busy={starting} busyLabel="Starting…">{user ? "Confirm loop check-in" : "Confirm private check-in"}</Button><Button variant="secondary" onClick={() => setConfirmPlanStart(null)}>Cancel</Button></div></div> : <Button variant="primary" size="lg" onClick={() => setConfirmPlanStart("loop")}><Icon name="walk" /> Start manual loop check-in</Button>}
-            {user && circle.length ? <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Who follows this journey">{[[true, `Share with ${names(circle.map((c) => c.name))}`], [false, "Just me"]].map(([value, label]) => <button key={String(value)} type="button" role="radio" aria-checked={shareWithCircle === value} onClick={() => setShareWithCircle(value as boolean)} className={cx("min-h-11 rounded-full border-2 px-3 text-sm font-semibold", shareWithCircle === value ? "border-accent bg-accent-soft text-accent-strong" : "border-line text-ink-muted")}>{label as string}</button>)}</div> : null}
-            <p className="text-xs text-ink-muted">{!user ? "Without sign-in or GPS, this is a private timer in this tab. It does not monitor or notify anyone." : sharesWithCircle ? circleStartLine() : "Nobody is alerted automatically. You can choose to send a live link after starting."}</p>
+            <PlanOptions plan={plan} onRoute={setPlanGeometry} onChoice={choosePlan} />
+            <p className="text-sm text-ink-muted">Review mapped options when available. Manual progress does not detect your return.</p>
+            <PlanJourneyControls plan={plan!} option={chosenPlanOption} signedIn={Boolean(user)} emailAlerts={emailAlerts} />
           </div>
         ) : dest ? (
           <div className="animate-rise">
@@ -910,26 +775,8 @@ export function HomeScreen({
               </section>
             ) : null}
             <div className="mt-3">
-              {planActive ? plan?.mode === "walk" && chosenPlanOption ? confirmPlanStart === planRouteKey ? <div className="rounded-lg border border-line p-3"><p className="text-sm">Start this walking journey now from your current position? Mira will check that you are near the planned origin. {sharesWithCircle ? `Mira will attempt to notify ${names(circle.map((c) => c.name))}.` : "Nobody in your Circle will be notified. You can send a live link yourself."}</p><div className="mt-2 flex gap-2"><Button variant="primary" onClick={() => void startChosenPlan()} busy={starting} busyLabel="Checking location…">Confirm start</Button><Button variant="secondary" onClick={() => setConfirmPlanStart(null)}>Cancel</Button></div></div> : <Button variant="primary" size="lg" onClick={() => setConfirmPlanStart(planRouteKey)}><Icon name="walk" /> Start chosen walk</Button> : <p className="text-sm text-ink-muted">{plan?.mode === "walk" ? "Choose a mapped walking option before starting. Future plans can start when you are at the origin and ready to go." : "A future ride or transit service has not been checked. Confirm operation, pickup and last-leg access with the provider. You can edit this plan or choose walking if a mapped walk suits you."}</p> : <Button variant="primary" size="lg" onClick={() => void startTrip()} busy={starting} busyLabel="Starting…" disabled={!me || (mode !== "walk" && routeLoading)}><Icon name={mode === "walk" ? "walk" : "route"} /> Go with Mira</Button>}
-              {user && circle.length ? (
-                <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Who follows this journey">
-                  {[
-                    [true, `Share with ${names(circle.map((c) => c.name))}`],
-                    [false, "Just me"],
-                  ].map(([v, label]) => (
-                    <button
-                      key={String(v)}
-                      type="button"
-                      role="radio"
-                      aria-checked={shareWithCircle === v}
-                      onClick={() => setShareWithCircle(v as boolean)}
-                      className={cx("min-h-11 truncate rounded-full border-2 px-3 text-sm font-semibold", shareWithCircle === v ? "border-accent bg-accent-soft text-accent-strong" : "border-line text-ink-muted")}
-                    >
-                      {label as string}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+              {planActive && plan ? <PlanJourneyControls plan={plan} option={chosenPlanOption} signedIn={Boolean(user)} emailAlerts={emailAlerts} /> : <Button variant="primary" size="lg" onClick={() => void startTrip()} busy={starting} busyLabel="Starting…" disabled={!me || (mode !== "walk" && routeLoading)}><Icon name={mode === "walk" ? "walk" : "route"} /> Go with Mira</Button>}
+              {user && !planActive ? <RecipientPicker contacts={contacts} selectedIds={recipientIds} onChange={(ids) => { setRecipientIds(ids); setShareWithCircle(ids.length > 0); }} /> : null}
               {/* Who follows and whether anyone is alerted: stated before she starts, never implied. */}
               <p className="mt-2 text-center text-xs text-ink-muted">
                 {!user
@@ -1084,8 +931,9 @@ export function HomeScreen({
       />
       <UnsafeSheet
         open={unsafe}
+        change={{ label: "Review another destination", detail: "Choose a place and inspect the route before starting. Nothing changes by opening search.", onReview: () => closeOverlayThen(() => setUnsafe(false), () => setSearchOpen(true)) }}
         onClose={() => setUnsafe(false)}
-        me={me}
+        me={usableLocationPoint(loc, now?.getTime())}
         area={area}
         helpPoints={unsafeHelp}
         helpLoading={Boolean(me) && nearHelp?.key !== meKey}
@@ -1104,7 +952,7 @@ export function HomeScreen({
       <HelpNearSheet
         open={nearOpen}
         onClose={() => setNearOpen(false)}
-        me={me}
+        me={usableLocationPoint(loc, now?.getTime())}
         points={nearHelp?.points ?? []}
         evidence={nearHelp?.evidence ?? null}
         failed={Boolean(nearHelp?.failed)}

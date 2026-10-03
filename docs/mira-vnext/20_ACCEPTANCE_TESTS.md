@@ -253,3 +253,14 @@ This is the current implementation audit; the earlier snapshot above remains as 
 5. **Country and optional community evidence:** Identify official emergency/transport source owner and intended countries for dated regional review, then regenerate registry coverage. Optional route/time community or local-development claims need source rights, moderation duty, eligibility thresholds, correction and withdrawal operations before enablement.
 
 No fixture, placeholder or bounded provider probe satisfies a live scenario claim.
+
+
+## v0 flagship implementation continuation — 2026-10-03
+
+The founder-authorised implementation supersedes the preceding current-state matrices. The frozen thesis is unchanged; there is no additional product phase. S1's formerly unresolved minimum is now explicitly defined and demonstrated with mapped loops, editable pace/duration, route/time/daylight choice and a guest no-GPS selected-route manual journey (guidance, progress, private check-in and explicit arrival). A timer alone still fails.
+
+[Current S1–S7 matrix, repairs, commands, screenshots and walkthrough evidence](27_V0_IMPLEMENTATION_EVIDENCE.md). [Provider rights/capabilities/evidence register](28_PROVIDER_EVIDENCE.md). Three isolated browser agents covered guest, signed-in and traveler scenarios on mobile emulation and desktop using fictional data; source fixtures were identified separately from actual local APIs and imported OSM archive routing. Enlarged-text urgent overflow was observed, fixed and given a persistent browser regression.
+
+No automated fixture establishes a live route, operating service, open/staffed Help Point or safety outcome. Physical-phone evidence remains **UNKNOWN**, external recruitment optional, independent privacy/security/staging retention/backup/provider-worker operations remain release-only gates. Migration0024 was applied only to isolated local test databases. No commit, deployment or production migration occurred. Full V1 release acceptance remains **PARTIAL**, public beta **NOT READY**.
+
+**S4 long-night condition:** Save a complete fictional dinner/return explicitly; confirm arrival; advance the actual browser timers through three hours and prove the two-hour draft is removed before reload. Restore the exact dated return from the saved-return picker, recheck fresh options and require a separate start confirmation. Preserve the event as another leg, named places, time zone and recipient preferences without GPS, automatic sharing or a journey POST. Deleted/expired/account-inaccessible plans cannot be restored. `setFixedTime` alone is insufficient expiry evidence.

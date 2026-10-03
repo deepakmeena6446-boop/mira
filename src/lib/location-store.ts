@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { haversineMeters } from "@/domain/pilot";
+import { invalidateCountryForLocation, clearCountry } from "@/lib/locale-store";
 
 /**
  * The user's current position, held in JS memory only (never persisted, never put in
@@ -16,30 +17,57 @@ export interface LocState {
   area: string | null;
 }
 
+export const LOCATION_FRESH_MS = 120_000;
+export const LOCATION_MAX_ACCURACY_M = 100;
+export function locationUsable(loc: LocState, options: { at?: number; maxAgeMs?: number; maxAccuracyM?: number } = {}): boolean {
+  const age = (options.at ?? Date.now()) - loc.at;
+  return loc.status === "ok" && Boolean(loc.point) && Number.isFinite(loc.point?.lat) && Math.abs(loc.point!.lat) <= 90 && Number.isFinite(loc.point?.lon) && Math.abs(loc.point!.lon) <= 180 && age >= -10_000 && age < (options.maxAgeMs ?? LOCATION_FRESH_MS) && Number.isFinite(loc.point?.accuracy) && loc.point!.accuracy >= 0 && loc.point!.accuracy <= (options.maxAccuracyM ?? LOCATION_MAX_ACCURACY_M);
+}
+export function usableLocationPoint(loc: LocState, at = Date.now()): LocState["point"] { return locationUsable(loc, { at }) ? loc.point : null; }
+
+let locationGeneration = 0;
 let state: LocState = { status: "idle", point: null, at: 0, area: null };
+export function currentLocation(): LocState { return state; }
 const listeners = new Set<() => void>();
 const set = (s: Partial<LocState>) => {
   state = { ...state, ...s };
   listeners.forEach((l) => l());
 };
 
+export function clearLocation() {
+  locationGeneration++;
+  set({ status: "idle", point: null, at: 0, area: null });
+  pendingDest = null;
+  clearCountry();
+}
+
 export function requestLocation(): Promise<LocState> {
   return new Promise((resolve) => {
+    const generation = locationGeneration;
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
-      set({ status: "unavailable" });
+      set({ status: "unavailable", point: null, at: 0, area: null });
+      clearCountry();
       return resolve(state);
     }
     if (state.status !== "ok") set({ status: "asking" });
     navigator.geolocation.getCurrentPosition(
       (p) => {
-        set({ status: "ok", point: { lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy }, at: Date.now() });
+        if (generation !== locationGeneration) return resolve(state);
+        const point = { lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy };
+        set({ status: "ok", point, at: p.timestamp });
+        if (!locationUsable(state)) { set({ status: "unavailable", point: null, area: null }); clearCountry(); }
+        else invalidateCountryForLocation(point);
         resolve(state);
       },
       (e) => {
-        set({ status: e.code === e.PERMISSION_DENIED ? "denied" : "unavailable" });
+        if (generation !== locationGeneration) return resolve(state);
+        set({ status: e.code === e.PERMISSION_DENIED ? "denied" : "unavailable", point: null, at: 0, area: null });
+        clearCountry();
         resolve(state);
       },
-      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 },
+      // An explicit retry/confirmation must acquire a new fix, not return the
+      // browser's cached point that may have just failed the origin check.
+      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 0 },
     );
   });
 }
@@ -49,15 +77,17 @@ export function rememberLocationChoice(useLocation: boolean) {
   try { localStorage.setItem("mira.location.skip", useLocation ? "0" : "1"); } catch { /* memory-only location still works */ }
 }
 export function shouldAutoLocate(): boolean {
-  try { return localStorage.getItem("mira.welcomed") === "1" && localStorage.getItem("mira.location.skip") !== "1"; } catch { return false; }
+  // Only an explicit location choice authorises reacquisition on a local-context screen.
+  // Merely completing onboarding must not opt in; choosing location needs no onboarding flag.
+  try { return localStorage.getItem("mira.location.skip") === "0"; } catch { return false; }
 }
 
 /** A fix older than this is refreshed before it's used for anything that matters. */
-const FRESH_MS = 2 * 60_000;
+const FRESH_MS = LOCATION_FRESH_MS;
 
 /** The current position, refreshed first if it's stale (for reports, trips, saving "here"). */
 export async function freshLocation(): Promise<LocState> {
-  if (state.status === "ok" && state.point && Date.now() - state.at <= FRESH_MS) return state;
+  if (locationUsable(state)) return state;
   return requestLocation();
 }
 
@@ -78,16 +108,21 @@ function accept(fix: { lat: number; lon: number; accuracy: number }): boolean {
  * no battery in the background. Returns a cleanup function.
  */
 export function watchWhileVisible(): () => void {
+  const generation = locationGeneration;
   if (typeof navigator === "undefined" || !("geolocation" in navigator)) return () => {};
   let id: number | null = null;
   const start = () => {
     if (id !== null || document.visibilityState !== "visible") return;
     id = navigator.geolocation.watchPosition(
       (p) => {
+        if (generation !== locationGeneration) return;
         const fix = { lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy };
-        if (accept(fix)) set({ status: "ok", point: fix, at: Date.now() });
+        const point = accept(fix) ? fix : { ...state.point!, accuracy: fix.accuracy };
+        set({ status: "ok", point, at: p.timestamp });
+        if (!locationUsable(state)) { set({ status: "unavailable", point: null, area: null }); clearCountry(); }
+        else invalidateCountryForLocation(point);
       },
-      (e) => e.code === e.PERMISSION_DENIED && set({ status: "denied" }),
+      (e) => { if (generation !== locationGeneration) return; set({ status: e.code === e.PERMISSION_DENIED ? "denied" : "unavailable", point: null, at: 0, area: null }); clearCountry(); },
       { enableHighAccuracy: true, maximumAge: 15_000 },
     );
   };
@@ -104,8 +139,10 @@ export function watchWhileVisible(): () => void {
   };
 }
 
-export function setLocation(point: LocState["point"]) {
-  set({ status: point ? "ok" : state.status, point, at: Date.now() });
+export function setLocation(point: LocState["point"], at = Date.now()) {
+  set({ status: point ? "ok" : "unavailable", point, at, area: point ? state.area : null });
+  if (!locationUsable(state)) { set({ status: "unavailable", point: null, area: null }); clearCountry(); }
+  else invalidateCountryForLocation(point);
 }
 
 export function useLocation(auto = true): LocState & { request: () => Promise<LocState> } {

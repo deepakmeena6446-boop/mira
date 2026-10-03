@@ -17,7 +17,7 @@ export function EmergencyPill({ className, variant = "pill" }: { className?: str
   const direct = actions.length === 1 && actions[0].scope === "all" ? actions[0] : null;
   const [explain, setExplain] = useState(false);
   const styles = {
-    pill: "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-sm font-semibold text-ink shadow-[var(--shadow-float)]",
+    pill: "inline-flex min-h-12 shrink-0 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-sm font-semibold text-ink shadow-[var(--shadow-float)]",
     block: "flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-button)] bg-ink px-3 text-[0.95rem] font-semibold text-canvas",
     link: "font-semibold text-ink underline",
   }[variant];
@@ -41,7 +41,7 @@ function EmergencyOptionsSheet({ open, onClose, country, actions }: { open: bool
   if (!open) return null;
   return createPortal(
     <div role="dialog" aria-modal="true" aria-labelledby="emergency-h" className="fixed inset-0 z-[60] flex items-end justify-center bg-scrim animate-fade sm:items-center" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-t-[var(--radius-lg)] bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[var(--radius-lg)]">
+      <div onClick={(e) => e.stopPropagation()} className="max-h-[92dvh] w-full min-w-0 max-w-[min(28rem,100vw)] overflow-y-auto overscroll-contain rounded-t-[var(--radius-lg)] bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[var(--radius-lg)]">
         <h2 id="emergency-h" className="text-xl font-semibold">Emergency call options</h2>
         {actions.length ? <>
           <p className="mt-2 text-sm text-ink-muted">Choose the service you need. Mira opens your phone&apos;s dialler; it does not make the call.</p>
@@ -51,7 +51,7 @@ function EmergencyOptionsSheet({ open, onClose, country, actions }: { open: bool
           </li>)}</ul>
           {note ? <p className="mt-3 text-xs text-ink-muted">{note}</p> : null}
         </> : <p className="mt-2 text-sm text-ink-muted">{noNumberReason(country)} If you know the local number, use your phone&apos;s dialler.</p>}
-        <button type="button" onClick={onClose} className="mt-3 min-h-11 w-full rounded-full font-semibold text-ink-muted hover:bg-sunken">Close</button>
+        <button type="button" onClick={onClose} className="mt-3 min-h-12 w-full rounded-full font-semibold text-ink-muted hover:bg-sunken">Close</button>
       </div>
     </div>, document.body,
   );

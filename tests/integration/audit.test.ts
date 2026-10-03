@@ -1,3 +1,4 @@
+import { chosenRecipientIds } from "../helpers/recipient-choice";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 
@@ -59,7 +60,7 @@ async function trustedContact(owner: Jar, name: string, tag: string) {
   return { email, id: contact.id as string };
 }
 async function startSharedTrip(dest = "Home") {
-  const res = await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: dest }, share: true }));
+  const res = await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: dest }, recipientIds: await chosenRecipientIds() }));
   expect(res.status).toBe(201);
   return (await res.json()).trip as { id: string; shareUrl: string };
 }

@@ -2,7 +2,15 @@ import { z } from "zod";
 import { TRAVEL_MODES } from "./travel-mode";
 
 /** Versioned movement contracts. Phase 1 binds only the intent schema to transient client state. */
-export const PLAN_CONTRACT_VERSION = 1 as const;
+export const PLAN_CONTRACT_VERSION = 2 as const;
+/** Version 1 remains readable; new tab drafts use the additive version 2 fields. */
+export const planVersionSchema = z.union([z.literal(1), z.literal(2)]);
+export const planTimeKindSchema = z.enum(["depart_at", "arrive_by"]);
+export const loopTargetSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("duration"), value: z.number().min(5).max(235) }).strict(),
+  z.object({ kind: z.literal("distance"), value: z.number().min(500).max(20_000) }).strict(),
+]);
+export const paceSchema = z.number().min(2).max(30);
 
 const point = z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).strict();
 const namedPlace = z.object({
@@ -26,7 +34,7 @@ export const plannedTimeSchema = z.object({
 }).strict();
 
 export const movementIntentSchema = z.object({
-  version: z.literal(PLAN_CONTRACT_VERSION),
+  version: planVersionSchema,
   activity: z.string().trim().min(1).max(160),
   origin: planOriginSchema,
   destination: namedPlace.nullable(),
@@ -34,6 +42,9 @@ export const movementIntentSchema = z.object({
   departure: plannedTimeSchema,
   mode: z.enum(TRAVEL_MODES),
   constraints: z.array(z.string().trim().min(1).max(120)).max(8),
+  timeKind: planTimeKindSchema.optional(),
+  loopTarget: loopTargetSchema.optional(),
+  paceMinutesPerKm: paceSchema.optional(),
 }).strict().refine((v) => v.loop || v.destination !== null, { path: ["destination"], message: "A one-way plan needs a destination" });
 export type MovementIntent = z.infer<typeof movementIntentSchema>;
 

@@ -8,15 +8,20 @@ test.describe("Privacy — links die, strangers see nothing, deletion is real", 
     const address = await addContact(owner.page, "Bhai", "bhai");
     const contact = await acceptContactInvite(browser, address);
     await openRoute(owner.page);
-    await owner.page.getByRole("radio", { name: /Share with Bhai/ }).click();
+    await owner.page.getByRole("checkbox", { name: /Bhai/ }).check();
     await owner.page.getByRole("button", { name: /Go with Mira/ }).click();
     await owner.page.waitForURL("**/trip");
     const link = await shareLinkFor(address);
-    const [trip] = await db`SELECT id FROM journeys ORDER BY created_at DESC LIMIT 1`;
+    const { trip } = await (await owner.page.request.get("/api/trips/current")).json();
+    expect(trip.sharedWith).toEqual([expect.objectContaining({ name: "Bhai", linkDelivery: "sent" })]);
 
     const stranger = await newUser(browser, "Stranger");
-    for (const action of ["end", "arrive", "extend"]) {
-      const res = await stranger.page.request.post(`/api/trips/${trip.id}/${action}`, { headers: SAME_ORIGIN, data: action === "extend" ? { minutes: 10 } : {} });
+    for (const [action, data] of [
+      ["end", {}], ["arrive", {}], ["extend", { minutes: 10 }], ["checkon", {}],
+      ["share", { recipientIds: [trip.sharedWith[0].id] }], ["revoke", { contactId: trip.sharedWith[0].id }],
+      ["link", {}], ["change", { to: { lat: 28.7, lon: 77.2, name: "Fictional change" }, etaMinutes: 20 }],
+    ] as const) {
+      const res = await stranger.page.request.post(`/api/trips/${trip.id}/${action}`, { headers: SAME_ORIGIN, data });
       expect(res.status(), action).toBe(404);
     }
     const loc = await stranger.page.request.post(`/api/trips/${trip.id}/location`, { headers: SAME_ORIGIN, data: { lat: 28.7, lon: 77.2 } });

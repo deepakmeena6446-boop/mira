@@ -1,31 +1,40 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { SafetyAccess } from "@/components/app/SafetyAccess";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { Icon } from "@/components/ui/Icon";
 import { api } from "@/lib/api-client";
-import { freshLocation } from "@/lib/location-store";
-import { clearPlanDraft, ensurePlanDraft, setPlanDraft, usePlanDraft } from "@/lib/plan-store";
+import { freshLocation, locationUsable } from "@/lib/location-store";
+import { clearPlanDraft, currentPlanDraft, ensurePlanDraft, setPlanDraft, usePlanDraft } from "@/lib/plan-store";
 import { intentFromDraft, resolvedDestination, resolvedOrigin, type PlanDraft, type PlanPlaceResolution } from "@/domain/plan-state";
 import { TRAVEL_MODE_INFO, type TravelMode } from "@/domain/travel-mode";
 import { TravelLegs } from "./TravelLegs";
+import { usePlanStep } from "@/lib/use-plan-step";
+import { PlanOptions } from "@/components/app/PlanOptions";
+import { PlanJourneyControls } from "@/components/app/PlanJourneyControls";
+import { DesktopPlanMap, InspectPlanMap } from "@/components/app/PlanMap";
+import { PlanConversation } from "@/components/app/PlanConversation";
+import { TimeZoneChoices } from "@/components/app/TimeZoneChoices";
+import { planOptionsKey, type PlanOption } from "@/domain/plan-options";
 
 type PlaceHit = { id: string; name: string; kind: string; lat: number; lon: number };
 type Field = "origin" | "destination";
 type Lookup = { field: Field; state: "loading" | "ready" | "empty" | "failed"; hits: PlaceHit[]; message?: string };
 
-export function PlanScreen({ emailAlerts, signedIn, countries }: { emailAlerts: boolean; signedIn: boolean; countries: { iso: string; name: string }[] }) {
-  const router = useRouter();
+export function PlanScreen({ emailAlerts, signedIn, countries, embedded = false }: { emailAlerts: boolean; signedIn: boolean; countries: { iso: string; name: string }[]; embedded?: boolean }) {
   const draft = usePlanDraft();
   const [lookup, setLookup] = useState<Lookup | null>(null);
   const lookupVersion = useRef(0);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveFeedback, setSaveFeedback] = useState<{ context: PlanDraft | null; text: string } | null>(null);
+  const saveMessage = saveFeedback?.context === draft ? saveFeedback?.text : null;
   const [signInOpen, setSignInOpen] = useState(false);
+  const [step, setStep] = usePlanStep();
+  const [choice, setChoice] = useState<{ key: string; option: PlanOption } | null>(null);
+  const chooseOption = useCallback((option: PlanOption | null, key: string) => setChoice(option ? { key, option } : null), []);
   useEffect(ensurePlanDraft, [draft]);
   if (!draft) return <main className="px-4 pt-8"><p role="status">Opening your plan…</p></main>;
 
@@ -33,6 +42,7 @@ export function PlanScreen({ emailAlerts, signedIn, countries }: { emailAlerts: 
   const originPoint = intent ? resolvedOrigin(intent) : null;
   const destinationPoint = intent ? resolvedDestination(intent) : null;
   const ready = Boolean(intent && originPoint && (intent.loop || destinationPoint));
+  const nextQuestion = !originPoint ? "Where are you leaving from?" : !draft.loop && !destinationPoint ? "Which destination do you mean?" : !draft.departureLocal || !draft.timeZone ? "What local date, time and time zone should this plan use?" : "Ready to compare the available options.";
   const update = (patch: Partial<PlanDraft>) => setPlanDraft({ ...draft, ...patch, touched: true });
   const search = async (field: Field) => {
     const version = ++lookupVersion.current;
@@ -59,49 +69,54 @@ export function PlanScreen({ emailAlerts, signedIn, countries }: { emailAlerts: 
     lookupVersion.current += 1;
     setLocationMessage(null);
     const loc = await freshLocation();
-    if (!loc.point) return setLocationMessage("Location wasn’t available. Enter a named origin instead.");
+    if (!locationUsable(loc) || !loc.point) return setLocationMessage("A fresh, accurate location wasn’t available. Enter a named origin instead.");
     update({ origin: { kind: "device", use: "from_here", point: { lat: loc.point.lat, lon: loc.point.lon } } });
   };
   const save = async () => {
     if (!signedIn) return setSignInOpen(true);
     setSaving(true);
-    setSaveMessage(null);
+    setSaveFeedback(null);
     const result = await api<{ plan: { id: string } }>("/api/me/plans", { body: { draft } });
     setSaving(false);
-    setSaveMessage(result.ok ? "Saved to Journeys for 30 days. You can delete it there. No journey or sharing started." : result.message);
+    setSaveFeedback({ context: currentPlanDraft(), text: result.ok ? currentPlanDraft() === draft ? "Saved to Journeys for 30 days. You can delete it there. No journey or sharing started." : "The version you submitted was saved to Journeys. Your newer edits are not included; save again to keep them." : result.message });
   };
   const fieldResults = (field: Field) => lookup?.field === field ? <div className="mt-2" role="status">
-    {lookup.state === "loading" ? <p>Looking for places…</p> : lookup.state !== "ready" ? <p>{lookup.message}</p> : <><p className="mb-2">Choose the place you mean:</p><ul className="space-y-1">{lookup.hits.map((hit) => <li key={hit.id}><button type="button" onClick={() => choose(field, hit)} className="min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-left"><strong className="block">{hit.name}</strong><span className="text-xs text-ink-muted">{hit.kind}</span></button></li>)}</ul></>}
+    {lookup.state === "loading" ? <p>Looking for places…</p> : lookup.state !== "ready" ? <p>{lookup.message}</p> : <><p className="mb-2">Choose the place you mean:</p><ul className="space-y-1">{lookup.hits.map((hit) => <li key={hit.id}><button type="button" onClick={() => choose(field, hit)} className="min-h-12 w-full rounded-lg border border-line bg-surface px-3 py-2 text-left"><strong className="block">{hit.name}</strong><span className="text-xs text-ink-muted">{hit.kind}</span></button></li>)}</ul></>}
   </div> : null;
 
-  return <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
-    <div className="mx-auto flex max-w-xl flex-col gap-5">
-      <header><Link href="/" className="inline-flex min-h-11 items-center gap-2 text-sm text-accent-strong"><Icon name="back" className="size-4" /> Go</Link><h1 className="mt-1 text-[1.9rem] font-semibold">Plan a movement</h1><p className="mt-1 text-sm text-ink-muted">Start with where and when you want to go. This plan stays in this tab for up to two hours unless you clear it.</p></header>
-      <SafetyAccess emailAlerts={emailAlerts} />
-      <section className="space-y-4 rounded-[var(--radius-lg)] border border-line bg-surface p-5" aria-label="Movement intent">
+  return <div className="mira-workspace min-h-dvh px-5 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
+    <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,600px)_minmax(0,1fr)]"><div className="flex min-w-0 flex-col gap-5">
+      <header><div className="flex items-center justify-between"><Link href="/" className="mira-wordmark">mira<span aria-hidden>↗</span></Link><button type="button" onClick={() => { lookupVersion.current++; clearPlanDraft(); if (!embedded) ensurePlanDraft(); setLookup(null); setStep(0); }} className="min-h-12 text-sm font-medium text-ink-muted">New plan</button></div><p className="mira-eyebrow mt-7">Your movement, connected</p><h1 className="mt-2 text-[1.9rem] font-semibold">Let’s make it work.</h1><p className="mt-2 text-sm text-ink-muted">{draft.activity || "Start with where and when you want to go."}</p></header>
+      <nav className="mira-plan-steps border-b border-line" aria-label="Plan steps">{["Plan", "Options", "Return & legs"].map((label, index) => <button key={label} type="button" aria-current={step === index ? "step" : undefined} onClick={() => setStep(index)} className="mira-plan-step"><span className="grid size-6 place-items-center rounded-full bg-sunken text-xs">{index + 1}</span>{label}</button>)}</nav>
+      {step === 0 ? <section className="space-y-4 rounded-[var(--radius-lg)] border border-line bg-surface p-5" aria-label="Movement intent">
+        <p className="text-base font-semibold" role="status">{nextQuestion}</p>
         <label className="block text-sm font-semibold">What do you want to do?<input value={draft.activity} onChange={(e) => update({ activity: e.target.value })} maxLength={160} placeholder="For example, go for an early run" className="mt-2 min-h-12 w-full rounded-lg border border-line-strong bg-canvas px-3 text-base font-normal" /></label>
         <div>
           <label className="block text-sm font-semibold" htmlFor="plan-origin">From</label>
-          {draft.origin.kind === "named" ? <><div className="mt-2 flex gap-2"><input id="plan-origin" value={draft.origin.query} onChange={(e) => { lookupVersion.current += 1; update({ origin: { kind: "named", query: e.target.value, resolution: null } }); setLookup(null); }} maxLength={160} placeholder="Named origin, anywhere" className="min-h-12 min-w-0 flex-1 rounded-lg border border-line-strong bg-canvas px-3 text-base" /><button type="button" onClick={() => void search("origin")} className="min-h-11 rounded-lg border border-line px-3 text-sm font-semibold">Find</button></div>{draft.origin.resolution ? <p className="mt-1 text-xs text-accent-strong">Selected: {draft.origin.resolution.name}</p> : null}{fieldResults("origin")}</> : <p id="plan-origin" className="mt-2 text-sm">From here selected. Current position is used only because you chose it.</p>}
-          <div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => { lookupVersion.current += 1; if (draft.origin.kind === "device") update({ origin: { kind: "named", query: "", resolution: null } }); }} className="min-h-11 rounded-lg border border-line px-3 text-sm">Use named origin</button><button type="button" onClick={() => void fromHere()} className="min-h-11 rounded-lg border border-line px-3 text-sm">From here</button></div>
+          {draft.origin.kind === "named" ? <><div className="mt-2 flex gap-2"><input id="plan-origin" value={draft.origin.query} onChange={(e) => { lookupVersion.current += 1; update({ origin: { kind: "named", query: e.target.value, resolution: null } }); setLookup(null); }} maxLength={160} placeholder="Named origin, anywhere" className="min-h-12 min-w-0 flex-1 rounded-lg border border-line-strong bg-canvas px-3 text-base" /><button type="button" onClick={() => void search("origin")} className="min-h-12 rounded-lg border border-line px-3 text-sm font-semibold">Find</button></div>{draft.origin.resolution ? <p className="mt-1 text-xs text-accent-strong">Selected: {draft.origin.resolution.name}</p> : null}{fieldResults("origin")}</> : <p id="plan-origin" className="mt-2 text-sm">From here selected. Current position is used only because you chose it.</p>}
+          <div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => { lookupVersion.current += 1; if (draft.origin.kind === "device") update({ origin: { kind: "named", query: "", resolution: null } }); }} className="min-h-12 rounded-lg border border-line px-3 text-sm">Use named origin</button><button type="button" onClick={() => void fromHere()} className="min-h-12 rounded-lg border border-line px-3 text-sm">From here</button></div>
           {locationMessage ? <p role="status" className="mt-2 text-sm text-warm">{locationMessage}</p> : null}
         </div>
         {draft.timeHint ? <p role="status" className="text-sm text-ink-muted">You mentioned {draft.timeHint}. Choose the date and time zone below; Mira has not assumed either.</p> : null}
-        <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={draft.loop} onChange={(e) => update({ loop: e.target.checked })} className="size-5" /> Return to my starting point (loop)</label>
-        {!draft.loop ? <div><label className="block text-sm font-semibold" htmlFor="plan-destination">To</label><div className="mt-2 flex gap-2"><input id="plan-destination" value={draft.destination.query} onChange={(e) => { lookupVersion.current += 1; update({ destination: { query: e.target.value, resolution: null } }); setLookup(null); }} maxLength={160} placeholder="Named destination" className="min-h-12 min-w-0 flex-1 rounded-lg border border-line-strong bg-canvas px-3 text-base" /><button type="button" onClick={() => void search("destination")} className="min-h-11 rounded-lg border border-line px-3 text-sm font-semibold">Find</button></div>{draft.destination.resolution ? <p className="mt-1 text-xs text-accent-strong">Selected: {draft.destination.resolution.name}</p> : null}{fieldResults("destination")}</div> : null}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">Planned local time<input type="datetime-local" value={draft.departureLocal} onChange={(e) => update({ departureLocal: e.target.value })} className="mt-2 min-h-12 w-full rounded-lg border border-line-strong bg-canvas px-3 text-base font-normal" /></label><label className="text-sm font-semibold">Time zone (IANA)<input value={draft.timeZone} onChange={(e) => update({ timeZone: e.target.value })} placeholder="Asia/Kolkata" className="mt-2 min-h-12 w-full rounded-lg border border-line-strong bg-canvas px-3 text-base font-normal" /></label></div>
+        <label className="flex min-h-12 items-center gap-3 text-sm"><input type="checkbox" checked={draft.loop} onChange={(e) => update({ loop: e.target.checked })} className="size-5" /> Return to my starting point (loop)</label>
+        {draft.loop ? <div className="grid grid-cols-2 gap-3"><label className="text-sm font-semibold">Loop duration (minutes)<input type="number" min={5} max={235} value={draft.loopTarget?.kind === "duration" ? draft.loopTarget.value : 30} onChange={(e) => update({ loopTarget: { kind: "duration", value: Number(e.target.value) } })} className="mt-2 min-h-12 w-full rounded-lg border border-line-strong bg-canvas px-3" /></label><label className="text-sm font-semibold">Pace (min / km)<input type="number" min={2} max={30} step={0.5} value={draft.paceMinutesPerKm ?? (/run/i.test(draft.activity) ? 6 : Number((60 / 4.5).toFixed(2)))} onChange={(e) => update({ paceMinutesPerKm: Number(e.target.value) })} className="mt-2 min-h-12 w-full rounded-lg border border-line-strong bg-canvas px-3" /></label><p className="col-span-2 text-xs text-ink-muted">Editable planning estimate, not a measured pace or prediction.</p></div> : null}
+        {!draft.loop ? <div><label className="block text-sm font-semibold" htmlFor="plan-destination">To</label><div className="mt-2 flex gap-2"><input id="plan-destination" value={draft.destination.query} onChange={(e) => { lookupVersion.current += 1; update({ destination: { query: e.target.value, resolution: null } }); setLookup(null); }} maxLength={160} placeholder="Named destination" className="min-h-12 min-w-0 flex-1 rounded-lg border border-line-strong bg-canvas px-3 text-base" /><button type="button" onClick={() => void search("destination")} className="min-h-12 rounded-lg border border-line px-3 text-sm font-semibold">Find</button></div>{draft.destination.resolution ? <p className="mt-1 text-xs text-accent-strong">Selected: {draft.destination.resolution.name}</p> : null}{fieldResults("destination")}</div> : null}
+        <label className="block text-sm font-semibold">Timing<select value={draft.timeKind ?? "depart_at"} onChange={(e) => update({ timeKind: e.target.value as "depart_at" | "arrive_by" })} className="mt-2 min-h-12 w-full rounded-lg border border-line-strong bg-canvas px-3"><option value="depart_at">Depart at</option><option value="arrive_by">Arrive by</option></select></label>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">Planned local time<input type="datetime-local" value={draft.departureLocal} onChange={(e) => update({ departureLocal: e.target.value })} className="mt-2 min-h-12 w-full rounded-lg border border-line-strong bg-canvas px-3 text-base font-normal" /></label><label className="text-sm font-semibold">Time zone (IANA)<input list="mira-time-zones" value={draft.timeZone} onChange={(e) => update({ timeZone: e.target.value })} placeholder="Asia/Kolkata" className="mt-2 min-h-12 w-full rounded-lg border border-line-strong bg-canvas px-3 text-base font-normal" /></label></div>
         <label className="block text-sm font-semibold">Mode<select value={draft.mode} onChange={(e) => update({ mode: e.target.value as TravelMode })} className="mt-2 min-h-12 w-full rounded-lg border border-line-strong bg-canvas px-3 text-base font-normal">{(["walk", "ride", "transit"] as const).map((mode) => <option key={mode} value={mode}>{TRAVEL_MODE_INFO[mode].label}</option>)}</select></label>
-        <label className="block text-sm font-semibold">Essential constraints (optional)<input value={draft.constraints} onChange={(e) => update({ constraints: e.target.value })} maxLength={500} placeholder="Separate with commas" className="mt-2 min-h-12 w-full rounded-lg border border-line-strong bg-canvas px-3 text-base font-normal" /></label>
-      </section>
-      <TravelLegs draft={draft} countries={countries} />
-      <section className="rounded-[var(--radius-lg)] border border-line bg-surface p-5" aria-label="Plan state">
+        <details><summary className="min-h-12 cursor-pointer py-3 text-sm font-semibold">Requirements & accessibility</summary><label className="block text-sm font-semibold">Essential constraints (optional)<input value={draft.constraints} onChange={(e) => update({ constraints: e.target.value })} maxLength={500} placeholder="Separate with commas" className="mt-2 min-h-12 w-full rounded-lg border border-line-strong bg-canvas px-3 text-base font-normal" /></label></details>
+      </section> : null}
+      {step === 2 ? <><p className="text-sm text-ink-muted">{draft.returnTimeHint ? `You mentioned a return around ${draft.returnTimeHint}. Confirm its date and local time below.` : "Plan the way back or your next transfer. Each leg keeps its own time and evidence."}</p><TravelLegs draft={draft} countries={countries} onReview={() => setStep(1)} />{draft.legs?.length ? <section aria-label="Keep this return plan" className="rounded-[var(--radius-card)] border border-line bg-surface p-4"><h2 className="font-semibold">Keep the way back</h2><p className="mt-2 text-sm text-ink-muted">This tab’s plan expires two hours after the last edit. For a longer night out, complete each leg and choose to save the plan to your account for 30 days. You can review its saved return from the journey screen. Saving starts no journey and shares nothing.</p><button type="button" disabled={!intent || saving} onClick={() => void save()} className="mira-intent-chip mt-3 justify-center disabled:opacity-50">{saving ? "Saving…" : "Save plan and return"}</button>{saveMessage ? <p role="status" className="mt-2 text-sm text-ink-muted">{saveMessage}</p> : null}</section> : null}</> : null}
+      {step === 1 ? intent ? <><PlanOptions plan={intent} onChoice={chooseOption} onTimeChoice={(local) => update({ departureLocal: local, timeKind: "depart_at" })} /><InspectPlanMap plan={intent} option={choice?.key === planOptionsKey(intent) ? choice.option : null} /><PlanJourneyControls plan={intent} option={choice?.key === planOptionsKey(intent) ? choice.option : null} signedIn={signedIn} emailAlerts={emailAlerts} /><PlanConversation plan={intent} /></> : <p role="status">Complete the places and local time in Plan first. Your entries are still here.</p> : null}
+      {step === 0 ? <section className="rounded-[var(--radius-lg)] border border-line bg-surface p-5" aria-label="Plan state">
         <h2 className="font-semibold">Current plan</h2>
-        {!intent ? <p role="status" className="mt-2 text-sm text-ink-muted">Add an activity, origin, destination or loop, and a valid local time zone. Your entries stay here while you work.</p> : <><p className="mt-2 text-sm">{intent.activity} · {intent.origin.kind === "device" ? "From here" : intent.origin.query}{intent.loop ? " · loop" : ` → ${intent.destination?.query}`} · {intent.departure.local} ({intent.departure.timeZone}) · {TRAVEL_MODE_INFO[intent.mode].label}</p>{!ready ? <p role="status" className="mt-2 text-sm text-ink-muted">{!originPoint ? "Choose an origin search result. " : ""}{!intent.loop && !destinationPoint ? "Choose a destination search result." : ""} Your named places stay in the plan; Mira won’t replace them with your current location.</p> : <p role="status" className="mt-2 text-sm text-accent-strong">Places resolved. Open Around to compare mapped walking options and see what remains unknown at your planned time.</p>}</>}
-        {intent?.loop ? <p className="mt-2 text-sm text-ink-muted">Loop routing is not available yet. You can inspect the starting area and choose a route manually.</p> : null}
-        <div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={!intent} onClick={() => router.push("/around")} className="min-h-11 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-50">View in Around</button><button type="button" disabled={!intent} onClick={() => router.push("/around/map")} className="min-h-11 rounded-lg border border-line px-4 text-sm font-semibold disabled:opacity-50">Open map</button><button type="button" disabled={!intent || saving} onClick={() => void save()} className="min-h-11 rounded-lg border border-line px-4 text-sm font-semibold disabled:opacity-50">{saving ? "Saving…" : "Save plan"}</button><button type="button" onClick={() => { lookupVersion.current += 1; clearPlanDraft(); ensurePlanDraft(); setLookup(null); setSaveMessage(null); }} className="min-h-11 rounded-lg border border-line px-4 text-sm font-semibold">Clear plan</button></div>
+        {!intent ? <p role="status" className="mt-2 text-sm text-ink-muted">Add an activity, origin, destination or loop, and a valid local time zone. Your entries stay here while you work.</p> : <><p className="mt-2 text-sm">{intent.activity} · {intent.origin.kind === "device" ? "From here" : intent.origin.query}{intent.loop ? " · loop" : ` → ${intent.destination?.query}`} · {intent.departure.local} ({intent.departure.timeZone}) · {TRAVEL_MODE_INFO[intent.mode].label}</p>{!ready ? <p role="status" className="mt-2 text-sm text-ink-muted">{!originPoint ? "Choose an origin search result. " : ""}{!intent.loop && !destinationPoint ? "Choose a destination search result." : ""} Your named places stay in the plan; Mira won’t replace them with your current location.</p> : <p role="status" className="mt-2 text-sm text-accent-strong">Places resolved. Compare the available routes, timing and explicit unknowns.</p>}</>}
+        <div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={!intent} onClick={() => setStep(1)} className="mira-primary w-full">Compare my options <Icon name="chevron" /></button><button type="button" disabled={!intent || saving} onClick={() => void save()} className="min-h-12 px-2 text-sm font-semibold text-accent-strong disabled:opacity-50">{saving ? "Saving…" : "Save plan"}</button><button type="button" onClick={() => { lookupVersion.current += 1; clearPlanDraft(); ensurePlanDraft(); setLookup(null); setSaveFeedback(null); }} className="min-h-12 px-2 text-sm text-ink-muted">Clear plan</button></div>
         {saveMessage ? <p role="status" className="mt-2 text-sm text-ink-muted">{saveMessage}</p> : null}
-      </section>
+      </section> : null}
+      <TimeZoneChoices /><SafetyAccess emailAlerts={emailAlerts} />
+      <p className="text-xs text-ink-muted">Temporary in this tab · expires two hours after the last edit · saving and sharing are your choice.</p>
       <SignInSheet open={signInOpen} onClose={() => setSignInOpen(false)} reason="Sign in to save this plan" />
-    </div>
+    </div><aside className="hidden lg:block">{intent && ready ? <div className="sticky top-8"><DesktopPlanMap plan={intent} option={choice?.key === planOptionsKey(intent) ? choice.option : null} /></div> : <div className="sticky top-8 rounded-3xl bg-sunken p-8"><p className="mira-eyebrow">Make the next move clear</p><p className="mt-4 text-2xl font-semibold">Your places, timing and choices. Together.</p><p className="mt-4 text-sm text-ink-muted">Choose the named places you mean. The map appears here after they resolve; planning works without location permission.</p></div>}</aside></div>
   </div>;
 }

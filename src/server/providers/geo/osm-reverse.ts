@@ -61,10 +61,14 @@ export async function osmArea(p: GeoPoint): Promise<Area | null> {
 
 /** Wait for our turn under Nominatim's 1 request/second rule (only for explicit searches). */
 async function nominatimTurn(maxWaitMs = 1500): Promise<boolean> {
-  const wait = lastCall + 1000 - Date.now();
+  const now = Date.now();
+  const startsAt = Math.max(now, lastCall + 1000);
+  const wait = startsAt - now;
   if (wait > maxWaitMs) return false;
+  // Reserve synchronously: concurrent searches must not wake into the same slot.
+  // This is per process; public-service quotas still need an application-wide gate.
+  lastCall = startsAt;
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-  lastCall = Date.now();
   return true;
 }
 

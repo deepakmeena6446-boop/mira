@@ -10,7 +10,7 @@ import { getEnv } from "@/server/config/env";
 import type { Clock } from "@/server/clock";
 import { getGeo } from "@/server/providers/geo";
 import { emailContact } from "@/server/providers/notify";
-import { phoneTargets, shareTargets } from "@/server/account/contacts";
+import { MAX_CONTACTS } from "@/domain/limits";
 import { checkOnMeMessage, journeyMessage, whatsappLink } from "@/domain/phone";
 import { tooMany } from "@/server/http/errors";
 import { checkOnMeEmail, tripSharedEmail } from "@/server/mail/templates";
@@ -37,6 +37,8 @@ export const startTripSchema = z
     to: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180), name: placeLabel(80) }).strict().optional(),
     /** Contacts are linked only after an affirmative choice on this start. */
     share: z.boolean().default(false),
+    recipientIds: z.array(z.guid()).max(MAX_CONTACTS).default([]),
+    idempotencyKey: z.guid().optional(),
     /** Walking minutes of the route option she chose, when it isn't the fastest (clamped on the server). */
     routeMinutes: z.number().int().min(1).max(240).optional(),
     /** Auto/cab, metro/bus or other: MIRA can't estimate those, so she gives the ETA. */
@@ -57,6 +59,7 @@ export const startTripSchema = z
     startHour: z.number().int().min(0).max(23).optional(),
   })
   .strict()
+  .refine((v) => !v.share || v.recipientIds.length > 0, { message: "Choose the contacts for this journey before sharing.", path: ["recipientIds"] })
   .refine((v) => (v.mode === "walk" && v.to) || v.etaMinutes !== undefined, { message: "Choose when you expect to arrive.", path: ["etaMinutes"] });
 
 /** A "share where I am" journey lasts this long unless she changes it. */
@@ -72,13 +75,14 @@ export function chosenMinutes(fastest: number, chosen: number | undefined): numb
 
 const liveLink = (token: string) => new URL(`/t/${token}`, getEnv().APP_BASE_URL).toString();
 
-/** Everyone in her Circle a journey can reach: accepted email contacts and WhatsApp contacts (one row each). */
-async function circleTargets(sql: postgres.Sql, userId: string): Promise<Array<{ id: string; name: string; email: string | null }>> {
-  const [byEmail, byPhone] = await Promise.all([shareTargets(sql, userId), phoneTargets(sql, userId)]);
-  const out = new Map<string, { id: string; name: string; email: string | null }>();
-  for (const t of byPhone) out.set(t.id, { id: t.id, name: t.name, email: null });
-  for (const t of byEmail) out.set(t.id, { id: t.id, name: t.name, email: t.email });
-  return [...out.values()];
+/** Validate the explicitly selected accepted email or WhatsApp contacts owned by this user. */
+export async function recipientTargets(sql: postgres.Sql | postgres.TransactionSql, userId: string, ids: string[]): Promise<Array<{ id: string; name: string; email: string | null; phone: string | null }>> {
+  const unique = [...new Set(ids)];
+  if (!unique.length) return [];
+  const rows = await sql<{ id: string; name: string; encrypted_email: string | null; accepted_at: Date | null; phone_enc: string | null }[]>`
+    SELECT id, name, encrypted_email, accepted_at, phone_enc FROM contacts WHERE user_id = ${userId} AND id IN ${sql(unique)}`;
+  if (rows.length !== unique.length || rows.some((r) => !r.accepted_at && !r.phone_enc)) throw new ApiError(400, "invalid_recipients", "Choose only your accepted email or WhatsApp contacts.");
+  return rows.map((r) => ({ id: r.id, name: r.name, email: r.accepted_at && r.encrypted_email ? decryptText(r.encrypted_email, "contact_email") : null, phone: r.phone_enc ? decryptText(r.phone_enc, "contact_phone") : null }));
 }
 
 export function tripOwnerHash(userId: string): string {
@@ -111,7 +115,7 @@ export interface TripView {
    * email was accepted by the provider. `whatsapp`: a wa.me link with their own live link, for her to send
    * (open journeys only). MIRA can't know whether she pressed Send in WhatsApp, so nothing claims it.
    */
-  sharedWith: Array<{ name: string; notified: boolean; viaEmail: boolean; whatsapp: string | null }>;
+  sharedWith: Array<{ id: string; name: string; notified: boolean; viaEmail: boolean; whatsapp: string | null; linkDelivery: AlertState; alertDelivery: AlertState; checkDelivery: AlertState }>;
   mode: JourneyMode;
   /** False for "share where I am" journeys (no destination to arrive at). */
   autoArrival: boolean;
@@ -147,9 +151,9 @@ type Row = {
 
 async function toView(sql: postgres.Sql, r: Row, now: Date): Promise<TripView> {
   const [contacts, [loc]] = await Promise.all([
-    sql<{ name: string; notified: boolean; via_email: boolean; phone_enc: string | null; share_token_enc: string | null }[]>`
-      SELECT c.name, tc.notified_at IS NOT NULL AS notified, (c.accepted_at IS NOT NULL AND c.encrypted_email IS NOT NULL) AS via_email, c.phone_enc, tc.share_token_enc
-      FROM trip_contacts tc JOIN contacts c ON c.id = tc.contact_id WHERE tc.journey_id = ${r.id} ORDER BY c.name`,
+    sql<{ id: string; name: string; notified: boolean; via_email: boolean; phone_enc: string | null; share_token_enc: string | null; link_delivery: AlertState; alert_delivery: AlertState; check_delivery: AlertState }[]>`
+      SELECT c.id, c.name, tc.notified_at IS NOT NULL AS notified, (c.accepted_at IS NOT NULL AND c.encrypted_email IS NOT NULL) AS via_email, c.phone_enc, tc.share_token_enc, tc.link_delivery, tc.alert_delivery, tc.check_delivery
+      FROM trip_contacts tc JOIN contacts c ON c.id = tc.contact_id WHERE tc.journey_id = ${r.id} AND tc.revoked_at IS NULL ORDER BY c.name`,
     sql<{ lat: number; lon: number; at: Date }[]>`SELECT lat, lon, at FROM trip_locations WHERE journey_id = ${r.id} ORDER BY at DESC LIMIT 1`,
   ]);
   const open = r.state === "active" || r.state === "missed";
@@ -164,9 +168,13 @@ async function toView(sql: postgres.Sql, r: Row, now: Date): Promise<TripView> {
     alert: displayAlertState(r.alert_state, r.alert_claimed_at ? new Date(r.alert_claimed_at) : null, now),
     shareUrl: open && r.share_token_enc ? new URL(`/t/${decryptText(r.share_token_enc, "share_token")}`, getEnv().APP_BASE_URL).toString() : null,
     sharedWith: contacts.map((c) => ({
+      id: c.id,
       name: c.name,
       notified: c.notified,
       viaEmail: c.via_email,
+      linkDelivery: c.link_delivery === "claimed" ? "unconfirmed" : c.link_delivery,
+      alertDelivery: displayAlertState(c.alert_delivery, r.alert_claimed_at ? new Date(r.alert_claimed_at) : null, now),
+      checkDelivery: c.check_delivery === "claimed" ? "unconfirmed" : c.check_delivery,
       whatsapp:
         open && c.phone_enc && c.share_token_enc
           ? whatsappLink(decryptText(c.phone_enc, "contact_phone"), journeyMessage(liveLink(decryptText(c.share_token_enc, "share_token")), r.auto_arrival ? r.dest_name : null, r.mode))
@@ -183,10 +191,25 @@ async function toView(sql: postgres.Sql, r: Row, now: Date): Promise<TripView> {
   };
 }
 
+/** A revoked or closed grant is checked again immediately before external delivery. */
+async function deliveryConsent(sql: postgres.Sql, journeyId: string, contactId: string): Promise<boolean> {
+  const [grant] = await sql`SELECT 1 FROM trip_contacts tc JOIN journeys j ON j.id = tc.journey_id
+    WHERE tc.journey_id = ${journeyId} AND tc.contact_id = ${contactId} AND tc.revoked_at IS NULL AND j.state IN ('active', 'missed')`;
+  return Boolean(grant);
+}
+
 const COLS = "id, state, dest_lat, dest_lon, dest_name, eta_at, route_meters, extended, alert_state, alert_claimed_at, share_token_enc, closed_at, purge_at, mode, auto_arrival, check_requested_at, tz, created_at";
 
 export async function startTrip(sql: postgres.Sql, user: User, input: z.infer<typeof startTripSchema>, clock: Clock): Promise<TripView> {
   const now = clock.now();
+  const requestHash = hmacHex("trip-start", JSON.stringify({ ...input, idempotencyKey: undefined, recipientIds: [...new Set(input.recipientIds)].sort() }));
+  if (input.idempotencyKey) {
+    const [previous] = await sql<(Row & { start_request_hash: string })[]>`SELECT ${sql.unsafe(COLS)}, start_request_hash FROM journeys WHERE user_id = ${user.id} AND idempotency_key = ${input.idempotencyKey}`;
+    if (previous) {
+      if (previous.start_request_hash !== requestHash) throw conflict("idempotency_conflict", "This start request was already used for a different journey.");
+      return toView(sql, previous, now);
+    }
+  }
   const to = input.to ?? { ...input.from, name: "Where I am" };
   const walking = input.mode === "walk" && input.to;
   let eta: Date;
@@ -217,21 +240,29 @@ export async function startTrip(sql: postgres.Sql, user: User, input: z.infer<ty
   try {
     // One transaction: the trip, its first point and every contact link exist together, or not at all.
     created = await sql.begin(async (tx) => {
+      await tx`SELECT pg_advisory_xact_lock(hashtext(${`trip-start:${user.id}`}))`;
+      if (input.idempotencyKey) {
+        const [previous] = await tx<(Row & { start_request_hash: string })[]>`SELECT ${sql.unsafe(COLS)}, start_request_hash FROM journeys WHERE user_id = ${user.id} AND idempotency_key = ${input.idempotencyKey}`;
+        if (previous) {
+          if (previous.start_request_hash !== requestHash) throw conflict("idempotency_conflict", "This start request was already used for a different journey.");
+          return { row: previous, links: [] };
+        }
+      }
+      const targets = await recipientTargets(tx, user.id, input.recipientIds);
       const [row] = await tx<Row[]>`
         INSERT INTO journeys (owner_actor_hash, idempotency_key, user_id, destination_label_enc, dest_lat, dest_lon, dest_name, route_meters,
                               eta_at, created_at, share_token_hash, share_token_enc, contact_state, last_location_at, mode, auto_arrival,
-                              tz, saved_place_id, start_hour)
-        VALUES (${tripOwnerHash(user.id)}, ${randomToken(12)}, ${user.id}, ${encryptText(to.name, "journey_destination")}, ${to.lat}, ${to.lon},
+                              tz, saved_place_id, start_hour, start_request_hash)
+        VALUES (${tripOwnerHash(user.id)}, ${input.idempotencyKey ?? randomToken(12)}, ${user.id}, ${encryptText(to.name, "journey_destination")}, ${to.lat}, ${to.lon},
                 ${to.name}, ${routeMeters}, ${eta}, ${now}, ${hashToken("invite", `trip:${ownerToken}`)}, ${encryptText(ownerToken, "share_token")}, 'none', ${now},
-                ${input.mode}, ${Boolean(input.to)}, ${tz}, ${savedPlaceId}, ${startHour})
+                ${input.mode}, ${Boolean(input.to)}, ${tz}, ${savedPlaceId}, ${startHour}, ${requestHash})
         RETURNING ${sql.unsafe(COLS)}`;
       await tx`INSERT INTO trip_locations (journey_id, lat, lon, at) VALUES (${row.id}, ${input.from.lat}, ${input.from.lon}, ${now})`;
-      const targets = input.share ? await circleTargets(tx as unknown as postgres.Sql, user.id) : [];
       const links = targets.map((t) => ({ contactId: t.id, name: t.name, email: t.email, token: randomToken(24) }));
       for (const l of links) {
         // Each contact gets their own link: removing them from your contacts revokes it immediately.
-        await tx`INSERT INTO trip_contacts (journey_id, contact_id, share_token_hash, share_token_enc)
-                 VALUES (${row.id}, ${l.contactId}, ${hashToken("invite", `trip:${l.token}`)}, ${encryptText(l.token, "share_token")})`;
+        await tx`INSERT INTO trip_contacts (journey_id, contact_id, share_token_hash, share_token_enc, link_delivery)
+                 VALUES (${row.id}, ${l.contactId}, ${hashToken("invite", `trip:${l.token}`)}, ${encryptText(l.token, "share_token")}, ${l.email ? "claimed" : "not_attempted"})`;
       }
       if (links.length) await tx`UPDATE journeys SET contact_state = 'accepted' WHERE id = ${row.id}`;
       return { row, links };
@@ -246,9 +277,10 @@ export async function startTrip(sql: postgres.Sql, user: User, input: z.infer<ty
   await Promise.all(
     created.links.map(async (l) => {
       if (!l.email) return; // WhatsApp contact: she sends the link herself from the journey screen
+      if (!await deliveryConsent(sql, created.row.id, l.contactId)) return;
       const mail = tripSharedEmail({ contactName: l.name, ownerName: user.name.split(" ")[0], destination: input.to?.name ?? "where they are", minutesToEta, etaAt: eta, tz, liveUrl: new URL(`/t/${l.token}`, getEnv().APP_BASE_URL).toString(), mode: input.to ? input.mode : "other" });
       const sent = await emailContact(l.email, mail.subject, mail.text).catch(() => ({ ok: false }));
-      if (sent.ok) await sql`UPDATE trip_contacts SET notified_at = now() WHERE journey_id = ${created.row.id} AND contact_id = ${l.contactId}`;
+      await sql`UPDATE trip_contacts SET link_delivery = ${sent.ok ? "sent" : "definite" in sent && sent.definite ? "failed" : "unconfirmed"}, notified_at = ${sent.ok ? now : null} WHERE journey_id = ${created.row.id} AND contact_id = ${l.contactId} AND revoked_at IS NULL`;
     }),
   );
   return toView(sql, created.row, now);
@@ -257,57 +289,112 @@ export async function startTrip(sql: postgres.Sql, user: User, input: z.infer<ty
 /** How often she can ask her people to check on her during one journey. */
 export const CHECK_ON_ME_EVERY_MS = 5 * 60_000;
 
-/**
- * "Tell my people now" (blueprint §5D): an immediate email to her accepted trusted contacts
- * asking them to check on her, with their live link. Her tap is the consent: if the journey
- * was private, her default accepted contacts are added to it first. Care wording, not SOS,
- * and nothing goes to anyone else. Returns exactly who was and wasn't reached.
- */
-export async function tellMyPeopleNow(sql: postgres.Sql, user: User, id: string, clock: Clock): Promise<{ told: string[]; failed: string[]; whatsapp: Array<{ name: string; url: string }> }> {
+/** Insert a bounded owner-only action receipt while the journey row is locked. */
+async function claimAction(tx: postgres.TransactionSql, id: string, action: "share" | "checkon" | "change", key: string | undefined, request: unknown, now: Date): Promise<boolean> {
+  if (!key) return true;
+  const hash = hmacHex("trip-action", JSON.stringify(request));
+  const [previous] = await tx<{ request_hash: string }[]>`SELECT request_hash FROM trip_action_receipts WHERE journey_id = ${id} AND action = ${action} AND key = ${key}`;
+  if (previous) {
+    if (previous.request_hash !== hash) throw conflict("idempotency_conflict", "This action request was already used with different choices.");
+    return false;
+  }
+  await tx`INSERT INTO trip_action_receipts (journey_id, action, key, request_hash, created_at) VALUES (${id}, ${action}, ${key}, ${hash}, ${now})`;
+  return true;
+}
+
+async function lockOpenTrip(tx: postgres.TransactionSql, userId: string, id: string) {
+  const [trip] = await tx<(Row & { check_requested_at: Date | null })[]>`SELECT ${tx.unsafe(COLS)} FROM journeys WHERE id = ${id} AND user_id = ${userId} FOR UPDATE`;
+  if (!trip) throw notFound("Trip not found.");
+  if (trip.state !== "active" && trip.state !== "missed") throw conflict("trip_closed", "This journey has already ended.");
+  return trip;
+}
+
+/** Share only the explicitly named recipients. Existing live links are not resent automatically. */
+export async function shareTrip(sql: postgres.Sql, user: User, id: string, recipientIds: string[], clock: Clock, idempotencyKey?: string): Promise<TripView> {
   const now = clock.now();
-  const [j] = await sql<{ id: string; state: JourneyState; check_requested_at: Date | null }[]>`
-    SELECT id, state, check_requested_at FROM journeys WHERE id = ${id} AND user_id = ${user.id}`;
-  if (!j) throw notFound("Trip not found.");
-  if (j.state !== "active" && j.state !== "missed") throw conflict("trip_closed", "This journey has already ended.");
-  if (j.check_requested_at && now.getTime() - new Date(j.check_requested_at).getTime() < CHECK_ON_ME_EVERY_MS) throw tooMany("You asked a moment ago. Try calling them, or send your live link.");
-  const targets = await circleTargets(sql, user.id);
-  const phones = new Map((await phoneTargets(sql, user.id)).map((p) => [p.id, p.phone]));
-  const links = await sql.begin(async (tx) => {
-    await tx`UPDATE journeys SET check_requested_at = ${now} WHERE id = ${id}`;
-    const out: Array<{ contactId: string; name: string; email: string | null; token: string }> = [];
-    for (const t of targets) {
-      const [existing] = await tx<{ share_token_enc: string | null }[]>`SELECT share_token_enc FROM trip_contacts WHERE journey_id = ${id} AND contact_id = ${t.id}`;
-      let token = existing?.share_token_enc ? decryptText(existing.share_token_enc, "share_token") : null;
-      if (!token) {
-        token = randomToken(24);
-        await tx`INSERT INTO trip_contacts (journey_id, contact_id, share_token_hash, share_token_enc) VALUES (${id}, ${t.id}, ${hashToken("invite", `trip:${token}`)}, ${encryptText(token, "share_token")})
-                 ON CONFLICT (journey_id, contact_id) DO UPDATE SET share_token_hash = EXCLUDED.share_token_hash, share_token_enc = EXCLUDED.share_token_enc`;
-      }
-      out.push({ contactId: t.id, name: t.name, email: t.email, token });
+  const result = await sql.begin(async (tx) => {
+    const trip = await lockOpenTrip(tx, user.id, id);
+    if (!await claimAction(tx, id, "share", idempotencyKey, [...new Set(recipientIds)].sort(), now)) return { trip, links: [] };
+    const targets = await recipientTargets(tx, user.id, recipientIds);
+    const links: Array<{ contactId: string; name: string; email: string | null; token: string }> = [];
+    for (const target of targets) {
+      const [existing] = await tx<{ revoked_at: Date | null; link_delivery: AlertState; share_token_enc: string | null }[]>`SELECT revoked_at, link_delivery, share_token_enc FROM trip_contacts WHERE journey_id = ${id} AND contact_id = ${target.id}`;
+      if (existing && !existing.revoked_at && existing.link_delivery !== "failed") continue;
+      const token = existing && !existing.revoked_at && existing.share_token_enc ? decryptText(existing.share_token_enc, "share_token") : randomToken(24);
+      await tx`INSERT INTO trip_contacts (journey_id, contact_id, share_token_hash, share_token_enc, link_delivery)
+        VALUES (${id}, ${target.id}, ${hashToken("invite", `trip:${token}`)}, ${encryptText(token, "share_token")}, ${target.email ? "claimed" : "not_attempted"})
+        ON CONFLICT (journey_id, contact_id) DO UPDATE SET revoked_at = NULL, share_token_hash = EXCLUDED.share_token_hash, share_token_enc = EXCLUDED.share_token_enc,
+        notified_at = NULL, link_delivery = EXCLUDED.link_delivery, alert_delivery = 'none', check_delivery = 'none'`;
+      links.push({ contactId: target.id, name: target.name, email: target.email, token });
     }
-    if (out.length) await tx`UPDATE journeys SET contact_state = 'accepted' WHERE id = ${id}`;
+    return { trip, links };
+  });
+  for (const link of result.links) {
+    if (!link.email) continue;
+    if (!await deliveryConsent(sql, id, link.contactId)) continue;
+    const mail = tripSharedEmail({ contactName: link.name, ownerName: user.name.split(" ")[0], destination: result.trip.dest_name, minutesToEta: Math.max(0, Math.round((new Date(result.trip.eta_at).getTime() - now.getTime()) / 60_000)), etaAt: new Date(result.trip.eta_at), tz: result.trip.tz, liveUrl: liveLink(link.token), mode: result.trip.auto_arrival ? result.trip.mode : "other" });
+    const sent = await emailContact(link.email, mail.subject, mail.text).catch(() => ({ ok: false, definite: false }));
+    await sql`UPDATE trip_contacts SET link_delivery = ${sent.ok ? "sent" : sent.definite ? "failed" : "unconfirmed"}, notified_at = ${sent.ok ? now : null} WHERE journey_id = ${id} AND contact_id = ${link.contactId} AND revoked_at IS NULL`;
+  }
+  return tripById(sql, user.id, id, now);
+}
+
+/** Revoke a recipient on this trip without deleting their saved contact, or invalidate a copied owner link. */
+export async function revokeTripShare(sql: postgres.Sql, userId: string, id: string, input: { contactId?: string; ownerLink?: boolean }, clock: Clock): Promise<TripView> {
+  await sql.begin(async (tx) => {
+    await lockOpenTrip(tx, userId, id);
+    if (input.ownerLink) await tx`UPDATE journeys SET share_token_enc = NULL, share_token_hash = ${hashToken("invite", randomToken(32))} WHERE id = ${id}`;
+    else await tx`UPDATE trip_contacts SET revoked_at = ${clock.now()} WHERE journey_id = ${id} AND contact_id = ${input.contactId!}`;
+  });
+  return tripById(sql, userId, id, clock.now());
+}
+
+/** Create a fresh private owner link after explicit request; no contacts receive it. */
+export async function createTripLink(sql: postgres.Sql, userId: string, id: string, clock: Clock): Promise<TripView> {
+  await sql.begin(async (tx) => {
+    const trip = await lockOpenTrip(tx, userId, id);
+    if (trip.share_token_enc) return;
+    const token = randomToken(24);
+    await tx`UPDATE journeys SET share_token_enc = ${encryptText(token, "share_token")}, share_token_hash = ${hashToken("invite", `trip:${token}`)} WHERE id = ${id}`;
+  });
+  return tripById(sql, userId, id, clock.now());
+}
+
+/** Ask only already-selected recipients, or explicitly select named contacts in the same confirmation. */
+export async function tellMyPeopleNow(sql: postgres.Sql, user: User, id: string, clock: Clock, input: { recipientIds?: string[]; idempotencyKey?: string } = {}): Promise<{ told: string[]; failed: string[]; unconfirmed: string[]; whatsapp: Array<{ name: string; url: string }> }> {
+  const now = clock.now();
+  const links = await sql.begin(async (tx) => {
+    const trip = await lockOpenTrip(tx, user.id, id);
+    const selected = input.recipientIds ?? (await tx<{ contact_id: string }[]>`SELECT contact_id FROM trip_contacts WHERE journey_id = ${id} AND revoked_at IS NULL`).map((row) => row.contact_id);
+    if (!await claimAction(tx, id, "checkon", input.idempotencyKey, [...new Set(selected)].sort(), now)) return [];
+    if (trip.check_requested_at && now.getTime() - new Date(trip.check_requested_at).getTime() < CHECK_ON_ME_EVERY_MS) throw tooMany("You asked a moment ago. Try calling them, or send your live link.");
+    const targets = await recipientTargets(tx, user.id, selected);
+    if (!targets.length) throw new ApiError(400, "choose_recipients", "Choose who you want to ask to check on you.");
+    await tx`UPDATE journeys SET check_requested_at = ${now} WHERE id = ${id}`;
+    const out: Array<{ contactId: string; name: string; email: string | null; phone: string | null; token: string }> = [];
+    for (const target of targets) {
+      const [existing] = await tx<{ share_token_enc: string | null; revoked_at: Date | null }[]>`SELECT share_token_enc, revoked_at FROM trip_contacts WHERE journey_id = ${id} AND contact_id = ${target.id}`;
+      const token = existing?.share_token_enc && !existing.revoked_at ? decryptText(existing.share_token_enc, "share_token") : randomToken(24);
+      await tx`INSERT INTO trip_contacts (journey_id, contact_id, share_token_hash, share_token_enc, check_delivery)
+        VALUES (${id}, ${target.id}, ${hashToken("invite", `trip:${token}`)}, ${encryptText(token, "share_token")}, ${target.email ? "claimed" : "not_attempted"})
+        ON CONFLICT (journey_id, contact_id) DO UPDATE SET revoked_at = NULL, share_token_hash = EXCLUDED.share_token_hash, share_token_enc = EXCLUDED.share_token_enc, check_delivery = EXCLUDED.check_delivery`;
+      out.push({ contactId: target.id, name: target.name, email: target.email, phone: target.phone, token });
+    }
     return out;
   });
-  const told: string[] = [];
-  const failed: string[] = [];
-  // WhatsApp: ready-to-send messages she opens one by one — never counted as "told".
-  const whatsapp = links
-    .filter((l) => phones.has(l.contactId))
-    .map((l) => ({ name: l.name, url: whatsappLink(phones.get(l.contactId)!, checkOnMeMessage(liveLink(l.token))) }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  await Promise.all(
-    links.map(async (l) => {
-      if (!l.email) return;
-      const mail = checkOnMeEmail({ ownerName: user.name.split(" ")[0], liveUrl: new URL(`/t/${l.token}`, getEnv().APP_BASE_URL).toString() });
-      const r = await emailContact(l.email, mail.subject, mail.text).catch(() => ({ ok: false }));
-      if (r.ok) {
-        told.push(l.name);
-        await sql`UPDATE trip_contacts SET notified_at = COALESCE(notified_at, now()) WHERE journey_id = ${id} AND contact_id = ${l.contactId}`;
-      } else failed.push(l.name);
-    }),
-  );
-  console.log(JSON.stringify({ t: now.toISOString(), src: "web", event: "trip.check_requested", trip: id, told: told.length, failed: failed.length, whatsapp: whatsapp.length }));
-  return { told: told.sort(), failed: failed.sort(), whatsapp };
+  const told: string[] = [], failed: string[] = [], unconfirmed: string[] = [];
+  const whatsapp = links.filter((link) => link.phone).map((link) => ({ name: link.name, url: whatsappLink(link.phone!, checkOnMeMessage(liveLink(link.token))) })).sort((a, b) => a.name.localeCompare(b.name));
+  for (const link of links) {
+    if (!link.email) continue;
+    if (!await deliveryConsent(sql, id, link.contactId)) continue;
+    const mail = checkOnMeEmail({ ownerName: user.name.split(" ")[0], liveUrl: liveLink(link.token) });
+    const sent = await emailContact(link.email, mail.subject, mail.text).catch(() => ({ ok: false, definite: false }));
+    const delivery = sent.ok ? "sent" : sent.definite ? "failed" : "unconfirmed";
+    (sent.ok ? told : sent.definite ? failed : unconfirmed).push(link.name);
+    await sql`UPDATE trip_contacts SET check_delivery = ${delivery}, notified_at = CASE WHEN ${sent.ok} THEN COALESCE(notified_at, ${now}) ELSE notified_at END WHERE journey_id = ${id} AND contact_id = ${link.contactId} AND revoked_at IS NULL`;
+  }
+  console.log(JSON.stringify({ t: now.toISOString(), src: "web", event: "trip.check_requested", trip: id, told: told.length, failed: failed.length, unconfirmed: unconfirmed.length, whatsapp: whatsapp.length }));
+  return { told: told.sort(), failed: failed.sort(), unconfirmed: unconfirmed.sort(), whatsapp };
 }
 
 export async function currentTrip(sql: postgres.Sql, userId: string, now: Date): Promise<TripView | null> {
@@ -325,11 +412,12 @@ export async function tripById(sql: postgres.Sql, userId: string, id: string, no
 }
 
 /** A confirmed change keeps the existing share recipients and token; it creates no notification. */
-export async function changeTrip(sql: postgres.Sql, userId: string, id: string, input: { to: { lat: number; lon: number; name: string }; etaMinutes: number }, clock: Clock): Promise<TripView> {
+export async function changeTrip(sql: postgres.Sql, userId: string, id: string, input: { to: { lat: number; lon: number; name: string }; etaMinutes: number; idempotencyKey?: string }, clock: Clock): Promise<TripView> {
   const now = clock.now();
   await sql.begin(async (tx) => {
     const [row] = await tx<{ state: JourneyState; created_at: Date }[]>`SELECT state, created_at FROM journeys WHERE id = ${id} AND user_id = ${userId} FOR UPDATE`;
     if (!row) throw notFound("Trip not found.");
+    if (!await claimAction(tx, id, "change", input.idempotencyKey, { to: input.to, etaMinutes: input.etaMinutes }, now)) return;
     if (row.state !== "active") throw conflict("trip_not_active", "Only an active journey can change destination.");
     const eta = new Date(now.getTime() + input.etaMinutes * 60_000);
     const issue = validateNewEta(now, eta);
@@ -391,7 +479,7 @@ export async function sharedTrip(sql: postgres.Sql, token: string, now: Date) {
     FROM trip_contacts tc JOIN journeys j ON j.id = tc.journey_id JOIN users u ON u.id = j.user_id
     -- A contact's own link: an accepted email contact, or one she sends it to on WhatsApp. Removing the contact revokes it.
     JOIN contacts c ON c.id = tc.contact_id AND (c.accepted_at IS NOT NULL OR c.phone_enc IS NOT NULL)
-    WHERE tc.share_token_hash = ${hash}
+    WHERE tc.share_token_hash = ${hash} AND tc.revoked_at IS NULL
     LIMIT 1`;
   if (!j) return null;
   const name = j.name.split(" ")[0];
@@ -446,7 +534,7 @@ export async function tripsOverview(sql: postgres.Sql, userId: string, now: Date
   const recent = await sql<{ id: string; state: JourneyState; dest_name: string; mode: JourneyMode; auto_arrival: boolean; created_at: Date; closed_at: Date; tz: string | null; shared: string[] | null }[]>`
     SELECT j.id, j.state, j.dest_name, j.mode, j.auto_arrival, j.created_at, j.closed_at, j.tz,
            (SELECT array_agg(c.name ORDER BY c.name) FROM trip_contacts tc JOIN contacts c ON c.id = tc.contact_id
-             WHERE tc.journey_id = j.id AND tc.notified_at IS NOT NULL) AS shared
+             WHERE tc.journey_id = j.id AND tc.notified_at IS NOT NULL AND tc.revoked_at IS NULL) AS shared
     FROM journeys j
     WHERE j.user_id = ${userId} AND j.state NOT IN ('active', 'missed')
       AND j.closed_at > ${new Date(now.getTime() - RECENT_TRIPS_MS)} AND (j.purge_at IS NULL OR j.purge_at > ${now})

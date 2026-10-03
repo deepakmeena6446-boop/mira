@@ -80,12 +80,17 @@ test("Ask uses the selected plan and an ephemeral sourced response", async ({ pa
 
 test("guest danger message shows Emergency before any plan answer", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("mira.welcomed", "1"));
+  let processingPosts = 0;
+  page.on("request", (request) => { if (request.method() === "POST" && new URL(request.url()).pathname.startsWith("/api/mira")) processingPosts++; });
   await page.goto("/mira");
   await page.getByLabel("Message Mira").fill("Someone is following me");
   await page.getByRole("button", { name: "Send" }).click();
-  const log = page.getByRole("log", { name: "Conversation with Mira" });
-  await expect(log).toContainText("If you may be in danger, use Emergency now");
-  await expect(log.getByText(/Mira doesn't call anyone for you/)).toBeVisible();
+  const support = page.getByRole("dialog", { name: "Right now" });
+  await expect(support).toBeVisible();
+  await expect(support.getByLabel("Immediate Emergency action").getByRole("button", { name: "Emergency options" })).toBeVisible();
+  await expect(support.getByRole("button", { name: "Call someone", exact: true })).toBeVisible();
+  await expect(support).toContainText("Turn on location to see Help Points near you.");
+  expect(processingPosts).toBe(0);
   expect(await page.evaluate(() => sessionStorage.getItem("mira.plan.v1"))).toBeNull();
 });
 

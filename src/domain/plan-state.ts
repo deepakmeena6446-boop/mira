@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { movementIntentSchema, PLAN_CONTRACT_VERSION, type MovementIntent } from "./plan-contract";
+import { movementIntentSchema, PLAN_CONTRACT_VERSION, planVersionSchema, planTimeKindSchema, loopTargetSchema, paceSchema, type MovementIntent } from "./plan-contract";
 import { TRAVEL_MODES } from "./travel-mode";
 
 const point = z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }).strict();
@@ -8,21 +8,30 @@ export type PlanPlaceResolution = z.infer<typeof planPlaceResolutionSchema>;
 const namedPlace = z.object({ query: z.string().max(160), resolution: planPlaceResolutionSchema.nullable() }).strict();
 export const planLegDraftSchema = z.object({
   label: z.string().max(160),
+  timeHint: z.string().max(24).nullable().optional(),
+  returnTimeHint: z.string().max(24).nullable().optional(),
   origin: namedPlace,
   destination: namedPlace,
   departureLocal: z.string().max(16),
   timeZone: z.string().max(64),
   mode: z.enum(TRAVEL_MODES),
   destinationCountryIso: z.string().regex(/^[A-Z]{2}$/).nullable(),
+  timeKind: planTimeKindSchema.optional(),
+  constraints: z.string().max(500).optional(),
+  paceMinutesPerKm: paceSchema.optional(),
 }).strict();
 export type PlanLegDraft = z.infer<typeof planLegDraftSchema>;
 
 /** Partial entry is useful before both places resolve. It never authorizes a journey start. */
 export const planDraftSchema = z.object({
-  version: z.literal(PLAN_CONTRACT_VERSION),
+  version: planVersionSchema,
   touched: z.boolean(),
   activity: z.string().max(160),
   timeHint: z.string().max(24).nullable().optional(),
+  returnTimeHint: z.string().max(24).nullable().optional(),
+  selection: z.object({ optionId: z.string().max(160), context: z.string().max(16) }).strict().optional(),
+  journeyMode: z.enum(["manual", "location"]).optional(),
+  recipientIds: z.array(z.uuid()).max(20).optional(),
   origin: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("named"), query: z.string().max(160), resolution: planPlaceResolutionSchema.nullable() }).strict(),
     z.object({ kind: z.literal("device"), use: z.literal("from_here"), point }).strict(),
@@ -33,6 +42,9 @@ export const planDraftSchema = z.object({
   timeZone: z.string().max(64),
   mode: z.enum(TRAVEL_MODES),
   constraints: z.string().max(500),
+  timeKind: planTimeKindSchema.optional(),
+  loopTarget: loopTargetSchema.optional(),
+  paceMinutesPerKm: paceSchema.optional(),
   destinationCountryIso: z.string().regex(/^[A-Z]{2}$/).nullable().optional(),
   legs: z.array(planLegDraftSchema).max(2).optional(),
 }).strict();
@@ -44,23 +56,23 @@ export function hasPlanWork(draft: PlanDraft | null): boolean {
 
 export function newPlanDraft(now: Date, timeZone: string): PlanDraft {
   const local = new Intl.DateTimeFormat("sv-SE", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(now).replace(" ", "T");
-  return { version: PLAN_CONTRACT_VERSION, touched: false, activity: "", origin: { kind: "named", query: "", resolution: null }, destination: { query: "", resolution: null }, loop: false, departureLocal: local, timeZone, mode: "walk", constraints: "", destinationCountryIso: null, legs: [] };
+  return { version: PLAN_CONTRACT_VERSION, touched: false, activity: "", origin: { kind: "named", query: "", resolution: null }, destination: { query: "", resolution: null }, loop: false, departureLocal: local, timeZone, mode: "walk", constraints: "", timeKind: "depart_at", destinationCountryIso: null, legs: [] };
 }
 
 export function newPlanLeg(): PlanLegDraft {
-  return { label: "", origin: { query: "", resolution: null }, destination: { query: "", resolution: null }, departureLocal: "", timeZone: "", mode: "walk", destinationCountryIso: null };
+  return { label: "", origin: { query: "", resolution: null }, destination: { query: "", resolution: null }, departureLocal: "", timeZone: "", mode: "walk", timeKind: "depart_at", constraints: "", destinationCountryIso: null };
 }
 
 /** Prefill the reverse places only; the return's time, zone and service need fresh checks. */
 export function returnLegFromMain(draft: PlanDraft): PlanLegDraft | null {
   const main = intentFromDraft(draft);
   if (!main || main.loop || draft.origin.kind !== "named" || !resolvedOrigin(main) || !resolvedDestination(main)) return null;
-  return { label: `Return to ${draft.origin.query}`.slice(0, 160), origin: { ...draft.destination }, destination: { query: draft.origin.query, resolution: draft.origin.resolution }, departureLocal: "", timeZone: "", mode: draft.mode, destinationCountryIso: null };
+  return { label: `Return to ${draft.origin.query}`.slice(0, 160), timeHint: draft.returnTimeHint ?? null, origin: { ...draft.destination }, destination: { query: draft.origin.query, resolution: draft.origin.resolution }, departureLocal: "", timeZone: draft.timeZone, mode: draft.mode, timeKind: "depart_at", constraints: draft.constraints, paceMinutesPerKm: draft.paceMinutesPerKm, destinationCountryIso: null };
 }
 
 export function intentFromLeg(leg: PlanLegDraft): MovementIntent | null {
   const named = (place: PlanLegDraft["origin"]) => ({ kind: "named" as const, query: place.query.trim(), ...(place.resolution ? { resolution: { source: place.resolution.source, point: place.resolution.point, ...(place.resolution.placeId ? { placeId: place.resolution.placeId } : {}) } } : {}) });
-  const parsed = movementIntentSchema.safeParse({ version: PLAN_CONTRACT_VERSION, activity: leg.label.trim(), origin: named(leg.origin), destination: named(leg.destination), loop: false, departure: { local: leg.departureLocal, timeZone: leg.timeZone }, mode: leg.mode, constraints: [] });
+  const parsed = movementIntentSchema.safeParse({ version: PLAN_CONTRACT_VERSION, activity: leg.label.trim(), origin: named(leg.origin), destination: named(leg.destination), loop: false, departure: { local: leg.departureLocal, timeZone: leg.timeZone }, mode: leg.mode, timeKind: leg.timeKind ?? "depart_at", paceMinutesPerKm: leg.paceMinutesPerKm, constraints: (leg.constraints ?? "").split(",").map((part) => part.trim()).filter(Boolean) });
   return parsed.success ? parsed.data : null;
 }
 
@@ -76,6 +88,7 @@ export function intentFromDraft(draft: PlanDraft): MovementIntent | null {
     activity: draft.activity.trim(), origin, destination, loop: draft.loop,
     departure: { local: draft.departureLocal, timeZone: draft.timeZone }, mode: draft.mode,
     constraints: draft.constraints.split(",").map((part) => part.trim()).filter(Boolean),
+    timeKind: draft.timeKind ?? "depart_at", loopTarget: draft.loopTarget, paceMinutesPerKm: draft.paceMinutesPerKm,
   });
   return parsed.success ? parsed.data : null;
 }
@@ -85,21 +98,24 @@ export function activatePlanLeg(draft: PlanDraft, index: number): PlanDraft | nu
   const leg = draft.legs?.[index];
   if (!leg) return null;
   const selected = intentFromLeg(leg);
-  const main = intentFromDraft(draft);
-  if (!selected || !main || main.loop || draft.origin.kind !== "named" || !resolvedOrigin(main) || !resolvedDestination(main)) return null;
+  // Other named legs can still be partial. Reviewing a complete leg preserves them,
+  // while the explicit account-save contract continues to require every leg complete.
+  if (!selected || draft.loop || draft.origin.kind !== "named") return null;
   if (!resolvedOrigin(selected) || !resolvedDestination(selected)) return null;
   const previous: PlanLegDraft = {
     label: draft.activity,
+    timeHint: draft.timeHint, returnTimeHint: draft.returnTimeHint,
     origin: { query: draft.origin.query, resolution: draft.origin.resolution },
     destination: draft.destination,
     departureLocal: draft.departureLocal,
     timeZone: draft.timeZone,
     mode: draft.mode,
+    timeKind: draft.timeKind ?? "depart_at", constraints: draft.constraints, paceMinutesPerKm: draft.paceMinutesPerKm,
     destinationCountryIso: draft.destinationCountryIso ?? null,
   };
   const legs = [...(draft.legs ?? [])];
   legs[index] = previous;
-  return { ...draft, touched: true, activity: leg.label, origin: { kind: "named", ...leg.origin }, destination: leg.destination, departureLocal: leg.departureLocal, timeZone: leg.timeZone, mode: leg.mode, destinationCountryIso: leg.destinationCountryIso, legs };
+  return { ...draft, touched: true, activity: leg.label, timeHint: leg.timeHint ?? null, returnTimeHint: leg.returnTimeHint ?? null, selection: undefined, origin: { kind: "named", ...leg.origin }, destination: leg.destination, departureLocal: leg.departureLocal, timeZone: leg.timeZone, mode: leg.mode, timeKind: leg.timeKind ?? "depart_at", constraints: leg.constraints ?? "", paceMinutesPerKm: leg.paceMinutesPerKm, loopTarget: undefined, destinationCountryIso: leg.destinationCountryIso, legs };
 }
 
 export function resolvedOrigin(intent: MovementIntent): { lat: number; lon: number } | null {
@@ -118,7 +134,7 @@ export function parsePlanSession(raw: string | null, now: number): PlanDraft | n
   try {
     const parsed = z.object({ savedAt: z.number().int(), draft: planDraftSchema }).strict().safeParse(JSON.parse(raw));
     if (!parsed.success || parsed.data.savedAt > now || now - parsed.data.savedAt >= PLAN_SESSION_TTL_MS) return null;
-    return parsed.data.draft;
+    return { ...parsed.data.draft, version: PLAN_CONTRACT_VERSION, timeKind: parsed.data.draft.timeKind ?? "depart_at" };
   } catch { return null; }
 }
 export function serializePlanSession(draft: PlanDraft, now: number): string {

@@ -1,0 +1,296 @@
+[
+  {
+    "label": "mobile first screen",
+    "status": "PASS",
+    "data": {
+      "gps": 0,
+      "screenshot": "/private/tmp/mira-product-mobile-first-screen.png",
+      "copy": "GO SOMEWHERE. FEEL PREPARED.\n\nWhat’s your plan?\n\nCompare routes and timing. Make a plan, move with it, and get support along the way.\n\nYour movement plan\nEnter places instead\nLet’s plan\n\nSubmitted text may be interpreted by the configured AI provider. Movement planning is not saved to account chat history. Data details\n\nNight out → home\nEarly run\nLate arrival\n\nBuilt for women’s everyday movement and travel. Start without an account or location permission."
+    }
+  },
+  {
+    "label": "mobile fictional sign-in and local Mailpit contacts",
+    "status": "PASS",
+    "data": {
+      "existingFictionalLocalAccount": true
+    }
+  },
+  {
+    "label": "mobile midnight missing-provider comparison",
+    "status": "PASS",
+    "data": {
+      "screenshot": "/private/tmp/mira-product-mobile-midnight-provider-unknown.png",
+      "service": "mocked unsupported source, future plan cannot silently start now"
+    }
+  },
+  {
+    "label": "mobile event+return setup, no repeated places",
+    "status": "PASS",
+    "data": {
+      "browserBackRestoresStage": true,
+      "screenshot": "/private/tmp/mira-product-mobile-event-options.png",
+      "selected": {
+        "optionId": "fixture-second",
+        "context": "b7633f28"
+      }
+    }
+  },
+  {
+    "label": "mobile cancellation and named-recipient consent",
+    "status": "PASS",
+    "data": {
+      "posts": 0,
+      "gps": 0
+    }
+  },
+  {
+    "label": "mobile denied location falls back without sharing",
+    "status": "PASS",
+    "data": {
+      "screenshot": "/private/tmp/mira-product-mobile-manual-checkin.png",
+      "posts": 0,
+      "checkin": "separate from arrival; early end not arrival"
+    }
+  },
+  {
+    "label": "mobile exact start replay after lost response",
+    "status": "PASS",
+    "data": {
+      "tripId": "eb1f4f15-f937-4299-b0eb-2b6b19d2561f",
+      "identicalRequest": true,
+      "screenshot": "/private/tmp/mira-product-mobile-foreground-active.png"
+    }
+  },
+  {
+    "label": "mobile S7 immediate help with failed provider and focus return",
+    "status": "PASS",
+    "data": {
+      "screenshot": "/private/tmp/mira-product-mobile-unsafe-no-provider.png",
+      "focusRestored": true
+    }
+  },
+  {
+    "label": "mobile failed arrival action is retryable and leaves trip active",
+    "status": "PASS",
+    "data": {
+      "offlineSupportImmediate": true,
+      "screenshot": "/private/tmp/mira-product-mobile-failed-arrival.png"
+    }
+  },
+  {
+    "label": "mobile optional chosen links revoke independently",
+    "status": "PASS",
+    "data": {
+      "selectedRecipients": 0,
+      "ownerLinkInvalidated": true
+    }
+  },
+  {
+    "label": "mobile confirmed event arrival preserves return, fresh start confirmation",
+    "status": "PASS",
+    "data": {
+      "screenshot": "/private/tmp/mira-product-mobile-return-review.png",
+      "retainedEvent": true,
+      "arrivalVsCheckinDistinct": true,
+      "tripPosts": 2
+    }
+  },
+  {
+    "device": "mobile",
+    "pageErrors": [],
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_FAILED",
+      "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+      "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+    ],
+    "postBodies": [
+      {
+        "from": {
+          "lat": 28.6951,
+          "lon": 77.2143
+        },
+        "to": {
+          "name": "Fictional Event Venue",
+          "lat": 28.6991,
+          "lon": 77.2163
+        },
+        "mode": "walk",
+        "etaMinutes": 16,
+        "routeMinutes": 16,
+        "tz": "Asia/Kolkata",
+        "recipientIds": [
+          "71032cb8-7a7f-4274-ba0f-8b1ab6ce64ae"
+        ],
+        "share": true,
+        "idempotencyKey": "555ede44-41ed-4981-96d5-df409334f403"
+      },
+      {
+        "from": {
+          "lat": 28.6951,
+          "lon": 77.2143
+        },
+        "to": {
+          "name": "Fictional Event Venue",
+          "lat": 28.6991,
+          "lon": 77.2163
+        },
+        "mode": "walk",
+        "etaMinutes": 16,
+        "routeMinutes": 16,
+        "tz": "Asia/Kolkata",
+        "recipientIds": [
+          "71032cb8-7a7f-4274-ba0f-8b1ab6ce64ae"
+        ],
+        "share": true,
+        "idempotencyKey": "555ede44-41ed-4981-96d5-df409334f403"
+      }
+    ]
+  },
+  {
+    "label": "desktop first screen",
+    "status": "PASS",
+    "data": {
+      "gps": 0,
+      "screenshot": "/private/tmp/mira-product-desktop-first-screen.png",
+      "copy": "GO SOMEWHERE. FEEL PREPARED.\n\nWhat’s your plan?\n\nCompare routes and timing. Make a plan, move with it, and get support along the way.\n\nYour movement plan\nEnter places instead\nLet’s plan\n\nSubmitted text may be interpreted by the configured AI provider. Movement planning is not saved to account chat history. Data details\n\nNight out → home\nEarly run\nLate arrival\n\nBuilt for women’s everyday movement and travel. Start without an account or location permission."
+    }
+  },
+  {
+    "label": "desktop fictional sign-in and local Mailpit contacts",
+    "status": "PASS",
+    "data": {
+      "existingFictionalLocalAccount": true
+    }
+  },
+  {
+    "label": "desktop midnight missing-provider comparison",
+    "status": "PASS",
+    "data": {
+      "screenshot": "/private/tmp/mira-product-desktop-midnight-provider-unknown.png",
+      "service": "mocked unsupported source, future plan cannot silently start now"
+    }
+  },
+  {
+    "label": "desktop event+return setup, no repeated places",
+    "status": "PASS",
+    "data": {
+      "browserBackRestoresStage": true,
+      "screenshot": "/private/tmp/mira-product-desktop-event-options.png",
+      "selected": {
+        "optionId": "fixture-second",
+        "context": "b7633f28"
+      }
+    }
+  },
+  {
+    "label": "desktop cancellation and named-recipient consent",
+    "status": "PASS",
+    "data": {
+      "posts": 0,
+      "gps": 0
+    }
+  },
+  {
+    "label": "desktop denied location falls back without sharing",
+    "status": "PASS",
+    "data": {
+      "screenshot": "/private/tmp/mira-product-desktop-manual-checkin.png",
+      "posts": 0,
+      "checkin": "separate from arrival; early end not arrival"
+    }
+  },
+  {
+    "label": "desktop exact start replay after lost response",
+    "status": "PASS",
+    "data": {
+      "tripId": "05b3b37b-65a6-4c0d-9e47-2d1c7aab8921",
+      "identicalRequest": true,
+      "screenshot": "/private/tmp/mira-product-desktop-foreground-active.png"
+    }
+  },
+  {
+    "label": "desktop S7 immediate help with failed provider and focus return",
+    "status": "PASS",
+    "data": {
+      "screenshot": "/private/tmp/mira-product-desktop-unsafe-no-provider.png",
+      "focusRestored": true
+    }
+  },
+  {
+    "label": "desktop failed arrival action is retryable and leaves trip active",
+    "status": "PASS",
+    "data": {
+      "offlineSupportImmediate": true,
+      "screenshot": "/private/tmp/mira-product-desktop-failed-arrival.png"
+    }
+  },
+  {
+    "label": "desktop optional chosen links revoke independently",
+    "status": "PASS",
+    "data": {
+      "selectedRecipients": 0,
+      "ownerLinkInvalidated": true
+    }
+  },
+  {
+    "label": "desktop confirmed event arrival preserves return, fresh start confirmation",
+    "status": "PASS",
+    "data": {
+      "screenshot": "/private/tmp/mira-product-desktop-return-review.png",
+      "retainedEvent": true,
+      "arrivalVsCheckinDistinct": true,
+      "tripPosts": 2
+    }
+  },
+  {
+    "device": "desktop",
+    "pageErrors": [],
+    "consoleErrors": [
+      "Failed to load resource: net::ERR_FAILED",
+      "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+      "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+    ],
+    "postBodies": [
+      {
+        "from": {
+          "lat": 28.6951,
+          "lon": 77.2143
+        },
+        "to": {
+          "name": "Fictional Event Venue",
+          "lat": 28.6991,
+          "lon": 77.2163
+        },
+        "mode": "walk",
+        "etaMinutes": 16,
+        "routeMinutes": 16,
+        "tz": "Asia/Kolkata",
+        "recipientIds": [
+          "9c228052-5450-4226-8ebc-7777ae1ca7ed"
+        ],
+        "share": true,
+        "idempotencyKey": "dd6a24ea-dc14-4602-bc56-7e957a80b94d"
+      },
+      {
+        "from": {
+          "lat": 28.6951,
+          "lon": 77.2143
+        },
+        "to": {
+          "name": "Fictional Event Venue",
+          "lat": 28.6991,
+          "lon": 77.2163
+        },
+        "mode": "walk",
+        "etaMinutes": 16,
+        "routeMinutes": 16,
+        "tz": "Asia/Kolkata",
+        "recipientIds": [
+          "9c228052-5450-4226-8ebc-7777ae1ca7ed"
+        ],
+        "share": true,
+        "idempotencyKey": "dd6a24ea-dc14-4602-bc56-7e957a80b94d"
+      }
+    ]
+  }
+]
