@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 import { ActionBar, MiraVoice, QuestionRow, StateNote } from "@/components/mira/Frame";
 import { EvidenceChip, EvidenceLedger, type EvidenceItem } from "@/components/mira/Evidence";
+import { Row, RowAction, RowList } from "@/components/mira/Rows";
 import { BriefMap } from "@/components/mira/BriefMap";
 import { SkyCard, skyAt, type LiveStat } from "@/components/mira/LiveNow";
 import { SafetyAccess } from "@/components/app/SafetyAccess";
@@ -22,7 +23,7 @@ import { decisionTake } from "@/lib/decision-take";
 import { HELP_CLASSES, hoursState, type HelpPoint } from "@/domain/help-points";
 import { localTimeInZone } from "@/domain/opening-hours";
 import { daylightAt, instantForLocal, laterDaylight, localTimeForInstant, type PlanOptionsResult } from "@/domain/plan-options";
-import { intentFromDraft, newPlanDraft, type PlanDraft } from "@/domain/plan-state";
+import { activatePlanLeg, intentFromDraft, newPlanDraft, returnLegFromMain, type PlanDraft, type PlanLegDraft } from "@/domain/plan-state";
 import { emergencyActions, statusWords, type CountryContext } from "@/domain/country-context";
 import type { EvidenceState } from "@/domain/evidence-state";
 import type { SafetyUpdatesData } from "@/domain/safety-updates";
@@ -82,6 +83,8 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   const here = usableLocationPoint(loc, clock?.getTime());
   const [situation, setSituation] = useState<Situation>(initialFor ?? "go");
   const [sheet, setSheet] = useState<"origin" | "destination" | "when" | "go" | null>(null);
+  /** A leg sheet: where the way back returns to, or when it leaves. */
+  const [legSheet, setLegSheet] = useState<{ index: number; kind: "place" | "when" } | null>(null);
   const [signIn, setSignIn] = useState(false);
   const [selected, setSelected] = useState(0);
   const [editing, setEditing] = useState(false);
@@ -251,6 +254,37 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
     if (r.ok && r.data.plan.id !== draft.savedId) setPlanDraft({ ...draft, savedId: r.data.plan.id });
     setSaveState({ busy: false, text: r.ok ? `${updated ? "Updated in" : "Saved to"} Journeys for 30 days. Nothing started and nothing shared.` : r.code === "provider_content" || r.code === "incomplete_plan" ? `${r.message} This plan stays in this tab for 2 hours.` : r.message });
   };
+  // ── The way back and other legs (docs/phase2-ux/00 §1) ─────────────────────────────────────
+  const setLegs = (legs: PlanLegDraft[]) => { if (draft) setPlanDraft({ ...draft, legs, touched: true, selection: undefined }); };
+  const addWayBack = () => {
+    if (!draft) return;
+    const legs = draft.legs ?? [];
+    const back = returnLegFromMain({ ...draft, timeZone: zone });
+    if (back) { setLegs([...legs, back]); setLegSheet({ index: legs.length, kind: "when" }); return; }
+    // Started from where you are: ask where you're coming back to.
+    setLegSheet({ index: legs.length, kind: "place" });
+  };
+  const pickLegPlace = (p: PickedPlace) => {
+    if (!draft || !legSheet || "here" in p) return;
+    const legs = [...(draft.legs ?? [])];
+    const to = { query: p.name, resolution: { source: p.source, name: p.name, point: { lat: p.lat, lon: p.lon }, ...(p.placeId ? { placeId: p.placeId } : {}) } };
+    const from = { query: placeName(draft.destination) ?? draft.destination.query, resolution: draft.destination.resolution };
+    legs[legSheet.index] = { ...(legs[legSheet.index] ?? { label: "", departureLocal: "", timeZone: zone, mode: draft.mode, timeKind: "depart_at", constraints: "", destinationCountryIso: null }), label: `Return to ${p.name}`.slice(0, 160), origin: from, destination: to };
+    setLegs(legs);
+    setLegSheet({ index: legSheet.index, kind: "when" });
+  };
+  const checkLeg = (index: number) => {
+    if (!draft) return;
+    const leg = draft.legs?.[index];
+    if (!leg) return;
+    if (!leg.departureLocal) return setLegSheet({ index, kind: "when" });
+    const swapped = activatePlanLeg(draft, index);
+    // A trip there "from where you are" was for that moment; it isn't kept as a leg of its own.
+    const next = swapped ?? { ...draft, touched: true, selection: undefined, activity: leg.label, origin: { kind: "named" as const, ...leg.origin }, destination: leg.destination, departureLocal: leg.departureLocal, timeZone: leg.timeZone || zone, mode: leg.mode, timeKind: leg.timeKind ?? "depart_at", legs: (draft.legs ?? []).filter((_, i) => i !== index) };
+    setPlanDraft(next);
+    setSelected(0);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   const askAbout = () => { handOffAsk("What should I know about this plan?"); router.push("/mira"); };
   const pick = (field: "origin" | "destination", p: PickedPlace) => {
     if (!draft) return;
@@ -405,11 +439,24 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
             <EvidenceLedger className="mt-4" items={claims.map((c): EvidenceItem => ({ ...c, ...(c.kind === "failed" ? { action: { label: "Try again", onClick: () => setRetry((n) => n + 1) } } : {}) }))} title={loop ? "Your start, at that time" : "That way, at that time"} label="What Mira checked" />
 
             {saveState.text ? <StateNote className="mt-3">{saveState.text}</StateNote> : null}
+
+            {!loop ? (
+              <RowList label={(draft.legs ?? []).every((l) => /^return\b/i.test(l.label)) ? "The way back" : /^return\b/i.test(draft.activity) ? "The way there" : "Also in this plan"} id="legs-h" className="mt-6">
+                {(draft.legs ?? []).map((leg, i) => {
+                  const to = leg.destination.resolution?.name ?? leg.destination.query;
+                  const back = /^return\b/i.test(leg.label);
+                  return <Row key={i} icon="route" tone={back ? "dusk" : "accent"} eyebrow={leg.departureLocal ? whenWords(leg.departureLocal, leg.timeZone || zone) : "Choose a time"} title={back ? `Back to ${to}` : `To ${to}`} detail={leg.departureLocal ? "Check this way, at that time" : "Mira checks it again for the time you choose"} onClick={() => checkLeg(i)} ariaLabel={`${back ? "Way back" : "Leg"}: ${to}`} trailing={<RowAction icon="trash" label={back ? "Remove the way back" : "Remove this leg"} onClick={() => setLegs((draft.legs ?? []).filter((_, j) => j !== i))} />} />;
+                })}
+                {!(draft.legs ?? []).some((l) => /^return\b/i.test(l.label)) && !/^return\b/i.test(draft.activity) && (draft.legs ?? []).length < 2 ? (
+                  <Row icon="plus" tone="ink" title="Add the way back" detail={draft.origin.kind === "named" && originLabel ? `Back to ${originLabel} — you choose when` : "Choose where you’re coming back to"} onClick={addWayBack} />
+                ) : null}
+              </RowList>
+            ) : null}
           </>
         )}
 
         <div className="mt-6 flex flex-wrap gap-x-5 text-sm">
-          <Link href="/plan/legs" className="inline-flex min-h-11 items-center gap-1.5 font-semibold text-accent-strong"><Icon name="plus" className="size-4" />Return trip or more legs</Link>
+          <Link href="/plan/legs" className="inline-flex min-h-11 items-center gap-1.5 font-semibold text-accent-strong"><Icon name="plus" className="size-4" />More stops or cities</Link>
           <button type="button" onClick={() => { clearPlanDraft(); ensurePlanDraft(); const d = newPlanDraft(new Date(), deviceZone()); setPlanDraft(preset(d, situation, currentLocation().point ? { lat: currentLocation().point!.lat, lon: currentLocation().point!.lon } : null)); setSelected(0); setSaveState({ busy: false, text: null }); }} className="inline-flex min-h-11 items-center font-semibold text-ink-muted">Clear plan</button>
         </div>
         <p className="mt-1 text-xs text-ink-subtle">This plan stays in this tab for 2 hours after your last change. Saving and sharing are always your choice.</p>
@@ -430,6 +477,8 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
       <PlaceSheet open={sheet === "origin"} onClose={() => setSheet(null)} title={situation === "travel" ? "Where are you arriving?" : "Starting from"} onPick={(p) => pick("origin", p)} saved={places} near={here ? { lat: here.lat, lon: here.lon } : null} allowHere osmOnly={osmOnly} />
       <PlaceSheet open={sheet === "destination"} onClose={() => setSheet(null)} title={situation === "travel" ? "Where are you staying?" : "Where to?"} onPick={(p) => pick("destination", p)} saved={places} near={origin ?? (here ? { lat: here.lat, lon: here.lon } : null)} allowHere={false} osmOnly={osmOnly} />
       <WhenSheet open={sheet === "when"} onClose={() => setSheet(null)} local={draft.departureLocal} zone={zone} timeKind={draft.timeKind ?? "depart_at"} allowArrive={!loop} quick={situation} deviceZone={deviceZone()} onChange={(p) => update({ ...(p.local ? { departureLocal: p.local, timeHint: null } : {}), ...(!draft.timeZone ? { timeZone: zone } : {}), ...(p.zone && validZone(p.zone) ? { timeZone: p.zone } : {}), ...(p.timeKind ? { timeKind: p.timeKind } : {}) })} />
+      <PlaceSheet open={legSheet?.kind === "place"} onClose={() => setLegSheet(null)} title="Coming back to" onPick={pickLegPlace} saved={places} near={dest ?? (here ? { lat: here.lat, lon: here.lon } : null)} allowHere={false} osmOnly={osmOnly} />
+      <WhenSheet open={legSheet?.kind === "when"} onClose={() => setLegSheet(null)} local={draft.legs?.[legSheet?.index ?? -1]?.departureLocal ?? ""} zone={draft.legs?.[legSheet?.index ?? -1]?.timeZone || zone} timeKind={draft.legs?.[legSheet?.index ?? -1]?.timeKind ?? "depart_at"} allowArrive quick="go" deviceZone={deviceZone()} title={/^return\b/i.test(draft.legs?.[legSheet?.index ?? -1]?.label ?? "") ? "When are you heading back?" : "When does this leg start?"} after={instant} onChange={(p) => { const i = legSheet?.index ?? -1; const legs = [...(draft.legs ?? [])]; if (!legs[i]) return; legs[i] = { ...legs[i], ...(p.local ? { departureLocal: p.local, timeHint: null } : {}), ...(p.zone && validZone(p.zone) ? { timeZone: p.zone } : !legs[i].timeZone ? { timeZone: zone } : {}), ...(p.timeKind ? { timeKind: p.timeKind } : {}) }; setLegs(legs); }} />
       <GoSheet open={sheet === "go"} onClose={() => setSheet(null)} target={goTarget} signedIn={signedIn} emailAlerts={emailAlerts} onSignIn={() => { setSheet(null); setSignIn(true); }} />
       <SignInSheet open={signIn} onClose={() => setSignIn(false)} reason="Sign in to save plans and go with Mira" />
       <TimeZoneChoices />

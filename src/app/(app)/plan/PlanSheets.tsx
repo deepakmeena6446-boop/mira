@@ -105,14 +105,19 @@ function localAt(zone: string, base: Date, addMin = 0, setHour?: number, dayOffs
 export { whenWords } from "@/domain/plan-name";
 
 /** When: quick choices, an exact local time, depart/arrive, and the zone the time is in. */
-export function WhenSheet({ open, onClose, local, zone, timeKind, allowArrive, quick, onChange, deviceZone }: { open: boolean; onClose: () => void; local: string; zone: string; timeKind: "depart_at" | "arrive_by"; allowArrive: boolean; quick: "go" | "run" | "travel"; onChange: (patch: { local?: string; zone?: string; timeKind?: "depart_at" | "arrive_by" }) => void; deviceZone: string }) {
+export function WhenSheet({ open, onClose, local, zone, timeKind, allowArrive, quick, onChange, deviceZone, title, after }: { open: boolean; onClose: () => void; local: string; zone: string; timeKind: "depart_at" | "arrive_by"; allowArrive: boolean; quick: "go" | "run" | "travel"; onChange: (patch: { local?: string; zone?: string; timeKind?: "depart_at" | "arrive_by" }) => void; deviceZone: string; title?: string;
+  /** For a way back: offer the hours after the trip there instead of "now". */
+  after?: Date | null }) {
   const now = new Date();
-  const choices = quick === "run"
+  const clockOf = (v: string) => { const [h, m] = v.slice(11, 16).split(":").map(Number); return `${((h + 11) % 12) + 1}:${pad(m)} ${h < 12 ? "AM" : "PM"}`; };
+  const choices = after
+    ? [60, 120, 180, 240].map((m) => { const v = localAt(zone, after, m); return [`${m / 60} h later · ${clockOf(v)}`, v]; })
+    : quick === "run"
     ? [["Now", localAt(zone, now)], ["Tomorrow 5 AM", localAt(zone, now, 0, 5, 1)], ["Tomorrow 6 AM", localAt(zone, now, 0, 6, 1)], ["This evening 6 PM", localAt(zone, now, 0, 18, 0)]]
     : [["Now", localAt(zone, now)], ["In 30 min", localAt(zone, now, 30)], ["Tonight 10 PM", localAt(zone, now, 0, 22, 0)], ["Tomorrow 9 AM", localAt(zone, now, 0, 9, 1)]];
   const [zoneDraft, setZoneDraft] = useState(zone);
   return (
-    <Sheet open={open} onClose={onClose} title={quick === "travel" ? "When do you arrive?" : "When?"} labelledBy="when-sheet-title" footer={<button type="button" onClick={onClose} className="mira-primary w-full">Done</button>}>
+    <Sheet open={open} onClose={onClose} title={title ?? (quick === "travel" ? "When do you arrive?" : "When?")} labelledBy="when-sheet-title" footer={<button type="button" onClick={onClose} className="mira-primary w-full">Done</button>}>
       {allowArrive ? (
         <div role="radiogroup" aria-label="Timing" className="mb-4 grid grid-cols-2 gap-1 rounded-2xl bg-sunken p-1">
           {(["depart_at", "arrive_by"] as const).map((k) => (
