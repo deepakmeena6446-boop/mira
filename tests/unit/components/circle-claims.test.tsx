@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { CircleScreen } from "@/app/(app)/circle/CircleScreen";
+
+// The Support pair in the header is covered by its own tests; these are about Circle's claims.
+vi.mock("@/components/app/SafetyAccess", () => ({ SafetyAccess: () => null }));
 import type { Contact } from "@/server/account/contacts";
 
 const accepted: Contact = { id: "1", name: "Mum", emailHint: "mu••@example.test", phone: null, phoneHint: null, isDefault: true, status: "accepted" };
