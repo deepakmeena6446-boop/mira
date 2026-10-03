@@ -144,7 +144,12 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
       : { label: "to the nearest", value: nearestOpen ? `${nearestOpen.minutes} min` : "—", state: helpState },
     { label: notes.length === 1 ? "note from people" : "notes from people", value: String(notes.length), state: !now || now.notes === null ? "loading" : "ok" },
   ];
-  const line = nearestOpen ? <><strong className="font-semibold text-[color:var(--sky-ink)]">{nearestOpen.name}</strong> is {hoursWords(hoursState(nearestOpen, localNow ?? undefined, 0, clock?.getTime()))}, about {nearestOpen.minutes} min {place ? "from it" : "away"}. Staffing isn’t verified.</> : null;
+  // Same sentences as Home's card, so "none open" reads the same on both screens.
+  const helpTotal = now?.help?.points.length ?? 0;
+  const line = nearestOpen ? <><strong className="font-semibold text-[color:var(--sky-ink)]">{nearestOpen.name}</strong> is {hoursWords(hoursState(nearestOpen, localNow ?? undefined, 0, clock?.getTime()))}, about {nearestOpen.minutes} min {place ? "from it" : "away"}. Staffing isn’t verified.</>
+    : now?.help && now.help.evidence.state !== "failed"
+      ? helpTotal ? <>None of the {helpTotal} Help Points near {place ? "it" : "you"} is listed open right now. Emergency is always one tap away.</> : <>No Help Points found within a short walk in the sources checked — that doesn’t mean none exist.</>
+      : null;
   const mapPins = ranked.slice(0, 8).filter((p) => !osmOnly || !p.id.startsWith("g:")).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, icon: HELP_ICON[p.cls] ?? "pin", strong: HELP_CLASSES[p.cls].emergency }));
 
   return (

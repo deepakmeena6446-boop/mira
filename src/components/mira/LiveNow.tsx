@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useLayoutEffect, useRef } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 import { MiraPulse, type PulseState } from "@/components/app/MiraPulse";
@@ -40,6 +41,36 @@ export function daylightSegments(from: Date, point: { lat: number; lon: number }
 export type LiveStat = { value: string; label: string; state: "ok" | "loading" | "failed" | "none" };
 
 /**
+ * Keeps a sky-card title on one line when it nearly fits ("12 min walk · arrive 11:23 PM" is ~3 px
+ * too wide at 390 px): shrinks it just enough, never below `min` px; beyond that it wraps, balanced,
+ * so a lone "PM" never ends up on its own line. Styles are written directly, so nothing re-renders.
+ */
+function useFitOneLine<T extends HTMLElement>(text: unknown, min = 24) {
+  const ref = useRef<T>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      el.style.fontSize = "";
+      el.style.whiteSpace = "nowrap";
+      const over = el.scrollWidth / Math.max(1, el.clientWidth);
+      if (over <= 1) return;
+      const size = parseFloat(getComputedStyle(el).fontSize) / over;
+      if (size >= min) el.style.fontSize = `${Math.floor(size * 10) / 10}px`;
+      else el.style.whiteSpace = "";
+    };
+    fit();
+    if (typeof ResizeObserver === "undefined") return;
+    let width = el.clientWidth;
+    const ro = new ResizeObserver(() => { if (el.parentElement && el.parentElement.clientWidth !== width) { width = el.parentElement.clientWidth; fit(); } });
+    if (el.parentElement) { width = el.parentElement.clientWidth; ro.observe(el.parentElement); }
+    void document.fonts?.ready.then(fit);
+    return () => ro.disconnect();
+  }, [text, min]);
+  return ref;
+}
+
+/**
  * The sky card: Mira's signature surface. Its colour is the calculated sky at the moment it talks
  * about (now, or a plan's departure); the strip shows what the sky does next; stats are facts with
  * their evidence one tap away. Used on Home, Around, Plan and the journey so all four read as one.
@@ -65,6 +96,8 @@ export function SkyCard({ state, label, eyebrow, aside, title, titleAs = "div", 
   const segments = strip && Math.abs(strip.point.lat) <= 72 ? daylightSegments(strip.from, strip.point, hours) : null;
   const firstChange = segments && segments.length > 1 ? segments[1] : null;
   const foot = "-mx-5 mt-4 flex min-h-13 w-[calc(100%+2.5rem)] items-center justify-between border-t px-5 text-left text-sm font-semibold";
+  const titleRef = useFitOneLine<HTMLHeadingElement & HTMLDivElement>(typeof title === "string" ? title : null);
+  const Title = titleAs;
   return (
     <section aria-label={label} className={cx("relative overflow-hidden rounded-[1.75rem] p-5 shadow-[0_24px_48px_-28px_rgb(20_33_61/.55)] ring-1 ring-white/10", footer ? "pb-0" : "", className)} style={{ background: sky.bg, color: sky.ink, ["--sky-ink" as string]: sky.ink, ["--sky-muted" as string]: sky.muted, ["--sky-chip" as string]: sky.chip }}>
       {eyebrow || aside ? (
@@ -73,7 +106,7 @@ export function SkyCard({ state, label, eyebrow, aside, title, titleAs = "div", 
           {aside ? <p className="shrink-0 truncate text-[0.8125rem] font-semibold" style={{ color: sky.muted }}>{aside}</p> : null}
         </div>
       ) : null}
-      {title ? (() => { const T = titleAs; return <T className="mt-4 text-[1.75rem] font-medium leading-tight tracking-[-0.035em]">{title}</T>; })() : null}
+      {title ? <Title ref={titleRef} className="mt-4 text-[1.75rem] font-medium leading-tight tracking-[-0.035em] text-balance">{title}</Title> : null}
       {segments ? (
         <div className="mt-3" aria-label={firstChange ? `${word(firstChange.state)} from about ${clockIn(firstChange.start)}` : `No change in the next ${hours} hours`}>
           <div className="flex h-1.5 gap-px overflow-hidden rounded-full" aria-hidden>
