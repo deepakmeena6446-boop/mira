@@ -35,7 +35,7 @@ export function RowList({ label, id, children, className, action }: { label: str
  * and one line of detail. Tapping the row opens it; an optional quiet trailing action (delete, forget)
  * replaces the chevron at the end.
  */
-export function Row({ icon, tone = "accent", eyebrow, kind, title, detail, href, onClick, trailing, ariaLabel }: {
+export function Row({ icon, tone = "accent", eyebrow, kind, title, detail, href, onClick, trailing, ariaLabel, wrap = false, mark }: {
   icon: string;
   tone?: RowTone;
   eyebrow?: React.ReactNode;
@@ -46,6 +46,10 @@ export function Row({ icon, tone = "accent", eyebrow, kind, title, detail, href,
   onClick?: () => void;
   trailing?: React.ReactNode;
   ariaLabel?: string;
+  /** Show the whole detail (a message) instead of one truncated line. */
+  wrap?: boolean;
+  /** A small accent dot for something new. */
+  mark?: boolean;
 }) {
   const interactive = Boolean(href || onClick);
   const body = (
@@ -54,8 +58,9 @@ export function Row({ icon, tone = "accent", eyebrow, kind, title, detail, href,
       <span className="min-w-0 flex-1">
         {eyebrow ? <span className="m-label flex items-center gap-1.5">{kind ? <EvidenceGlyph kind={kind} /> : null}<span className="truncate">{eyebrow}</span></span> : null}
         <span className="block truncate font-semibold">{title}</span>
-        {detail ? <span className="block truncate text-[0.8125rem] text-ink-muted">{detail}</span> : null}
+        {detail ? <span className={cx("block text-[0.8125rem] text-ink-muted", wrap ? "leading-snug" : "truncate")}>{detail}</span> : null}
       </span>
+      {mark ? <span aria-label="New" className="size-2.5 shrink-0 rounded-full bg-accent" /> : null}
       {interactive && !trailing ? <Icon name="chevron" className="size-4 shrink-0 text-ink-subtle" /> : null}
     </>
   );

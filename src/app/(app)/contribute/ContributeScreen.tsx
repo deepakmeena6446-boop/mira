@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { MiraPulse } from "@/components/app/MiraPulse";
 import { SEEN_SCOUT_KEY, readNumber, recordUsage, writeValue } from "@/lib/usage-signal";
 import { Section } from "@/components/app/Section";
@@ -17,6 +18,8 @@ import { CORRECTIONS, CORRECTION_LABEL, type Correction } from "@/domain/contrib
 import type { CheckView } from "@/server/contributions/checks";
 import type { ImpactView } from "@/server/contributions";
 import { SafetyAccess } from "@/components/app/SafetyAccess";
+import { StateNote } from "@/components/mira/Frame";
+import { Row, RowList } from "@/components/mira/Rows";
 
 /** Same wording everywhere a report is offered: honest about review, never promises a person. */
 const REPORT_PRIVACY_LINE = "Sent privately. Some reports are reviewed before informing Mira.";
@@ -29,38 +32,35 @@ const QUICK: Array<{ c: string; icon: string; label: string; hint: string }> = [
 ];
 
 export function ContributeScreen({ signedIn, durable, checks, impact, pendingChecks = false, emailAlerts }: { signedIn: boolean; durable: boolean; checks: CheckView[]; impact: ImpactView | null; pendingChecks?: boolean; emailAlerts: boolean }) {
+  const router = useRouter();
   const [signIn, setSignIn] = useState(false);
   const report = <ReportSection key="report" />;
   const checksBlock = signedIn ? <ChecksSection key="checks" checks={checks} pendingChecks={pendingChecks} /> : null;
   return (
-    <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
-      <div className="mx-auto flex max-w-xl flex-col gap-5">
+    <div className="m-screen bg-companion">
+      <div className="m-screen-inner flex flex-col gap-7">
         <header>
-          <h1 className="text-[1.75rem] font-semibold tracking-tight">Contribute</h1>
-          <p className="mt-1 text-sm text-ink-muted">A small detail can help the next person.</p>
+          <div className="flex items-center justify-between gap-3">
+            <button type="button" onClick={() => (window.history.length > 1 ? router.back() : router.push("/"))} aria-label="Back" className="grid size-11 shrink-0 place-items-center rounded-full bg-surface ring-1 ring-line"><Icon name="back" className="size-5" /></button>
+            <SafetyAccess emailAlerts={emailAlerts} compact className="min-w-0" />
+          </div>
+          <h1 className="m-display mt-5">Add what you know</h1>
+          <p className="mt-1 text-[0.95rem] text-ink-muted">A small detail helps the next person. Only what several people agree on ever shows as a note.</p>
         </header>
-        <SafetyAccess emailAlerts={emailAlerts} />
 
         {impact?.steward.steward ? <ScoutWelcome /> : null}
-        {impact ? <ImpactSection impact={impact} /> : null}
+        {/* What you can do first; your impact once there is any (never a wall of zeros). */}
         {checksBlock}
         {report}
+        {impact && (impact.summary.verified || impact.summary.pending || impact.summary.differed) ? <ImpactSection impact={impact} /> : null}
 
         {!signedIn ? (
-          <section className="rounded-[var(--radius-card)] border border-line bg-surface p-5">
-            <p className="text-sm text-ink-muted">Sign in to answer Mira Checks after your journeys, correct places Mira shows, and see what you&apos;ve helped confirm.</p>
-            <Button className="mt-3" variant="secondary" onClick={() => setSignIn(true)}>
-              Sign in
-            </Button>
+          <>
+            <StateNote title="Answer Mira Checks and correct places" action={<button type="button" onClick={() => setSignIn(true)} className="mira-primary min-h-11 px-5 text-sm">Sign in</button>}>Sign in to answer Mira Checks after your journeys, correct places Mira shows, and see what you&apos;ve helped confirm.</StateNote>
             <SignInSheet open={signIn} onClose={() => setSignIn(false)} reason="Sign in to help Mira" />
-          </section>
+          </>
         ) : !durable ? (
-          <p className="rounded-[var(--radius-card)] border border-line bg-surface px-5 py-4 text-sm text-ink-muted">
-            Checks and corrections need a Google or email sign-in, so each person counts once.{" "}
-            <Link href="/me#account" className="font-semibold text-accent-strong">
-              Keep your account
-            </Link>
-          </p>
+          <StateNote title="Checks and corrections count each person once" action={<Link href="/me#account" className="font-semibold text-accent-strong">Keep your account</Link>}>They need a Google or email sign-in.</StateNote>
         ) : (
           <CorrectSection durable={durable} />
         )}
@@ -73,29 +73,12 @@ export function ContributeScreen({ signedIn, durable, checks, impact, pendingChe
 /** Street observations in two taps: a tile opens the report form with the category chosen. */
 function ReportSection() {
   return (
-    <section id="report" aria-labelledby="report-h" className="scroll-mt-6">
-      <h2 id="report-h" className="mb-2 px-1 text-[13px] font-medium text-ink-subtle">
-        Report something
-      </h2>
-      <div className="grid gap-2">
-        {QUICK.map((t) => (
-          <Link key={t.c} href={`/report?c=${t.c}&from=contribute`} className="flex min-h-16 items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 hover:bg-sunken">
-            <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink">
-              <Icon name={t.icon} className="size-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-semibold leading-tight">{t.label}</span>
-              <span className="block text-sm text-ink-muted">{t.hint}</span>
-            </span>
-            <Icon name="chevron" className="size-4 text-ink-subtle" />
-          </Link>
-        ))}
-        <Link href="/report?from=contribute" className="flex min-h-12 items-center justify-between rounded-[var(--radius-card)] border border-line bg-surface px-4 text-sm font-semibold hover:bg-sunken">
-          Something that happened to you or near you
-          <Icon name="chevron" className="size-4 text-ink-subtle" />
-        </Link>
-      </div>
-      <p className="mt-2 px-1 text-xs text-ink-subtle">{REPORT_PRIVACY_LINE} Reports never earn credit.</p>
+    <section id="report" className="scroll-mt-6">
+      <RowList label="Report something" id="report-h">
+        {QUICK.map((t) => <Row key={t.c} icon={t.icon} tone="dusk" title={t.label} detail={t.hint} href={`/report?c=${t.c}&from=contribute`} />)}
+        <Row icon="flag" tone="ink" title="Something that happened" detail="To you or near you — privately" href="/report?from=contribute" />
+      </RowList>
+      <p className="m-meta mt-2 px-1">{REPORT_PRIVACY_LINE} Reports never earn credit.</p>
     </section>
   );
 }
@@ -110,7 +93,7 @@ function ScoutWelcome() {
   }, []);
   if (!show) return null;
   return (
-    <section className="flex items-start gap-3 rounded-[var(--radius-card)] border border-accent/30 bg-accent-soft p-4 animate-rise" aria-label="Mira Scout">
+    <section className="flex items-start gap-3 rounded-2xl bg-people-soft p-4 animate-rise" aria-label="Mira Scout">
       <MiraPulse size={16} scout state="observing" className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <p className="font-semibold">You&apos;re a Mira Scout.</p>
@@ -126,20 +109,16 @@ function ScoutWelcome() {
 function ChecksSection({ checks, pendingChecks }: { checks: CheckView[]; pendingChecks: boolean }) {
   return (
     <section id="checks" aria-labelledby="checks-h" className="scroll-mt-6">
-      <h2 id="checks-h" className="mb-2 px-1 text-[13px] font-medium text-ink-subtle">
-        Mira Checks
-      </h2>
-      {pendingChecks ? <p role="status" className="mb-3 rounded-[var(--radius-card)] bg-surface px-5 py-3 text-sm text-ink-muted shadow-[var(--shadow-card)]">A journey question is still being prepared. Check back here later.</p> : null}
+      <h2 id="checks-h" className="m-label">Mira Checks</h2>
+      {pendingChecks ? <StateNote className="mt-2.5">A journey question is still being prepared. Check back here later.</StateNote> : null}
       {checks.length ? (
-        <div className="flex flex-col gap-3">
+        <div className="mt-2.5 flex flex-col gap-2.5">
           {checks.map((c) => (
             <CheckCard key={c.id} check={c} />
           ))}
         </div>
       ) : (
-        <p className="rounded-[var(--radius-card)] bg-surface px-5 py-4 text-sm text-ink-muted shadow-[var(--shadow-card)]">
-          After a journey, Mira may ask one quick question about something you passed.
-        </p>
+        <StateNote className="mt-2.5">After a journey, Mira may ask one quick question about something you passed.</StateNote>
       )}
     </section>
   );
@@ -249,7 +228,7 @@ function ImpactSection({ impact }: { impact: ImpactView }) {
         {s.archived ? <p className="text-ink-muted">{s.archived} earlier credited {s.archived === 1 ? "answer is" : "answers are"} kept for your record but cannot be rechecked, so {s.archived === 1 ? "it no longer counts" : "they no longer count"} toward current impact or Mira Scout.</p> : null}
         {s.pending ? <p className="text-ink-muted">{s.pending} waiting for someone else to confirm.</p> : null}
         {s.differed ? <p className="text-ink-muted">{s.differed} where reports differed, so nobody was credited.</p> : null}
-        <div className="rounded-[var(--radius-card)] bg-sunken p-4">
+        <div className="rounded-2xl bg-sunken p-4">
           <p className="flex items-center gap-2 font-semibold">
             <MiraPulse size={14} scout={impact.steward.steward} /> Mira Scout
           </p>

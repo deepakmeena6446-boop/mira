@@ -133,6 +133,14 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [habit, places, savedPlan, updates, areaKey]);
 
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    void api<{ notifications: Array<{ read_at: string | null }> }>("/api/me/notifications").then((r) => { if (live && r.ok) setUnread(r.data.notifications.filter((n) => !n.read_at).length); });
+    return () => { live = false; };
+  }, [user]);
+
   const submitAsk = (text: string) => {
     const t = text.trim();
     if (!t) return;
@@ -157,7 +165,14 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
             </p>
           </div>
           {user ? (
-            <Link href="/me" aria-label="Your profile and settings" className="shrink-0"><Avatar name={user.name} src={user.avatarUrl} size={40} /></Link>
+            <div className="flex shrink-0 items-center gap-2">
+              {/* Updates: a contact accepted, a journey needs you. The count clears when the inbox is opened. */}
+              <Link href="/inbox" aria-label={unread ? `Updates, ${unread} new` : "Updates"} className="relative grid size-10 place-items-center rounded-full bg-surface text-ink ring-1 ring-line">
+                <Icon name="bell" className="size-[18px]" />
+                {unread ? <span aria-hidden className="absolute -right-0.5 -top-0.5 grid min-w-[1.125rem] place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-[1.125rem] text-accent-ink ring-2 ring-canvas">{unread > 9 ? "9+" : unread}</span> : null}
+              </Link>
+              <Link href="/me" aria-label="Your profile and settings"><Avatar name={user.name} src={user.avatarUrl} size={40} /></Link>
+            </div>
           ) : (
             <button type="button" onClick={() => setSignIn(true)} className="min-h-11 shrink-0 rounded-full px-1 text-[0.875rem] font-semibold text-accent-strong">Sign in</button>
           )}

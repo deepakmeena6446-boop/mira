@@ -41,9 +41,10 @@ test("375 px Help Points, Emergency, arrival and Contribute remain usable", asyn
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   await page.getByRole("button", { name: "I'm okay now" }).click();
   await page.goto("/contribute");
-  await expect(page.getByRole("heading", { name: "Contribute" })).toBeVisible();
-  await expect(page.getByRole("img", { name: /Verified contributions:/ })).toBeVisible();
-  await expect(page.getByText("Mira Scout")).toBeVisible();
+  // Phase 2: what you can add leads; a new person's impact isn't shown as a wall of zeros.
+  await expect(page.getByRole("heading", { level: 1, name: "Add what you know" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Report something" }).getByRole("link", { name: /Dark or broken street/ })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Verified contributions:/ })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   await openRoute(page);
   await page.getByRole("button", { name: /Go with Mira/ }).click();
