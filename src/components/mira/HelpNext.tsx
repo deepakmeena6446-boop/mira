@@ -25,7 +25,7 @@ const QUICK: Array<{ c: Category; icon: string; label: string; tone: "dusk" | "p
  * Mira Check is answered inline; a quick observation opens the private report with this spot and the
  * category already chosen. Impact is counted from her own receipts only (never a leaderboard).
  */
-export function HelpNextCard({ check, impactLine, signedIn, country, spot = null, title = "Add what you see here" }: { spot?: { lat: number; lon: number; name: string } | null; title?: string; check: Check | null; impactLine: string | null; signedIn: boolean; country: string | null }) {
+export function HelpNextCard({ check, impactLine, signedIn, country, spot = null, title = "Add what you see here", from = "home" }: { spot?: { lat: number; lon: number; name: string } | null; title?: string; check: Check | null; impactLine: string | null; signedIn: boolean; country: string | null; /** Which screen the report starts from (orders its tiles). */ from?: "home" | "around" }) {
   const router = useRouter();
   const [answered, setAnswered] = useState<{ text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -41,7 +41,7 @@ export function HelpNextCard({ check, impactLine, signedIn, country, spot = null
   // Near her, the report uses her live position ("Around where you are now"); about a chosen place, that place.
   const report = (c: Category) => {
     if (spot) setPendingReportSpot({ lat: spot.lat, lon: spot.lon, name: spot.name });
-    router.push(`/report?c=${c}&from=home`);
+    router.push(`/report?c=${c}&from=${from}`);
   };
 
   return (

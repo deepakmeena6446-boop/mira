@@ -1,7 +1,7 @@
 import { CATEGORY_POLARITY, type Category } from "@/domain/report/taxonomy";
 
 /** Where Report was opened from (a UI-only hint in the URL: never a place, never an id). */
-export const REPORT_FROM = ["journey", "unsafe", "mira", "contribute", "map", "home", "me"] as const;
+export const REPORT_FROM = ["journey", "unsafe", "mira", "contribute", "map", "home", "around", "me"] as const;
 export type ReportFrom = (typeof REPORT_FROM)[number];
 export type ReportGroup = "street" | "happened";
 
@@ -12,7 +12,7 @@ export function parseReportFrom(v: unknown): ReportFrom | null {
 /**
  * Which group of report tiles comes first (docs/launch-ux/06 §3.13). After a journey, from "I feel
  * unsafe", from Mira, or with an incident preset: "Something that happened". Otherwise — Contribute,
- * the map, Home, Me, or nothing — "On the street" first: everyday observations for everyone.
+ * the map, Home, Around, Me, or nothing — "On the street" first: everyday observations for everyone.
  */
 export function reportGroupOrder(from: ReportFrom | null, preset: Category | null): [ReportGroup, ReportGroup] {
   const incident = preset !== null && CATEGORY_POLARITY[preset] === "incident";

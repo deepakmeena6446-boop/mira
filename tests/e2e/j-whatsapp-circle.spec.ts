@@ -6,7 +6,7 @@ test("a WhatsApp contact gets a one-tap live link on the journey screen", async 
   test.skip(info.project.name !== "mobile", "one phone-sized browser is enough");
   const { ctx, page } = await newUser(browser, "Asha");
   await page.goto("/circle");
-  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByRole("button", { name: "Add", exact: true }).click();
   await page.getByLabel("Name").fill("Priya");
   await page.getByLabel("WhatsApp number").fill("+91 98765 43210");
   await page.getByRole("button", { name: "Save", exact: true }).click();

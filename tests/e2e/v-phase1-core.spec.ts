@@ -67,7 +67,7 @@ test("Mira and Around share the live sky card and Around offers one-tap contribu
   await page.getByRole("dialog").getByRole("button", { name: new RegExp(DEST) }).first().click();
   await expect(page.getByRole("heading", { name: "Add what you know about it" })).toBeVisible();
   await page.getByRole("button", { name: "Something good here" }).click();
-  await expect(page).toHaveURL(/\/report\?c=positive_condition&from=home$/);
+  await expect(page).toHaveURL(/\/report\?c=positive_condition&from=around$/);
   await expect(page.getByText(new RegExp(`Near ${DEST}`)).first()).toBeVisible();
   await ctx.close();
 });

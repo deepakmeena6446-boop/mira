@@ -121,7 +121,7 @@ export async function newUser(browser: Browser, name: string): Promise<{ ctx: Br
 export async function addContact(page: Page, name: string, tag: string): Promise<string> {
   const address = uniqueAddress(tag);
   await page.goto("/circle");
-  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByRole("button", { name: "Add", exact: true }).click();
   await page.getByLabel("Name").last().fill(name);
   await page.getByLabel("Email (optional)", { exact: true }).fill(address);
   await page.getByRole("button", { name: "Save and send invite", exact: true }).click();

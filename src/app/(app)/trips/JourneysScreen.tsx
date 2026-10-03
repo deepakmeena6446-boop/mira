@@ -61,6 +61,7 @@ export function JourneysScreen({ signedIn, emailAlerts, active, recent }: { sign
     setBusy(null);
     if (r.ok) setSaved((s) => ({ ...s, plans: s.plans?.filter((p) => p.id !== id) ?? [] }));
     else setSaved((s) => ({ ...s, failed: r.message }));
+    return r.ok;
   };
   const open = (plan: Saved) => { setPlanDraft({ ...plan.draft, touched: true }); router.push("/plan"); };
 
@@ -95,7 +96,7 @@ export function JourneysScreen({ signedIn, emailAlerts, active, recent }: { sign
         {/* 2. Coming up: this tab's plan and plans you chose to save. */}
         <RowList label="Coming up" id="upcoming-h" className="mt-7">
           {tabPlan ? (
-            <Row icon="route" eyebrow={[tabPlan.activity.trim() || null, tabPassed ? "Time passed · check again" : tabPlan.savedId ? "Saved · open now" : "In this tab"].filter(Boolean).join(" · ")} title={planTitle(tabPlan)} detail={planLine(tabPlan)} href="/plan" ariaLabel={`Continue plan: ${planTitle(tabPlan)}`} />
+            <Row icon="route" eyebrow={[tabPlan.activity.trim() || null, tabPassed ? "Time passed · check again" : tabPlan.savedId ? "Saved · open now" : "In this tab"].filter(Boolean).join(" · ")} title={planTitle(tabPlan)} detail={planLine(tabPlan)} href="/plan" ariaLabel={`Continue plan: ${planTitle(tabPlan)}`} trailing={tabPlan.savedId ? <RowAction icon="trash" label="Delete plan" disabled={busy === tabPlan.savedId} onClick={() => { const id = tabPlan.savedId!; void remove(id).then((ok) => { if (ok) setPlanDraft({ ...tabPlan, savedId: undefined }); }); }} /> : undefined} />
           ) : null}
           {savedList.map((p) => (
             <Row key={p.id} icon="star" eyebrow={p.draft.activity.trim() || "Saved plan"} title={planTitle(p.draft)} detail={planLine(p.draft)} onClick={() => open(p)} ariaLabel={`Open plan: ${p.draft.activity.trim() || planTitle(p.draft)}`} trailing={<RowAction icon="trash" label="Delete plan" disabled={busy === p.id} onClick={() => void remove(p.id)} />} />

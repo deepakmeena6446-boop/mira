@@ -145,7 +145,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
   const cold = usage === "cold";
 
   return (
-    <div className={cx("m-screen bg-companion", journeyTo !== null && "pb-[calc(var(--tabbar-space)+6rem)]")}>
+    <div className="m-screen bg-companion">
       <div className="m-screen-inner">
         <RootHeader emailAlerts={emailAlerts} leading={<Link href="/" className="mira-wordmark" aria-label="Mira home">mira<span aria-hidden>↗</span></Link>} />
 

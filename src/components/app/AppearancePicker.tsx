@@ -17,11 +17,11 @@ export function AppearancePicker() {
   const pref = useThemePref();
   const daypart = useDaypart();
   return (
-    <div className="px-5 py-4">
+    <div className="px-4 py-3.5">
       <p id="appearance-label" className="font-semibold">
         Appearance
       </p>
-      <p className="text-sm text-ink-muted">
+      <p className="text-[0.8125rem] text-ink-muted">
         {pref === "auto" ? `Follows the time of day${daypart ? ` — it's ${LABEL[daypart]} colors now` : ""}.` : pref === "light" ? "Always light." : "Always dark."}
       </p>
       <div role="radiogroup" aria-labelledby="appearance-label" className="mt-3 grid grid-cols-3 gap-2 rounded-2xl bg-sunken p-1">

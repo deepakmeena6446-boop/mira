@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Avatar } from "@/components/app/Avatar";
-import { MiraOrb } from "@/components/app/MiraOrb";
+import { SafetyAccess } from "@/components/app/SafetyAccess";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { Section } from "@/components/app/Section";
 import { Button } from "@/components/ui/Button";
@@ -36,13 +36,15 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
 
   if (!user) {
     return (
-      <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-[calc(var(--tabbar-space)+2rem)] text-center">
-        <MiraOrb size={80} />
-        <h1 className="mt-6 text-3xl font-semibold">Your circle</h1>
-        <p className="mt-2 max-w-sm text-ink-muted">Save the people who should know you got there. Select recipients when confirming a shared journey, then send each live link from the journey screen. Contact email depends on availability and their acceptance.</p>
-        <Button className="mt-7 max-w-xs" variant="hero" size="lg" onClick={() => setSignIn(true)}>
-          Get started
-        </Button>
+      <div className="m-screen bg-companion">
+        <div className="m-screen-inner">
+          <CircleHeader emailAlerts={emailAlerts} />
+          <section aria-labelledby="circle-h" className="m-card mt-5 p-5">
+            <h1 id="circle-h" className="m-display">Your Circle</h1>
+            <p className="m-meta mt-2 text-[0.95rem]">Save the people who should know you got there. You choose who can follow each journey, and you send each live link yourself.</p>
+            <button type="button" onClick={() => setSignIn(true)} className="mira-primary mt-5 w-full">Get started</button>
+          </section>
+        </div>
         <SignInSheet open={signIn} onClose={() => setSignIn(false)} />
       </div>
     );
@@ -70,12 +72,13 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
   const list = (xs: Contact[]) => (xs.length <= 2 ? xs.map((c) => c.name).join(" and ") : `${xs.slice(0, -1).map((c) => c.name).join(", ")} and ${xs[xs.length - 1].name}`);
 
   return (
-    <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
-      <div className="mx-auto flex max-w-xl flex-col gap-6">
-        <header className="pt-2 animate-rise">
-          <h1 className="text-[1.75rem] font-semibold tracking-tight">Your circle</h1>
+    <div className="m-screen bg-companion">
+      <div className="m-screen-inner flex flex-col gap-7">
+        <header>
+          <CircleHeader emailAlerts={emailAlerts} />
+          <h1 className="m-display mt-5">Your Circle</h1>
           {onWhatsApp.length ? (
-            <p className="mt-1 text-ink-muted">
+            <p className="m-meta mt-2 text-[0.95rem]">
               <span className="font-semibold text-ink">{list(onWhatsApp)}</span> {onWhatsApp.length === 1 ? "is" : "are"} available for WhatsApp sharing. Select recipients when confirming a shared journey, then tap Send link on the journey screen. Mira opens WhatsApp; you press Send.
             </p>
           ) : null}
@@ -99,31 +102,31 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
               </span>
             ) : (
               <button type="button" onClick={() => setAddingContact((v) => !v)} className="min-h-11 rounded-full px-3 text-sm font-semibold text-accent-strong">
-                {addingContact ? "Cancel" : "+ Add"}
+                {addingContact ? "Cancel" : "Add"}
               </button>
             )
           }
         >
           {!emailAlerts ? (
-            <p role="status" className="border-b border-line bg-warm-soft px-5 py-3 text-sm text-ink">
+            <p role="status" className="bg-warm-soft px-4 py-3 text-sm text-ink">
               Email alerts aren&apos;t switched on in this version yet, so contacts can&apos;t be emailed. Add their WhatsApp number to send your live link in one tap.
             </p>
           ) : null}
           {addingContact ? (
-            <form onSubmit={addContact} className="border-b border-line p-5">
+            <form onSubmit={addContact} className="p-4">
               <label className="block text-sm font-semibold" htmlFor="c-name">
                 Name
               </label>
-              <input id="c-name" required value={cName} maxLength={60} onChange={(e) => setCName(e.target.value)} placeholder="e.g. Mum" className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
+              <input id="c-name" required value={cName} maxLength={60} onChange={(e) => setCName(e.target.value)} placeholder="e.g. Mum" className="mt-1 w-full min-h-12 rounded-xl bg-sunken px-3 outline-none focus:ring-2 focus:ring-accent" />
               <label className="mt-3 block text-sm font-semibold" htmlFor="c-phone">
                 WhatsApp number
               </label>
-              <input id="c-phone" type="tel" inputMode="tel" autoComplete="tel" value={cPhone} maxLength={32} onChange={(e) => setCPhone(e.target.value)} placeholder={country.callingCode ? `${country.callingCode} 98765 43210` : "+91 98765 43210"} className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
+              <input id="c-phone" type="tel" inputMode="tel" autoComplete="tel" value={cPhone} maxLength={32} onChange={(e) => setCPhone(e.target.value)} placeholder={country.callingCode ? `${country.callingCode} 98765 43210` : "+91 98765 43210"} className="mt-1 w-full min-h-12 rounded-xl bg-sunken px-3 outline-none focus:ring-2 focus:ring-accent" />
               <p className="mt-1 text-sm text-ink-muted">Choose this person when confirming a shared journey. Then tap Send link on the journey screen to open WhatsApp; you press Send.</p>
               <label className="mt-3 block text-sm font-semibold" htmlFor="c-email">
                 Email <span className="font-normal text-ink-muted">(optional)</span>
               </label>
-              <input id="c-email" type="email" inputMode="email" value={cEmail} onChange={(e) => setCEmail(e.target.value)} className="mt-1 w-full min-h-12 rounded-2xl border border-line bg-sunken px-4 outline-none focus:border-accent" />
+              <input id="c-email" type="email" inputMode="email" value={cEmail} onChange={(e) => setCEmail(e.target.value)} className="mt-1 w-full min-h-12 rounded-xl bg-sunken px-3 outline-none focus:ring-2 focus:ring-accent" />
               <p className="mt-1 text-sm text-ink-muted">For an automatic alert if you don&apos;t arrive. Mira attempts an email invite when email is available. After they accept, journey and missed-check-in emails can be attempted; sending can fail.</p>
               <Button type="submit" className="mt-4" variant="primary" size="lg" busy={busy === "contact"} busyLabel="Saving…" disabled={!cName.trim() || (!cPhone.trim() && !cEmail.trim())}>
                 {cEmail.trim() ? "Save and send invite" : "Save"}
@@ -133,9 +136,9 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
           {contacts.length === 0 && !addingContact ? (
             <p className="p-5 text-ink-muted">Add someone you trust — a WhatsApp number is enough. Accepted email contacts on a journey can also receive live-link and missed-check-in emails when email is available.</p>
           ) : (
-            <ul className="divide-y divide-line">
+            <ul className="divide-y divide-line/70">
               {contacts.map((c) => (
-                <li key={c.id} className="flex items-center gap-3 px-5 py-3">
+                <li key={c.id} className="flex items-center gap-3 px-4 py-3">
                   <Avatar name={c.name} size={44} />
                   <span className="min-w-0 flex-1">
                     <span className="block font-semibold">{c.name}</span>
@@ -195,6 +198,16 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
           </Link>
         </p>
       </div>
+    </div>
+  );
+}
+
+/** Same frame as You: back, and the Support pair in its usual place. */
+function CircleHeader({ emailAlerts }: { emailAlerts: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <Link href="/me" aria-label="Back to You" className="grid size-11 shrink-0 place-items-center rounded-full bg-surface ring-1 ring-line"><Icon name="back" className="size-5" /></Link>
+      <SafetyAccess emailAlerts={emailAlerts} compact className="min-w-0" />
     </div>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { EmergencyPill } from "@/components/app/EmergencyPill";
+import { SafetyAccess } from "@/components/app/SafetyAccess";
+import { Row, RowList } from "@/components/mira/Rows";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -37,8 +38,15 @@ function bandFor(d: Date): "day" | "evening" | "late" {
   return h >= 6 && h < 18 ? "day" : h >= 18 && h < 22 ? "evening" : "late";
 }
 
-export function ReportScreen({ preset, from = null }: { preset: Category | null; from?: ReportFrom | null }) {
+export function ReportScreen({ preset, from = null, emailAlerts = false }: { preset: Category | null; from?: ReportFrom | null; emailAlerts?: boolean }) {
   const router = useRouter();
+  // Same frame as every screen: back on the left, the Support pair where it always is.
+  const header = (onBack: () => void) => (
+    <header className="flex items-center justify-between gap-3">
+      <button type="button" onClick={onBack} aria-label="Back" className="grid size-11 shrink-0 place-items-center rounded-full bg-surface ring-1 ring-line"><Icon name="back" className="size-5" /></button>
+      <SafetyAccess emailAlerts={emailAlerts} compact className="min-w-0" />
+    </header>
+  );
   const loc = useLocation(true);
   // A spot long-pressed on the map, handed over in memory (never via the URL).
   const [spot, setSpot] = useState(() => takePendingReportSpot());
@@ -92,78 +100,53 @@ export function ReportScreen({ preset, from = null }: { preset: Category | null;
 
   if (done) {
     return (
-      <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-[calc(var(--tabbar-space)+2rem)] text-center">
-        <span aria-hidden className="grid size-14 place-items-center rounded-full bg-accent-soft text-accent">
-          <Icon name="check" className="mira-draw size-7" />
-        </span>
-        <h1 className="mt-5 text-[1.75rem] font-semibold animate-rise">Thank you.</h1>
-        <p className="mt-2 max-w-sm text-ink-muted animate-rise">
-          It&apos;s private. If others report something similar here, it can become a community note. Mira never shows one person&apos;s report.
-        </p>
-        <p className="mt-2 max-w-sm text-sm text-ink-muted">
-          If you&apos;re in danger right now, <EmergencyPill variant="link" />.
-        </p>
-        <div className="mt-8 flex w-full max-w-xs flex-col gap-3">
-          <Button variant="primary" size="lg" onClick={() => (window.history.length > 1 ? router.back() : router.push("/"))}>
-            Done
-          </Button>
-          <Button variant="secondary" onClick={() => { setDone(false); setCategory(null); setNote(""); }}>
-            Report something else
-          </Button>
+      <div className="m-screen bg-companion">
+        <div className="m-screen-inner">
+          {header(() => (window.history.length > 1 ? router.back() : router.push("/")))}
+          <section className="m-card mt-6 p-6 text-center">
+            <span aria-hidden className="mx-auto grid size-14 place-items-center rounded-full bg-people-soft text-people">
+              <Icon name="check" className="mira-draw size-7" />
+            </span>
+            <h1 className="m-display mt-4">Thank you.</h1>
+            <p className="mt-2 text-ink-muted">It&apos;s private. If others report something similar here, it can become a community note. Mira never shows one person&apos;s report.</p>
+            <div className="mt-6 grid gap-2">
+              <button type="button" className="mira-primary w-full" onClick={() => (window.history.length > 1 ? router.back() : router.push("/"))}>Done</button>
+              <button type="button" className="min-h-12 w-full rounded-2xl bg-surface font-semibold ring-1 ring-line-strong" onClick={() => { setDone(false); setCategory(null); setNote(""); }}>Report something else</button>
+            </div>
+          </section>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
-      <div className="mx-auto max-w-xl">
+    <div className="m-screen bg-companion">
+      <div className="m-screen-inner">
+        {header(() => (tile ? setCategory(null) : window.history.length > 1 ? router.back() : router.push("/")))}
         {!tile ? (
-          <div className="animate-rise">
-            <h1 className="text-[1.75rem] font-semibold tracking-tight">What did you notice?</h1>
-            <p className="mt-1 text-ink-muted">
+          <div>
+            <h1 className="m-display mt-5">What did you notice?</h1>
+            <p className="mt-1 text-[0.95rem] text-ink-muted">
               {spot ? `Reporting ${spot.name ? spot.name.replace(/^Near /, "near ") : "the spot you picked on the map"}. ` : ""}Private. Only a rough area is kept.
             </p>
             {order.map((g) => (
-              <section key={g} className="mt-6" aria-label={GROUP_TITLE[g]}>
-                <h2 className="text-[13px] font-medium text-ink-subtle">{GROUP_TITLE[g]}</h2>
-                <div className="mt-2 grid gap-2">
-                  {TILES.filter((t) => t.group === g).map((t) => (
-                    <button
-                      key={t.category}
-                      type="button"
-                      onClick={() => setCategory(t.category)}
-                      className="flex min-h-16 items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 text-left transition-transform duration-100 active:scale-[0.98] hover:bg-sunken"
-                    >
-                      <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink">
-                        <Icon name={t.icon} className="size-5" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-semibold leading-tight">{t.label}</span>
-                        <span className="block text-sm text-ink-muted">{t.hint}</span>
-                      </span>
-                      <Icon name="chevron" className="size-4 text-ink-subtle" />
-                    </button>
-                  ))}
-                </div>
-              </section>
+              <RowList key={g} label={GROUP_TITLE[g]} id={`report-${g}`} className="mt-7">
+                {TILES.filter((t) => t.group === g).map((t) => <Row key={t.category} icon={t.icon} tone={t.group === "street" ? "dusk" : "ink"} title={t.label} detail={t.hint} onClick={() => setCategory(t.category)} ariaLabel={`${t.label}: ${t.hint}`} />)}
+              </RowList>
             ))}
-            <button type="button" onClick={() => setCategory("other")} className="mt-4 min-h-11 w-full rounded-[var(--radius-button)] text-sm font-semibold text-accent-strong hover:bg-accent-soft">
+            <button type="button" onClick={() => setCategory("other")} className="mt-4 min-h-11 w-full rounded-2xl text-sm font-semibold text-accent-strong hover:bg-accent-soft">
               Something else
             </button>
             {spot ? null : <p className="mt-2 text-center text-sm text-ink-subtle">Tip: on the map, press and hold a spot to report it.</p>}
           </div>
         ) : (
-          <div className="animate-rise">
-            <button type="button" onClick={() => setCategory(null)} className="mb-3 inline-flex min-h-11 items-center gap-1 rounded-full pr-3 font-semibold text-ink-muted">
-              <Icon name="back" className="size-5" /> Back
-            </button>
-            <div className="flex items-center gap-3">
-              <span aria-hidden className="grid size-12 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink"><Icon name={tile.icon} className="size-6" /></span>
-              <h1 className="text-2xl font-semibold">{tile.label}</h1>
+          <div>
+            <div className="mt-5 flex items-center gap-3">
+              <span aria-hidden className={cx("grid size-12 shrink-0 place-items-center rounded-2xl", tile.group === "street" ? "bg-dusk-soft text-dusk" : "bg-sunken text-ink-muted")}><Icon name={tile.icon} className="size-6" /></span>
+              <h1 className="m-display">{tile.label}</h1>
             </div>
 
-            <section className="mt-6 rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--shadow-card)]">
+            <section className="m-card mt-6 p-4">
               <p className="flex items-center gap-2 font-semibold">
                 <Icon name="pin" className="size-5 text-accent" />
                 {spot ? (spot.name ? `Near ${spot.name.replace(/^Near /, "")}` : "The spot you picked on the map") : loc.point ? "Around where you are now" : loc.status === "asking" ? "Finding you…" : "Location is off"}
@@ -173,28 +156,28 @@ export function ReportScreen({ preset, from = null }: { preset: Category | null;
                   Use where I am instead
                 </button>
               ) : !loc.point && loc.status !== "asking" ? (
-                <button type="button" onClick={() => setChoosing(true)} className="mt-2 min-h-11 rounded-full bg-accent px-4 text-sm font-semibold text-accent-ink">
+                <button type="button" onClick={() => setChoosing(true)} className="mt-2 min-h-11 rounded-full bg-accent-soft px-4 text-sm font-semibold text-accent-strong">
                   Choose where it happened
                 </button>
               ) : null}
               <p className="mt-1 text-sm text-ink-muted">Only a rough area (about 1 km) is kept — never the exact spot.</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {WHEN.map((w) => (
-                  <button key={w.value} type="button" onClick={() => setWhen(w.value)} aria-pressed={when === w.value} className={cx("min-h-11 rounded-full border px-4 text-sm font-semibold", when === w.value ? "border-accent bg-accent text-accent-ink" : "border-line")}>
+                  <button key={w.value} type="button" onClick={() => setWhen(w.value)} aria-pressed={when === w.value} className={cx("min-h-11 rounded-full px-4 text-sm font-semibold ring-1", when === w.value ? "bg-accent text-accent-ink ring-accent" : "bg-surface text-ink-muted ring-line-strong")}>
                     {w.label}
                   </button>
                 ))}
               </div>
-              <div className="mt-4 inline-flex rounded-full bg-sunken p-1">
+              <div className="mt-4 grid grid-cols-2 gap-1 rounded-2xl bg-sunken p-1">
                 {(["experienced", "witnessed"] as const).map((v) => (
-                  <button key={v} type="button" onClick={() => setInvolvement(v)} aria-pressed={involvement === v} className={cx("min-h-11 rounded-full px-4 text-sm font-semibold", involvement === v ? "bg-surface shadow" : "text-ink-muted")}>
+                  <button key={v} type="button" onClick={() => setInvolvement(v)} aria-pressed={involvement === v} className={cx("min-h-11 rounded-xl px-3 text-sm font-semibold", involvement === v ? "bg-surface shadow-[var(--shadow-float)]" : "text-ink-muted")}>
                     {v === "experienced" ? "It happened to me" : "I saw it"}
                   </button>
                 ))}
               </div>
             </section>
 
-            <section className="mt-4 rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--shadow-card)]">
+            <section className="m-card mt-3 p-4">
               <label htmlFor="note" className="font-semibold">
                 Anything to add? <span className="font-normal text-ink-muted">(optional)</span>
               </label>
@@ -205,7 +188,7 @@ export function ReportScreen({ preset, from = null }: { preset: Category | null;
                 maxLength={1000}
                 rows={3}
                 placeholder="What did you notice? Leave out names, numbers and plates."
-                className="mt-2 w-full resize-none rounded-2xl border border-line bg-sunken px-4 py-3 outline-none focus:border-accent focus:bg-surface text-mixed"
+                className="mt-2 w-full resize-none rounded-xl bg-sunken px-3 py-3 outline-none focus:ring-2 focus:ring-accent text-mixed"
               />
               {pii.length ? (
                 <p className="mt-2 rounded-2xl bg-warm-soft px-3 py-2 text-sm text-warm">
@@ -215,7 +198,7 @@ export function ReportScreen({ preset, from = null }: { preset: Category | null;
             </section>
 
             {error ? (
-              <p role="alert" className="mt-4 rounded-2xl bg-error-soft px-4 py-3 text-sm font-semibold text-error">
+              <p role="alert" className="mt-3 rounded-2xl bg-warm-soft px-4 py-3 text-sm font-semibold text-warm">
                 {error}
               </p>
             ) : null}

@@ -8,13 +8,13 @@ export const metadata: Metadata = { title: "Privacy" };
 
 function Item({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
   return (
-    <li className="flex gap-4 rounded-[var(--radius-card)] border border-line bg-surface p-5">
-      <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink">
+    <li className="m-card flex gap-3 p-4">
+      <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent-strong">
         <Icon name={icon} className="size-5" />
       </span>
       <div>
-        <h2 className="font-semibold">{title}</h2>
-        <div className="mt-1 space-y-1.5 text-ink-muted">{children}</div>
+        <h2 className="m-h">{title}</h2>
+        <div className="mt-1 space-y-1.5 text-[0.9375rem] text-ink-muted">{children}</div>
       </div>
     </li>
   );
@@ -24,15 +24,15 @@ export default function PrivacyPage() {
   const canEmailContacts = emailConfigured();
   const safetyUpdates = getEnv().SAFETY_UPDATES ?? "gdelt";
   return (
-    <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1.25rem,env(safe-area-inset-top))]">
-      <article className="mx-auto max-w-xl">
-        <Link href="/me" className="mb-4 inline-flex min-h-11 items-center gap-1 font-semibold text-ink-muted">
-          <Icon name="back" className="size-5" /> Back
+    <div className="m-screen bg-companion">
+      <article className="m-screen-inner">
+        <Link href="/me" aria-label="Back to You" className="grid size-11 place-items-center rounded-full bg-surface ring-1 ring-line">
+          <Icon name="back" className="size-5" />
         </Link>
-        <h1 className="text-[1.75rem] font-semibold tracking-tight">Your privacy</h1>
-        <p className="mt-3 text-lg text-ink-muted">Plain words about what Mira keeps, who sees it, and when it&apos;s gone.</p>
+        <h1 className="m-display mt-5">Your privacy</h1>
+        <p className="mt-2 text-[1.0625rem] text-ink-muted">Plain words about what Mira keeps, who sees it, and when it&apos;s gone.</p>
 
-        <p className="mt-2 text-sm text-ink-muted">Accounts are for adults 18 or older. Mira keeps a signed self-attestation cookie for up to one year, without collecting a birth date. <Link href="/terms" className="font-semibold text-accent underline">Read the beta terms</Link>.</p>
+        <p className="m-meta mt-2">Accounts are for adults 18 or older. Mira keeps a signed self-attestation cookie for up to one year, without collecting a birth date. <Link href="/terms" className="font-semibold text-accent underline">Read the beta terms</Link>.</p>
 
         <ul className="mt-6 space-y-3">
           <Item icon="pin" title="Your location">

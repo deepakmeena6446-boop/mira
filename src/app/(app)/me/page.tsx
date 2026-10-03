@@ -9,7 +9,7 @@ import { emailHint } from "@/server/account/email-auth";
 import { MeScreen } from "./MeScreen";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Me" };
+export const metadata: Metadata = { title: "You" };
 
 export default async function MePage({ searchParams }: PageProps<"/me">) {
   const sql = getSql();

@@ -166,7 +166,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
         {!focus ? (
           <div className="mt-5">
             <LiveNowCard now={clock} point={null} area={null} stats={[]} line={null} footer={null} locating={loc.status === "asking"} locationState={loc.status} onLocate={() => { rememberLocationChoice(true); void loc.request(); }} />
-            <div className="mt-3"><HelpNextCard check={null} impactLine={null} signedIn={signedIn} country={country.iso ?? null} /></div>
+            <div className="mt-3"><HelpNextCard from="around" check={null} impactLine={null} signedIn={signedIn} country={country.iso ?? null} /></div>
           </div>
         ) : (
           <>
@@ -189,7 +189,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
 
             {/* 2. One tap: what you see here (about the chosen place, when there is one). */}
             <div className="mt-3">
-              <HelpNextCard check={null} impactLine={null} signedIn={signedIn} country={country.iso ?? null} spot={place ? { lat: place.lat, lon: place.lon, name: place.name } : null} title={place ? "Add what you know about it" : "Add what you see here"} />
+              <HelpNextCard from="around" check={null} impactLine={null} signedIn={signedIn} country={country.iso ?? null} spot={place ? { lat: place.lat, lon: place.lon, name: place.name } : null} title={place ? "Add what you know about it" : "Add what you see here"} />
             </div>
 
             {/* 3. The map answers "where": you, Help Points, released notes, the walk there. */}
