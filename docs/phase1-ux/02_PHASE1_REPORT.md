@@ -6,6 +6,25 @@
 - **Docs:** read with `00_AUDIT.md` (what existed) and `01_UX_ARCHITECTURE.md` (the model)
 - **Screenshots:** `screenshots/` (390×844 unless named otherwise; live data, Kamla Nagar, Delhi)
 
+## 0. Revision after review (Home)
+
+Owner feedback: Home should offer contributing directly, and the core of Mira wasn't coming through.
+
+- **What was wrong:** Home *described* Mira with a greeting, a paragraph and four feature tiles. It never *showed* her knowing anything, and the community was two screens away.
+- **Home now shows Mira's three pillars, live:**
+  1. **Mira knows.** A "Right now, around you" card shows:
+     - the sky state for the next 12 h, from the solar calculation;
+     - Help Points listed open now out of the total, from `/api/geo/help` with listed hours;
+     - minutes to the nearest open one;
+     - released notes from people;
+     - one sentence naming the nearest open place, with "staffing isn't verified".
+  2. **Everyone makes it better.** "Add what you see here" sits directly under the live card:
+     - Four one-tap observations open the private report pre-filled: two taps in total.
+     - A waiting Mira Check is answered inline.
+     - The impact line appears for signed-in users.
+  3. **Mira goes with you.** One "Tell Mira" input plus four compact situation buttons, replacing the tall tiles.
+- **Screenshots:** `01-home.jpg`, `01d-home-scrolled.jpg`, `01e-home-location-off.jpg`, `01f-home-contribute-to-report.jpg`.
+
 ## 1. Screens
 
 | # | Experience | Screenshots |
