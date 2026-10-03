@@ -32,8 +32,8 @@ test("the way back is added, checked for its own time, saved with the plan and n
   await expect(page.getByRole("heading", { level: 1, name: "To South Library" })).toBeVisible();
 
   // Add the way back: same places reversed, time chosen relative to the trip there.
+  await page.getByRole("region", { name: "After this" }).getByRole("button", { name: /Add the way back/ }).click();
   const back = page.getByRole("region", { name: "The way back" });
-  await back.getByRole("button", { name: /Add the way back/ }).click();
   const when = page.getByRole("dialog", { name: "When are you heading back?" });
   await when.getByRole("button", { name: /^2 h later · 11:00 PM$/ }).click();
   await when.getByRole("button", { name: "Done" }).click();

@@ -109,11 +109,9 @@ export async function newUser(browser: Browser, name: string): Promise<{ ctx: Br
   await expect(page.getByRole("dialog")).toBeHidden();
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: new RegExp(`, ${name}$`) })).toBeVisible();
-  // Legacy local-context flows opt in through the UI; root planning needs no GPS.
-  await page.goto("/today");
-  await page.getByRole("button", { name: "Use my location for local context" }).click();
+  // Location is chosen once, through the UI, on Home's live card (D12: never silently).
+  await page.getByRole("region", { name: "Right now, around you" }).getByRole("button", { name: "Use my location" }).click();
   await expect(page.getByRole("link", { name: /Emergency call, 112/ }).first()).toBeVisible();
-  await page.goto("/");
   return { ctx, page };
 }
 
@@ -152,12 +150,54 @@ export async function shareLinkFor(address: string): Promise<string> {
 }
 
 /** Open the explicit map and choose a destination in its existing route sheet. */
+/** The real path to a walk: Going somewhere → From: where I am now → To: a place → the brief, leaving now. */
 export async function openRoute(page: Page, name = DEST) {
-  await page.goto("/around/map/classic");
-  await page.getByRole("button", { name: /Search a place or address/ }).click();
-  await page.getByPlaceholder("Search a place or address").fill(name);
-  await page.getByRole("button", { name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first().click();
-  await expect(page.getByRole("button", { name: /Go with Mira/ })).toBeVisible();
+  await page.goto("/plan?for=go");
+  const plan = page.getByRole("region", { name: "Your plan", exact: true });
+  await plan.getByRole("button", { name: /^From/ }).click();
+  await page.getByRole("dialog").getByRole("button", { name: /Where I am now/ }).click();
+  await plan.getByRole("button", { name: /^To/ }).click();
+  await page.getByRole("dialog").getByRole("textbox").fill(name);
+  await page.getByRole("dialog").getByRole("button", { name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first().click();
+  await expect(page.getByRole("button", { name: "Go with Mira" })).toBeVisible();
+}
+
+/** Go with Mira → choose who follows (none = just me) → Start, on the consent sheet. */
+export async function startJourney(page: Page, share: string[] = []) {
+  await page.getByRole("button", { name: "Go with Mira" }).click();
+  const sheet = page.getByRole("dialog", { name: "Go with Mira" });
+  for (const name of share) await sheet.getByRole("button", { name, exact: true }).click();
+  await sheet.getByRole("button", { name: /^Start/ }).click();
+  await page.waitForURL("**/trip");
+}
+
+/** Save a searched place under a name (e.g. a destination as "Home"), as the places API does from Around. */
+export async function savePlaceAt(page: Page, label: string, query: string) {
+  const { places } = await (await page.request.post("/api/geo/search", { headers: SAME_ORIGIN, data: { q: query, near: { lat: GEO.latitude, lon: GEO.longitude } } })).json();
+  const p = places[0];
+  const r = await page.request.post("/api/me/places", { headers: SAME_ORIGIN, data: { label, emoji: "🏠", lat: p.lat, lon: p.lon } });
+  expect(r.status()).toBe(201);
+}
+
+/** Plan to one of her saved places: Going somewhere → From: where I am now → To: the saved place. */
+export async function openSavedRoute(page: Page, label: string) {
+  await page.goto("/plan?for=go");
+  const plan = page.getByRole("region", { name: "Your plan", exact: true });
+  await plan.getByRole("button", { name: /^From/ }).click();
+  await page.getByRole("dialog").getByRole("button", { name: /Where I am now/ }).click();
+  await plan.getByRole("button", { name: /^To/ }).click();
+  await page.getByRole("dialog").getByRole("button", { name: new RegExp(`^\\S*\\s*${label}`) }).first().click();
+  await expect(page.getByRole("button", { name: "Go with Mira" })).toBeVisible();
+}
+
+/** You → Your places → Add → save where you are as a named place. */
+export async function savePlaceHere(page: Page, label = "Home") {
+  await page.goto("/me");
+  await page.getByRole("region", { name: "Your places" }).getByRole("button", { name: "Add", exact: true }).click();
+  const sheet = page.getByRole("dialog", { name: "Save where you are now" });
+  await sheet.getByRole("radio", { name: new RegExp(label) }).click();
+  await sheet.getByRole("button", { name: "Save my current spot" }).click();
+  await expect(page.getByRole("button", { name: `Remove ${label}` })).toBeVisible();
 }
 
 export async function adminPage(browser: Browser): Promise<Page> {

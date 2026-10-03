@@ -90,6 +90,7 @@ export function MapScreen({ emailAlerts, places, tiles }: { emailAlerts: boolean
 
   return (
     <div className="flex h-[calc(100dvh-var(--tabbar-space))] flex-col bg-canvas">
+      <h1 className="sr-only">{focus ? `Map around ${focus.name}` : "Map around you"}</h1>
       <div className="relative min-h-[45dvh] flex-1">
         <WorldMap tiles={tiles} me={here ? { lat: here.lat, lon: here.lon } : null} dest={focus ? { lat: focus.lat, lon: focus.lon } : null} places={pins} follow={!focus} recenter={recenter} onLongPress={(p) => void pressed(p)} onPlaceClick={(p) => { const hp = ranked.find((x) => x.id === p.id); if (hp) setFocus({ name: hp.name, lat: hp.lat, lon: hp.lon, source: "selected_point", kind: HELP_CLASSES[hp.cls].label }); }} padding={{ top: 90, bottom: 60, left: 40, right: 40 }} label={focus ? `Map around ${focus.name}` : "Map around you"} className="absolute inset-0" />
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">

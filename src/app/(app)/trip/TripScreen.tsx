@@ -453,7 +453,7 @@ export function TripScreen({
           {arrived ? (
             <section className="m-card mt-4 w-full max-w-sm p-4 text-left" aria-label="Return journey">
               <h2 className="font-semibold">Your way back</h2>
-              {returnPlan ? <><p className="mt-1 text-sm text-ink-muted">{returnPlan.origin.kind === "named" ? returnPlan.origin.query : "Origin"} → {returnPlan.destination.query} · {returnPlan.departureLocal.replace("T", " ")} ({returnPlan.timeZone}).</p><Button className="mt-3 w-full" variant="secondary" onClick={() => { clearTripRoutes(); setPlanDraft(returnPlan); router.push("/plan?planStep=options"); }}>Review return journey</Button></> : <><p className="mt-1 text-sm text-ink-muted">When you’re ready to head back, confirm the return places and time — Mira checks the way again for then.</p><Link href="/plan?planStep=return" className="mt-1 inline-flex min-h-11 items-center font-semibold text-accent-strong">Plan the return journey</Link></>}
+              {returnPlan ? <><p className="mt-1 text-sm text-ink-muted">{returnPlan.origin.kind === "named" ? returnPlan.origin.query : "Origin"} → {returnPlan.destination.query} · {returnPlan.departureLocal.replace("T", " ")} ({returnPlan.timeZone}).</p><Button className="mt-3 w-full" variant="secondary" onClick={() => { clearTripRoutes(); setPlanDraft(returnPlan); router.push("/plan"); }}>Review return journey</Button></> : <><p className="mt-1 text-sm text-ink-muted">When you’re ready to head back, confirm the return places and time — Mira checks the way again for then.</p><Link href="/plan" className="mt-1 inline-flex min-h-11 items-center font-semibold text-accent-strong">Plan the return journey</Link></>}
               {!returnPlan ? <SavedReturnReview /> : null}
             </section>
           ) : null}
@@ -465,7 +465,7 @@ export function TripScreen({
           </Link>
           <Button className="mt-6 w-full max-w-xs" variant="primary" size="lg" onClick={() => { clearTripRoutes(); router.push("/"); router.refresh(); }}>Done</Button>
           <Link href="/trips" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-strong">Your journeys</Link>
-          {trip.state !== "arrived" && planDraft?.legs?.length ? <Link href="/plan?planStep=return" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-strong">Review another planned leg</Link> : null}
+          {trip.state !== "arrived" && planDraft?.legs?.length ? <Link href="/plan" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-strong">Review another planned leg</Link> : null}
         </div>
       </div>
     );

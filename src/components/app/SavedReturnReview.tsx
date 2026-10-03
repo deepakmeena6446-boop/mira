@@ -57,7 +57,7 @@ export function SavedReturnReview() {
       const fresh = next.find((choice) => choice.id === selected.id && choice.index === selected.index);
       if (!fresh) return setMessage("That saved return is no longer available. It may have been deleted or expired. Choose another plan.");
       setPlanDraft(fresh.plan);
-      router.push("/plan?planStep=options");
+      router.push("/plan");
     } catch (error) {
       if (!controller.signal.aborted && !(error instanceof DOMException && error.name === "AbortError")) { setChoices(null); setMessage("Couldn’t check saved return plans. Retry; your journey has not changed."); }
     } finally { if (!controller.signal.aborted) setBusy(false); }

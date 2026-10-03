@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { SAME_ORIGIN, acceptContactInvite, addContact, db, newUser, openRoute, shareLinkFor, openJourneyMore } from "./helpers";
+import { DEST, SAME_ORIGIN, acceptContactInvite, addContact, db, newUser, openRoute, savePlaceAt, shareLinkFor, startJourney, openJourneyMore } from "./helpers";
 
 test.describe("Privacy — links die, strangers see nothing, deletion is real", () => {
   test("an ended trip's link and forged links reveal nothing; another user can't act on the trip", async ({ browser }) => {
@@ -8,9 +8,7 @@ test.describe("Privacy — links die, strangers see nothing, deletion is real", 
     const address = await addContact(owner.page, "Bhai", "bhai");
     const contact = await acceptContactInvite(browser, address);
     await openRoute(owner.page);
-    await owner.page.getByRole("checkbox", { name: /Bhai/ }).check();
-    await owner.page.getByRole("button", { name: /Go with Mira/ }).click();
-    await owner.page.waitForURL("**/trip");
+    await startJourney(owner.page, ["Bhai"]);
     const link = await shareLinkFor(address);
     const { trip } = await (await owner.page.request.get("/api/trips/current")).json();
     expect(trip.sharedWith).toEqual([expect.objectContaining({ name: "Bhai", linkDelivery: "sent" })]);
@@ -54,9 +52,7 @@ test.describe("Privacy — links die, strangers see nothing, deletion is real", 
     expect((await (await anon.request.get("/api/me")).json()).user).toBeNull();
 
     const { ctx, page } = await newUser(browser, "Gone");
-    await openRoute(page);
-    await page.getByRole("button", { name: "🏠 Home" }).click();
-    await expect(page.getByText("Saved as Home")).toBeVisible();
+    await savePlaceAt(page, "Home", DEST);
     await addContact(page, "Friend", "friend");
     const [{ id: userId }] = await db`SELECT id FROM users WHERE name = 'Gone' ORDER BY created_at DESC LIMIT 1`;
     expect((await page.request.delete("/api/me", { headers: SAME_ORIGIN })).status()).toBe(200);

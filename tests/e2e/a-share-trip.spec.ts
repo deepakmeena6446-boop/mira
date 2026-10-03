@@ -1,15 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { DEST, acceptContactInvite, addContact, db, mailsTo, newUser, openRoute, shareLinkFor, waitFor, openJourneyMore } from "./helpers";
+import { DEST, acceptContactInvite, addContact, db, mailsTo, newUser, openRoute, openSavedRoute, savePlaceAt, shareLinkFor, waitFor, openJourneyMore } from "./helpers";
 
 test.describe("Core loop — onboard, save Home, share a trip live, arrive", () => {
   test("a trusted contact follows the trip live and the link goes dark on arrival", async ({ browser }) => {
     const owner = await newUser(browser, "Priya");
 
-    // Save a destination as Home straight from the route sheet.
-    await openRoute(owner.page);
-    await expect(owner.page.getByText(/min/).first()).toBeVisible();
-    await owner.page.getByRole("button", { name: "🏠 Home" }).click();
-    await expect(owner.page.getByText("Saved as Home")).toBeVisible();
+    // Save a destination as Home.
+    await savePlaceAt(owner.page, "Home", DEST);
 
     // Trusted contact accepts once, from their own browser.
     const address = await addContact(owner.page, "Mum", "mum");
@@ -19,22 +16,22 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     // Phase 1 roots (D39): Home, Mira, Around and Journeys; legacy routes remain reachable in context.
     await expect(owner.page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Home", "Mira", "Around", "Journeys"]);
 
-    // Around → map → one tap on the saved place → context → Start with Mira.
-    await owner.page.goto("/around/map/classic");
-    await expect(owner.page.getByRole("heading", { name: "Where are you going?", exact: true })).toBeVisible();
+    // Plan → to the saved Home → the brief → Go with Mira, choosing who follows on the consent sheet.
+    await openSavedRoute(owner.page, "Home");
     await expect(owner.page.getByRole("link", { name: /Emergency call, 112/ })).toHaveAttribute("href", "tel:112");
-    await owner.page.getByRole("button", { name: /Home/ }).first().click();
-    await expect(owner.page.getByRole("region", { name: "Help Points along this route" })).toBeVisible();
+    await expect(owner.page.getByRole("region", { name: "What Mira checked" })).toContainText("Help Points");
     const starts: Array<{ recipientIds: string[]; share: boolean }> = [];
     owner.page.on("request", (request) => {
       if (new URL(request.url()).pathname === "/api/trips" && request.method() === "POST") starts.push(request.postDataJSON());
     });
-    await expect(owner.page.getByRole("checkbox", { name: /Mum/ })).not.toBeChecked();
-    await owner.page.getByRole("checkbox", { name: /Mum/ }).check();
-    await expect(owner.page.getByRole("checkbox", { name: /Mum/ })).toBeChecked();
+    await owner.page.getByRole("button", { name: "Go with Mira" }).click();
+    const go = owner.page.getByRole("dialog", { name: "Go with Mira" });
+    await expect(go.getByRole("button", { name: "Mum", exact: true })).toHaveAttribute("aria-pressed", "false");
+    await go.getByRole("button", { name: "Mum", exact: true }).click();
+    await expect(go.getByRole("button", { name: "Mum", exact: true })).toHaveAttribute("aria-pressed", "true");
     expect(starts).toHaveLength(0); // Recipient selection alone never starts or alerts.
-    await expect(owner.page.getByText(/Mira attempts to email Mum a live link when this journey starts/)).toBeVisible();
-    await owner.page.getByRole("button", { name: /Go with Mira/ }).click();
+    await expect(go).toContainText(/Mira attempts to email Mum a live link now/);
+    await go.getByRole("button", { name: /^Start and share with Mum/ }).click();
     await owner.page.waitForURL("**/trip");
     expect(starts).toHaveLength(1);
     expect(starts[0]).toMatchObject({ share: true, recipientIds: [expect.any(String)] });
@@ -90,8 +87,9 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
   test("works without contacts as a private trip, and can be ended early", async ({ browser }) => {
     const solo = await newUser(browser, "Zoya");
     await openRoute(solo.page);
-    await expect(solo.page.getByText(/Nobody is alerted automatically/)).toBeVisible(); // honest before starting
-    await solo.page.getByRole("button", { name: /Go with Mira/ }).click();
+    await solo.page.getByRole("button", { name: "Go with Mira" }).click();
+    await expect(solo.page.getByRole("dialog", { name: "Go with Mira" })).toContainText("Nobody is contacted."); // honest before starting
+    await solo.page.getByRole("dialog", { name: "Go with Mira" }).getByRole("button", { name: "Start — just me" }).click();
     await solo.page.waitForURL("**/trip");
     expect((await (await solo.page.request.get("/api/trips/current")).json()).trip.sharedWith).toEqual([]);
     await expect(solo.page.getByText(/Only people you send your live link to can follow\. Nobody is alerted automatically/)).toBeVisible();

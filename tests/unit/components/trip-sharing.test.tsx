@@ -50,7 +50,7 @@ describe("active journey consent and fresh position controls", () => {
     trip = { ...trip, state: "arrived", destination: { name: "Fictional event", lat: 28.70, lon: 77.21 } };
     show(); await act(async () => {});
     fireEvent.click(screen.getByRole("button", { name: "Review return journey" }));
-    expect(mocks.push).toHaveBeenCalledWith("/plan?planStep=options");
+    expect(mocks.push).toHaveBeenCalledWith("/plan");
     expect(mocks.setPlan).toHaveBeenCalledWith(expect.objectContaining({ activity: "Return after event", timeZone: "Asia/Kolkata", recipientIds: [noor], journeyMode: "location", legs: [expect.objectContaining({ label: "Fictional event", departureLocal: "2026-10-03T18:00" })] }));
     expect(mocks.api.mock.calls.some(([path]) => /trips.*\/(share|checkon|location)$/.test(String(path)))).toBe(false);
   });
@@ -67,7 +67,7 @@ describe("active journey consent and fresh position controls", () => {
     trip = { ...trip, state: "arrived" };
     show(); await act(async () => {});
     expect(screen.queryByRole("button", { name: "Review return journey" })).toBeNull();
-    expect(screen.getByRole("link", { name: "Plan the return journey" })).toHaveAttribute("href", "/plan?planStep=return");
+    expect(screen.getByRole("link", { name: "Plan the return journey" })).toHaveAttribute("href", "/plan");
     expect(mocks.setPlan).not.toHaveBeenCalled();
   });
 

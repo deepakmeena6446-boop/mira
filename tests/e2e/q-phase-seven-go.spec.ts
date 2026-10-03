@@ -32,12 +32,11 @@ test("guest Home shows Mira live, opens Plan, Mira and Around without requesting
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Around" }).click();
   await expect(page).toHaveURL(/\/around$/);
   await expect(page.getByRole("region", { name: "Right now, around you" })).toBeVisible();
-  await page.goto("/around/map/classic");
-  await expect(page).toHaveURL(/\/around\/map\/classic$/);
+  await page.goto("/around/map");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
   expect(await page.evaluate(() => (window as unknown as { geoCalls: number }).geoCalls)).toBe(0);
   expect(await page.evaluate(() => localStorage.getItem("mira.location.skip"))).toBeNull();
-  await page.getByRole("button", { name: "Use my location for local context", exact: true }).click();
+  await page.getByRole("region", { name: "On the map" }).getByRole("button", { name: "Use my location" }).click();
   expect(await page.evaluate(() => (window as unknown as { geoCalls: number }).geoCalls)).toBe(1);
   expect(await page.evaluate(() => localStorage.getItem("mira.location.skip"))).toBe("0");
 });

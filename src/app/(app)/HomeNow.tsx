@@ -10,6 +10,7 @@ import { SignInSheet } from "@/components/app/SignInSheet";
 import { RootHeader } from "@/components/mira/Frame";
 import { Row, RowList } from "@/components/mira/Rows";
 import { SituationChips } from "@/components/mira/Situations";
+import { greetingKey, useT } from "@/lib/i18n";
 import { LiveNowCard, type LiveStat } from "@/components/mira/LiveNow";
 import { HelpNextCard } from "@/components/mira/HelpNext";
 import { api } from "@/lib/api-client";
@@ -149,6 +150,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
   };
 
   const greeting = clock ? greetingFor(clock) : null;
+  const t = useT();
   const firstName = user?.name.split(" ")[0];
   const cold = usage === "cold";
 
@@ -159,7 +161,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
 
         <div className="mt-7 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-[1.625rem] font-semibold leading-tight tracking-[-0.035em]">{greeting ? `${greeting.hello}${firstName ? `, ${firstName}` : ""}` : "Hello"}</h1>
+            <h1 className="text-[1.625rem] font-semibold leading-tight tracking-[-0.035em]">{greeting && clock ? `${t(greetingKey(clock.getHours()))}${firstName ? `, ${firstName}` : ""}` : "Hello"}</h1>
             <p className="mt-0.5 text-[0.875rem] text-ink-muted">
               {journeyTo !== null ? `You’re on your way${journeyTo ? ` to ${journeyTo}` : ""} — I’m with you until you check in.` : cold ? "Here’s what’s true around you right now." : "Here’s what I know around you."}
             </p>
@@ -190,7 +192,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
 
         {/* 3. Mira goes with you: where are you going? */}
         <section aria-labelledby="going-h" className="mt-8">
-          <h2 id="going-h" className="text-[1.0625rem] font-semibold tracking-[-0.015em]">Where are you going?</h2>
+          <h2 id="going-h" className="text-[1.0625rem] font-semibold tracking-[-0.015em]">{t("home.going")}</h2>
           <form onSubmit={(e) => { e.preventDefault(); submitAsk(ask); }} className="m-card mt-2.5 flex items-center gap-2 rounded-[1.5rem] p-1.5 pl-4 focus-within:ring-2 focus-within:ring-accent">
             <span aria-hidden><Icon name="sparkle" className="size-5 text-accent" /></span>
             <label htmlFor="home-ask" className="sr-only">Tell Mira what you’re about to do</label>
@@ -203,7 +205,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
         </section>
 
         {noticed.length ? (
-          <RowList label="Mira noticed" id="noticed-h" className="mt-6">
+          <RowList label={t("home.noticed")} id="noticed-h" className="mt-6">
             {noticed.map((n) => (
               <Row key={n.id} icon={n.icon} tone={n.tone} kind={n.kind} eyebrow={n.eyebrow} title={n.title} detail={n.detail} onClick={n.onOpen} ariaLabel={`${n.eyebrow}: ${n.title}`} />
             ))}

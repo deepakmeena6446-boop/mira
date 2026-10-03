@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
@@ -84,7 +83,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   const [situation, setSituation] = useState<Situation>(initialFor ?? "go");
   const [sheet, setSheet] = useState<"origin" | "destination" | "when" | "go" | null>(null);
   /** A leg sheet: where the way back returns to, or when it leaves. */
-  const [legSheet, setLegSheet] = useState<{ index: number; kind: "place" | "when" } | null>(null);
+  const [legSheet, setLegSheet] = useState<{ index: number; kind: "place" | "stop" | "when" } | null>(null);
   const [signIn, setSignIn] = useState(false);
   const [selected, setSelected] = useState(0);
   const [editing, setEditing] = useState(false);
@@ -268,8 +267,11 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
     if (!draft || !legSheet || "here" in p) return;
     const legs = [...(draft.legs ?? [])];
     const to = { query: p.name, resolution: { source: p.source, name: p.name, point: { lat: p.lat, lon: p.lon }, ...(p.placeId ? { placeId: p.placeId } : {}) } };
-    const from = { query: placeName(draft.destination) ?? draft.destination.query, resolution: draft.destination.resolution };
-    legs[legSheet.index] = { ...(legs[legSheet.index] ?? { label: "", departureLocal: "", timeZone: zone, mode: draft.mode, timeKind: "depart_at", constraints: "", destinationCountryIso: null }), label: `Return to ${p.name}`.slice(0, 160), origin: from, destination: to };
+    // A next stop continues from where the previous leg ends; a way back starts where the trip there ends.
+    const prev = legSheet.kind === "stop" && legs.length ? legs[legs.length - 1].destination : null;
+    const from = prev ?? { query: placeName(draft.destination) ?? draft.destination.query, resolution: draft.destination.resolution };
+    const label = legSheet.kind === "stop" ? `To ${p.name}` : `Return to ${p.name}`;
+    legs[legSheet.index] = { ...(legs[legSheet.index] ?? { label: "", departureLocal: "", timeZone: zone, mode: draft.mode, timeKind: "depart_at", constraints: "", destinationCountryIso: null }), label: label.slice(0, 160), origin: from, destination: to };
     setLegs(legs);
     setLegSheet({ index: legSheet.index, kind: "when" });
   };
@@ -441,7 +443,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
             {saveState.text ? <StateNote className="mt-3">{saveState.text}</StateNote> : null}
 
             {!loop ? (
-              <RowList label={(draft.legs ?? []).every((l) => /^return\b/i.test(l.label)) ? "The way back" : /^return\b/i.test(draft.activity) ? "The way there" : "Also in this plan"} id="legs-h" className="mt-6">
+              <RowList label={!(draft.legs ?? []).length ? "After this" : (draft.legs ?? []).every((l) => /^return\b/i.test(l.label)) ? "The way back" : /^return\b/i.test(draft.activity) ? "The way there" : "Also in this plan"} id="legs-h" className="mt-6">
                 {(draft.legs ?? []).map((leg, i) => {
                   const to = leg.destination.resolution?.name ?? leg.destination.query;
                   const back = /^return\b/i.test(leg.label);
@@ -450,13 +452,15 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
                 {!(draft.legs ?? []).some((l) => /^return\b/i.test(l.label)) && !/^return\b/i.test(draft.activity) && (draft.legs ?? []).length < 2 ? (
                   <Row icon="plus" tone="ink" title="Add the way back" detail={draft.origin.kind === "named" && originLabel ? `Back to ${originLabel} — you choose when` : "Choose where you’re coming back to"} onClick={addWayBack} />
                 ) : null}
+                {(draft.legs ?? []).length < 2 && !/^return\b/i.test(draft.activity) ? (
+                  <Row icon="route" tone="ink" title="Add another stop" detail="Another place after this one — each leg is checked for its own time" onClick={() => setLegSheet({ index: (draft.legs ?? []).length, kind: "stop" })} />
+                ) : null}
               </RowList>
             ) : null}
           </>
         )}
 
         <div className="mt-6 flex flex-wrap gap-x-5 text-sm">
-          <Link href="/plan/legs" className="inline-flex min-h-11 items-center gap-1.5 font-semibold text-accent-strong"><Icon name="plus" className="size-4" />More stops or cities</Link>
           <button type="button" onClick={() => { clearPlanDraft(); ensurePlanDraft(); const d = newPlanDraft(new Date(), deviceZone()); setPlanDraft(preset(d, situation, currentLocation().point ? { lat: currentLocation().point!.lat, lon: currentLocation().point!.lon } : null)); setSelected(0); setSaveState({ busy: false, text: null }); }} className="inline-flex min-h-11 items-center font-semibold text-ink-muted">Clear plan</button>
         </div>
         <p className="mt-1 text-xs text-ink-subtle">This plan stays in this tab for 2 hours after your last change. Saving and sharing are always your choice.</p>
@@ -477,7 +481,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
       <PlaceSheet open={sheet === "origin"} onClose={() => setSheet(null)} title={situation === "travel" ? "Where are you arriving?" : "Starting from"} onPick={(p) => pick("origin", p)} saved={places} near={here ? { lat: here.lat, lon: here.lon } : null} allowHere osmOnly={osmOnly} />
       <PlaceSheet open={sheet === "destination"} onClose={() => setSheet(null)} title={situation === "travel" ? "Where are you staying?" : "Where to?"} onPick={(p) => pick("destination", p)} saved={places} near={origin ?? (here ? { lat: here.lat, lon: here.lon } : null)} allowHere={false} osmOnly={osmOnly} />
       <WhenSheet open={sheet === "when"} onClose={() => setSheet(null)} local={draft.departureLocal} zone={zone} timeKind={draft.timeKind ?? "depart_at"} allowArrive={!loop} quick={situation} deviceZone={deviceZone()} onChange={(p) => update({ ...(p.local ? { departureLocal: p.local, timeHint: null } : {}), ...(!draft.timeZone ? { timeZone: zone } : {}), ...(p.zone && validZone(p.zone) ? { timeZone: p.zone } : {}), ...(p.timeKind ? { timeKind: p.timeKind } : {}) })} />
-      <PlaceSheet open={legSheet?.kind === "place"} onClose={() => setLegSheet(null)} title="Coming back to" onPick={pickLegPlace} saved={places} near={dest ?? (here ? { lat: here.lat, lon: here.lon } : null)} allowHere={false} osmOnly={osmOnly} />
+      <PlaceSheet open={legSheet?.kind === "place" || legSheet?.kind === "stop"} onClose={() => setLegSheet(null)} title={legSheet?.kind === "stop" ? "Next stop" : "Coming back to"} onPick={pickLegPlace} saved={places} near={dest ?? (here ? { lat: here.lat, lon: here.lon } : null)} allowHere={false} osmOnly={osmOnly} />
       <WhenSheet open={legSheet?.kind === "when"} onClose={() => setLegSheet(null)} local={draft.legs?.[legSheet?.index ?? -1]?.departureLocal ?? ""} zone={draft.legs?.[legSheet?.index ?? -1]?.timeZone || zone} timeKind={draft.legs?.[legSheet?.index ?? -1]?.timeKind ?? "depart_at"} allowArrive quick="go" deviceZone={deviceZone()} title={/^return\b/i.test(draft.legs?.[legSheet?.index ?? -1]?.label ?? "") ? "When are you heading back?" : "When does this leg start?"} after={instant} onChange={(p) => { const i = legSheet?.index ?? -1; const legs = [...(draft.legs ?? [])]; if (!legs[i]) return; legs[i] = { ...legs[i], ...(p.local ? { departureLocal: p.local, timeHint: null } : {}), ...(p.zone && validZone(p.zone) ? { timeZone: p.zone } : !legs[i].timeZone ? { timeZone: zone } : {}), ...(p.timeKind ? { timeKind: p.timeKind } : {}) }; setLegs(legs); }} />
       <GoSheet open={sheet === "go"} onClose={() => setSheet(null)} target={goTarget} signedIn={signedIn} emailAlerts={emailAlerts} onSignIn={() => { setSheet(null); setSignIn(true); }} />
       <SignInSheet open={signIn} onClose={() => setSignIn(false)} reason="Sign in to save plans and go with Mira" />

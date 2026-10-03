@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { SAME_ORIGIN, newUser, openRoute } from "./helpers";
+import { DEST, SAME_ORIGIN, newUser, savePlaceAt } from "./helpers";
 
 /** Open Mira and wait until the chat has hydrated (it loads history on mount), so taps aren't lost. */
 async function openMira(page: Page) {
@@ -11,9 +11,7 @@ async function openMira(page: Page) {
 test.describe("Mira — the companion (placeholder engine)", () => {
   test("keeps nearby tools and seeds a saved Home in the shared plan without starting", async ({ browser }) => {
     const { ctx, page } = await newUser(browser, "Kavya");
-    await openRoute(page);
-    await page.getByRole("button", { name: "🏠 Home" }).click();
-    await expect(page.getByText("Saved as Home")).toBeVisible();
+    await savePlaceAt(page, "Home", DEST);
 
     await openMira(page);
     await page.getByRole("button", { name: "Use current location for nearby questions" }).click();

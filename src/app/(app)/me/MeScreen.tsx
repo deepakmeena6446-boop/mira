@@ -25,6 +25,7 @@ import type { ImpactView } from "@/server/contributions";
 import type { ProviderModes } from "@/server/providers/modes";
 import { AccountSection, PushSection } from "./MeSections";
 import { PersonalSections } from "./PersonalSections";
+import { LanguagePicker } from "./LanguagePicker";
 
 const EMOJIS = [["🏠", "Home"], ["🎓", "College"], ["💼", "Work"], ["🏋️", "Gym"], ["⭐", "Favourite"]] as const;
 /** The kinds a person can turn off (the API's list; airports and stores aren't suggested as help on their own). */
@@ -194,10 +195,10 @@ export function MeScreen({ user, places: initialPlaces, contacts, modes, emailAl
         <div className="mt-7 space-y-7">
           <AccountSection durable={user.durable} google={user.google} emailHint={user.emailHint} emailAvailable={emailAlerts} googleAvailable={modes.auth === "google"} saved={saved} />
           <PushSection available={modes.push === "web_push"} />
-          <Group id="app" label="App"><AppearancePicker /><InstallCard variant="row" /></Group>
+          <Group id="app" label="App"><AppearancePicker /><LanguagePicker /><InstallCard variant="row" /></Group>
           <Group id="privacy" label="Privacy and your data">
             <GroupRow icon="shield" title="How Mira handles your data" href="/privacy" />
-            <GroupRow icon="arrow" title="Download my data" detail="Everything Mira keeps for you, as one file" onClick={() => { window.location.href = "/api/me/export"; }} end={<span />} />
+            <GroupRow icon="arrow" title="Download my data" detail="Everything Mira keeps for you, as one file" onClick={() => { const a = document.createElement("a"); a.href = "/api/me/export"; a.download = ""; a.click(); }} end={<span />} />
             <GroupRow icon="sparkle" title="Clear my chat with Mira" detail="Movement-plan questions are never kept" onClick={async () => { const r = await api("/api/mira", { method: "DELETE" }); toast(r.ok ? "Mira’s chat history cleared" : r.message, r.ok ? "info" : "error"); }} end={<span />} />
             <GroupRow icon="signout" tone="ink" title="Sign out" detail={isDemo ? "This account has no email — signing out deletes it" : "On this device"} onClick={() => setSheet("signout")} end={<span />} />
             <GroupRow icon="trash" tone="warm" title="Delete my account" detail="Places, people, journeys and chat are erased" onClick={() => setSheet("delete")} end={<span />} />

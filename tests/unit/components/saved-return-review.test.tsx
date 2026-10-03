@@ -34,7 +34,7 @@ describe("explicit account-saved return recovery after temporary draft expiry", 
     expect(screen.getByText("2026-10-04 00:10 (Asia/Kolkata)")).toBeInTheDocument();
     expect(currentPlanDraft()).toBeNull();
     fireEvent.click(review);
-    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/plan?planStep=options"));
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/plan"));
     expect(currentPlanDraft()).toMatchObject({ activity: "Return to Fictional home", origin: { query: "Fictional venue" }, destination: { query: "Fictional home" }, departureLocal: "2026-10-04T00:10", timeZone: "Asia/Kolkata", constraints: "luggage", journeyMode: "manual", recipientIds: plan().recipientIds, legs: [expect.objectContaining({ label: "Fictional dinner", departureLocal: "2026-10-03T21:00", constraints: "step free" })] });
     expect(currentPlanDraft()?.selection).toBeUndefined();
     const restored = sessionStorage.getItem("mira.plan.v1");
