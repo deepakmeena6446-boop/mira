@@ -42,7 +42,8 @@ export function zoneLabel(iso: string | Date, tz: string): string {
 
 function withZone(iso: string | Date, tz: string | null | undefined, opts: Intl.DateTimeFormatOptions): string {
   const zone = zoneOrUtc(tz);
-  const text = new Intl.DateTimeFormat("en-GB", { timeZone: zone, ...opts }).format(new Date(iso));
+  // "9:05 PM", the same clock as every screen (en-GB writes "pm").
+  const text = new Intl.DateTimeFormat("en-GB", { timeZone: zone, ...opts }).format(new Date(iso)).replace(/\b(am|pm)\b/g, (m) => m.toUpperCase());
   return `${text} ${zoneLabel(iso, zone)}`;
 }
 
@@ -50,7 +51,7 @@ export function formatPlaceDate(iso: string | Date, tz: string | null = DEFAULT_
   return new Intl.DateTimeFormat("en-GB", { timeZone: zoneOrUtc(tz), day: "numeric", month: "long", year: "numeric" }).format(new Date(iso));
 }
 
-/** "9:05 pm EDT" */
+/** "9:05 PM EDT" */
 export function formatPlaceTime(iso: string | Date, tz: string | null = DEFAULT_TIMEZONE): string {
   return withZone(iso, tz, { hour: "numeric", minute: "2-digit", hour12: true });
 }

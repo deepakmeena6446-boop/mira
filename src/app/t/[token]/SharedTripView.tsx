@@ -4,9 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { WorldMap } from "@/components/map/WorldMap";
 import { MiraPulse } from "@/components/app/MiraPulse";
-import { Avatar } from "@/components/app/Avatar";
 import { Icon } from "@/components/ui/Icon";
-import { cx } from "@/components/ui/cx";
+import { SkyCard, skyAt } from "@/components/mira/LiveNow";
 import { useClock } from "@/lib/location-store";
 import { formatPlaceTime } from "@/lib/time";
 import { modeWords } from "@/domain/travel-prefs";
@@ -103,37 +102,35 @@ Live sharing is off. Mira doesn&apos;t keep a record of the trip.
   return (
     <main className="fixed inset-0">
       <WorldMap tiles={tiles} me={me} dest={trip.dest ?? null} follow label={`Live location of ${trip.name}`} padding={{ top: 80, bottom: 320, left: 40, right: 40 }} />
-      <section className="absolute inset-x-0 bottom-0 z-20 mx-auto max-w-xl rounded-t-[var(--radius-lg)] border border-b-0 border-line bg-surface p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-sheet)]">
-        <p className={cx("inline-flex items-center gap-2 rounded-full px-3 py-1 text-[13px] font-semibold", checkOn ? "bg-warm-soft text-warm" : "bg-accent-soft text-accent-strong")}>
-          {checkOn ? "Check on them" : here ? "Sharing where they are" : "On the way"}
-        </p>
-        <div className="mt-3 flex items-center gap-3">
-          <Avatar name={trip.name} size={48} />
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold">{here ? `${trip.name} is sharing where they are` : `${trip.name} ${verb(trip.mode)} ${trip.destination}`}</h1>
-            {/* The ETA is in the traveller's own time zone, labelled, so it reads the same for every viewer. */}
-            <p className="text-ink-muted">
-              {trip.etaAt ? `${here ? "Sharing until" : "Expected by"} ${formatPlaceTime(trip.etaAt, trip.tz ?? null)}` : ""}
-              {age !== null ? ` · updated ${ago(age)}` : ""}
-            </p>
-          </div>
-        </div>
+      <section className="absolute inset-x-0 bottom-0 z-20 mx-auto max-w-xl rounded-t-[var(--radius-sheet)] bg-surface px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 shadow-[var(--shadow-sheet)]">
+        {/* The same sky card the traveller sees on their own journey: the sky where they are, who and where to. */}
+        <SkyCard
+          state={skyAt(now, me ?? trip.dest ?? null)}
+          label="Their journey"
+          pulse={checkOn ? "attention" : "with-you"}
+          eyebrow={checkOn ? "Check on them" : here ? "Sharing where they are" : "On the way"}
+          aside={age !== null ? `updated ${ago(age)}` : null}
+          titleAs="h1"
+          title={here ? `${trip.name} is sharing where they are` : `${trip.name} ${verb(trip.mode)} ${trip.destination}`}
+          /* The ETA is in the traveller's own time zone, labelled, so it reads the same for every viewer. */
+          line={trip.etaAt ? `${here ? "Sharing until" : "Expected by"} ${formatPlaceTime(trip.etaAt, trip.tz ?? null)}` : null}
+        />
         {polledFailed ? (
-          <p role="status" className="mt-4 rounded-[var(--radius-card)] bg-sunken px-4 py-3 text-sm text-ink-muted">
+          <p role="status" className="mt-4 rounded-2xl bg-sunken px-4 py-3 text-sm text-ink-muted">
             <span className="font-semibold text-ink">Can&apos;t refresh right now.</span> Check your connection — this shows the last update I received.
           </p>
         ) : null}
         {trip.checkRequested ? (
-          <p role="alert" className="mt-4 rounded-[var(--radius-card)] bg-warm-soft px-4 py-3 font-semibold text-warm">
+          <p role="alert" className="mt-4 rounded-2xl bg-warm-soft px-4 py-3 font-semibold text-warm">
             {trip.name} asked you to check on them. The best next step is usually to call or message them. Mira isn&apos;t an emergency service; if you think they&apos;re in danger, call your local emergency number.
           </p>
         ) : null}
         {trip.state === "missed" ? (
-          <p role="alert" className="mt-4 rounded-[var(--radius-card)] bg-warm-soft px-4 py-3 font-semibold text-warm">
+          <p role="alert" className="mt-4 rounded-2xl bg-warm-soft px-4 py-3 font-semibold text-warm">
             {trip.name} hasn&apos;t checked in yet. They may just have forgotten — try calling them. Mira isn&apos;t an emergency service; if you think they&apos;re in danger, call your local emergency number.
           </p>
         ) : age !== null && age > 180 ? (
-          <p className="mt-4 rounded-[var(--radius-card)] bg-sunken px-4 py-3 text-sm text-ink-muted">
+          <p className="mt-4 rounded-2xl bg-sunken px-4 py-3 text-sm text-ink-muted">
             <span className="font-semibold text-ink">Location paused.</span> This is their last shared spot, from {ago(age)} — often it just means the phone screen is off.
             {trip.alertsViewer ? ` Mira may attempt an email if ${trip.name} misses check-in; sending can fail.` : ""}
           </p>
