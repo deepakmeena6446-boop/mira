@@ -11,13 +11,12 @@ import { Sheet, StateNote } from "@/components/mira/Frame";
 import { Row, RowList } from "@/components/mira/Rows";
 import { api } from "@/lib/api-client";
 import { hoursWords } from "@/lib/brief";
-import { setPlanDraft } from "@/lib/plan-store";
+import { planGoingTo } from "@/lib/plan-handoff";
 import { clearPendingDestination, peekPendingDestination, rememberLocationChoice, setPendingReportSpot, shouldAutoLocate, usableLocationPoint, useClock, useLocation } from "@/lib/location-store";
 import { useCountry } from "@/lib/locale-store";
 import { HELP_CLASSES, helpWeightsFor, hoursState, isNight, rankHelpPoints, type HelpPoint } from "@/domain/help-points";
 import { localTimeInZone } from "@/domain/opening-hours";
 import { haversineMeters } from "@/domain/pilot";
-import { newPlanDraft } from "@/domain/plan-state";
 import type { EvidenceState } from "@/domain/evidence-state";
 import type { SavedPlace } from "@/server/account/places";
 import type { TileConfig } from "@/server/providers/geo/tiles";
@@ -80,11 +79,7 @@ export function MapScreen({ emailAlerts, places, tiles }: { emailAlerts: boolean
     const r = await api<{ label: string | null }>("/api/geo/reverse", { body: { lat: p.lat, lon: p.lon } });
     setSpot((s) => (s && s.lat === p.lat && s.lon === p.lon ? { ...s, name: r.ok ? r.data.label : null } : s));
   };
-  const planTo = (to: { name: string; lat: number; lon: number; source: Focus["source"]; placeId?: string }) => {
-    const z = deviceZone() ?? "UTC";
-    setPlanDraft({ ...newPlanDraft(new Date(), z), touched: true, activity: `Go to ${to.name}`.slice(0, 160), ...(here ? { origin: { kind: "device" as const, use: "from_here" as const, point: { lat: here.lat, lon: here.lon } } } : {}), destination: { query: to.name.slice(0, 160), resolution: { source: to.source, name: to.name, point: { lat: to.lat, lon: to.lon }, ...(to.placeId ? { placeId: to.placeId } : {}) } } });
-    router.push("/plan?for=go");
-  };
+  const planTo = (to: { name: string; lat: number; lon: number; source: Focus["source"]; placeId?: string }) => { planGoingTo(to, here ? { lat: here.lat, lon: here.lon } : null); router.push("/plan?for=go"); };
   const reportAt = (s: { lat: number; lon: number; name: string | null }) => { setPendingReportSpot(s); router.push("/report?from=map"); };
   const choose = (p: PickedPlace) => {
     setSearch(false);
