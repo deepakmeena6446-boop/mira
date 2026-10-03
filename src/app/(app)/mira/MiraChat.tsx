@@ -124,7 +124,7 @@ function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; o
               <li key={r.key}>
                 <button type="button" onClick={r.go} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-sunken">
                   <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-xl bg-sunken text-ink-muted"><Icon name={r.icon} className="size-[18px]" /></span>
-                  <span className="min-w-0 flex-1"><span className="block truncate font-semibold text-mixed">{r.name}</span><span className="block truncate text-xs text-ink-muted">{r.sub}</span></span>
+                  <span className="min-w-0 flex-1"><span className="block truncate font-semibold text-mixed">{r.name}</span><span className="line-clamp-2 block text-xs text-ink-muted">{r.sub}</span></span>
                   <span className="shrink-0 text-sm text-ink-subtle">{r.right}</span>
                 </button>
               </li>

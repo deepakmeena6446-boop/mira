@@ -279,7 +279,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
         </div>
 
         <h1 className="m-display mt-5">{complete ? (loop ? `${loopName} · ${loopMinutes} min` : `To ${destLabel}`) : situation === "run" ? "Plan a run or walk" : situation === "travel" ? "Plan your arrival" : "Where are you going?"}</h1>
-        {complete ? <p className="mt-1 text-[0.95rem] text-ink-muted">{loop ? `From ${originLabel}` : `From ${originLabel}`} · {whenWords(draft.departureLocal, zone)}{!sameClock(zone, deviceZone()) ? ` (${zone.split("/").pop()?.replace(/_/g, " ")} time)` : ""}</p> : null}
+        {complete ? <p className="mt-1 text-[0.95rem] text-ink-muted">From {draft.origin.kind === "device" ? "where you are" : originLabel} · {whenWords(draft.departureLocal, zone)}{!sameClock(zone, deviceZone()) ? ` (${zone.split("/").pop()?.replace(/_/g, " ")} time)` : ""}</p> : null}
 
         {/* The few questions that change the answer; once answered they fold into one line so the brief leads. */}
         {complete && !editing ? (
