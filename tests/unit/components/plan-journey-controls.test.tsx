@@ -43,11 +43,11 @@ describe("chosen journey explicit consent and stable retry", () => {
     updateLocalJourney(plan, null, 20, entry);
     render(<LocalCheckInScreen />); await act(async () => {});
     expect(screen.getByText(/Journey update confirmed at/)).toHaveTextContent("The original start is unchanged; nobody was notified");
-    expect(screen.getByRole("link", { name: "Review or change this journey" })).toHaveAttribute("href", "/plan");
+    expect(screen.getByRole("link", { name: "Review or change this journey" })).toHaveAttribute("href", "/plan/legs");
     fireEvent.click(screen.getByRole("button", { name: "I need options" }));
     expect(mocks.unsafe).toHaveBeenLastCalledWith(expect.objectContaining({ me: null, share: null, tell: null }));
     fireEvent.click(screen.getByRole("button", { name: "Review or change journey" }));
-    expect(screen.queryByRole("dialog")).toBeNull(); expect(mocks.push).toHaveBeenCalledWith("/plan");
+    expect(screen.queryByRole("dialog")).toBeNull(); expect(mocks.push).toHaveBeenCalledWith("/plan/legs");
     expect(readLocalCheckIn()).toEqual({ ...entry, dueAt: Date.now() + 20 * 60_000 });
     expect(mocks.location).not.toHaveBeenCalled(); expect(mocks.api).not.toHaveBeenCalled();
   });

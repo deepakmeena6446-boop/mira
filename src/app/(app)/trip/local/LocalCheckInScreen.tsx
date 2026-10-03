@@ -53,6 +53,6 @@ export function LocalCheckInScreen() {
       </section>
       <button type="button" onClick={() => setUnsafe(true)} className="mira-intent-chip justify-center">I need options</button><p className="text-xs text-ink-muted">Manual progress is entered by you. Refresh needs an unexpired plan and a new route check; offline route restoration is unavailable. This check-in expires 30 minutes after due.</p>
     </>}
-    <UnsafeSheet open={unsafe} onClose={() => setUnsafe(false)} me={null} area={null} helpPoints={[]} helpLoading={false} onGoHelpPoint={() => {}} goLabel="Show" share={null} tell={null} change={entry ? { label: "Review or change journey", detail: "Review the same private journey and manually confirm its continued origin. No GPS or contact alerts.", onReview: () => closeOverlayThen(() => setUnsafe(false), () => router.push("/plan")) } : null} />
+    <UnsafeSheet open={unsafe} onClose={() => setUnsafe(false)} me={null} area={null} helpPoints={[]} helpLoading={false} onGoHelpPoint={() => {}} goLabel="Show" share={null} tell={null} change={entry ? { label: "Review or change journey", detail: "Review the same private journey and manually confirm its continued origin. No GPS or contact alerts.", onReview: () => closeOverlayThen(() => setUnsafe(false), () => router.push("/plan/legs")) } : null} />
   </div>;
 }
