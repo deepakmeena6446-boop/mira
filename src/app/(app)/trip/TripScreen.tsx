@@ -4,11 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { WorldMap } from "@/components/map/WorldMap";
-import { BottomSheet, type Snap } from "@/components/app/BottomSheet";
 import { EmergencyPill } from "@/components/app/EmergencyPill";
 import { HelpCluster } from "@/components/app/HelpCluster";
 import { useChromeTop } from "@/lib/use-chrome-top";
-import { useWide } from "@/lib/use-wide";
 import { MiraPulse } from "@/components/app/MiraPulse";
 import { journeyNextAction } from "@/lib/trip-actions";
 import { haptic } from "@/lib/haptics";
@@ -17,6 +15,7 @@ import { AfterArrival } from "@/components/app/AfterArrival";
 import { HELP_ICON } from "@/components/app/kinds";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
+import { cx } from "@/components/ui/cx";
 import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api-client";
 import { setLocation, useClock } from "@/lib/location-store";
@@ -98,8 +97,8 @@ export function TripScreen({
   const walking = initial.mode === "walk" && initial.autoArrival;
   const clock = useClock(); // null during server render: times appear after hydration (the server doesn't know your zone)
   const now = clock?.getTime() ?? new Date(initial.etaAt).getTime();
-  const freshMe = me && clock && lastFixAt !== null && clock.getTime() - lastFixAt >= -10_000 && clock.getTime() - lastFixAt < 120_000 && lastAccuracyM !== null && lastAccuracyM <= 100 ? me : null;
-  const [snap, setSnap] = useState<Snap>("half");
+  // useClock() can lag real time by up to ~30 s (+ its tick), so a just-received fix may look "from the future": allow that lag.
+  const freshMe = me && clock && lastFixAt !== null && clock.getTime() - lastFixAt >= -90_000 && clock.getTime() - lastFixAt < 120_000 && lastAccuracyM !== null && lastAccuracyM <= 100 ? me : null;
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [awake, setAwake] = useState(false);
@@ -122,7 +121,6 @@ export function TripScreen({
   const open = trip.state === "active" || trip.state === "missed";
   const chromeRef = useRef<HTMLDivElement>(null);
   useChromeTop(chromeRef);
-  const wide = useWide();
   // Immersive journey mode: no tab bar while the journey is open (globals.css `html[data-journey]`).
   useEffect(() => {
     if (!open) return;
@@ -434,51 +432,44 @@ export function TripScreen({
   const returnPlan = planDraft && returnLeg && instantForLocal(returnLeg.departureLocal, returnLeg.timeZone) ? activatePlanLeg(planDraft, returnIndex) : null;
 
   if (!open) {
+    const arrived = trip.state === "arrived";
     return (
-      <div className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 pb-[calc(var(--tabbar-space)+2rem)] text-center">
-        <span aria-hidden className={`grid size-14 place-items-center rounded-full ${trip.state === "arrived" ? "bg-accent-soft text-accent" : "bg-sunken text-ink-muted"}`}>
-          <Icon name={trip.state === "arrived" ? "check" : "route"} className={`size-7 ${trip.state === "arrived" ? "mira-draw" : ""}`} />
-        </span>
-        <h1 className="mt-5 text-[1.75rem] font-semibold animate-rise">
-          {!trip.autoArrival && trip.state !== "expired" ? "Sharing stopped" : trip.state === "arrived" ? "You made it." : trip.state === "ended" ? "Journey ended" : "Journey closed"}
-        </h1>
-        <p className="mt-2 max-w-sm text-ink-muted animate-rise">
-          {!trip.autoArrival
-            ? "Nobody can follow your live location any more."
-            : trip.state === "arrived"
-            ? `Glad you're at ${trip.destination.name}. ${sharedOk.length ? `${names(sharedOk.map((c) => c.name))} can see you arrived.` : "Your live link now just says you arrived."}`
-            : "Live sharing is off."}
-        </p>
-        {trip.state === "arrived" ? <section className="mt-5 w-full max-w-sm rounded-[var(--radius-card)] border border-line bg-surface p-4 text-left" aria-label="Return journey">
-          <h2 className="font-semibold">Your way back</h2>
-          {returnPlan ? <><p className="mt-2 text-sm text-ink-muted">{returnPlan.origin.kind === "named" ? returnPlan.origin.query : "Origin"} → {returnPlan.destination.query} · {returnPlan.departureLocal.replace("T", " ")} ({returnPlan.timeZone}).</p><Button className="mt-3" variant="primary" onClick={() => { clearTripRoutes(); setPlanDraft(returnPlan); router.push("/plan?planStep=options"); }}>Review return journey</Button></> : <><p className="mt-2 text-sm text-ink-muted">Keep the event plan and confirm the return places, local date and time.</p><Link href="/plan?planStep=return" className="mt-2 inline-flex min-h-11 items-center font-semibold text-accent-strong">Plan the return journey</Link></>}
-          <p className="mt-2 text-xs text-ink-muted">Review only. Starting and any contact sharing require a new confirmation.</p>
-          {!returnPlan ? <SavedReturnReview /> : null}
-        </section> : null}
-        {/* The one question after a journey (or nothing): its own slot, extended in AfterArrival. */}
-        <AfterArrival trip={trip} route={route} hour={clock ? clock.getHours() : null} onDone={() => clearTripRoutes()} />
-        <p className="mt-6 max-w-sm text-sm text-ink-subtle">
-          Journey details are deleted{trip.purgeAt && clock ? ` by ${time(trip.purgeAt)}` : " within a day"}. Mira doesn&apos;t keep a history of where you&apos;ve been.
-        </p>
-        <Link href="/report?from=journey" className="mt-3 inline-flex min-h-11 max-w-sm items-center justify-center gap-1.5 text-sm font-semibold text-ink-muted">
-          <Icon name="flag" className="size-4" /> <span>Something happened on the way? Report it privately</span>
-        </Link>
-        <Button
-          className="mt-6 max-w-xs"
-          variant="primary"
-          size="lg"
-          onClick={() => {
-            clearTripRoutes();
-            router.push("/");
-            router.refresh();
-          }}
-        >
-          Done
-        </Button>
-        <Link href="/trips" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-strong">
-          Your trips
-        </Link>
-        {trip.state !== "arrived" && planDraft?.legs?.length ? <Link href="/plan?planStep=return" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-strong">Review another planned leg</Link> : null}
+      <div className="m-screen bg-companion flex flex-col items-center pb-[calc(var(--tabbar-space)+2rem)] text-center">
+        <div className="m-screen-inner flex flex-col items-center pt-[12dvh]">
+          <span aria-hidden className={`grid size-16 place-items-center rounded-full ${arrived ? "bg-accent-soft text-accent" : "bg-sunken text-ink-muted"}`}>
+            <Icon name={arrived ? "check" : "route"} className={`size-8 ${arrived ? "mira-draw" : ""}`} />
+          </span>
+          <h1 className="m-display mt-6 animate-rise">
+            {!trip.autoArrival && trip.state !== "expired" ? "Sharing stopped" : arrived ? "You made it." : trip.state === "ended" ? "Journey ended" : "Journey closed"}
+          </h1>
+          <p className="mt-3 max-w-sm text-[1.0625rem] text-ink-muted animate-rise">
+            {!trip.autoArrival
+              ? "Nobody can follow your live location any more."
+              : arrived
+              ? `Glad you're at ${trip.destination.name}. ${sharedOk.length ? `${names(sharedOk.map((c) => c.name))} can see you arrived.` : "Your live link now just says you arrived."}`
+              : "Live sharing is off."}
+          </p>
+          {/* The one question after a journey (or nothing): a Mira Check that helps the next person. */}
+          <div className="mt-6 w-full max-w-sm text-left">
+            <AfterArrival trip={trip} route={route} hour={clock ? clock.getHours() : null} onDone={() => clearTripRoutes()} />
+          </div>
+          {arrived ? (
+            <section className="m-card mt-4 w-full max-w-sm p-4 text-left" aria-label="Return journey">
+              <h2 className="font-semibold">Your way back</h2>
+              {returnPlan ? <><p className="mt-1 text-sm text-ink-muted">{returnPlan.origin.kind === "named" ? returnPlan.origin.query : "Origin"} → {returnPlan.destination.query} · {returnPlan.departureLocal.replace("T", " ")} ({returnPlan.timeZone}).</p><Button className="mt-3 w-full" variant="secondary" onClick={() => { clearTripRoutes(); setPlanDraft(returnPlan); router.push("/plan?planStep=options"); }}>Review return journey</Button></> : <><p className="mt-1 text-sm text-ink-muted">When you’re ready to head back, confirm the return places and time — Mira checks the way again for then.</p><Link href="/plan?planStep=return" className="mt-1 inline-flex min-h-11 items-center font-semibold text-accent-strong">Plan the return journey</Link></>}
+              {!returnPlan ? <SavedReturnReview /> : null}
+            </section>
+          ) : null}
+          <p className="mt-6 max-w-sm text-sm text-ink-subtle">
+            Journey details are deleted{trip.purgeAt && clock ? ` by ${time(trip.purgeAt)}` : " within a day"}. Mira doesn&apos;t keep a history of where you&apos;ve been.
+          </p>
+          <Link href="/report?from=journey" className="mt-2 inline-flex min-h-11 max-w-sm items-center justify-center gap-2 text-sm font-semibold text-ink-muted">
+            <Icon name="flag" className="size-4 shrink-0" /><span className="text-left">Something happened on the way? Report it privately</span>
+          </Link>
+          <Button className="mt-6 w-full max-w-xs" variant="primary" size="lg" onClick={() => { clearTripRoutes(); router.push("/"); router.refresh(); }}>Done</Button>
+          <Link href="/trips" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-strong">Your journeys</Link>
+          {trip.state !== "arrived" && planDraft?.legs?.length ? <Link href="/plan?planStep=return" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-strong">Review another planned leg</Link> : null}
+        </div>
       </div>
     );
   }
@@ -487,8 +478,10 @@ export function TripScreen({
   const fixAge = lastFixAt === null || !clock ? null : Math.max(0, Math.floor((clock.getTime() - lastFixAt) / 1000));
   const sharedAt = lastUploadAt ?? (trip.lastLocation ? Date.parse(trip.lastLocation.at) : null);
   const sharedAge = sharedAt === null || !clock ? null : Math.max(0, Math.floor((clock.getTime() - sharedAt) / 1000));
-  const attention = netDown || gps !== "ok" || uploadFailing || trip.state === "missed" || trip.sharedWith.some((c) => c.viaEmail && !c.notified);
-  const next = journeyNextAction({ missed: trip.state === "missed", whatsapp: onWhatsApp.map((c) => c.name), opened, following: sharedOk.length, canShare: Boolean(trip.shareUrl) });
+  const missed = trip.state === "missed";
+  const emailFailed = trip.sharedWith.filter((c) => c.viaEmail && !c.notified);
+  const attention = netDown || gps !== "ok" || uploadFailing || missed || emailFailed.length > 0;
+  const next = journeyNextAction({ missed, whatsapp: onWhatsApp.map((c) => c.name), opened, following: sharedOk.length, canShare: Boolean(trip.shareUrl) });
   // Honest alert behaviour: only claim an automatic email when email works, someone accepted and got the link, and the worker is up.
   const alertsOn = emailAlerts && trip.sharedWith.some((contact) => contact.viaEmail) && !netDown;
   const emailRecipients = trip.sharedWith.filter((contact) => contact.viaEmail);
@@ -499,269 +492,215 @@ export function TripScreen({
   const aheadCount = ranked.filter((p) => p.ahead).length;
   const mapPins = ranked.slice(0, 6).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, icon: HELP_ICON[p.cls] ?? "pin", strong: HELP_CLASSES[p.cls].emergency }));
   const directions = (p: { lat: number; lon: number }) => `https://www.google.com/maps/dir/?api=1&destination=${p.lat.toFixed(5)},${p.lon.toFixed(5)}&travelmode=walking`;
+  // Who can see her, in one line (receipts only).
+  const whoLine = sharedOk.length ? `The email provider accepted a journey link for ${names(sharedOk.map((c) => c.name))}. Receipt and viewing are unknown.` : onWhatsApp.length ? `${names(onWhatsApp.map((c) => c.name))} ${onWhatsApp.length === 1 ? "gets" : "get"} your link when you send it on WhatsApp.` : "Only people you send your live link to can follow.";
+  const alertLine = alertsOn
+    ? `If you haven't ${trip.autoArrival ? "arrived" : "checked in"} ${Math.round(MISS_GRACE_MS / 60_000)} min after ${trip.autoArrival ? "your ETA" : "your sharing time ends"}, Mira attempts an email to ${names(emailRecipients.map((contact) => contact.name))}. Sending can fail; receipt is unknown.`
+    : !emailAlerts
+      ? `Nobody is alerted automatically if you don't ${trip.autoArrival ? "arrive" : "check in"} — Mira can't send email alerts yet.`
+      : netDown
+        ? "Nobody is alerted automatically right now — missed-arrival checks are paused."
+        : `Nobody is alerted automatically if you don't ${trip.autoArrival ? "arrive" : "check in"}.`;
+  // The single most important degraded state, said once at the top; details live under "More".
+  const issue = netDown
+    ? { title: "Missed-arrival checks are paused", body: "Mira’s background service isn’t responding, so nobody would be told if you don’t arrive. Send your live link, or let someone know directly." }
+    : gps === "denied" ? { title: "Location is off for Mira", body: "Turn location back on for this site in your browser settings. Your live link shows only your last uploaded position." }
+    : gps === "lost" ? { title: "Can't get your location right now", body: "It usually comes back once you're outdoors or have signal. Your live link shows your last uploaded position." }
+    : uploadFailing ? { title: "Can't reach Mira right now", body: "Check your connection — Mira keeps trying. Your live link shows your last uploaded position." }
+    : emailFailed.length ? { title: `Couldn't email your link to ${names(emailFailed.map((c) => c.name))}`, body: "Tap “Send my live link” to send it yourself." }
+    : null;
 
   return (
-    <div className="fixed inset-0 overflow-hidden">
-      <WorldMap tiles={tiles} me={me} dest={trip.destination} route={route} places={mapPins} follow presence={trip.state === "active" && !unsafe} label={`Live map of your journey to ${trip.destination.name}`} padding={wide ? { top: 40, bottom: 40, left: 88 + 400 + 40, right: 60 } : { top: 170, bottom: 420, left: 40, right: 40 }} />
-
-      <div className="mira-chrome pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.9rem,env(safe-area-inset-top))]">
-        <div ref={chromeRef} className="mx-auto max-w-xl">
-        <div className="pointer-events-auto glass mx-auto flex max-w-xl items-center gap-3 rounded-[var(--radius-card)] border border-glass-edge px-4 py-2.5 shadow-[var(--shadow-float)]">
-          <Link href="/trips" aria-label="Back to your trips" className="grid size-11 shrink-0 place-items-center rounded-full bg-sunken">
-            <Icon name="back" className="size-5" />
-          </Link>
-          <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-2 text-sm font-semibold text-accent-strong">
-              <MiraPulse size={12} state={trip.state === "missed" ? "attention" : "with-you"} />
-              {trip.sharedWith.length ? "Sharing enabled" : `${noun[0].toUpperCase()}${noun.slice(1)} in progress`}
-            </p>
-            <h1 className="truncate font-semibold">{trip.autoArrival ? `To ${trip.destination.name}${modeLine ? ` · ${modeLine}` : ""}` : "Sharing where you are"}</h1>
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-canvas">
+      {/* The map shows where you are and Help Points ahead; everything on it is also said below. */}
+      <div className="relative min-h-[30dvh] flex-1">
+        <WorldMap tiles={tiles} me={me} dest={trip.destination} route={route} places={mapPins} follow presence={trip.state === "active" && !unsafe} label={`Live map of your journey to ${trip.destination.name}`} padding={{ top: 80, bottom: 40, left: 40, right: 40 }} />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <div ref={chromeRef} className="pointer-events-auto mx-auto flex max-w-xl items-center justify-between gap-2">
+            <Link href="/trips" aria-label="Back to your trips" className="grid size-11 shrink-0 place-items-center rounded-full bg-surface shadow-[var(--shadow-float)]">
+              <Icon name="back" className="size-5" />
+            </Link>
+            <HelpCluster compact onUnsafe={() => setUnsafe(true)} />
           </div>
-        </div>
-        <div className="pointer-events-auto mx-auto mt-2 max-w-xl">
-          <HelpCluster onUnsafe={() => setUnsafe(true)} />
-        </div>
-        <div className="pointer-events-auto mt-2 rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-sm">
-          <p className="text-xs text-ink-muted">{!visible ? "Updates paused while hidden" : fixAge === null ? "Waiting for a device position" : !freshMe ? `Last known position · ${fixAge}s old` : `Device position · ${fixAge}s ago`}{uploadFailing ? " · upload failed" : sharedAge === null ? " · nothing sent yet" : ` · update sent ${sharedAge}s ago`}</p>
-          <Button variant="primary" className="mt-2 w-full" onClick={() => void act("arrive")} busy={busy === "arrive"}>{trip.autoArrival ? "I'm here" : "I'm okay — stop sharing"}</Button>
-        </div>
         </div>
       </div>
 
-      <BottomSheet snap={snap} onSnap={setSnap} label="Journey controls">
-        {netDown ? (
-          <div role="alert" className="mb-4 rounded-[var(--radius-card)] bg-warm-soft p-4">
-            <p className="font-semibold text-warm">Missed-arrival checks are paused</p>
-            <p className="mt-1 text-sm text-ink-muted">Mira&apos;s background service isn&apos;t responding, so nobody would be told if you don&apos;t arrive. Send your live link, or let someone know directly.</p>
-          </div>
-        ) : null}
-        <p role="status" className="mb-4 rounded-[var(--radius-card)] bg-sunken p-3 text-sm text-ink-muted">
-          {visible ? "Foreground location is on while this journey screen is visible. " : "This screen is hidden; location updates are paused. "}
-          {fixAge === null ? "No device position yet. " : `Last device position ${fixAge < 60 ? `${fixAge} seconds` : `${Math.floor(fixAge / 60)} minutes`} ago. `}
-          {lastAccuracyM === null ? "Position accuracy is not available for the saved fix. " : `Device reported about ${Math.round(lastAccuracyM)} m accuracy. `}
-          {sharedAge === null ? "No position has reached Mira yet. " : `Last position shared ${sharedAge < 60 ? `${sharedAge} seconds` : `${Math.floor(sharedAge / 60)} minutes`} ago. `}
-          {fixAge !== null && fixAge >= 120 ? "The map marker is a last known position, not your current position. " : ""}
-          Browsers may stop updates when locked; missed check-ins still depend on the background service.
-        </p>
-        {gps !== "ok" || uploadFailing ? (
-          <div role="status" className="mb-4 rounded-[var(--radius-card)] bg-warm-soft p-4">
-            <p className="font-semibold text-warm">{gps === "denied" ? "Location is off for Mira" : gps === "lost" ? "Can't get your location right now" : "Can't reach Mira right now"}</p>
-            <p className="mt-1 text-sm text-ink-muted">
-              {sharedAge !== null && (trip.shareUrl || trip.sharedWith.length) ? "A valid journey link can show your last uploaded position. Receipt and viewing are unknown. " : ""}
-              {gps === "denied" ? "Turn location back on for this site in your browser settings." : gps === "lost" ? "It usually comes back once you're outdoors or have signal." : "Check your connection — Mira keeps trying."}
-              {alertsOn ? " If you miss check-in, Mira still attempts an email after your ETA; sending can fail." : ""}
-            </p>
-          </div>
-        ) : null}
-        {trip.sharedWith.some((c) => c.viaEmail && !c.notified) ? (
-          <div role="status" className="mb-4 rounded-[var(--radius-card)] bg-warm-soft p-4">
-            <p className="font-semibold text-warm">
-              Couldn&apos;t email your link to {names(trip.sharedWith.filter((c) => c.viaEmail && !c.notified).map((c) => c.name))}
-            </p>
-            <p className="mt-1 text-sm text-ink-muted">Tap &ldquo;Send my live link&rdquo; to send it yourself.</p>
-          </div>
-        ) : null}
-        {trip.state === "missed" ? (
-          <div role="alert" className="mb-4 rounded-[var(--radius-card)] bg-warm-soft p-4">
-            <p className="font-semibold">Are you okay? Tap &ldquo;I&apos;m here&rdquo; if you&apos;ve arrived.</p>
-            <p className="mt-1 text-sm text-ink-muted">
-              {trip.alert === "sent"
-                ? `The email provider accepted the missed-check-in message for ${names(acceptedAlerts.length ? acceptedAlerts.map((contact) => contact.name) : emailRecipients.map((contact) => contact.name))}. Receipt is unknown.`
-                : trip.alert === "claimed"
-                  ? "I'm letting your contacts know now…"
-                  : trip.alert === "failed" || trip.alert === "unconfirmed"
-                    ? `${acceptedAlerts.length ? `The provider accepted email for ${names(acceptedAlerts.map((contact) => contact.name))}. ` : ""}${uncertainAlerts.length ? `Email was rejected or unconfirmed for ${names(uncertainAlerts.map((contact) => contact.name))}. ` : "The email attempt could not be confirmed. "}Call or message them directly.`
-                    : onWhatsApp.length
-                      ? "Nobody was notified automatically — Mira can't send WhatsApp for you. Use “Send to …” above, or call someone."
-                      : "Nobody was notified — either no contact on this trip has accepted your invite, or email isn't available right now."}{" "}
-              If you&apos;re in danger, <EmergencyPill variant="link" />.
-            </p>
-          </div>
-        ) : null}
-
-        {/* 1. Who can see her, and what happens if she doesn't arrive — the Mira line, plainly. */}
-        <div className="flex items-start gap-3">
-          <MiraPulse size={16} state={attention ? "attention" : "with-you"} className="mt-[5px]" />
-          <p className="min-w-0 flex-1 text-sm text-ink-muted">
-            <span className="block text-[1.0625rem] font-medium leading-snug text-ink">{sharedOk.length ? `The email provider accepted a journey link for ${names(sharedOk.map((c) => c.name))}. Receipt and viewing are unknown.` : "Only people you send your live link to can follow."}</span>{" "}
-            {alertsOn
-              ? `If you haven't ${trip.autoArrival ? "arrived" : "checked in"} ${Math.round(MISS_GRACE_MS / 60_000)} min after ${trip.autoArrival ? "your ETA" : "your sharing time ends"}, Mira attempts an email to ${names(emailRecipients.map((contact) => contact.name))}. Sending can fail; receipt is unknown.`
-              : !emailAlerts
-                ? `Nobody is alerted automatically if you don't ${trip.autoArrival ? "arrive" : "check in"} — Mira can't send email alerts yet. Your live link is how people follow you.`
-                : netDown
-                  ? "Nobody is alerted automatically right now — missed-arrival checks are paused."
-                  : (
-                      <>
-                        Nobody is alerted automatically if you don&apos;t {trip.autoArrival ? "arrive" : "check in"} —{" "}
-                        <button type="button" onClick={() => setSharingOpen(true)} className="font-semibold text-accent-strong underline">
-                          choose someone for this journey
-                        </button>{" "}
-                        for that.
-                      </>
-                    )}
+      <section aria-label="Journey controls" className="relative z-10 -mt-6 max-h-[68dvh] overflow-y-auto overscroll-contain rounded-t-[var(--radius-sheet)] bg-surface px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 shadow-[var(--shadow-sheet)]">
+        <div className="mx-auto max-w-xl">
+          {/* 1. Glance: who's with you, how long, where. */}
+          <p className={cx("flex items-center gap-2 text-sm font-semibold", missed || attention ? "text-warm" : "text-accent-strong")}>
+            <MiraPulse size={12} state={missed || attention ? "attention" : "with-you"} ambient />
+            {missed ? "Check-in due" : trip.sharedWith.length ? "Sharing enabled" : `${noun[0].toUpperCase()}${noun.slice(1)} in progress`}
           </p>
-        </div>
-
-        {/* 2. Where and when: ETA in her local time, how far. */}
-        <div className="mt-4">
-          <p className="text-[13px] font-medium text-ink-subtle">{trip.autoArrival ? (left > 0 ? "Expected in" : "Expected") : "Sharing for"}</p>
-          <p className="text-4xl font-semibold tabular-nums">{!clock ? "…" : left > 0 ? span : mins < 1 ? "now" : `${span} ago`}</p>
-          <p className="text-ink-muted">
-            {/* The ETA is the check-in time: the route's time plus spare time (etaFor), so it's later than the walk Home showed. */}
-            {trip.autoArrival ? (clock ? `ETA ${time(trip.etaAt)}, with time to spare` : "ETA") : clock ? `Until ${time(trip.etaAt)}` : ""}
-            {distance !== null && trip.autoArrival ? ` · ${distance < 1000 ? `${Math.round(distance / 10) * 10} m` : `${(distance / 1000).toFixed(1)} km`} to go` : ""}
-          </p>
-          {walking && route ? (
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-subtle">
-              <Icon name="route" className="size-4" /> Your planned route stays on this phone
-              {aheadCount ? ` · ${aheadCount} Help Point${aheadCount === 1 ? "" : "s"} along it` : ""}
+          <div className="mt-1 flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="truncate text-[1.0625rem] font-semibold">{trip.autoArrival ? `To ${trip.destination.name}${modeLine ? ` · ${modeLine}` : ""}` : "Sharing where you are"}</h1>
+              <p className="text-sm text-ink-muted">
+                {trip.autoArrival ? (clock ? `ETA ${time(trip.etaAt)}, with time to spare` : "ETA") : clock ? `Until ${time(trip.etaAt)}` : ""}
+                {distance !== null && trip.autoArrival ? ` · ${distance < 1000 ? `${Math.round(distance / 10) * 10} m` : `${(distance / 1000).toFixed(1)} km`} to go` : ""}
+              </p>
+            </div>
+            <p className="shrink-0 text-right">
+              <span className="block text-[0.72rem] font-medium text-ink-subtle">{trip.autoArrival ? (left > 0 ? "Expected in" : "Expected") : "Sharing for"}</span>
+              <span className={cx("mira-journey-number block tabular-nums", left > 0 ? "text-[2.75rem]" : "text-[1.75rem]")}>{!clock ? "…" : left > 0 ? span : mins < 1 ? "now" : `${span} ago`}</span>
             </p>
-          ) : null}
-          {walking ? <div className="mt-3 rounded-[var(--radius-card)] bg-sunken p-3 text-sm"><Button variant="secondary" onClick={() => void reviewCurrentRoute()} busy={busy === "route-review"}>Review route from here</Button>{routeReviewMessage ? <p role="status" className="mt-2">{routeReviewMessage}</p> : null}{reviewedRoute ? <div className="mt-2"><p>A mapped walk from your latest position is about {Math.round(reviewedRoute.minutes)} min. Source: {reviewedRoute.evidence[0]?.status === "known" ? reviewedRoute.evidence[0].source.label : "unknown"}. Check actual access and conditions yourself.</p><Button variant="primary" onClick={() => void changeDestination(trip.destination, Math.min(235, Math.max(5, Math.ceil(reviewedRoute.minutes * 1.25) + 5)), reviewedRoute.geometry)} busy={busy === "change"}>Confirm route and ETA update</Button></div> : null}</div> : null}
-          <details id="journey-timing-review" className="mt-3 rounded-[var(--radius-card)] bg-sunken p-3 text-sm"><summary className="min-h-12 cursor-pointer py-3 font-semibold">Review check-in timing</summary><p>This is your remaining-time estimate. Destination and recipients stay the same; no route or operating service is confirmed by changing it.</p><label className="mt-3 block font-semibold">Minutes from now until check-in<input type="number" min={5} max={235} value={manualEtaMinutes} onChange={(event) => setManualEtaMinutes(Number(event.target.value))} className="mt-2 min-h-12 w-full rounded-xl border border-line-strong bg-surface px-3" /></label><Button variant="primary" className="mt-3" disabled={!Number.isInteger(manualEtaMinutes) || manualEtaMinutes < 5 || manualEtaMinutes > 235} busy={busy === "change"} onClick={() => void changeDestination(trip.destination, manualEtaMinutes, route)}>Confirm check-in time change</Button></details>
-        </div>
+          </div>
 
-
-        {/* 3. The one next action (exactly one filled button), then the other journey actions. */}
-        <div className="mt-4 grid gap-2.5">
-          {next.kind === "whatsapp" ? null : next.kind === "share" ? (
-            <Button variant="primary" size="lg" onClick={share} disabled={!trip.shareUrl}>
-              <Icon name="share" className="size-5" /> Send my live link
-            </Button>
+          {missed ? (
+            <div role="alert" className="mt-3 rounded-2xl bg-warm-soft p-4">
+              <p className="font-semibold">Are you okay? Tap &ldquo;I&apos;m here&rdquo; if you&apos;ve arrived.</p>
+              <p className="mt-1 text-sm text-ink-muted">
+                {trip.alert === "sent"
+                  ? `The email provider accepted the missed-check-in message for ${names(acceptedAlerts.length ? acceptedAlerts.map((contact) => contact.name) : emailRecipients.map((contact) => contact.name))}. Receipt is unknown.`
+                  : trip.alert === "claimed"
+                    ? "I'm letting your contacts know now…"
+                    : trip.alert === "failed" || trip.alert === "unconfirmed"
+                      ? `${acceptedAlerts.length ? `The provider accepted email for ${names(acceptedAlerts.map((contact) => contact.name))}. ` : ""}${uncertainAlerts.length ? `Email was rejected or unconfirmed for ${names(uncertainAlerts.map((contact) => contact.name))}. ` : "The email attempt could not be confirmed. "}Call or message them directly.`
+                      : onWhatsApp.length
+                        ? "Nobody was notified automatically — Mira can't send WhatsApp for you. Use “Send to …” below, or call someone."
+                        : "Nobody was notified — either no contact on this trip has accepted your invite, or email isn't available right now."}{" "}
+                If you&apos;re in danger, <EmergencyPill variant="link" />.
+              </p>
+            </div>
+          ) : issue ? (
+            <div role={netDown ? "alert" : "status"} className="mt-3 rounded-2xl bg-warm-soft p-3.5">
+              <p className="font-semibold text-warm">{issue.title}</p>
+              <p className="mt-0.5 text-sm text-ink-muted">{issue.body}</p>
+            </div>
           ) : null}
-          {/* Her WhatsApp contacts: each one tap, their own link, message ready. Mira opens WhatsApp; she presses Send. */}
-          {onWhatsApp.length ? (
-            <div>
+
+          {/* 2. Who can see you — one line, receipts only. */}
+          <p className="mt-3 text-sm text-ink-muted"><span className="font-medium text-ink">{whoLine}</span> {alertLine}</p>
+
+          {/* 3. The one next action (filled), with "I'm here" always in reach. */}
+          <div className="mt-4 grid gap-2">
+            {onWhatsApp.length ? (
               <ul className="grid gap-2">
                 {onWhatsApp.map((c) => {
                   const isNext = next.kind === "whatsapp" && next.name === c.name;
                   return (
                     <li key={c.name}>
-                      <a
-                        href={c.whatsapp!}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => markOpened(c.name)}
-                        data-variant={isNext ? "primary" : "secondary"}
-                        className={`flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-button)] px-4 font-semibold ${isNext ? "bg-accent text-accent-ink" : opened.includes(c.name) ? "border border-line bg-accent-soft text-ink" : "border border-line-strong bg-surface text-ink"}`}
-                      >
+                      <a href={c.whatsapp!} target="_blank" rel="noopener noreferrer" onClick={() => markOpened(c.name)} data-variant={isNext ? "primary" : "secondary"} className={cx("flex min-h-13 items-center justify-center gap-2 rounded-2xl px-4 font-semibold", isNext ? "bg-accent text-accent-ink" : opened.includes(c.name) ? "bg-accent-soft text-ink" : "bg-surface text-ink ring-1 ring-line-strong")}>
                         <Icon name={opened.includes(c.name) ? "check" : "send"} className="size-4" /> {opened.includes(c.name) ? `Opened WhatsApp for ${c.name} ✓` : `Send to ${c.name}`}
                       </a>
                     </li>
                   );
                 })}
               </ul>
-              <p className="mt-1.5 text-xs text-ink-muted">Each link is theirs alone and stops when you {trip.autoArrival ? "arrive" : "stop sharing"}. Mira can&apos;t see whether you pressed Send.</p>
-            </div>
-          ) : null}
-          <div className="grid grid-cols-2 gap-2.5">
-            {next.kind === "share" ? null : (
-              <Button variant="secondary" onClick={share} disabled={!trip.shareUrl}>
-                <Icon name="share" className="size-4" /> Send my live link
-              </Button>
-            )}
-            <Button variant="secondary" onClick={() => act("extend")} busy={busy === "extend"} disabled={trip.extended || trip.state !== "active"} className={next.kind === "share" ? "col-span-2" : undefined}>
-              <Icon name="clock" className="size-4" /> {trip.extended ? "Extended" : "+10 min"}
+            ) : null}
+            {next.kind === "share" ? (
+              <Button variant="primary" size="lg" onClick={share} disabled={!trip.shareUrl}><Icon name="share" className="size-5" /> Send my live link</Button>
+            ) : null}
+            <Button variant={next.kind === "arrive" ? "primary" : "secondary"} size="lg" onClick={() => void act("arrive")} busy={busy === "arrive"}>
+              <Icon name="check" className="size-5" /> {trip.autoArrival ? "I'm here" : "I'm okay — stop sharing"}
             </Button>
           </div>
-        </div>
-        {trip.checkRequestedAt && clock && clock.getTime() - new Date(trip.checkRequestedAt).getTime() < 30 * 60_000 ? (
-          <p role="status" className="mt-3 rounded-2xl bg-mint-soft px-4 py-3 text-sm">
-            Check-in request at {time(trip.checkRequestedAt)}. {trip.sharedWith.filter((contact) => contact.checkDelivery === "sent").length ? `Email accepted for ${names(trip.sharedWith.filter((contact) => contact.checkDelivery === "sent").map((contact) => contact.name))}; receipt is unknown. ` : "No email acceptance is confirmed. "}Mira didn&apos;t contact anyone else.
-          </p>
-        ) : null}
 
-        <section aria-label="Journey sharing" className="mt-4 rounded-[var(--radius-card)] border border-line p-3">
-          <Button variant="secondary" onClick={() => setSharingOpen((value) => !value)}>{sharingOpen ? "Hide sharing controls" : "Manage who follows"}</Button>
-          {sharingOpen ? <div className="mt-3 space-y-3">
-            <p className="text-sm text-ink-muted">Only the people selected for this journey have their own links. Removing a link here keeps their saved contact.</p>
-            {trip.sharedWith.length ? <ul className="space-y-3">{trip.sharedWith.map((contact) => <li key={contact.id} className="rounded-lg bg-sunken p-3 text-sm">
-              <p className="font-semibold">{contact.name}</p>
-              <p>Live-link email: {deliveryLabel(contact.linkDelivery)}.</p>
-              <p>Missed check-in: {deliveryLabel(contact.alertDelivery)}.</p>
-              {contact.checkDelivery !== "none" ? <p>Chosen check-in request: {deliveryLabel(contact.checkDelivery)}.</p> : null}
-              {contact.whatsapp ? <p>You send their WhatsApp link yourself; Mira cannot confirm Send.</p> : null}
-              {revokeConfirm === contact.id ? <div className="mt-2 flex gap-2"><Button variant="danger" busy={busy === "sharing-revoke"} onClick={() => void sharingAction("revoke", { contactId: contact.id })}>Confirm remove {contact.name}&apos;s journey link</Button><Button variant="ghost" onClick={() => setRevokeConfirm(null)}>Keep link</Button></div> : <Button variant="secondary" className="mt-2" onClick={() => setRevokeConfirm(contact.id)}>Remove {contact.name}&apos;s journey link</Button>}
-            </li>)}</ul> : <p className="text-sm">No selected recipients. Nobody receives automatic contact emails.</p>}
-            {contactsState === "failed" ? <div role="status"><p>Contact choices could not load. Existing links are unchanged.</p><Button variant="secondary" onClick={() => setContactsState("idle")}>Retry contact choices</Button></div> : contactsState !== "ready" ? <p role="status">Loading contact choices…</p> : <>
-              <RecipientPicker contacts={contacts.filter((contact) => !trip.sharedWith.some((recipient) => recipient.id === contact.id))} selectedIds={recipientIds} onChange={(ids) => { setRecipientIds(ids); shareActionKey.current = null; }} disabled={busy === "sharing-share"} />
-              {recipientIds.length ? <><p className="text-sm">Confirm live links for {names(contacts.filter((contact) => recipientIds.includes(contact.id)).map((contact) => contact.name))}? Mira attempts accepted-contact emails; WhatsApp still requires Send.</p><Button variant="primary" busy={busy === "sharing-share"} onClick={() => { shareActionKey.current ??= crypto.randomUUID(); void sharingAction("share", { recipientIds, idempotencyKey: shareActionKey.current }); }}>Confirm chosen recipients</Button></> : null}
-            </>}
-            <div className="rounded-lg border border-line p-3 text-sm">
-              <p>Your copied live link can be forwarded by its recipient. Invalidate it to stop everyone using that copy; selected contacts&apos; individual links stay unchanged.</p>
-              {!trip.shareUrl ? <Button variant="secondary" className="mt-2" busy={busy === "sharing-link"} onClick={() => void sharingAction("link", {})}>Create a new private live link</Button> : revokeConfirm === "owner" ? <div className="mt-2 flex gap-2"><Button variant="danger" busy={busy === "sharing-revoke"} onClick={() => void sharingAction("revoke", { ownerLink: true })}>Confirm invalidate copied live link</Button><Button variant="ghost" onClick={() => setRevokeConfirm(null)}>Keep link</Button></div> : <Button variant="secondary" className="mt-2" onClick={() => setRevokeConfirm("owner")}>Invalidate copied live link</Button>}
-            </div>
-          </div> : null}
-        </section>
-
-        {/* The nearest Help Point, ranked for right now */}
-        {focus && freshMe ? (
-          <div className="mt-3 rounded-[var(--radius-card)] bg-accent-soft p-4">
-            <div className="flex items-start gap-3">
-              <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-surface text-ink"><Icon name={HELP_ICON[focus.cls] ?? "pin"} className="size-5" /></span>
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold">{focus.name}</p>
-                <p className="text-sm text-ink-muted">
-                  {HELP_CLASSES[focus.cls].label} · roughly {focus.minutes} min by distance, route unverified · {hoursLine(focus)}
-                </p>
-                <p className="mt-1 text-xs text-ink-subtle">Staffing is not verified. Check the place directly before relying on it.</p>
-                {helpRoute?.id === focus.id ? <p role="status" className="mt-1 text-sm">{helpRoute.option ? `Mapped walk from the checked position: about ${Math.round(helpRoute.option.minutes)} min · ${helpRoute.option.evidence[0]?.status === "known" ? helpRoute.option.evidence[0].source.label : "source unknown"}. ` : ""}{helpRoute.detail}</p> : null}
-              </div>
-              <button type="button" aria-label="Close" onClick={() => setFocus(null)} className="grid size-11 shrink-0 place-items-center rounded-full bg-surface">
-                <Icon name="close" className="size-4" />
-              </button>
-            </div>
-            <a href={directions(focus)} target="_blank" rel="noopener noreferrer" className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-full bg-surface text-sm font-semibold text-accent-strong">
-              Directions in Maps <Icon name="arrow" className="size-4" />
-            </a>
-            <Button variant="secondary" className="mt-2" onClick={() => void reviewHelpRoute(focus)} busy={busy === "help-route"}>Check mapped walk to this place</Button>
-            {trip.state === "active" ? <Button variant="secondary" className="mt-2" onClick={() => { setPendingChange(focus); setManualEtaMinutes(30); }}>Change journey to this place</Button> : null}
-            {pendingChange?.id === focus.id ? <div className="mt-2 rounded-lg bg-surface p-3 text-sm"><p>This changes your destination and check-in ETA. {helpRoute?.id === focus.id && helpRoute.option ? "A mapped walk was checked, but current access, opening hours and staffing are unverified." : "The route, opening hours and staffing have not been verified."} Your existing contacts and live link stay the same; nobody new is notified.</p><label className="mt-2 block">Minutes until check-in <input type="number" min={5} max={235} value={manualEtaMinutes} onChange={(e) => setManualEtaMinutes(Number(e.target.value))} className="ml-2 w-20 rounded border border-line p-2" /></label><div className="mt-2 flex gap-2"><Button variant="primary" disabled={!Number.isInteger(manualEtaMinutes) || manualEtaMinutes < 5 || manualEtaMinutes > 235} busy={busy === "change"} onClick={() => void changeDestination({ lat: focus.lat, lon: focus.lon, name: focus.name.slice(0, 80) }, manualEtaMinutes, helpRoute?.id === focus.id ? helpRoute.option?.geometry ?? null : null)}>Confirm change</Button><Button variant="secondary" onClick={() => setPendingChange(null)}>Cancel</Button></div></div> : null}
+          {/* 4. Quick, one-handed. */}
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <button type="button" onClick={() => void act("extend")} disabled={busy === "extend" || trip.extended || trip.state !== "active"} className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl bg-sunken text-[0.8125rem] font-semibold disabled:opacity-45"><Icon name="clock" className="size-5" />{trip.extended ? "Extended" : "+10 min"}</button>
+            <button type="button" onClick={share} disabled={!trip.shareUrl || next.kind === "share"} className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl bg-sunken text-[0.8125rem] font-semibold disabled:opacity-45"><Icon name="share" className="size-5" />{next.kind === "share" ? "Link above" : "Send link"}</button>
+            <button type="button" onClick={() => (nextHelp && freshMe ? setFocus(nextHelp) : setUnsafe(true))} className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl bg-sunken text-[0.8125rem] font-semibold"><Icon name="shield" className="size-5" />Help near</button>
           </div>
-        ) : nextHelp ? (
-          <button type="button" onClick={() => setFocus(nextHelp)} className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-[var(--radius-card)] px-4 py-2 text-left hover:bg-sunken">
-            <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink"><Icon name={HELP_ICON[nextHelp.cls] ?? "pin"} className="size-[18px]" /></span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-medium text-ink-subtle">Nearest Help Point{nextHelp.ahead ? " ahead" : ""}</span>
-              <span className="block truncate font-semibold">
-                {nextHelp.name} <span className="font-normal text-ink-muted">· {HELP_CLASSES[nextHelp.cls].label} · roughly {nextHelp.minutes} min, route unverified</span>
-              </span>
-            </span>
-            <Icon name="chevron" className="size-4" />
-          </button>
-        ) : clock && lastFixAt && !freshMe ? <p role="status" className="mt-3 text-sm text-ink-muted">Your last position is too old to rank nearby Help Points. Refresh location to compare places; Emergency and calling still work.</p> : null}
+          {trip.checkRequestedAt && clock && clock.getTime() - new Date(trip.checkRequestedAt).getTime() < 30 * 60_000 ? (
+            <p role="status" className="mt-3 rounded-2xl bg-mint-soft px-4 py-3 text-sm">
+              Check-in request at {time(trip.checkRequestedAt)}. {trip.sharedWith.filter((contact) => contact.checkDelivery === "sent").length ? `Email accepted for ${names(trip.sharedWith.filter((contact) => contact.checkDelivery === "sent").map((contact) => contact.name))}; receipt is unknown. ` : "No email acceptance is confirmed. "}Mira didn&apos;t contact anyone else.
+            </p>
+          ) : null}
 
-        <p className="mt-4 text-sm text-ink-muted">
-          {awake ? "Mira is keeping your screen on. " : ""}
-          Your location updates while this screen is open.{" "}
-          {sharedAge !== null && (trip.shareUrl || trip.sharedWith.length) ? "If you close Mira, a valid journey link can show only the last uploaded position. Receipt and viewing are unknown. " : ""}
-          {trip.autoArrival ? <>Tap &ldquo;I&apos;m here&rdquo; when you arrive if Mira hasn&apos;t noticed.</> : null}
-        </p>
-
-        <div className="mt-5">
-          {confirmEnd ? (
-            <div className="rounded-[var(--radius-card)] bg-sunken p-4">
-              <p className="font-semibold">End the {noun}? Live sharing stops{alertsOn ? " and nobody is told if you don't arrive" : ""}.</p>
-              <div className="mt-3 flex gap-2">
-                <Button variant="danger" onClick={() => act("end")} busy={busy === "end"}>
-                  End trip
-                </Button>
-                <Button variant="ghost" onClick={() => setConfirmEnd(false)}>
-                  Keep going
-                </Button>
+          {/* 5. The nearest Help Point, ranked for right now (or its detail when chosen). */}
+          {focus && freshMe ? (
+            <div className="mt-3 rounded-2xl bg-accent-soft p-4">
+              <div className="flex items-start gap-3">
+                <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface text-ink"><Icon name={HELP_ICON[focus.cls] ?? "pin"} className="size-5" /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">{focus.name}</p>
+                  <p className="text-sm text-ink-muted">{HELP_CLASSES[focus.cls].label} · roughly {focus.minutes} min by distance, route unverified · {hoursLine(focus)}</p>
+                  <p className="mt-1 text-xs text-ink-subtle">Staffing is not verified. Check the place directly before relying on it.</p>
+                  {helpRoute?.id === focus.id ? <p role="status" className="mt-1 text-sm">{helpRoute.option ? `Mapped walk from the checked position: about ${Math.round(helpRoute.option.minutes)} min · ${helpRoute.option.evidence[0]?.status === "known" ? helpRoute.option.evidence[0].source.label : "source unknown"}. ` : ""}{helpRoute.detail}</p> : null}
+                </div>
+                <button type="button" aria-label="Close" onClick={() => setFocus(null)} className="grid size-11 shrink-0 place-items-center rounded-full bg-surface"><Icon name="close" className="size-4" /></button>
               </div>
+              <a href={directions(focus)} target="_blank" rel="noopener noreferrer" className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-full bg-surface text-sm font-semibold text-accent-strong">Directions in Maps <Icon name="arrow" className="size-4" /></a>
+              <Button variant="secondary" className="mt-2 w-full" onClick={() => void reviewHelpRoute(focus)} busy={busy === "help-route"}>Check mapped walk to this place</Button>
+              {trip.state === "active" ? <Button variant="secondary" className="mt-2 w-full" onClick={() => { setPendingChange(focus); setManualEtaMinutes(30); }}>Change journey to this place</Button> : null}
+              {pendingChange?.id === focus.id ? <div className="mt-2 rounded-xl bg-surface p-3 text-sm"><p>This changes your destination and check-in ETA. {helpRoute?.id === focus.id && helpRoute.option ? "A mapped walk was checked, but current access, opening hours and staffing are unverified." : "The route, opening hours and staffing have not been verified."} Your existing contacts and live link stay the same; nobody new is notified.</p><label className="mt-2 block">Minutes until check-in <input type="number" min={5} max={235} value={manualEtaMinutes} onChange={(e) => setManualEtaMinutes(Number(e.target.value))} className="ml-2 w-20 rounded-lg bg-sunken p-2" /></label><div className="mt-2 flex gap-2"><Button variant="primary" disabled={!Number.isInteger(manualEtaMinutes) || manualEtaMinutes < 5 || manualEtaMinutes > 235} busy={busy === "change"} onClick={() => void changeDestination({ lat: focus.lat, lon: focus.lon, name: focus.name.slice(0, 80) }, manualEtaMinutes, helpRoute?.id === focus.id ? helpRoute.option?.geometry ?? null : null)}>Confirm change</Button><Button variant="ghost" onClick={() => setPendingChange(null)}>Cancel</Button></div></div> : null}
             </div>
-          ) : trip.autoArrival ? (
-            <button type="button" onClick={() => setConfirmEnd(true)} className="min-h-11 w-full rounded-full text-sm font-semibold text-ink-muted hover:bg-sunken">
-              End trip without arriving
+          ) : nextHelp ? (
+            <button type="button" onClick={() => setFocus(nextHelp)} className="mt-3 flex min-h-14 w-full items-center gap-3 rounded-2xl px-1 py-2 text-left hover:bg-sunken">
+              <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-xl bg-sunken text-ink"><Icon name={HELP_ICON[nextHelp.cls] ?? "pin"} className="size-[18px]" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-medium text-ink-subtle">Nearest Help Point{nextHelp.ahead ? " ahead" : ""}{aheadCount > 1 ? ` · ${aheadCount} ahead on your route` : ""}</span>
+                <span className="block truncate font-semibold">{nextHelp.name} <span className="font-normal text-ink-muted">· {HELP_CLASSES[nextHelp.cls].label} · roughly {nextHelp.minutes} min, route unverified</span></span>
+              </span>
+              <Icon name="chevron" className="size-4" />
             </button>
-          ) : null /* sharing where she is: "I'm okay — stop sharing" already ends it */}
+          ) : clock && lastFixAt && !freshMe ? <p role="status" className="mt-3 text-sm text-ink-muted">Your last position is too old to rank nearby Help Points. Refresh location to compare places; Emergency and calling still work.</p> : null}
+
+          {/* 6. Everything else, one tap away. */}
+          <details className="group mt-4 rounded-2xl bg-sunken/60" open={sharingOpen || undefined}>
+            <summary className="flex min-h-13 cursor-pointer list-none items-center justify-between px-4 font-semibold [&::-webkit-details-marker]:hidden">More — sharing, timing, details<Icon name="chevron" className="size-4 transition-transform group-open:rotate-90" /></summary>
+            <div className="space-y-4 px-4 pb-4">
+              <section aria-label="Journey sharing">
+                <Button variant="secondary" className="w-full" onClick={() => setSharingOpen((value) => !value)}>{sharingOpen ? "Hide sharing controls" : "Manage who follows"}</Button>
+                {sharingOpen ? <div className="mt-3 space-y-3">
+                  <p className="text-sm text-ink-muted">Only the people selected for this journey have their own links. Removing a link here keeps their saved contact.</p>
+                  {trip.sharedWith.length ? <ul className="space-y-3">{trip.sharedWith.map((contact) => <li key={contact.id} className="rounded-xl bg-surface p-3 text-sm">
+                    <p className="font-semibold">{contact.name}</p>
+                    <p>Live-link email: {deliveryLabel(contact.linkDelivery)}.</p>
+                    <p>Missed check-in: {deliveryLabel(contact.alertDelivery)}.</p>
+                    {contact.checkDelivery !== "none" ? <p>Chosen check-in request: {deliveryLabel(contact.checkDelivery)}.</p> : null}
+                    {contact.whatsapp ? <p>You send their WhatsApp link yourself; Mira cannot confirm Send.</p> : null}
+                    {revokeConfirm === contact.id ? <div className="mt-2 flex gap-2"><Button variant="danger" busy={busy === "sharing-revoke"} onClick={() => void sharingAction("revoke", { contactId: contact.id })}>Confirm remove {contact.name}&apos;s journey link</Button><Button variant="ghost" onClick={() => setRevokeConfirm(null)}>Keep link</Button></div> : <Button variant="secondary" className="mt-2" onClick={() => setRevokeConfirm(contact.id)}>Remove {contact.name}&apos;s journey link</Button>}
+                  </li>)}</ul> : <p className="text-sm">No selected recipients. Nobody receives automatic contact emails.</p>}
+                  {contactsState === "failed" ? <div role="status"><p>Contact choices could not load. Existing links are unchanged.</p><Button variant="secondary" onClick={() => setContactsState("idle")}>Retry contact choices</Button></div> : contactsState !== "ready" ? <p role="status">Loading contact choices…</p> : <>
+                    <RecipientPicker contacts={contacts.filter((contact) => !trip.sharedWith.some((recipient) => recipient.id === contact.id))} selectedIds={recipientIds} onChange={(ids) => { setRecipientIds(ids); shareActionKey.current = null; }} disabled={busy === "sharing-share"} />
+                    {recipientIds.length ? <><p className="text-sm">Confirm live links for {names(contacts.filter((contact) => recipientIds.includes(contact.id)).map((contact) => contact.name))}? Mira attempts accepted-contact emails; WhatsApp still requires Send.</p><Button variant="primary" busy={busy === "sharing-share"} onClick={() => { shareActionKey.current ??= crypto.randomUUID(); void sharingAction("share", { recipientIds, idempotencyKey: shareActionKey.current }); }}>Confirm chosen recipients</Button></> : null}
+                  </>}
+                  <div className="rounded-xl bg-surface p-3 text-sm">
+                    <p>Your copied live link can be forwarded by its recipient. Invalidate it to stop everyone using that copy; selected contacts&apos; individual links stay unchanged.</p>
+                    {!trip.shareUrl ? <Button variant="secondary" className="mt-2" busy={busy === "sharing-link"} onClick={() => void sharingAction("link", {})}>Create a new private live link</Button> : revokeConfirm === "owner" ? <div className="mt-2 flex gap-2"><Button variant="danger" busy={busy === "sharing-revoke"} onClick={() => void sharingAction("revoke", { ownerLink: true })}>Confirm invalidate copied live link</Button><Button variant="ghost" onClick={() => setRevokeConfirm(null)}>Keep link</Button></div> : <Button variant="secondary" className="mt-2" onClick={() => setRevokeConfirm("owner")}>Invalidate copied live link</Button>}
+                  </div>
+                </div> : null}
+              </section>
+
+              {walking ? <div className="text-sm"><Button variant="secondary" className="w-full" onClick={() => void reviewCurrentRoute()} busy={busy === "route-review"}>Review route from here</Button>{routeReviewMessage ? <p role="status" className="mt-2">{routeReviewMessage}</p> : null}{reviewedRoute ? <div className="mt-2"><p>A mapped walk from your latest position is about {Math.round(reviewedRoute.minutes)} min. Source: {reviewedRoute.evidence[0]?.status === "known" ? reviewedRoute.evidence[0].source.label : "unknown"}. Check actual access and conditions yourself.</p><Button variant="primary" className="mt-2" onClick={() => void changeDestination(trip.destination, Math.min(235, Math.max(5, Math.ceil(reviewedRoute.minutes * 1.25) + 5)), reviewedRoute.geometry)} busy={busy === "change"}>Confirm route and ETA update</Button></div> : null}</div> : null}
+              <details id="journey-timing-review" className="rounded-xl bg-surface p-3 text-sm"><summary className="min-h-11 cursor-pointer py-2.5 font-semibold">Review check-in timing</summary><p>This is your remaining-time estimate. Destination and recipients stay the same; no route or operating service is confirmed by changing it.</p><label className="mt-3 block font-semibold">Minutes from now until check-in<input type="number" min={5} max={235} value={manualEtaMinutes} onChange={(event) => setManualEtaMinutes(Number(event.target.value))} className="mt-2 min-h-12 w-full rounded-xl bg-sunken px-3" /></label><Button variant="primary" className="mt-3" disabled={!Number.isInteger(manualEtaMinutes) || manualEtaMinutes < 5 || manualEtaMinutes > 235} busy={busy === "change"} onClick={() => void changeDestination(trip.destination, manualEtaMinutes, route)}>Confirm check-in time change</Button></details>
+
+              <section aria-label="Position and updates" role="status" className="rounded-xl bg-surface p-3 text-sm text-ink-muted">
+                <p className="font-semibold text-ink">Position and updates</p>
+                <p className="mt-1">
+                  {visible ? "Foreground location is on while this journey screen is visible. " : "This screen is hidden; location updates are paused. "}
+                  {fixAge === null ? "No device position yet. " : `Last device position ${fixAge < 60 ? `${fixAge} seconds` : `${Math.floor(fixAge / 60)} minutes`} ago. `}
+                  {lastAccuracyM === null ? "Position accuracy is not available for the saved fix. " : `Device reported about ${Math.round(lastAccuracyM)} m accuracy. `}
+                  {sharedAge === null ? "No position has reached Mira yet. " : `Last position shared ${sharedAge < 60 ? `${sharedAge} seconds` : `${Math.floor(sharedAge / 60)} minutes`} ago. `}
+                  {fixAge !== null && fixAge >= 120 ? "The map marker is a last known position, not your current position. " : ""}
+                  Browsers may stop updates when locked; missed check-ins still depend on the background service.
+                  {awake ? " Mira is keeping your screen on." : ""}
+                </p>
+                {walking && route && clock ? <p className="mt-1">Your planned route stays on this phone{aheadCount ? ` · ${aheadCount} Help Point${aheadCount === 1 ? "" : "s"} along it` : ""}.</p> : null}
+              </section>
+
+              {confirmEnd ? (
+                <div className="rounded-xl bg-surface p-4">
+                  <p className="font-semibold">End the {noun}? Live sharing stops{alertsOn ? " and nobody is told if you don't arrive" : ""}.</p>
+                  <div className="mt-3 flex gap-2">
+                    <Button variant="danger" onClick={() => act("end")} busy={busy === "end"}>End trip</Button>
+                    <Button variant="ghost" onClick={() => setConfirmEnd(false)}>Keep going</Button>
+                  </div>
+                </div>
+              ) : trip.autoArrival ? (
+                <button type="button" onClick={() => setConfirmEnd(true)} className="min-h-11 w-full rounded-full text-sm font-semibold text-ink-muted hover:bg-surface">End trip without arriving</button>
+              ) : null}
+            </div>
+          </details>
+          <p className="mt-3 px-1 text-xs text-ink-subtle">{visible ? `Device position ${fixAge === null ? "not yet available" : `${fixAge}s ago`}${uploadFailing ? " · upload failed" : sharedAge === null ? " · nothing sent yet" : ` · update sent ${sharedAge}s ago`}` : "Updates paused while hidden"}{trip.autoArrival ? " · Tap “I’m here” when you arrive if Mira hasn’t noticed." : ""}</p>
         </div>
-      </BottomSheet>
+      </section>
 
       <UnsafeSheet
         open={unsafe}
-        change={{ label: "Review route or timing", detail: "Keep this journey and recipients. Review first; a change needs your confirmation.", onReview: () => { setUnsafe(false); setSnap("half"); window.setTimeout(() => { const review = document.getElementById("journey-timing-review") as HTMLDetailsElement | null; if (review) { review.open = true; review.scrollIntoView({ block: "nearest" }); review.querySelector("summary")?.focus(); } }, 0); } }}
+        change={{ label: "Review route or timing", detail: "Keep this journey and recipients. Review first; a change needs your confirmation.", onReview: () => { setUnsafe(false); window.setTimeout(() => { const review = document.getElementById("journey-timing-review") as HTMLDetailsElement | null; if (review) { (review.parentElement?.closest("details") as HTMLDetailsElement | null)?.setAttribute("open", ""); review.open = true; review.scrollIntoView({ block: "nearest" }); review.querySelector("summary")?.focus(); } }, 0); } }}
         onClose={() => setUnsafe(false)}
         me={freshMe}
         staleLocation={fixAge !== null && fixAge >= 120}
@@ -773,7 +712,6 @@ export function TripScreen({
         onGoHelpPoint={(p) => {
           setUnsafe(false);
           setFocus(p);
-          setSnap("half");
         }}
         goLabel="Show"
         share={trip.shareUrl ? { label: "Send my live link", detail: "A valid link can show your last uploaded position until sharing stops. Receipt and viewing are unknown.", onShare: share } : null}

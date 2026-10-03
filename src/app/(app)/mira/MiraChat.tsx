@@ -300,7 +300,8 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
     if (handed.current || !planHydrated || (user && !loaded)) return;
     handed.current = true;
     const q = takeHandedOffAsk();
-    if (q) void send(q);
+    // Deferred a tick so the screen paints first; the question then streams in like any other.
+    if (q) window.setTimeout(() => void send(q), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planHydrated, loaded, user]);
 

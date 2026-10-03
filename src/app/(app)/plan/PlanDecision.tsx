@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
@@ -45,9 +45,16 @@ const SITUATIONS: Array<{ id: Situation; label: string; icon: string }> = [
 const MODES: Array<{ id: Mode; label: string }> = [{ id: "walk", label: "Walk" }, { id: "ride", label: "Taxi / ride" }, { id: "transit", label: "Transit" }];
 const LENGTHS = [15, 30, 45, 60, 90];
 const deviceZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { return "UTC"; } };
+/** Two zone names that keep the same clock (e.g. Asia/Calcutta and Asia/Kolkata) count as the same. */
+const sameClock = (a: string, b: string) => { try { const at = new Date(); const f = (z: string) => new Intl.DateTimeFormat("en", { timeZone: z, hour: "2-digit", minute: "2-digit", day: "2-digit", hourCycle: "h23" }).format(at); return f(a) === f(b); } catch { return a === b; } };
 const validZone = (z: string) => { try { new Intl.DateTimeFormat("en", { timeZone: z }); return true; } catch { return false; } };
 const pointOf = (p: PlanDraft["origin"] | PlanDraft["destination"]) => ("kind" in p && p.kind === "device" ? p.point : "resolution" in p && p.resolution ? p.resolution.point : null);
 const placeName = (p: PlanDraft["origin"] | PlanDraft["destination"]) => ("kind" in p && p.kind === "device" ? "Where you are" : "resolution" in p && p.resolution ? p.resolution.name : p.query || null);
+
+/** Which situation a draft describes (a loop is a run or walk; a ride to a stay is an arrival). */
+function situationOf(draft: PlanDraft): Situation {
+  return draft.loop ? "run" : draft.mode !== "walk" && /arriv|land|flight|hotel|stay/i.test(draft.activity) ? "travel" : "go";
+}
 
 /** Situation preset, applied once to an untouched draft (never over her own entries). */
 function preset(draft: PlanDraft, s: Situation, here: { lat: number; lon: number } | null): PlanDraft {
@@ -81,9 +88,13 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   // Apply the situation preset once, to an untouched draft. A draft handed over from Home or Mira keeps its entries.
   useEffect(() => {
     if (!hydrated || !draft) return;
-    if (!draft.touched) setPlanDraft(preset(draft, initialFor ?? "go", here ? { lat: here.lat, lon: here.lon } : null));
+    const at = here ? { lat: here.lat, lon: here.lon } : null;
+    const current = situationOf(draft);
+    if (!draft.touched) setPlanDraft(preset(draft, initialFor ?? "go", at));
+    // A different situation chosen on Home is a new intention: start it fresh rather than mixing it into the tab's plan.
+    else if (initialFor && current !== initialFor) setPlanDraft(preset(newPlanDraft(new Date(), deviceZone()), initialFor, at));
     // eslint-disable-next-line react-hooks/set-state-in-effect -- derive the situation from a handed-over draft once
-    else if (!initialFor) setSituation(draft.loop ? "run" : draft.mode !== "walk" && /arriv|land|flight|hotel/i.test(draft.activity) ? "travel" : "go");
+    else if (!initialFor) setSituation(current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated]);
 
@@ -142,15 +153,16 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   // Around the place that matters: the destination (or the start of a loop).
   const focus = loop ? origin : dest;
   const focusKey = complete && focus ? `${focus.lat.toFixed(3)},${focus.lon.toFixed(3)}` : "";
-  const [around, setAround] = useState<{ key: string; notes: CommunityNote[] | null; updates: { evidence: EvidenceState<SafetyUpdatesData> } | "failed" | null; country: CountryContext | null } | null>(null);
+  type Around = { key: string; notes: CommunityNote[] | null; updates: { evidence: EvidenceState<SafetyUpdatesData> } | "failed" | null; country: CountryContext | null };
+  const [around, setAroundState] = useState<Around | null>(null);
+  const setAround = (key: string, patch: Partial<Omit<Around, "key">>) => setAroundState((a) => ({ ...(a?.key === key ? a : { key, notes: null, updates: null, country: null }), ...patch }));
   useEffect(() => {
     if (!focusKey || !focus) return;
     let live = true;
     const at = { lat: focus.lat, lon: focus.lon };
-    setAround({ key: focusKey, notes: null, updates: null, country: null });
-    void api<{ notes: CommunityNote[] }>("/api/community/nearby", { body: at }).then((r) => { if (live) setAround((a) => (a?.key === focusKey ? { ...a, notes: r.ok ? r.data.notes : [] } : a)); });
-    void api<{ evidence: EvidenceState<SafetyUpdatesData> }>("/api/safety-updates", { body: { ...at, window: 7 } }).then((r) => { if (live) setAround((a) => (a?.key === focusKey ? { ...a, updates: r.ok ? r.data : "failed" } : a)); });
-    void api<{ country: CountryContext }>("/api/geo/reverse", { body: { ...at, ...(osmOnly ? { source: "osm" } : {}) } }).then((r) => { if (live && r.ok) setAround((a) => (a?.key === focusKey ? { ...a, country: r.data.country } : a)); });
+    void api<{ notes: CommunityNote[] }>("/api/community/nearby", { body: at }).then((r) => { if (live) setAround(focusKey, { notes: r.ok ? r.data.notes : [] }); });
+    void api<{ evidence: EvidenceState<SafetyUpdatesData> }>("/api/safety-updates", { body: { ...at, window: 7 } }).then((r) => { if (live) setAround(focusKey, { updates: r.ok ? r.data : "failed" }); });
+    void api<{ country: CountryContext }>("/api/geo/reverse", { body: { ...at, ...(osmOnly ? { source: "osm" } : {}) } }).then((r) => { if (live && r.ok) setAround(focusKey, { country: r.data.country }); });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey]);
@@ -159,7 +171,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   // Travelling: times default to the destination's zone once it's known (said plainly, changeable).
   const countryZone = aroundNow?.country?.timezone ?? null;
   useEffect(() => {
-    if (situation !== "travel" || !draft || !countryZone || !validZone(countryZone) || draft.timeZone === countryZone || draft.timeZone !== deviceZone()) return;
+    if (situation !== "travel" || !draft || !countryZone || !validZone(countryZone) || sameClock(draft.timeZone || deviceZone(), countryZone) || (draft.timeZone && draft.timeZone !== deviceZone())) return;
     setPlanDraft({ ...draft, timeZone: countryZone });
   }, [situation, countryZone, draft]);
 
@@ -177,13 +189,16 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   const later = draft && origin && departAt && sun && daylightAt(departAt, sun) === "dark" ? laterDaylight(localTimeForInstant(departAt, zone), zone, sun) : null;
   const helpPointsShown: HelpPoint[] = loop ? (startHelp?.key === loopKey ? startHelp.points.slice(0, 6) : []) : way?.helpPoints ?? [];
 
-  const claims: Claim[] = useMemo(() => {
+  const claims: Claim[] = (() => {
     if (!complete || !draft) return [];
     const list: Claim[] = [];
     if (loop) {
       list.push(loopPlan?.key !== loopKey ? { id: "route", kind: "pending", topic: "Route", icon: "route", claim: "Looking for a mapped loop…" } : loopReady ? { id: "route", kind: "estimate", topic: "Route", icon: "route", claim: `${loopReady.options.length} mapped loop${loopReady.options.length === 1 ? "" : "s"} near ${loopMinutes} min at your pace`, source: "OpenStreetMap walking graph · access from your start not verified" } : { id: "route", kind: "none", topic: "Route", icon: "route", claim: "Mira can’t map a loop here yet — it only has a walking graph for a few areas.", source: "You can still check daylight and Help Points near your start, and go with Mira for a set time." });
-      list.push(daylightClaim(departAt, sun, zone, "when you start"));
-      if (departAt) list.push({ ...daylightClaim(new Date(departAt.getTime() + loopMinutes * 60_000), sun, zone, "when you finish"), id: "daylight-end" });
+      // One daylight line when start and finish agree; two only when it changes during the run.
+      const endAt = departAt ? new Date(departAt.getTime() + loopMinutes * 60_000) : null;
+      const same = departAt && endAt && sun ? daylightAt(departAt, sun) === daylightAt(endAt, sun) : true;
+      list.push(daylightClaim(departAt, sun, zone, same ? "for the whole of it" : "when you start"));
+      if (!same && endAt) list.push({ ...daylightClaim(endAt, sun, zone, "when you finish"), id: "daylight-end" });
       list.push(startHelp?.key === loopKey ? helpClaim(startHelp.points, startHelp.evidence, helpAt, "within a short walk of your start", "when you start") : helpClaim([], undefined, null));
     } else {
       if (currentWays?.error) list.push({ id: "time", kind: "failed", topic: mode === "walk" ? "Walk time" : "Travel time", icon: "clock", claim: currentWays.error });
@@ -204,12 +219,12 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
     }
     list.push(blindSpotsClaim(loop ? "loop" : mode));
     return list;
-  }, [complete, draft, loop, loopPlan, loopKey, loopReady, loopMinutes, departAt, sun, zone, startHelp, helpAt, currentWays, mode, way, arriveAt, dest, aroundNow, situation]);
+  })();
 
-  const take = complete ? decisionTake({ departDaylight: departAt && sun ? daylightAt(departAt, sun) : null, arriveDaylight: (arriveAt ?? (loop && departAt ? new Date(departAt.getTime() + loopMinutes * 60_000) : null)) && sun ? daylightAt(arriveAt ?? new Date(departAt!.getTime() + loopMinutes * 60_000), sun) : null, ways: wayList, selected, helpAt, loop }) : [];
+  const take = complete ? decisionTake({ departDaylight: departAt && sun ? daylightAt(departAt, sun) : null, arriveDaylight: (arriveAt ?? (loop && departAt ? new Date(departAt.getTime() + loopMinutes * 60_000) : null)) && sun ? daylightAt(arriveAt ?? new Date(departAt!.getTime() + loopMinutes * 60_000), sun) : null, ways: wayList, selected, helpAt: mode === "walk" || loop ? helpAt : arriveAt ? localTimeInZone(arriveAt, zone) : helpAt, loop, mode, nearStart: loop && startHelp?.key === loopKey ? startHelp.points : undefined }) : [];
 
   // ── Actions ───────────────────────────────────────────────────────────────────────────────
-  const soon = departAt ? Math.abs(departAt.getTime() - Date.now()) <= 30 * 60_000 : false;
+  const soon = departAt && clock ? Math.abs(departAt.getTime() - clock.getTime()) <= 30 * 60_000 : false;
   const goTarget: GoTarget = {
     intent,
     mode,
@@ -264,7 +279,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
         </div>
 
         <h1 className="m-display mt-5">{complete ? (loop ? `${loopName} · ${loopMinutes} min` : `To ${destLabel}`) : situation === "run" ? "Plan a run or walk" : situation === "travel" ? "Plan your arrival" : "Where are you going?"}</h1>
-        {complete ? <p className="mt-1 text-[0.95rem] text-ink-muted">{loop ? `From ${originLabel}` : `From ${originLabel}`} · {whenWords(draft.departureLocal, zone)}{zone !== deviceZone() ? ` (${zone.split("/").pop()?.replace(/_/g, " ")} time)` : ""}</p> : null}
+        {complete ? <p className="mt-1 text-[0.95rem] text-ink-muted">{loop ? `From ${originLabel}` : `From ${originLabel}`} · {whenWords(draft.departureLocal, zone)}{!sameClock(zone, deviceZone()) ? ` (${zone.split("/").pop()?.replace(/_/g, " ")} time)` : ""}</p> : null}
 
         {/* The few questions that change the answer; once answered they fold into one line so the brief leads. */}
         {complete && !editing ? (
@@ -296,7 +311,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
           ) : (
             <QuestionRow label={situation === "travel" ? "Staying at" : "To"} icon="pin" value={destLabel && !unresolvedDest ? destLabel : null} placeholder={situation === "travel" ? "Hotel, home, address…" : "Search a place"} hint={unresolvedDest ? `Which “${draft.destination.query}” did you mean? Tap to choose.` : null} state={unresolvedDest ? "needs" : "idle"} onClick={() => setSheet("destination")} />
           )}
-          <QuestionRow label={situation === "travel" ? "Landing / arriving" : draft.timeKind === "arrive_by" ? "Arrive by" : "When"} icon="clock" value={instant ? whenWords(draft.departureLocal, zone) : null} placeholder="Choose a time" hint={draft.timeHint && !instant ? `You said ${draft.timeHint} — choose the day` : zone !== deviceZone() ? `${zone.replace(/_/g, " ")} time` : null} state={draft.timeHint && !instant ? "needs" : "idle"} onClick={() => setSheet("when")} />
+          <QuestionRow label={situation === "travel" ? "Landing / arriving" : draft.timeKind === "arrive_by" ? "Arrive by" : "When"} icon="clock" value={instant ? whenWords(draft.departureLocal, zone) : null} placeholder="Choose a time" hint={draft.timeHint && !instant ? `You said ${draft.timeHint} — choose the day` : !sameClock(zone, deviceZone()) ? `${zone.replace(/_/g, " ")} time` : null} state={draft.timeHint && !instant ? "needs" : "idle"} onClick={() => setSheet("when")} />
           {!loop ? (
             <div className="px-4 py-3">
               <p className="m-label">How</p>

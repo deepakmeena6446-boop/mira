@@ -33,7 +33,8 @@ export function daylightClaim(at: Date | null, point: { lat: number; lon: number
   const outlook = daylightOutlook(at, point);
   if (!outlook) return { id: "daylight", kind: "none", topic: "Daylight", icon: "sun", claim: "Mira doesn’t calculate daylight this far north or south." };
   const state = daylightAt(at, point);
-  const change = outlook.changeAt ? ` · ${outlook.changeTo === "daylight" || (state === "dark" && outlook.changeTo === "uncertain") ? "first light" : outlook.changeTo === "dark" ? "dark from" : "changes"} about ${clockIn(outlook.changeAt, timeZone)}` : "";
+  const next = outlook.changeTo === "daylight" ? "daylight from" : state === "dark" && outlook.changeTo === "uncertain" ? "twilight from" : outlook.changeTo === "dark" ? "dark from" : "changes";
+  const change = outlook.changeAt ? ` · ${next} about ${clockIn(outlook.changeAt, timeZone)}` : "";
   const words = state === "daylight" ? `Daylight ${label}` : state === "dark" ? `Dark ${label}` : `Twilight ${label}`;
   return { id: "daylight", kind: "checked", topic: "Daylight", icon: "sun", claim: `${words}${change}`, source: "Solar calculation for open sky · weather and shade not included" };
 }

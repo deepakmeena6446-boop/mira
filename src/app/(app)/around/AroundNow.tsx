@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
@@ -61,18 +61,19 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
   // The focus: a place she chose, else where she is.
   const focus = place ?? (here ? { lat: here.lat, lon: here.lon } : null);
   const areaKey = focus ? `${focus.lat.toFixed(3)},${focus.lon.toFixed(3)}` : "";
-  const [area, setArea] = useState<Area | null>(null);
+  const [area, setAreaState] = useState<Area | null>(null);
+  // Each answer merges into this area's record (a new area starts fresh; late answers for an old one are dropped by key).
+  const setArea = (key: string, patch: Partial<Omit<Area, "key">>) => setAreaState((a) => ({ ...(a?.key === key ? a : { key, help: null, notes: null, updates: null }), ...patch }));
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     if (!areaKey || !focus) return;
     let live = true;
     const at = { lat: focus.lat, lon: focus.lon };
-    setArea({ key: areaKey, help: null, notes: null, updates: null });
     void api<{ helpPoints: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> }>("/api/geo/help", { body: { ...at, ...(country.iso ? { country: country.iso } : {}), ...(osmOnly ? { source: "osm" } : {}) } }).then((r) => {
-      if (live) setArea((a) => (a?.key === areaKey ? { ...a, help: r.ok ? { points: r.data.helpPoints, evidence: r.data.evidence } : { points: [], evidence: { state: "failed", sources: [], retryable: true } } } : a));
+      if (live) setArea(areaKey, { help: r.ok ? { points: r.data.helpPoints, evidence: r.data.evidence } : { points: [], evidence: { state: "failed", sources: [], retryable: true } } });
     });
-    void api<{ notes: CommunityNote[] }>("/api/community/nearby", { body: at }).then((r) => { if (live) setArea((a) => (a?.key === areaKey ? { ...a, notes: r.ok ? r.data.notes : [] } : a)); });
-    void api<{ evidence: EvidenceState<SafetyUpdatesData> }>("/api/safety-updates", { body: { ...at, window: 7 } }).then((r) => { if (live) setArea((a) => (a?.key === areaKey ? { ...a, updates: r.ok ? r.data : "failed" } : a)); });
+    void api<{ notes: CommunityNote[] }>("/api/community/nearby", { body: at }).then((r) => { if (live) setArea(areaKey, { notes: r.ok ? r.data.notes : [] }); });
+    void api<{ evidence: EvidenceState<SafetyUpdatesData> }>("/api/safety-updates", { body: { ...at, window: 7 } }).then((r) => { if (live) setArea(areaKey, { updates: r.ok ? r.data : "failed" }); });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [areaKey, retry]);
@@ -94,7 +95,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
 
   const zone = deviceZone();
   const localNow = clock ? localTimeInZone(clock, country.timezone ?? zone) : null;
-  const ranked = useMemo(() => (focus && now?.help ? rankHelpPoints(now.help.points, focus, { situation: "nearby", night: localNow ? isNight(Math.floor(localNow.minute / 60)) : false, weights: helpWeightsFor(country.iso), timeZone: country.timezone ?? zone ?? undefined, now: localNow ?? undefined, at: clock?.getTime() }) : []), [focus, now, country.timezone, country.iso, zone, localNow, clock]);
+  const ranked = focus && now?.help ? rankHelpPoints(now.help.points, focus, { situation: "nearby", night: localNow ? isNight(Math.floor(localNow.minute / 60)) : false, weights: helpWeightsFor(country.iso), timeZone: country.timezone ?? zone ?? undefined, now: localNow ?? undefined, at: clock?.getTime() }) : [];
 
   const claims: Claim[] = [];
   if (focus) {

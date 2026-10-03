@@ -38,6 +38,10 @@ export function decisionTake(input: {
   selected: number;
   helpAt: LocalTime | null;
   loop: boolean;
+  /** Ride/transit Help Points are the ones near where she arrives, not along the way. */
+  mode?: "walk" | "ride" | "transit";
+  /** A run or walk loop: Help Points within a short walk of the start. */
+  nearStart?: HelpPoint[];
 }): string[] {
   const out: string[] = [];
   const { departDaylight: d0, arriveDaylight: d1 } = input;
@@ -51,7 +55,14 @@ export function decisionTake(input: {
   const way = input.ways[input.selected];
   if (way?.helpPoints.length) {
     const open = way.helpPoints.filter((p) => listedOpen(p, input.helpAt)).length;
-    out.push(input.helpAt ? `${way.helpPoints.length} Help Point${way.helpPoints.length === 1 ? " is" : "s are"} on this way; ${open} ${open === 1 ? "is" : "are"} listed open then.` : `${way.helpPoints.length} Help Point${way.helpPoints.length === 1 ? " is" : "s are"} on this way.`);
+    const where = input.mode && input.mode !== "walk" ? "near where you arrive" : "on this way";
+    const n = way.helpPoints.length;
+    out.push(`${n} Help Point${n === 1 ? " is" : "s are"} ${where}${input.helpAt ? `; ${open} ${open === 1 ? "is" : "are"} listed open then` : ""}.`);
+  }
+  if (input.loop && input.nearStart?.length) {
+    const n = input.nearStart.length;
+    const open = input.nearStart.filter((p) => listedOpen(p, input.helpAt)).length;
+    out.push(input.helpAt ? `Of ${n} Help Point${n === 1 ? "" : "s"} near your start, ${open} ${open === 1 ? "is" : "are"} listed open when you start.` : `${n} Help Point${n === 1 ? " is" : "s are"} near your start.`);
   }
   return out;
 }

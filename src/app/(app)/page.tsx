@@ -30,6 +30,7 @@ export default async function Home() {
     const [trip, savedPlans] = user ? await Promise.all([currentTrip(sql, user.id, systemClock.now()), listSavedPlans(sql, user.id)]) : [null, []];
     return <GoScreen name={user?.name ?? null} trip={trip} savedPlan={savedPlans[0] ?? null} emailAlerts={smtpConfigured()} countries={countryRegistry().map(({ iso2, name }) => ({ iso: iso2, name }))} />;
   }
-  const [places, savedPlans] = user ? await Promise.all([listPlaces(sql, user.id), listSavedPlans(sql, user.id).catch(() => [])]) : [[], []];
-  return <HomeNow user={user ? { name: user.name, avatarUrl: user.avatarUrl } : null} places={places} savedPlan={savedPlans[0] ?? null} emailAlerts={smtpConfigured()} />;
+  const [places, savedPlans, trip] = user ? await Promise.all([listPlaces(sql, user.id), listSavedPlans(sql, user.id).catch(() => []), currentTrip(sql, user.id, systemClock.now()).catch(() => null)]) : [[], [], null];
+  const open = trip && (trip.state === "active" || trip.state === "missed") ? trip : null;
+  return <HomeNow user={user ? { name: user.name, avatarUrl: user.avatarUrl } : null} places={places} savedPlan={savedPlans[0] ?? null} emailAlerts={smtpConfigured()} journeyTo={open ? (open.autoArrival ? open.destination.name : "") : null} />;
 }

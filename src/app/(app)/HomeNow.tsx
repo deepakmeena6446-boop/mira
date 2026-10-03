@@ -31,7 +31,7 @@ const ASK_IDEAS = ["Can I go for a run here around 5 AM?", "I’m walking from m
  * Home: "now". Who and where you are (only if you allowed it), what time it is in daylight terms,
  * what you're about to do, and at most two things Mira noticed. Nothing here is a feed.
  */
-export function HomeNow({ user, places, savedPlan, emailAlerts }: { user: { name: string; avatarUrl: string | null } | null; places: SavedPlace[]; savedPlan: SavedPlan | null; emailAlerts: boolean }) {
+export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { user: { name: string; avatarUrl: string | null } | null; places: SavedPlace[]; savedPlan: SavedPlan | null; emailAlerts: boolean; journeyTo: string | null }) {
   const router = useRouter();
   const loc = useLocation(false);
   const clock = useClock();
@@ -110,14 +110,16 @@ export function HomeNow({ user, places, savedPlan, emailAlerts }: { user: { name
 
   const firstTime = !user && usage === "cold";
   // Mira introduces herself until she's been used; after that she speaks to the moment.
-  const introLine = firstTime || usage === "cold"
+  const introLine = journeyTo !== null
+    ? `You’re on your way${journeyTo ? ` to ${journeyTo}` : ""}. I’m with you until you check in — your journey is one tap away below.`
+    : firstTime || usage === "cold"
     ? "I’m Mira. Tell me what you’re about to do — I’ll check what I can about that place at that time, and stay with you on the way."
     : outlook?.state === "dark" || outlook?.changeTo === "dark"
       ? "It’s getting dark. Going somewhere? I’ll check the way and who can follow."
       : "Going somewhere, out for a run, or somewhere new? Start here.";
 
   return (
-    <div className="m-screen bg-companion">
+    <div className={cx("m-screen bg-companion", journeyTo !== null && "pb-[calc(var(--tabbar-space)+6rem)]")}>
       <div className="m-screen-inner">
         <RootHeader emailAlerts={emailAlerts} leading={<Link href="/" className="mira-wordmark" aria-label="Mira home">mira<span aria-hidden>↗</span></Link>} />
 

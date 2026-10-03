@@ -11,7 +11,7 @@ import { useLocalJourneyActive } from "@/lib/local-check-in-store";
 export type DockTrip = { state: "active" | "missed"; destination: string | null; etaAt: string; following: string[] };
 
 /** Screens that already own the journey (or a sticky action bar) don't get the dock. */
-const HIDDEN = ["/trip", "/plan", "/mira"];
+const HIDDEN = ["/trip", "/trips", "/plan", "/mira"];
 
 /**
  * The open journey, one tap away from every root (docs/phase1-ux/01 §2). It says only what's true:
