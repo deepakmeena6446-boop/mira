@@ -41,10 +41,10 @@ export function HelpNextCard({ check, impactLine, signedIn, country }: { check: 
   const report = (c: Category) => router.push(`/report?c=${c}&from=home`);
 
   return (
-    <section aria-labelledby="help-next-h" className="rounded-[1.5rem] bg-people-soft/70 px-4 pb-4 pt-3.5 ring-1 ring-people/15">
+    <section aria-labelledby="help-next-h" className="rounded-[1.5rem] bg-people-soft/45 px-4 pb-3.5 pt-3.5">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 id="help-next-h" className="text-[0.95rem] font-semibold">Add what you see here</h2>
-        <p className="shrink-0 text-xs font-semibold text-people">One tap · private</p>
+        <h2 id="help-next-h" className="text-[0.9375rem] font-semibold tracking-[-0.01em]">Add what you see here</h2>
+        <p className="shrink-0 text-xs font-medium text-people">One tap · private</p>
       </div>
 
       {check ? (
@@ -65,13 +65,13 @@ export function HelpNextCard({ check, impactLine, signedIn, country }: { check: 
 
       <div className="m-scroll-x -mx-4 mt-3 px-4 pb-0.5">
         {QUICK.map((q) => (
-          <button key={q.c} type="button" onClick={() => report(q.c)} className="m-press flex min-h-12 shrink-0 items-center gap-2 rounded-full bg-surface py-2 pl-3 pr-4 text-[0.875rem] font-semibold ring-1 ring-line">
+          <button key={q.c} type="button" onClick={() => report(q.c)} className="m-press flex min-h-11 shrink-0 items-center gap-2 rounded-full bg-surface py-2 pl-3 pr-4 text-[0.8125rem] font-semibold shadow-[0_1px_2px_rgb(20_33_61/.06)]">
             <Icon name={q.icon} className={cx("size-[18px]", q.tone === "dusk" ? "text-dusk" : q.tone === "people" ? "text-people" : "text-ink-muted")} />
             {q.label}
           </button>
         ))}
       </div>
-      <p className="mt-2.5 text-xs leading-snug text-ink-muted">
+      <p className="mt-2.5 text-[0.72rem] leading-snug text-ink-subtle">
         {impactLine ? <><strong className="font-semibold text-ink">{impactLine}</strong> </> : null}
         {signedIn ? "It helps the next person. Only what several people agree on ever shows as a note." : "No account needed. It helps the next person, and is never shown as-is."}
       </p>

@@ -51,7 +51,7 @@ export function LiveNowCard({ now, point, area, stats, line, onLocate, locating,
   const segments = now && point && Math.abs(point.lat) <= 72 ? daylightSegments(now, point) : null;
   const firstChange = segments && segments.length > 1 ? segments[1] : null;
   return (
-    <section aria-label="Right now, around you" className="relative overflow-hidden rounded-[1.75rem] p-5 shadow-[0_18px_40px_-18px_rgb(20_33_61/.45)]" style={{ background: sky.bg, color: sky.ink }}>
+    <section aria-label="Right now, around you" className="relative overflow-hidden rounded-[1.75rem] p-5 pb-0 shadow-[0_24px_48px_-28px_rgb(20_33_61/.55)] ring-1 ring-white/10" style={{ background: sky.bg, color: sky.ink, ["--sky-ink" as string]: sky.ink }}>
       <div className="flex items-center justify-between gap-3">
         <p className="inline-flex items-center gap-2 text-[0.8125rem] font-semibold" style={{ color: sky.muted }}>
           <MiraPulse size={12} state={point ? "with-you" : "observing"} ambient={Boolean(point)} />
@@ -62,12 +62,12 @@ export function LiveNowCard({ now, point, area, stats, line, onLocate, locating,
 
       {point && now ? (
         <>
-          <p className="mt-3 text-[1.65rem] font-semibold leading-tight tracking-[-0.03em]">
+          <p className="mt-4 text-[1.75rem] font-medium leading-tight tracking-[-0.035em]">
             {clockIn(now)} · {state === "dark" ? "Dark now" : state === "uncertain" ? "Twilight" : "Daylight"}
           </p>
           {segments ? (
             <div className="mt-3" aria-label={firstChange ? `${firstChange.state === "dark" ? "Dark" : firstChange.state === "daylight" ? "Daylight" : "Twilight"} from about ${clockIn(firstChange.start)}` : "No change in the next 12 hours"}>
-              <div className="flex h-2 overflow-hidden rounded-full" aria-hidden>
+              <div className="flex h-1.5 gap-px overflow-hidden rounded-full" aria-hidden>
                 {segments.map((s, i) => <span key={i} style={{ width: `${s.share * 100}%`, background: SEG[s.state] }} />)}
               </div>
               <div className="mt-1.5 flex justify-between text-[0.72rem] font-medium" style={{ color: sky.muted }}>
@@ -77,17 +77,17 @@ export function LiveNowCard({ now, point, area, stats, line, onLocate, locating,
               </div>
             </div>
           ) : null}
-          <dl className="mt-4 grid grid-cols-3 gap-2">
+          <dl className="mt-5 grid grid-cols-3">
             {stats.map((s) => (
-              <div key={s.label} className="rounded-2xl px-3 py-2.5" style={{ background: sky.chip }}>
+              <div key={s.label} className="border-l px-3 first:border-l-0 first:pl-0" style={{ borderColor: sky.chip }}>
                 <dt className="sr-only">{s.label}</dt>
-                <dd className={cx("text-[1.35rem] font-semibold leading-none tabular-nums", s.state === "loading" && "animate-pulse")}>{s.state === "loading" ? "…" : s.state === "failed" ? "—" : s.value}</dd>
-                <dd className="mt-1.5 text-[0.7rem] leading-tight" style={{ color: sky.muted }}>{s.state === "failed" ? `${s.label}: couldn’t check` : s.label}</dd>
+                <dd className={cx("text-[1.5rem] font-medium leading-none tracking-[-0.02em] tabular-nums", s.state === "loading" && "animate-pulse")}>{s.state === "loading" ? "…" : s.state === "failed" ? "—" : s.value}</dd>
+                <dd className="mt-1.5 text-[0.72rem] leading-tight" style={{ color: sky.muted }}>{s.state === "failed" ? `${s.label}: couldn’t check` : s.label}</dd>
               </div>
             ))}
           </dl>
-          {line ? <p className="mt-3 text-[0.9rem] leading-snug">{line}</p> : null}
-          <Link href="/around" className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 text-sm font-semibold" style={{ background: sky.chip }}>
+          {line ? <p className="mt-4 text-[0.9rem] leading-snug" style={{ color: sky.muted }}>{line}</p> : null}
+          <Link href="/around" className="-mx-5 mt-4 flex min-h-13 items-center justify-between border-t px-5 text-sm font-semibold" style={{ borderColor: sky.chip }}>
             See everything around you <Icon name="arrow" className="size-4" />
           </Link>
         </>
@@ -97,7 +97,7 @@ export function LiveNowCard({ now, point, area, stats, line, onLocate, locating,
           <p className="mt-2 text-sm" style={{ color: sky.muted }}>
             {locationState === "denied" ? "Location is off for Mira. Allow it in your browser’s site settings — or check any place by name." : locationState === "unavailable" ? "Couldn’t find you just now. Try again outdoors, or check a place by name." : "Your location is used on this phone for this view only. Mira never keeps a history of where you’ve been."}
           </p>
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2 pb-5">
             <button type="button" onClick={onLocate} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-[#14213d]"><Icon name="locate" className="size-4" />{locating ? "Finding you…" : "Use my location"}</button>
             <Link href="/around?check=1" className="inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold" style={{ background: sky.chip }}><Icon name="search" className="size-4" />Check a place</Link>
           </div>

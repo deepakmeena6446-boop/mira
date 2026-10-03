@@ -111,7 +111,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
     { label: nearNow?.notes === 1 ? "note from people" : "notes from people", value: String(nearNow?.notes ?? 0), state: !nearNow || nearNow.notes === null ? "loading" : nearNow.notesFailed ? "failed" : "ok" },
   ];
   const line = nearestOpen ? (
-    <><strong className="font-semibold">{nearestOpen.name}</strong> is {hoursWords(hoursState(nearestOpen, localNow ?? undefined, 0, clock?.getTime()))}, about {nearestOpen.minutes} min away. Staffing isn’t verified.</>
+    <><strong className="font-semibold text-[color:var(--sky-ink)]">{nearestOpen.name}</strong> is {hoursWords(hoursState(nearestOpen, localNow ?? undefined, 0, clock?.getTime()))}, about {nearestOpen.minutes} min away. Staffing isn’t verified.</>
   ) : nearNow?.help && !nearNow.help.failed ? (
     helpTotal ? <>None of the {helpTotal} Help Points near you is listed open right now. Emergency is always one tap away.</> : <>No Help Points found within a short walk in the sources checked — that doesn’t mean none exist.</>
   ) : null;
@@ -153,11 +153,11 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
       <div className="m-screen-inner">
         <RootHeader emailAlerts={emailAlerts} leading={<Link href="/" className="mira-wordmark" aria-label="Mira home">mira<span aria-hidden>↗</span></Link>} />
 
-        <div className="mt-6 flex items-center justify-between gap-3">
+        <div className="mt-7 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-[1.5rem] font-semibold leading-tight tracking-[-0.025em]">{greeting ? `${greeting.hello}${firstName ? `, ${firstName}` : ""}` : "Hello"}</h1>
+            <h1 className="text-[1.625rem] font-semibold leading-tight tracking-[-0.035em]">{greeting ? `${greeting.hello}${firstName ? `, ${firstName}` : ""}` : "Hello"}</h1>
             <p className="mt-0.5 text-[0.875rem] text-ink-muted">
-              {journeyTo !== null ? `You’re on your way${journeyTo ? ` to ${journeyTo}` : ""} — I’m with you until you check in.` : cold ? "I’m Mira. I check what’s true around you, and go with you." : "Here’s what I know around you."}
+              {journeyTo !== null ? `You’re on your way${journeyTo ? ` to ${journeyTo}` : ""} — I’m with you until you check in.` : cold ? "Here’s what’s true around you right now." : "Here’s what I know around you."}
             </p>
           </div>
           {user ? (
@@ -168,7 +168,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
         </div>
 
         {/* 1. Mira knows: what's true around you, right now. */}
-        <div className="mt-4">
+        <div className="mt-5">
           <LiveNowCard now={clock} point={point ? { lat: point.lat, lon: point.lon } : null} area={point ? loc.area : null} stats={stats} line={line} locating={loc.status === "asking"} locationState={loc.status} onLocate={() => { rememberLocationChoice(true); void loc.request(); }} />
         </div>
 
@@ -178,8 +178,8 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
         </div>
 
         {/* 3. Mira goes with you: where are you going? */}
-        <section aria-labelledby="going-h" className="mt-6">
-          <h2 id="going-h" className="text-[1.0625rem] font-semibold">Where are you going?</h2>
+        <section aria-labelledby="going-h" className="mt-8">
+          <h2 id="going-h" className="text-[1.0625rem] font-semibold tracking-[-0.015em]">Where are you going?</h2>
           <form onSubmit={(e) => { e.preventDefault(); submitAsk(ask); }} className="m-card mt-2.5 flex items-center gap-2 rounded-[1.5rem] p-1.5 pl-4 focus-within:ring-2 focus-within:ring-accent">
             <span aria-hidden><Icon name="sparkle" className="size-5 text-accent" /></span>
             <label htmlFor="home-ask" className="sr-only">Tell Mira what you’re about to do</label>
@@ -190,8 +190,8 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
           </form>
           <div className="mt-2.5 grid grid-cols-2 gap-2">
             {SITUATIONS.map((s) => (
-              <Link key={s.href} href={s.href} className="m-card m-press flex min-h-12 items-center gap-2.5 px-3.5 text-[0.9rem] font-semibold">
-                <Icon name={s.icon} className="size-5 text-accent" />{s.label}
+              <Link key={s.href} href={s.href} className="m-card m-press flex min-h-12 items-center gap-2.5 whitespace-nowrap px-3.5 text-[0.875rem] font-semibold">
+                <Icon name={s.icon} className="size-[18px] text-accent" />{s.label}
               </Link>
             ))}
           </div>
@@ -218,7 +218,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
           </section>
         ) : null}
 
-        <p className="mt-6 px-1 text-xs leading-relaxed text-ink-subtle">Mira never scores a place. Every fact shows where it came from, and what Mira can’t see is said too.</p>
+        <p className="mt-8 px-1 text-center text-[0.72rem] leading-relaxed text-ink-subtle">Mira never scores a place. Every fact shows where it came from, and what Mira can’t see is said too.</p>
       </div>
       <SignInSheet open={signIn} onClose={() => setSignIn(false)} reason="Sign in to save plans and go with Mira" />
     </div>
