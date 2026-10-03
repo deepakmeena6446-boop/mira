@@ -8,7 +8,8 @@ import { cx } from "@/components/ui/cx";
 import { Avatar } from "@/components/app/Avatar";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { RootHeader } from "@/components/mira/Frame";
-import { EvidenceGlyph } from "@/components/mira/Evidence";
+import { Row, RowList } from "@/components/mira/Rows";
+import { SituationChips } from "@/components/mira/Situations";
 import { LiveNowCard, type LiveStat } from "@/components/mira/LiveNow";
 import { HelpNextCard } from "@/components/mira/HelpNext";
 import { api } from "@/lib/api-client";
@@ -22,6 +23,7 @@ import { hoursWords } from "@/lib/brief";
 import { helpWeightsFor, hoursState, isNight, rankHelpPoints, type HelpPoint } from "@/domain/help-points";
 import { localTimeInZone } from "@/domain/opening-hours";
 import { newPlanDraft } from "@/domain/plan-state";
+import { planLine, planTitle } from "@/domain/plan-name";
 import { CATEGORY_LABEL, ageLabel, type SafetyUpdatesData } from "@/domain/safety-updates";
 import type { EvidenceState } from "@/domain/evidence-state";
 import type { HabitSuggestion } from "@/domain/habits";
@@ -33,12 +35,6 @@ type Near = { key: string; help: { points: HelpPoint[]; failed: boolean } | null
 type Contrib = { checks: Array<{ id: string; question: string; placeName: string; options: Array<{ value: string; label: string }> }>; impact: { line: string | null } };
 
 /** Situations, not features: each is something she is about to do. */
-const SITUATIONS = [
-  { href: "/plan?for=go", icon: "route", label: "Going somewhere" },
-  { href: "/plan?for=run", icon: "walk", label: "Run or walk" },
-  { href: "/plan?for=travel", icon: "airport", label: "Travelling" },
-  { href: "/around?check=1", icon: "search", label: "Check a place" },
-];
 
 /**
  * Home (docs/phase1-ux/01). It shows Mira instead of describing her: what is true around you right
@@ -127,7 +123,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
     const list: Noticed[] = [];
     const usual = habit ? places.find((p) => p.id === habit.placeId) : null;
     if (habit && usual) list.push({ id: "habit", icon: "route", tone: "accent", kind: "checked", eyebrow: "Your usual", title: `${usual.label} around now`, detail: `${habit.times} of your journeys at this hour · from your own history`, onOpen: () => startPlanTo(usual) });
-    if (savedPlan) list.push({ id: "plan", icon: "clock", tone: "accent", kind: "checked", eyebrow: "Saved plan", title: savedPlan.draft.activity || "Your saved plan", detail: `${savedPlan.draft.origin.kind === "named" ? savedPlan.draft.origin.query : "From here"} → ${savedPlan.draft.destination.query || "loop"} · ${savedPlan.draft.departureLocal.replace("T", " ")}`, onOpen: () => { setPlanDraft({ ...savedPlan.draft, touched: true }); router.push("/plan"); } });
+    if (savedPlan) list.push({ id: "plan", icon: "clock", tone: "accent", kind: "checked", eyebrow: "Saved plan", title: savedPlan.draft.activity.trim() ? `${savedPlan.draft.activity.trim()} · ${planTitle(savedPlan.draft)}` : planTitle(savedPlan.draft), detail: planLine(savedPlan.draft), onOpen: () => { setPlanDraft({ ...savedPlan.draft, touched: true }); router.push("/plan"); } });
     const data = updates?.key === areaKey ? updates.data : null;
     if (data && data.updates.length) {
       const latest = data.updates[0];
@@ -188,34 +184,15 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
               <Icon name="arrow" className="size-5" />
             </button>
           </form>
-          <div className="mt-2.5 grid grid-cols-2 gap-2">
-            {SITUATIONS.map((s) => (
-              <Link key={s.href} href={s.href} className="m-card m-press flex min-h-12 items-center gap-2.5 whitespace-nowrap px-3.5 text-[0.875rem] font-semibold">
-                <Icon name={s.icon} className="size-[18px] text-accent" />{s.label}
-              </Link>
-            ))}
-          </div>
+          <SituationChips className="mt-2.5" />
         </section>
 
         {noticed.length ? (
-          <section aria-labelledby="noticed-h" className="mt-6">
-            <h2 id="noticed-h" className="m-label">Mira noticed</h2>
-            <ul className="mt-2.5 space-y-2.5">
-              {noticed.map((n) => (
-                <li key={n.id}>
-                  <button type="button" onClick={n.onOpen} className="m-card m-press flex w-full items-center gap-3 p-3.5 text-left">
-                    <span aria-hidden className={cx("grid size-10 shrink-0 place-items-center rounded-xl", n.tone === "people" ? "bg-people-soft text-people" : n.tone === "dusk" ? "bg-dusk-soft text-dusk" : "bg-accent-soft text-accent-strong")}><Icon name={n.icon} className="size-5" /></span>
-                    <span className="min-w-0 flex-1">
-                      <span className="m-label inline-flex items-center gap-1.5"><EvidenceGlyph kind={n.kind} />{n.eyebrow}</span>
-                      <span className="block truncate font-semibold">{n.title}</span>
-                      <span className="block truncate text-[0.8125rem] text-ink-muted">{n.detail}</span>
-                    </span>
-                    <Icon name="chevron" className="size-4 text-ink-subtle" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <RowList label="Mira noticed" id="noticed-h" className="mt-6">
+            {noticed.map((n) => (
+              <Row key={n.id} icon={n.icon} tone={n.tone} kind={n.kind} eyebrow={n.eyebrow} title={n.title} detail={n.detail} onClick={n.onOpen} ariaLabel={`${n.eyebrow}: ${n.title}`} />
+            ))}
+          </RowList>
         ) : null}
 
         <p className="mt-8 px-1 text-center text-[0.72rem] leading-relaxed text-ink-subtle">Mira never scores a place. Every fact shows where it came from, and what Mira can’t see is said too.</p>

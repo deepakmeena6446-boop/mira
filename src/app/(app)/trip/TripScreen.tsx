@@ -15,7 +15,7 @@ import { HELP_ICON } from "@/components/app/kinds";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
-import { SkyCard, skyAt } from "@/components/mira/LiveNow";
+import { JourneyGlance } from "@/components/mira/JourneyGlance";
 import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api-client";
 import { setLocation, useClock } from "@/lib/location-store";
@@ -24,7 +24,7 @@ import { clearTripRoutes, keepTripRoute, tripRoute } from "@/lib/trip-route";
 import { HELP_CLASSES, hoursLine, isNight, rankHelpPoints, type HelpClass, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
 import { setCountry, useCountry, type CountryContext } from "@/lib/locale-store";
 import { MISS_GRACE_MS } from "@/domain/journey";
-import { journeyNoun, modeWords } from "@/domain/travel-prefs";
+import { journeyNoun } from "@/domain/travel-prefs";
 import type { EvidenceState } from "@/domain/evidence-state";
 import type { TripView } from "@/server/trips";
 import type { SafetyNet } from "@/server/health/safety-net";
@@ -417,9 +417,6 @@ export function TripScreen({
     setHelpRoute({ id: point.id, option, detail: option ? "Mapped walking estimate only. Access, staffing and opening remain unverified." : `${result.data.detail} Reachability is unknown.` });
   };
 
-  const left = new Date(trip.etaAt).getTime() - now;
-  const mins = Math.round(Math.abs(left) / 60_000);
-  const span = mins >= 90 ? `${Math.round(mins / 60)} h` : `${mins} min`;
   const distance = me ? haversine(me, trip.destination) : null;
   const returnIndex = planDraft?.legs?.findIndex((leg) => {
     const intent = intentFromLeg(leg);
@@ -488,7 +485,6 @@ export function TripScreen({
   const acceptedAlerts = emailRecipients.filter((contact) => contact.alertDelivery === "sent");
   const uncertainAlerts = emailRecipients.filter((contact) => contact.alertDelivery === "unconfirmed" || contact.alertDelivery === "failed");
   const noun = journeyNoun(trip.autoArrival ? trip.mode : "other");
-  const modeLine = trip.mode === "other" ? "" : modeWords(trip.mode).short;
   const aheadCount = ranked.filter((p) => p.ahead).length;
   const mapPins = ranked.slice(0, 6).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, icon: HELP_ICON[p.cls] ?? "pin", strong: HELP_CLASSES[p.cls].emergency }));
   const directions = (p: { lat: number; lon: number }) => `https://www.google.com/maps/dir/?api=1&destination=${p.lat.toFixed(5)},${p.lon.toFixed(5)}&travelmode=walking`;
@@ -528,15 +524,7 @@ export function TripScreen({
       <section aria-label="Journey controls" className="relative z-10 -mt-6 max-h-[68dvh] overflow-y-auto overscroll-contain rounded-t-[var(--radius-sheet)] bg-surface px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 shadow-[var(--shadow-sheet)]">
         <div className="mx-auto max-w-xl">
           {/* 1. Glance — the same sky card as Home: who's with you, how long, where. */}
-          <SkyCard
-            state={skyAt(clock, me ?? trip.destination)}
-            label="Journey status"
-            pulse={missed || attention ? "attention" : "with-you"}
-            eyebrow={missed ? "Check-in due" : trip.sharedWith.length ? "Sharing enabled" : `${noun[0].toUpperCase()}${noun.slice(1)} in progress`}
-            aside={trip.autoArrival ? (clock ? `ETA ${time(trip.etaAt)}` : "ETA") : clock ? `Until ${time(trip.etaAt)}` : null}
-            title={<span className="flex items-baseline justify-between gap-3"><span className="min-w-0"><span className="block text-[0.72rem] font-medium tracking-normal text-[color:var(--sky-muted)]">{trip.autoArrival ? (left > 0 ? "Expected in" : "Expected") : "Sharing for"}</span><span className={cx("block tabular-nums", left > 0 ? "text-[2.75rem] leading-none" : "text-[1.75rem]")}>{!clock ? "…" : left > 0 ? span : mins < 1 ? "now" : `${span} ago`}</span></span></span>}
-            line={<><h1 className="truncate font-semibold text-[color:var(--sky-ink)]">{trip.autoArrival ? `To ${trip.destination.name}${modeLine ? ` · ${modeLine}` : ""}` : "Sharing where you are"}</h1>{distance !== null && trip.autoArrival ? <span>{distance < 1000 ? `${Math.round(distance / 10) * 10} m` : `${(distance / 1000).toFixed(1)} km`} to go · ETA with time to spare</span> : null}</>}
-          />
+          <JourneyGlance trip={{ ...trip, sharing: trip.sharedWith.length > 0 }} clock={clock} at={me} attention={attention} distance={distance} headingAs="h1" />
 
           {missed ? (
             <div role="alert" className="mt-3 rounded-2xl bg-warm-soft p-4">

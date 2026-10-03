@@ -28,8 +28,10 @@ export function EmergencyPill({ className, variant = "pill" }: { className?: str
     return <a href={`tel:${direct.number}`} aria-label={`Emergency call, ${direct.number}`} className={cx(styles, className)}>{icon}<span>{variant === "link" ? `call ${direct.number}` : `Emergency ${direct.number}`}</span></a>;
   }
   return <>
-    <button type="button" onClick={() => setExplain(true)} aria-haspopup="dialog" className={cx(styles, className)}>
-      {icon}<span>{actions.length === 1 && actions[0].scope === "service" ? `${actions[0].label} ${actions[0].number}` : "Emergency options"}</span>
+    {/* In the compact header the unknown-country label is just "Emergency" so the Support pair stays on one line
+        beside any title; the accessible name still says it opens options. */}
+    <button type="button" onClick={() => setExplain(true)} aria-haspopup="dialog" aria-label={variant === "quiet" && !(actions.length === 1 && actions[0].scope === "service") ? "Emergency options" : undefined} className={cx(styles, className)}>
+      {icon}<span>{actions.length === 1 && actions[0].scope === "service" ? `${actions[0].label} ${actions[0].number}` : variant === "quiet" ? "Emergency" : "Emergency options"}</span>
     </button>
     <EmergencyOptionsSheet open={explain} onClose={() => setExplain(false)} country={country} actions={actions} />
   </>;

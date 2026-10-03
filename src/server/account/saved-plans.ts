@@ -12,7 +12,8 @@ export type SavedPlan = { id: string; draft: PlanDraft; createdAt: string; expir
 function readable(row: Row): SavedPlan {
   return {
     id: row.id,
-    draft: planDraftSchema.parse(JSON.parse(decryptText(row.draft_enc, "saved_plan"))),
+    // The draft carries its own saved id, so whoever opens it can update this copy later.
+    draft: { ...planDraftSchema.parse(JSON.parse(decryptText(row.draft_enc, "saved_plan"))), savedId: row.id },
     createdAt: row.created_at.toISOString(),
     expiresAt: row.expires_at.toISOString(),
   };
@@ -30,7 +31,9 @@ function checkedDraft(input: PlanDraft): PlanDraft {
     throw badRequest("provider_content", "Choose a Mira search result before saving this plan.");
   }
   if (draft.legs?.some((leg) => !intentFromLeg(leg))) throw badRequest("incomplete_leg", "Complete each added travel leg before saving the plan.");
-  return draft;
+  const { savedId: _drop, ...stored } = draft;
+  void _drop;
+  return stored;
 }
 
 export async function listSavedPlans(sql: postgres.Sql, userId: string, now = new Date()): Promise<SavedPlan[]> {
@@ -50,6 +53,16 @@ export async function savePlan(sql: postgres.Sql, userId: string, input: PlanDra
       RETURNING id, draft_enc, created_at, expires_at`;
     return readable(row);
   });
+}
+
+/** Replace a saved plan the person reopened and changed; its 30 days restart from this save. */
+export async function updateSavedPlan(sql: postgres.Sql, userId: string, id: string, input: PlanDraft, now = new Date()): Promise<SavedPlan | null> {
+  const draft = checkedDraft(input);
+  const expires = new Date(now.getTime() + SAVED_PLAN_DAYS * 86_400_000);
+  const [row] = await sql<Row[]>`UPDATE saved_plans SET draft_enc = ${encryptText(JSON.stringify(draft), "saved_plan")}, expires_at = ${expires}
+    WHERE user_id = ${userId} AND id = ${id} AND expires_at > ${now}
+    RETURNING id, draft_enc, created_at, expires_at`;
+  return row ? readable(row) : null;
 }
 
 export async function deleteSavedPlan(sql: postgres.Sql, userId: string, id: string): Promise<boolean> {
