@@ -197,6 +197,7 @@ export function MeScreen({ user, places: initialPlaces, contacts, modes, emailAl
           <Group id="app" label="App"><AppearancePicker /><InstallCard variant="row" /></Group>
           <Group id="privacy" label="Privacy and your data">
             <GroupRow icon="shield" title="How Mira handles your data" href="/privacy" />
+            <GroupRow icon="arrow" title="Download my data" detail="Everything Mira keeps for you, as one file" onClick={() => { window.location.href = "/api/me/export"; }} end={<span />} />
             <GroupRow icon="sparkle" title="Clear my chat with Mira" detail="Movement-plan questions are never kept" onClick={async () => { const r = await api("/api/mira", { method: "DELETE" }); toast(r.ok ? "Mira’s chat history cleared" : r.message, r.ok ? "info" : "error"); }} end={<span />} />
             <GroupRow icon="signout" tone="ink" title="Sign out" detail={isDemo ? "This account has no email — signing out deletes it" : "On this device"} onClick={() => setSheet("signout")} end={<span />} />
             <GroupRow icon="trash" tone="warm" title="Delete my account" detail="Places, people, journeys and chat are erased" onClick={() => setSheet("delete")} end={<span />} />

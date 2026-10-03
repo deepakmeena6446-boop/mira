@@ -77,6 +77,12 @@ export async function listHabits(sql: Db, userId: string): Promise<HabitView[]> 
   }));
 }
 
+/** Forget one remembered pattern (a place, a way of travelling, an hour); the rest stay. */
+export async function forgetHabit(sql: Db, userId: string, key: { placeId: string; mode: JourneyModeName; startHour: number }): Promise<boolean> {
+  const r = await sql`DELETE FROM journey_habits WHERE user_id = ${userId} AND place_id = ${key.placeId} AND mode = ${key.mode} AND start_hour = ${key.startHour}`;
+  return r.count > 0;
+}
+
 export async function forgetHabits(sql: Db, userId: string): Promise<number> {
   const r = await sql`DELETE FROM journey_habits WHERE user_id = ${userId}`;
   return r.count;

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Section } from "@/components/app/Section";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
-import { Chip, GroupRow, Toggle } from "@/components/mira/Rows";
+import { Chip, GroupRow, RowAction, Toggle } from "@/components/mira/Rows";
 import { api } from "@/lib/api-client";
 import { resetLocalPersonalisation } from "@/lib/usage-signal";
 import { MODE_WORDS, TRAVEL_MODES, type TravelMode, type TravelPrefs } from "@/domain/travel-prefs";
@@ -51,6 +51,16 @@ export function PersonalSections() {
     toast("Forgotten. Mira no longer remembers any of your journeys.");
   };
 
+  const forgetOne = async (h: HabitView) => {
+    const key = `habit:${h.placeId}:${h.mode}:${h.startHour}`;
+    setBusy(key);
+    const r = await api(`/api/me/habits?place=${encodeURIComponent(h.placeId)}&mode=${h.mode}&hour=${h.startHour}`, { method: "DELETE" });
+    setBusy(null);
+    if (!r.ok) return toast(r.message, "error");
+    setHabits((xs) => xs?.filter((x) => x !== h) ?? []);
+    toast(`Forgotten: ${h.placeLabel}, around ${h.startHour % 12 || 12} ${h.startHour < 12 ? "am" : "pm"}.`);
+  };
+
   const mode = prefs?.prefs.mode ?? null;
   const learning = prefs?.rememberHabits ?? false;
 
@@ -75,7 +85,7 @@ export function PersonalSections() {
         ) : null}
         {habits && habits.length ? (
           <>
-            {habits.map((h) => <GroupRow key={`${h.placeId}-${h.mode}-${h.startHour}`} art={<span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-base">{h.emoji}</span>} title={h.text} />)}
+            {habits.map((h) => <GroupRow key={`${h.placeId}-${h.mode}-${h.startHour}`} art={<span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-base">{h.emoji}</span>} title={h.text} end={<RowAction icon="trash" label={`Forget ${h.text}`} disabled={busy === `habit:${h.placeId}:${h.mode}:${h.startHour}`} onClick={() => void forgetOne(h)} />} />)}
             <div className="px-4 py-3">
               {confirmForget ? (
                 <div>
