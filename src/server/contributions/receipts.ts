@@ -291,3 +291,22 @@ export async function decidePending(sql: postgres.Sql, now: Date, limit = 300): 
   }
   return { checked: rows.length, verified, contradicted };
 }
+
+/**
+ * Worker: one calm Updates item per person whose contributions were newly confirmed by someone else
+ * (counted, verified receipts not yet announced). It says how many, never what or where.
+ */
+export async function notifyConfirmedContributions(sql: postgres.Sql, now: Date): Promise<number> {
+  const rows = await sql<{ user_id: string; n: number }[]>`
+    WITH due AS (
+      UPDATE contribution_receipts SET notified_at = ${now}
+      WHERE status = 'verified' AND counted AND notified_at IS NULL
+      RETURNING user_id)
+    SELECT user_id, count(*)::int AS n FROM due GROUP BY user_id`;
+  for (const r of rows) {
+    await sql`INSERT INTO notifications (user_id, kind, title, body, href) VALUES (${r.user_id}, 'contribution_confirmed',
+      ${r.n === 1 ? "Something you added was confirmed" : `${r.n} things you added were confirmed`},
+      ${"Someone else saw the same thing. It now helps the next person — thank you."}, ${"/contribute"})`;
+  }
+  return rows.length;
+}

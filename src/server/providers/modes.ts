@@ -1,4 +1,5 @@
 import "server-only";
+import { whatsappMode, type WhatsAppMode } from "@/server/providers/whatsapp";
 
 /**
  * Which implementation each external capability uses. Everything runs on a working
@@ -13,6 +14,8 @@ export interface ProviderModes {
   auth: "demo" | "google";
   companion: "placeholder" | "claude";
   push: "in_app" | "web_push";
+  /** WhatsApp: Mira opens it and the person presses Send, until a Business API adapter exists (placeholder). */
+  whatsapp: WhatsAppMode;
 }
 
 export function providerModes(): ProviderModes {
@@ -22,6 +25,7 @@ export function providerModes(): ProviderModes {
     auth: REAL_ADAPTERS.google && env.AUTH_GOOGLE_ID && env.AUTH_GOOGLE_SECRET ? "google" : "demo",
     companion: REAL_ADAPTERS.claude && env.ANTHROPIC_API_KEY ? "claude" : "placeholder",
     push: REAL_ADAPTERS.webPush && env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY ? "web_push" : "in_app",
+    whatsapp: whatsappMode(env),
   };
 }
 

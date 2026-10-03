@@ -151,8 +151,14 @@ export async function shareLinkFor(address: string): Promise<string> {
 
 /** Open the explicit map and choose a destination in its existing route sheet. */
 /** The real path to a walk: Going somewhere → From: where I am now → To: a place → the brief, leaving now. */
-export async function openRoute(page: Page, name = DEST) {
+/** A new plan in this tab, as when someone starts planning something else. */
+async function freshPlan(page: Page) {
+  if (page.url().startsWith("http")) await page.evaluate(() => sessionStorage.removeItem("mira.plan.v1"));
   await page.goto("/plan?for=go");
+}
+
+export async function openRoute(page: Page, name = DEST) {
+  await freshPlan(page);
   const plan = page.getByRole("region", { name: "Your plan", exact: true });
   await plan.getByRole("button", { name: /^From/ }).click();
   await page.getByRole("dialog").getByRole("button", { name: /Where I am now/ }).click();
@@ -181,7 +187,7 @@ export async function savePlaceAt(page: Page, label: string, query: string) {
 
 /** Plan to one of her saved places: Going somewhere → From: where I am now → To: the saved place. */
 export async function openSavedRoute(page: Page, label: string) {
-  await page.goto("/plan?for=go");
+  await freshPlan(page);
   const plan = page.getByRole("region", { name: "Your plan", exact: true });
   await plan.getByRole("button", { name: /^From/ }).click();
   await page.getByRole("dialog").getByRole("button", { name: /Where I am now/ }).click();

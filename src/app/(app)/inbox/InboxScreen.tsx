@@ -16,6 +16,7 @@ const KIND: Record<string, { icon: string; tone: RowTone }> = {
   trip_missed: { icon: "timer", tone: "warm" },
   trip_alert_failed: { icon: "info", tone: "warm" },
   location_paused: { icon: "wifi-off", tone: "warm" },
+  contribution_confirmed: { icon: "community", tone: "people" },
 };
 
 function ago(iso: string, now: number): string {
