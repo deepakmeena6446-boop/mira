@@ -14,7 +14,7 @@ Branch `ux/phase3`, stacked on `ux/phase2`. It is not merged and not pushed. The
 
 **Moved into the new screens**
 - **The way back and extra stops** now live in Plan (*After this* → *Add the way back* / *Add another stop*). Each leg is checked for its own time.
-- **Reviewing a return** from the journey screen, the guest check-in screen or a saved return opens the new Plan, not the step planner.
+- **Reviewing a return** from the live journey screen opens the new Plan. A *private manual* return (the guest check-in screen, or restoring a saved return) opens the detailed planner's options step, where a mapped option is chosen and the manual journey is confirmed.
 - **The detailed planner** (`/plan/legs`, `?planStep=`) stays for two things only: the full options comparison and confirming a private journey's continued origin. It is restyled in the same language and now has the Support pair.
 - **Tabs:** You, Circle, Privacy and Updates highlight Home, which is where they're reached from.
 

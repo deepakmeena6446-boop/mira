@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { GEO, newUser, openRoute, openJourneyMore } from "./helpers";
+import { GEO, newUser, openRoute, startJourney, openJourneyMore } from "./helpers";
 
 /** TEST-ONLY one-acquisition fixture. Static Chromium GPS can time out for maximumAge:0
  * while a watch holds its previous fix; reconfiguring CDP mid-request can reject it with code2.
@@ -22,8 +22,7 @@ async function nextReviewAcquisition(page: Page, kind: "timeout" | "fresh") {
 test("active journey resumes with truthful position age and immediate support", async ({ browser }) => {
   const owner = await newUser(browser, "Leena");
   await openRoute(owner.page);
-  await owner.page.getByRole("button", { name: /Go with Mira/ }).click();
-  await owner.page.waitForURL("**/trip");
+  await startJourney(owner.page);
   await openJourneyMore(owner.page);
   await expect(owner.page.getByRole("status").filter({ hasText: "Last position shared" })).toBeVisible();
   await expect(owner.page.getByText("Only people you send your live link to can follow.")).toBeVisible();
