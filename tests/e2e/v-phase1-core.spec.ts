@@ -32,7 +32,7 @@ test("signed-in person goes from Home's live card to a brief, starts privately, 
   // 4. Consent: "Just me" is the default and nothing starts before Start.
   await page.getByRole("button", { name: "Go with Mira" }).click();
   const sheet = page.getByRole("dialog", { name: "Go with Mira" });
-  await expect(sheet.getByRole("button", { name: "Just me" })).toHaveAttribute("aria-pressed", "true");
+  await expect(sheet.getByRole("button", { name: "Just me", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(sheet).toContainText("Nobody is contacted.");
   await sheet.getByRole("button", { name: "Start — just me" }).click();
 

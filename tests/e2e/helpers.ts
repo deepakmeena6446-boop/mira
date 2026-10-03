@@ -201,6 +201,6 @@ export async function expectNoVerdictWords(page: Page) {
  * one "More" disclosure so the glance stays simple. Opens it if it is closed.
  */
 export async function openJourneyMore(page: Page) {
-  const more = page.locator("details").filter({ has: page.locator("summary", { hasText: "More — sharing, timing, details" }) });
-  if (!(await more.evaluate((d) => (d as HTMLDetailsElement).open))) await more.locator("summary").click();
+  const summary = page.locator("summary", { hasText: "More — sharing, timing, details" });
+  if (!(await summary.evaluate((el) => (el.parentElement as HTMLDetailsElement).open))) await summary.click();
 }
