@@ -21,6 +21,7 @@ import { freshLocation, setPendingDestination, useClock, useLocation, usableLoca
 import type { MiraCard } from "@/server/providers/companion/types";
 import { circleSharingLine } from "@/domain/companion-output";
 import { clockIn } from "@/domain/daylight";
+import { useDaypart } from "@/lib/daypart-store";
 import { hasPlanWork, intentFromDraft, intentFromLeg, newPlanDraft } from "@/domain/plan-state";
 import { setPlanDraft, usePlanDraft, usePlanHydrated } from "@/lib/plan-store";
 import { draftFromAsk } from "@/domain/plan-ask";
@@ -36,6 +37,10 @@ interface Msg {
   failed?: boolean;
 }
 
+/** After dark, the way home and help nearby lead (the theme follows the device clock or her setting). */
+const NIGHT_STARTERS: Array<{ title: string; icon: string; asks: string[] }> = [
+  { title: "Getting home", icon: "home", asks: ["Take me home", "Find somewhere staffed nearby"] },
+];
 /** Situations, not prompts: each starter is something a person is about to do. */
 const STARTERS: Array<{ title: string; icon: string; asks: string[] }> = [
   { title: "Going out", icon: "route", asks: ["I’m walking from my hotel to a café at 10:30 PM", "Is there a better way for me to get home tonight?"] },
@@ -176,7 +181,7 @@ function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; o
         <section className={cx(shell, "p-4")} aria-label="Plan evidence">
           <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Plan evidence</h2><span className="text-xs text-ink-subtle">checked {new Date(card.checkedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>
           <ul className="mt-1 divide-y divide-line">
-            {card.state === "not_checked" ? <Fact kind="pending" label="Needs you">Places and time needed before Mira can check the way</Fact> : ready ? <Fact kind="estimate">{card.options.length} mapped walking option{card.options.length === 1 ? "" : "s"}{card.options[0] ? ` · fastest about ${Math.round(card.options[0].minutes)} min` : ""}</Fact> : <Fact kind={card.state === "failed" ? "failed" : "none"}>Mapped walking route: {card.state === "failed" ? "the check failed" : card.state === "stale" ? "the map snapshot is too old" : "not available for this area"}</Fact>}
+            {card.state === "not_checked" ? <Fact kind="pending" label="Needs you">Route check not started — places and time needed first</Fact> : ready ? <Fact kind="estimate">{card.options.length} mapped walking option{card.options.length === 1 ? "" : "s"}{card.options[0] ? ` · fastest about ${Math.round(card.options[0].minutes)} min` : ""}</Fact> : <Fact kind={card.state === "failed" ? "failed" : "none"}>Mapped walking route: {card.state === "failed" ? "the check failed" : card.state === "stale" ? "the map snapshot is too old" : "not available for this area"}</Fact>}
             {card.daylight ? <Fact kind={card.daylight.status === "known" ? "checked" : "none"}>{card.daylight.status === "known" ? `Daylight: ${String(card.daylight.value)} · ${card.daylight.source.label}` : "Daylight not calculated yet"}</Fact> : null}
           </ul>
           <div className="mt-3 flex gap-2">
@@ -209,6 +214,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   const clock = useClock();
   const here = usableLocationPoint(loc, clock?.getTime());
   const plan = planDraft ? intentFromDraft(planDraft) : null;
+  // Ask never requests GPS itself (D12): the context card appears only when this session already has her position.
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -334,6 +340,8 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   };
 
   const empty = (user ? loaded : true) && msgs.length === 0;
+  const night = useDaypart() === "night";
+  const starters = night ? [...NIGHT_STARTERS, ...STARTERS] : STARTERS;
   const planLine = plan ? `${plan.origin.kind === "device" ? "From where you are" : plan.origin.query}${plan.loop ? " · loop" : ` → ${plan.destination?.query}`}` : planDraft?.activity || "A plan in progress";
 
   return (
@@ -364,9 +372,9 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
                 <SkyCard state={skyAt(clock, here)} label="What Mira can see right now" eyebrow="What I can see right now" aside={loc.area ?? null} title={`${clockIn(clock)} · ${skyAt(clock, here) === "dark" ? "Dark now" : skyAt(clock, here) === "uncertain" ? "Twilight" : "Daylight"}`} strip={{ from: clock, point: here, hours: 12 }} className="mb-6" />
               ) : null}
               <p className="text-[1.625rem] font-semibold leading-tight tracking-[-0.035em]">Ask about a place, a time, or a plan.</p>
-              <p className="mt-2 text-[0.9375rem] text-ink-muted">I answer with what I can check — daylight, lit streets, Help Points open then, local updates — and say what I can’t. I never call a place good or bad.</p>
+              <p className="mt-2 text-[0.9375rem] text-ink-muted">{night ? "It’s late. I can help you get home, find a Help Point, or check what’s open — and I’ll say what I can’t check." : "I answer with what I can check — daylight, lit streets, Help Points open then, local updates — and say what I can’t. I never call a place good or bad."}</p>
               <div className="mt-7 space-y-5">
-                {STARTERS.map((g) => (
+                {starters.map((g) => (
                   <section key={g.title} aria-label={g.title}>
                     <h2 className="m-label flex items-center gap-1.5"><Icon name={g.icon} className="size-3.5" />{g.title}</h2>
                     <div className="mt-2 grid gap-2">

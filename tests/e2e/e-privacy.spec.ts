@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { SAME_ORIGIN, acceptContactInvite, addContact, db, newUser, openRoute, shareLinkFor } from "./helpers";
+import { SAME_ORIGIN, acceptContactInvite, addContact, db, newUser, openRoute, shareLinkFor, openJourneyMore } from "./helpers";
 
 test.describe("Privacy — links die, strangers see nothing, deletion is real", () => {
   test("an ended trip's link and forged links reveal nothing; another user can't act on the trip", async ({ browser }) => {
@@ -26,6 +26,8 @@ test.describe("Privacy — links die, strangers see nothing, deletion is real", 
     }
     const loc = await stranger.page.request.post(`/api/trips/${trip.id}/location`, { headers: SAME_ORIGIN, data: { lat: 28.7, lon: 77.2 } });
     expect(loc.status(), await loc.text()).toBe(404);
+
+    await openJourneyMore(owner.page);
 
     await owner.page.getByRole("button", { name: "End trip without arriving" }).click();
     await owner.page.getByRole("button", { name: "End trip", exact: true }).click();

@@ -44,12 +44,14 @@ export type LiveStat = { value: string; label: string; state: "ok" | "loading" |
  * about (now, or a plan's departure); the strip shows what the sky does next; stats are facts with
  * their evidence one tap away. Used on Home, Around, Plan and the journey so all four read as one.
  */
-export function SkyCard({ state, label, eyebrow, aside, title, strip, stats, line, footer, pulse = "observing", children, className }: {
+export function SkyCard({ state, label, eyebrow, aside, title, titleAs = "div", strip, stats, line, footer, pulse = "observing", children, className }: {
   state: DaylightState;
   label: string;
   eyebrow?: React.ReactNode;
   aside?: React.ReactNode;
   title?: React.ReactNode;
+  /** Render the title as a heading when it names the screen's subject (e.g. a chosen place). */
+  titleAs?: "div" | "h1" | "h2";
   strip?: { from: Date; point: { lat: number; lon: number }; hours?: number; startLabel?: string } | null;
   stats?: LiveStat[];
   line?: React.ReactNode | null;
@@ -71,7 +73,7 @@ export function SkyCard({ state, label, eyebrow, aside, title, strip, stats, lin
           {aside ? <p className="shrink-0 truncate text-[0.8125rem] font-semibold" style={{ color: sky.muted }}>{aside}</p> : null}
         </div>
       ) : null}
-      {title ? <div className="mt-4 text-[1.75rem] font-medium leading-tight tracking-[-0.035em]">{title}</div> : null}
+      {title ? (() => { const T = titleAs; return <T className="mt-4 text-[1.75rem] font-medium leading-tight tracking-[-0.035em]">{title}</T>; })() : null}
       {segments ? (
         <div className="mt-3" aria-label={firstChange ? `${word(firstChange.state)} from about ${clockIn(firstChange.start)}` : `No change in the next ${hours} hours`}>
           <div className="flex h-1.5 gap-px overflow-hidden rounded-full" aria-hidden>

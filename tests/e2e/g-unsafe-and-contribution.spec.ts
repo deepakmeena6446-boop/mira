@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { db, fixtureClockedGps, newUser, openRoute, testClientIp } from "./helpers";
+import { db, fixtureClockedGps, newUser, openRoute, testClientIp, openJourneyMore } from "./helpers";
 
 test.describe("When something feels wrong — instant, deterministic help", () => {
   test("Today: 'I feel unsafe' shows every action at once, with no Mira call, and walks to a Help Point", async ({ browser }) => {
@@ -55,6 +55,7 @@ test.describe("When something feels wrong — instant, deterministic help", () =
     await expect(sheet.getByLabel("Immediate Emergency action").getByRole("link", { name: /Emergency call, 112/ })).toHaveAttribute("href", "tel:112");
     await sheet.getByRole("button", { name: /Go to a Help Point/ }).click();
     await expect(page.getByRole("link", { name: /Directions in Maps/ })).toBeVisible();
+    await openJourneyMore(page);
     await page.getByRole("button", { name: "End trip without arriving" }).click();
     await page.getByRole("button", { name: "End trip", exact: true }).click();
     await ctx.close();
@@ -76,6 +77,7 @@ test.describe("Journeys that aren't walks", () => {
     const [trip] = await db`SELECT mode, eta_at, created_at FROM journeys ORDER BY created_at DESC LIMIT 1`;
     expect(trip.mode).toBe("ride");
     expect(Math.round((new Date(trip.eta_at).getTime() - new Date(trip.created_at).getTime()) / 60_000)).toBe(45);
+    await openJourneyMore(page);
     await page.getByRole("button", { name: "End trip without arriving" }).click();
     await page.getByRole("button", { name: "End trip", exact: true }).click();
     await ctx.close();
@@ -92,6 +94,7 @@ test.describe("After — one tiny factual contribution", () => {
     await openRoute(page);
     await page.getByRole("button", { name: /Go with Mira/ }).click();
     await page.waitForURL("**/trip");
+    await openJourneyMore(page);
     await page.getByRole("button", { name: "End trip without arriving" }).click();
     await page.getByRole("button", { name: "End trip", exact: true }).click();
     await expect(page.getByText("Was the way lit?")).toBeVisible();
@@ -110,7 +113,7 @@ test.describe("Degraded states are honest", () => {
     const ctx = await browser.newContext({ permissions: [], extraHTTPHeaders: { "x-forwarded-for": testClientIp() } });
     const page = await ctx.newPage();
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "What’s your plan?" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Right now, around you" })).toBeVisible();
     await page.goto("/today");
     await expect(page.getByRole("button", { name: /Use my location for local context|Location is off for Mira/ })).toBeVisible();
     await page.getByRole("button", { name: "Use my location for local context" }).click();

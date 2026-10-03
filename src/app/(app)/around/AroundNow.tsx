@@ -17,7 +17,7 @@ import { HELP_ICON } from "@/components/app/kinds";
 import { api } from "@/lib/api-client";
 import { handOffAsk } from "@/lib/ask-handoff";
 import { setPlanDraft } from "@/lib/plan-store";
-import { clearPendingDestination, peekPendingDestination, rememberLocationChoice, shouldAutoLocate, usableLocationPoint, useClock, useLocation } from "@/lib/location-store";
+import { clearPendingDestination, peekPendingDestination, rememberLocationChoice, setPendingDestination, shouldAutoLocate, usableLocationPoint, useClock, useLocation } from "@/lib/location-store";
 import { useCountry } from "@/lib/locale-store";
 import { blindSpotsClaim, daylightClaim, helpClaim, hoursWords, lightingClaim, notesClaim, updatesClaim, walkTimeClaim, type Claim, type CommunityNote, type WayOption } from "@/lib/brief";
 import { HELP_CLASSES, helpWeightsFor, hoursState, isNight, rankHelpPoints, type HelpPoint } from "@/domain/help-points";
@@ -168,7 +168,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
             {/* 1. What's true here, now — the same sky card as Home, for you or for the place you chose. */}
             <div className="mt-5">
               {place ? (
-                <SkyCard state={skyAt(clock, focus)} label={`Around ${place.name}, now`} eyebrow="Around this place, now" aside={clock ? clockIn(clock) : null} title={<span className="line-clamp-2">{place.name}</span>} strip={clock ? { from: clock, point: focus } : null} stats={stats} line={line} />
+                <SkyCard state={skyAt(clock, focus)} label={`Around ${place.name}, now`} eyebrow="Around this place, now" aside={clock ? clockIn(clock) : null} titleAs="h2" title={<span className="line-clamp-2">{place.name}</span>} strip={clock ? { from: clock, point: focus } : null} stats={stats} line={line} />
               ) : (
                 <LiveNowCard now={clock} point={focus} area={loc.area} stats={stats} line={line} footer={null} locating={false} locationState={loc.status} onLocate={() => undefined} />
               )}
@@ -189,6 +189,9 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
 
             {/* 3. The map answers "where": you, Help Points, released notes, the walk there. */}
             <BriefMap className="mt-6 h-60" tiles={tiles} me={here ? { lat: here.lat, lon: here.lon } : null} start={place || here ? null : focus} end={place ? { lat: place.lat, lon: place.lon } : null} follow={!place && Boolean(here)} route={walkNow?.way && !walkNow.way.route.approximate ? walkNow.way.route.geometry : null} lighting={walkNow?.way?.lighting?.segments ?? null} pins={mapPins} notes={notes.map((n) => ({ id: n.id, lat: n.lat, lon: n.lon }))} label={place ? `Map around ${place.name}` : "Map around you"} />
+            <button type="button" onClick={() => { if (place) setPendingDestination({ name: place.name, lat: place.lat, lon: place.lon }); router.push("/around/map"); }} className="mt-2 inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-semibold text-accent-strong">
+              {place ? "View route & map" : "Open the full map"} <Icon name="arrow" className="size-4" />
+            </button>
 
             {ranked.length ? (
               <section aria-labelledby="help-near-h" className="mt-8">

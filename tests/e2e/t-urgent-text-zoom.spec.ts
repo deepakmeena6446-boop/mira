@@ -4,7 +4,7 @@ test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true
 
 test("200% text keeps immediate support controls inside the mobile viewport, with nested keyboard and Back access", async ({ page }) => {
   await page.addInitScript(() => { localStorage.setItem("mira.welcomed", "1"); localStorage.setItem("mira.location.skip", "1"); });
-  await page.goto("/plan");
+  await page.goto("/plan/legs");
   await page.getByLabel("What do you want to do?").fill("Fictional evening appointment");
   await page.getByLabel("From", { exact: true }).fill("Fictional named terminal");
   await page.getByLabel("To", { exact: true }).fill("Fictional named venue");

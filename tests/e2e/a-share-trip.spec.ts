@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { DEST, acceptContactInvite, addContact, db, mailsTo, newUser, openRoute, shareLinkFor, waitFor } from "./helpers";
+import { DEST, acceptContactInvite, addContact, db, mailsTo, newUser, openRoute, shareLinkFor, waitFor, openJourneyMore } from "./helpers";
 
 test.describe("Core loop — onboard, save Home, share a trip live, arrive", () => {
   test("a trusted contact follows the trip live and the link goes dark on arrival", async ({ browser }) => {
@@ -16,8 +16,8 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     const mum = await acceptContactInvite(browser, address);
     await owner.page.reload();
     await expect(owner.page.getByText("Trusted", { exact: true })).toBeVisible();
-    // Go, Journeys and You are stable roots; legacy routes remain reachable in context.
-    await expect(owner.page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Go", "Journeys", "You"]);
+    // Phase 1 roots (D39): Home, Mira, Around and Journeys; legacy routes remain reachable in context.
+    await expect(owner.page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Home", "Mira", "Around", "Journeys"]);
 
     // Around → map → one tap on the saved place → context → Start with Mira.
     await owner.page.goto("/around/map");
@@ -96,6 +96,7 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     expect((await (await solo.page.request.get("/api/trips/current")).json()).trip.sharedWith).toEqual([]);
     await expect(solo.page.getByText(/Only people you send your live link to can follow\. Nobody is alerted automatically/)).toBeVisible();
     await expect(solo.page.getByText(/they'll see your last spot/)).toHaveCount(0);
+    await openJourneyMore(solo.page);
     await solo.page.getByRole("button", { name: "End trip without arriving" }).click();
     await solo.page.getByRole("button", { name: "End trip", exact: true }).click();
     await expect(solo.page.getByText("Journey ended")).toBeVisible();

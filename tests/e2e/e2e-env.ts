@@ -5,7 +5,8 @@
 import { randomBytes } from "node:crypto";
 import { hashSync } from "@node-rs/argon2";
 
-export const E2E_PORT = 3300;
+/** Override with E2E_PORT (and E2E_DATABASE_URL) to run beside another checkout's suite. */
+export const E2E_PORT = Number(process.env.E2E_PORT ?? 3300);
 export const E2E_BASE = `http://localhost:${E2E_PORT}`;
 export const E2E_DB = process.env.E2E_DATABASE_URL ?? "postgres://mira:mira_local_dev@127.0.0.1:54329/mira_e2e";
 export const E2E_ADMIN_PASSWORD = "e2e-only-moderator-password";

@@ -591,7 +591,11 @@ export function TripScreen({
           {/* 4. Quick, one-handed. */}
           <div className="mt-2 grid grid-cols-3 gap-2">
             <button type="button" onClick={() => void act("extend")} disabled={busy === "extend" || trip.extended || trip.state !== "active"} className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl bg-sunken text-[0.8125rem] font-semibold disabled:opacity-45"><Icon name="clock" className="size-5" />{trip.extended ? "Extended" : "+10 min"}</button>
-            <button type="button" onClick={share} disabled={!trip.shareUrl || next.kind === "share"} className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl bg-sunken text-[0.8125rem] font-semibold disabled:opacity-45"><Icon name="share" className="size-5" />{next.kind === "share" ? "Link above" : "Send link"}</button>
+            {next.kind === "share" ? (
+              <button type="button" onClick={() => setSharingOpen(true)} className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl bg-sunken text-[0.8125rem] font-semibold"><Icon name="user" className="size-5" />Who follows</button>
+            ) : (
+              <button type="button" onClick={share} disabled={!trip.shareUrl} aria-label="Send my live link" className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl bg-sunken text-[0.8125rem] font-semibold disabled:opacity-45"><Icon name="share" className="size-5" />Send link</button>
+            )}
             <button type="button" onClick={() => (nextHelp && freshMe ? setFocus(nextHelp) : setUnsafe(true))} className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl bg-sunken text-[0.8125rem] font-semibold"><Icon name="shield" className="size-5" />Help near</button>
           </div>
           {trip.checkRequestedAt && clock && clock.getTime() - new Date(trip.checkRequestedAt).getTime() < 30 * 60_000 ? (

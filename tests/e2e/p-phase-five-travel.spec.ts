@@ -21,7 +21,7 @@ test("S5 late remote arrival retains named places and gives honest destination c
     searches.push({ q: body.q, near: body.near });
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ places: body.q.includes("Airport") ? [AIRPORT] : [HOTEL] }) });
   });
-  await page.goto("/plan");
+  await page.goto("/plan/legs");
   await page.getByLabel("What do you want to do?").fill("Arrive at hotel after flight");
   await page.getByRole("textbox", { name: "From" }).fill("Arrival Airport");
   await page.getByRole("button", { name: "Find", exact: true }).first().click();
@@ -55,7 +55,7 @@ test("S6 two extra city legs keep distinct time zones, expose partial/unknown co
     const hit = query.includes("Station") ? STATION : query.includes("Venue") ? VENUE : AIRPORT;
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ places: [hit] }) });
   });
-  await page.goto("/plan");
+  await page.goto("/plan/legs");
   await page.getByRole("button", { name: "Return & legs" }).click();
   await page.getByRole("button", { name: "Add travel leg" }).click();
   await page.getByLabel("Leg 2 purpose").fill("Station to venue");
@@ -101,11 +101,11 @@ test("S4 event return can be selected for review without losing the arrival leg 
     const place = (query: string, lat: number) => ({ query, resolution: { source: "search", name: query, point: { lat, lon: 77.21 } } });
     sessionStorage.setItem("mira.plan.v1", JSON.stringify({ savedAt: Date.now(), draft: { version: 1, touched: true, activity: "Arrive at event", origin: { kind: "named", ...place("Station", 28.69) }, destination: place("Venue", 28.70), loop: false, departureLocal: "2026-10-03T18:00", timeZone: "Asia/Kolkata", mode: "walk", constraints: "", destinationCountryIso: null, legs: [{ label: "Return from event", origin: place("Venue", 28.70), destination: place("Station", 28.69), departureLocal: "2026-10-03T22:30", timeZone: "Asia/Kolkata", mode: "walk", destinationCountryIso: null }] } }));
   });
-  await page.goto("/plan");
+  await page.goto("/plan/legs");
   await page.getByRole("button", { name: "Return & legs" }).click();
   await expect(page.getByLabel("Leg 2", { exact: true })).toContainText("Return from event");
   await page.getByRole("button", { name: "Review leg 2 options" }).click();
-  await expect(page).toHaveURL(/\/plan\?planStep=options$/);
+  await expect(page).toHaveURL(/\/plan(\/legs)?\?planStep=options$/);
   await expect(page.getByRole("region", { name: "Plan options" })).toBeVisible();
   await page.getByRole("button", { name: /^1\s*Plan$/ }).click();
   await expect(page.getByRole("region", { name: "Plan state" })).toContainText("Return from event");
@@ -119,7 +119,7 @@ test("S4 reverse leg prefill needs a new departure and retains the explicitly ch
     const place = (query: string, lat: number) => ({ query, resolution: { source: "search", name: query, point: { lat, lon: 77.21 } } });
     sessionStorage.setItem("mira.plan.v1", JSON.stringify({ savedAt: Date.now(), draft: { version: 1, touched: true, activity: "Arrive at event", origin: { kind: "named", ...place("Station", 28.69) }, destination: place("Venue", 28.70), loop: false, departureLocal: "2026-10-03T18:00", timeZone: "Asia/Kolkata", mode: "walk", constraints: "", destinationCountryIso: null, legs: [] } }));
   });
-  await page.goto("/plan");
+  await page.goto("/plan/legs");
   await page.getByRole("button", { name: "Return & legs" }).click();
   await page.getByRole("button", { name: "Add return leg" }).click();
   await expect(page.getByLabel("Leg 2 from")).toHaveValue("Venue");
@@ -155,7 +155,7 @@ test("S4 arrival check-in and explicit return are two private confirmed journeys
   const arrived = (await (await owner.page.request.get("/api/trips/current")).json()).trip;
   expect(arrived).toMatchObject({ state: "arrived", sharedWith: [] });
   await owner.page.getByRole("button", { name: "Review return journey" }).click();
-  await expect(owner.page).toHaveURL(/\/plan\?planStep=options$/);
+  await expect(owner.page).toHaveURL(/\/plan(\/legs)?\?planStep=options$/);
   await expect(owner.page.getByRole("region", { name: "Plan options" })).toBeVisible();
   const retained = await owner.page.evaluate(() => JSON.parse(sessionStorage.getItem("mira.plan.v1") ?? "null")?.draft);
   expect(retained.origin.query).toBe("Venue"); expect(retained.destination.query).toBe("Station");

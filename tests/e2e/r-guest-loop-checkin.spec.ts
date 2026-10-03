@@ -39,11 +39,11 @@ test("S1 first-time guest chooses a mapped 4:45 AM run loop without GPS, progres
     optionRequests++;
     await route.fulfill({ json: fixtureOptions(intent, [{ id: "fixture-loop-a", label: "Fixture mapped run loop", minutes: 30, meters: 4280 }, { id: "fixture-loop-b", label: "Fixture out-and-back", minutes: 28, meters: 4000 }]) });
   });
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: "What’s your plan?" })).toBeVisible();
-  await page.getByRole("button", { name: "Early run", exact: true }).click();
-  await page.getByRole("button", { name: "Let’s plan" }).click();
+  await page.goto("/plan/legs");
+  await page.getByLabel("What do you want to do?").fill("A 30-minute run at 4:45 AM");
+  await page.getByRole("checkbox", { name: "Return to my starting point (loop)" }).check();
   await choosePlace(page, "From", NORTH);
+  await page.getByLabel("Loop duration (minutes)").fill("29"); // the field shows 30 by default; change it so the target is chosen explicitly
   await page.getByLabel("Loop duration (minutes)").fill("30");
   await page.getByLabel("Pace (min / km)").fill("8");
   await page.getByLabel("Pace (min / km)").fill("7");
@@ -97,7 +97,7 @@ test("S4 no-GPS night out completes arrival then reviews and explicitly starts a
   let tripPosts = 0;
   await page.route("**/api/trips", async (route) => { if (route.request().method() === "POST") tripPosts++; await route.continue(); });
   await page.route("**/api/plan/options", (route) => route.fulfill({ json: fixtureOptions((route.request().postDataJSON() as { intent: MovementIntent }).intent) }));
-  await page.goto("/plan");
+  await page.goto("/plan/legs");
   await page.getByLabel("What do you want to do?").fill("Night out at fictional venue");
   await choosePlace(page, "From", NORTH); await choosePlace(page, "To", VENUE);
   const format = (d: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d).replace(" ", "T");
@@ -113,7 +113,7 @@ test("S4 no-GPS night out completes arrival then reviews and explicitly starts a
   await page.getByRole("button", { name: "I’m here — confirm arrival" }).click();
   await expect(page.getByRole("heading", { name: "You’ve arrived." })).toBeVisible();
   await page.getByRole("button", { name: "Review return journey" }).click();
-  await expect(page).toHaveURL(/\/plan\?planStep=options$/);
+  await expect(page).toHaveURL(/\/plan(\/legs)?\?planStep=options$/);
   await expect(page.getByRole("button", { name: /^2\s*Options$/ })).toHaveAttribute("aria-current", "step");
   await expect(page.getByRole("region", { name: "Plan options" })).toContainText(format(midnight).replace("T", " "));
   await expect(page.getByText(`Return to ${NORTH.name}`, { exact: true })).toBeVisible();
@@ -146,7 +146,7 @@ test("missing loop provider keeps a guest manual check-in usable and ending earl
   });
   let tripPosts = 0;
   await page.route("**/api/trips", async (route) => { if (route.request().method() === "POST") tripPosts++; await route.continue(); });
-  await page.goto("/plan");
+  await page.goto("/plan/legs");
   await page.getByLabel("What do you want to do?").fill("Fictional evening loop");
   await choosePlace(page, "From", NORTH);
   await page.getByRole("checkbox", { name: "Return to my starting point (loop)" }).check();
@@ -173,7 +173,7 @@ test("missing place and service providers keep an arrival deadline usable throug
   await page.clock.setFixedTime(new Date("2026-10-03T18:00:00Z"));
   let tripPosts = 0;
   await page.route("**/api/trips", async (route) => { if (route.request().method() === "POST") tripPosts++; await route.continue(); });
-  await page.goto("/plan");
+  await page.goto("/plan/legs");
   await page.getByLabel("What do you want to do?").fill("Fictional late terminal arrival");
   await page.getByRole("textbox", { name: "From", exact: true }).fill("Fictional remote terminal");
   await page.getByRole("textbox", { name: "To", exact: true }).fill("Fictional remote hotel");
@@ -217,7 +217,7 @@ test("an active missing-provider manual journey changes only after origin confir
   const readTimer = () => page.evaluate(() => JSON.parse(sessionStorage.getItem("mira.local-check-in.v1") ?? "null"));
   const readChoice = () => page.evaluate(() => JSON.parse(sessionStorage.getItem("mira.local-journey-choice.v1") ?? "null"));
 
-  await page.goto("/plan");
+  await page.goto("/plan/legs");
   await page.getByLabel("What do you want to do?").fill("Fictional evening loop");
   await choosePlace(page, "From", NORTH);
   await page.getByRole("checkbox", { name: "Return to my starting point (loop)" }).check();
@@ -237,7 +237,7 @@ test("an active missing-provider manual journey changes only after origin confir
 
   await page.clock.setFixedTime(confirmedAt);
   await page.getByRole("link", { name: "Review or change this journey" }).click();
-  await expect(page).toHaveURL(/\/plan$/);
+  await expect(page).toHaveURL(/\/plan\/legs$/);
   await page.getByLabel("What do you want to do?").fill("Fictional continued loop");
   await choosePlace(page, "From", VENUE);
   await page.getByLabel("Planned local time").fill("2026-10-03T18:05");
