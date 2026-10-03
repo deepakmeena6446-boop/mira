@@ -8,6 +8,7 @@ import { cx } from "@/components/ui/cx";
 import { ActionBar, MiraVoice, QuestionRow, StateNote } from "@/components/mira/Frame";
 import { EvidenceChip, EvidenceLedger, type EvidenceItem } from "@/components/mira/Evidence";
 import { BriefMap } from "@/components/mira/BriefMap";
+import { SkyCard, skyAt, type LiveStat } from "@/components/mira/LiveNow";
 import { SafetyAccess } from "@/components/app/SafetyAccess";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { TimeZoneChoices } from "@/components/app/TimeZoneChoices";
@@ -18,7 +19,7 @@ import { clearPlanDraft, ensurePlanDraft, setPlanDraft, usePlanDraft, usePlanHyd
 import { currentLocation, usableLocationPoint, useClock, useLocation } from "@/lib/location-store";
 import { blindSpotsClaim, daylightClaim, helpClaim, lightingClaim, notesClaim, updatesClaim, walkTimeClaim, type Claim, type CommunityNote, type WayOption } from "@/lib/brief";
 import { decisionTake } from "@/lib/decision-take";
-import { HELP_CLASSES, type HelpPoint } from "@/domain/help-points";
+import { HELP_CLASSES, hoursState, type HelpPoint } from "@/domain/help-points";
 import { localTimeInZone } from "@/domain/opening-hours";
 import { daylightAt, instantForLocal, laterDaylight, localTimeForInstant, type PlanOptionsResult } from "@/domain/plan-options";
 import { intentFromDraft, newPlanDraft, type PlanDraft } from "@/domain/plan-state";
@@ -57,7 +58,10 @@ function situationOf(draft: PlanDraft): Situation {
 }
 
 /** Situation preset, applied once to an untouched draft (never over her own entries). */
-function preset(draft: PlanDraft, s: Situation, here: { lat: number; lon: number } | null): PlanDraft {
+function preset(input: PlanDraft, s: Situation, here: { lat: number; lon: number } | null): PlanDraft {
+  // A preset applies only to an untouched or new draft, so "now" must be now — not when the blank draft was made.
+  const zone = input.timeZone && validZone(input.timeZone) ? input.timeZone : deviceZone();
+  const draft = { ...input, timeZone: zone, departureLocal: localTimeForInstant(new Date(), zone), timeKind: "depart_at" as const };
   const origin = here && draft.origin.kind === "named" && !draft.origin.query ? { kind: "device" as const, use: "from_here" as const, point: here } : draft.origin;
   if (s === "run") return { ...draft, touched: true, activity: draft.activity || "Run", loop: true, mode: "walk", loopTarget: draft.loopTarget ?? { kind: "duration", value: 30 }, paceMinutesPerKm: draft.paceMinutesPerKm ?? 6, origin };
   if (s === "travel") return { ...draft, touched: true, activity: draft.activity || "Arrive and get to where I’m staying", loop: false, mode: "ride", loopTarget: undefined };
@@ -260,6 +264,23 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   const nextQuestion = !origin ? (situation === "travel" ? "Where are you arriving?" : situation === "run" ? "Where will you start?" : "Where are you starting from?") : !loop && !dest ? (situation === "travel" ? "Where are you staying?" : "Where are you going?") : !instant ? "When?" : null;
   // A share is shown only when some of the way has lighting evidence at all; otherwise it's "not known", never 0%.
   const loopName = /\bwalk/i.test(draft.activity) && !/\brun/i.test(draft.activity) ? "Walk" : "Run";
+  // ── Sky card facts ────────────────────────────────────────────────────────────────────────
+  const checking = (!loop && !currentWays) || (loop && loopPlan?.key !== loopKey);
+  const verb = loop ? loopName.toLowerCase() : mode === "walk" ? "walk" : mode === "ride" ? "ride" : "by transit";
+  const tripTitle = loop ? `${loopMinutes} min ${verb}` : minutes ? `${Math.round(minutes)} min ${verb}${arriveAt ? ` · arrive ${arriveAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", ...(zone ? { timeZone: zone } : {}) })}` : ""}` : currentWays?.error ? "Couldn’t check the way" : currentWays?.noRoute ? "No travel time available" : "…";
+  const helpList = loop ? (startHelp?.key === loopKey ? startHelp.points : null) : currentWays ? way?.helpPoints ?? [] : null;
+  const helpLocal = mode === "walk" || loop ? helpAt : arriveAt ? localTimeInZone(arriveAt, zone) : helpAt;
+  const openThen = helpList ? helpList.filter((p) => { const h = hoursState(p, helpLocal ?? undefined); return h.kind === "open_24h" || h.kind === "listed_open" || h.kind === "open_now"; }).length : 0;
+  const litShare = way?.lighting ? (() => { const l = way.lighting.summary; return l.lit + l.poles + l.dark > 0 ? `${l.lit + l.poles}%` : null; })() : null;
+  const planNotes = !loop && mode === "walk" ? currentWays?.notes ?? null : aroundNow?.notes ?? null;
+  const planStats: LiveStat[] = [
+    { label: loop ? "Help Points open near your start" : mode === "walk" ? "Help Points open on the way" : "Help Points open where you arrive", value: helpList ? `${openThen}/${helpList.length}` : "…", state: helpList ? "ok" : "loading" },
+    loop || mode !== "walk"
+      ? { label: "notes from people", value: planNotes ? String(planNotes.length) : "…", state: planNotes ? "ok" : "loading" }
+      : { label: "mapped as lit", value: litShare ?? "—", state: currentWays ? (litShare ? "ok" : "none") : "loading" },
+    ...(mode === "walk" && !loop ? [{ label: "notes from people", value: planNotes ? String(planNotes.length) : "…", state: (planNotes ? "ok" : "loading") as LiveStat["state"] }] : []),
+  ];
+
   const lit = (w: WayOption) => { const l = w.lighting?.summary; return l && l.lit + l.poles + l.dark > 0 ? l.lit + l.poles : null; };
 
   return (
@@ -331,10 +352,19 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
         ) : (
           <>
             {/* Mira's take, then the options, then the ledger. Conclusion → choice → evidence. */}
-            <section aria-label="Mira’s take" className="mt-6">
-              <MiraVoice size="lg" state={(!loop && !currentWays) || (loop && loopPlan?.key !== loopKey) ? "thinking" : "noticed"}>
-                {(!loop && !currentWays) || (loop && loopPlan?.key !== loopKey) ? <span className="text-ink-muted">Checking that place at that time…</span> : take.length ? take.join(" ") : "Here’s what I could check."}
-              </MiraVoice>
+            <section aria-label="Mira’s take" className="mt-5">
+              {/* The plan's own sky: coloured by the sky when she sets off, with the facts for that time. */}
+              <SkyCard
+                state={skyAt(departAt, sun)}
+                label="Your plan, at that time"
+                pulse={checking ? "thinking" : "noticed"}
+                eyebrow={checking ? "Checking that place at that time…" : "Your plan, at that time"}
+                aside={whenWords(draft.departureLocal, zone)}
+                title={tripTitle}
+                strip={departAt && sun ? { from: departAt, point: sun, hours: loop ? 3 : 6, startLabel: "set off" } : null}
+                stats={planStats}
+                line={checking ? null : take.length ? take.join(" ") : "Here’s what I could check."}
+              />
               {later ? (
                 <button type="button" onClick={() => update({ departureLocal: later.local, timeKind: "depart_at" })} className="m-card m-press mt-3 flex w-full items-center gap-3 p-3.5 text-left">
                   <span aria-hidden className="grid size-10 place-items-center rounded-xl bg-dusk-soft text-dusk"><Icon name="sun" className="size-5" /></span>

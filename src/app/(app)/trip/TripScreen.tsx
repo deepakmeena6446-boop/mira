@@ -7,7 +7,6 @@ import { WorldMap } from "@/components/map/WorldMap";
 import { EmergencyPill } from "@/components/app/EmergencyPill";
 import { HelpCluster } from "@/components/app/HelpCluster";
 import { useChromeTop } from "@/lib/use-chrome-top";
-import { MiraPulse } from "@/components/app/MiraPulse";
 import { journeyNextAction } from "@/lib/trip-actions";
 import { haptic } from "@/lib/haptics";
 import { UnsafeSheet } from "@/components/app/UnsafeSheet";
@@ -16,6 +15,7 @@ import { HELP_ICON } from "@/components/app/kinds";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
+import { SkyCard, skyAt } from "@/components/mira/LiveNow";
 import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api-client";
 import { setLocation, useClock } from "@/lib/location-store";
@@ -527,24 +527,16 @@ export function TripScreen({
 
       <section aria-label="Journey controls" className="relative z-10 -mt-6 max-h-[68dvh] overflow-y-auto overscroll-contain rounded-t-[var(--radius-sheet)] bg-surface px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 shadow-[var(--shadow-sheet)]">
         <div className="mx-auto max-w-xl">
-          {/* 1. Glance: who's with you, how long, where. */}
-          <p className={cx("flex items-center gap-2 text-sm font-semibold", missed || attention ? "text-warm" : "text-accent-strong")}>
-            <MiraPulse size={12} state={missed || attention ? "attention" : "with-you"} ambient />
-            {missed ? "Check-in due" : trip.sharedWith.length ? "Sharing enabled" : `${noun[0].toUpperCase()}${noun.slice(1)} in progress`}
-          </p>
-          <div className="mt-1 flex items-end justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="truncate text-[1.0625rem] font-semibold">{trip.autoArrival ? `To ${trip.destination.name}${modeLine ? ` · ${modeLine}` : ""}` : "Sharing where you are"}</h1>
-              <p className="text-sm text-ink-muted">
-                {trip.autoArrival ? (clock ? `ETA ${time(trip.etaAt)}, with time to spare` : "ETA") : clock ? `Until ${time(trip.etaAt)}` : ""}
-                {distance !== null && trip.autoArrival ? ` · ${distance < 1000 ? `${Math.round(distance / 10) * 10} m` : `${(distance / 1000).toFixed(1)} km`} to go` : ""}
-              </p>
-            </div>
-            <p className="shrink-0 text-right">
-              <span className="block text-[0.72rem] font-medium text-ink-subtle">{trip.autoArrival ? (left > 0 ? "Expected in" : "Expected") : "Sharing for"}</span>
-              <span className={cx("mira-journey-number block tabular-nums", left > 0 ? "text-[2.75rem]" : "text-[1.75rem]")}>{!clock ? "…" : left > 0 ? span : mins < 1 ? "now" : `${span} ago`}</span>
-            </p>
-          </div>
+          {/* 1. Glance — the same sky card as Home: who's with you, how long, where. */}
+          <SkyCard
+            state={skyAt(clock, me ?? trip.destination)}
+            label="Journey status"
+            pulse={missed || attention ? "attention" : "with-you"}
+            eyebrow={missed ? "Check-in due" : trip.sharedWith.length ? "Sharing enabled" : `${noun[0].toUpperCase()}${noun.slice(1)} in progress`}
+            aside={trip.autoArrival ? (clock ? `ETA ${time(trip.etaAt)}` : "ETA") : clock ? `Until ${time(trip.etaAt)}` : null}
+            title={<span className="flex items-baseline justify-between gap-3"><span className="min-w-0"><span className="block text-[0.72rem] font-medium tracking-normal text-[color:var(--sky-muted)]">{trip.autoArrival ? (left > 0 ? "Expected in" : "Expected") : "Sharing for"}</span><span className={cx("block tabular-nums", left > 0 ? "text-[2.75rem] leading-none" : "text-[1.75rem]")}>{!clock ? "…" : left > 0 ? span : mins < 1 ? "now" : `${span} ago`}</span></span></span>}
+            line={<><h1 className="truncate font-semibold text-[color:var(--sky-ink)]">{trip.autoArrival ? `To ${trip.destination.name}${modeLine ? ` · ${modeLine}` : ""}` : "Sharing where you are"}</h1>{distance !== null && trip.autoArrival ? <span>{distance < 1000 ? `${Math.round(distance / 10) * 10} m` : `${(distance / 1000).toFixed(1)} km`} to go · ETA with time to spare</span> : null}</>}
+          />
 
           {missed ? (
             <div role="alert" className="mt-3 rounded-2xl bg-warm-soft p-4">

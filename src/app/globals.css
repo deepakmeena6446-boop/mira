@@ -548,7 +548,10 @@
 .m-title { font-size: 1.25rem; line-height: 1.3; font-weight: 650; letter-spacing: -0.02em; }
 .m-meta { font-size: 0.8125rem; line-height: 1.35; color: var(--color-ink-muted); }
 .m-label { font-size: 0.75rem; font-weight: 650; letter-spacing: 0.02em; color: var(--color-ink-subtle); }
-.m-card { border-radius: var(--radius-tile); background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-line); }
+.m-card { border-radius: var(--radius-tile); background: var(--color-surface); box-shadow: 0 1px 2px rgb(20 33 61 / .04), 0 0 0 1px rgb(20 33 61 / .06); }
+:root[data-daypart="night"] .m-card { box-shadow: 0 0 0 1px var(--color-line); }
+/* A quiet section heading shared by every Phase 1 screen. */
+.m-h { font-size: 1.0625rem; line-height: 1.3; font-weight: 600; letter-spacing: -0.015em; }
 .m-press { transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-state) ease; }
 .m-press:active { transform: scale(0.985); }
 .m-actionbar { position: fixed; inset-inline: 0; bottom: var(--tabbar-space); z-index: 30; padding: 1.25rem 1rem 0.75rem; background: linear-gradient(to top, var(--color-canvas) 72%, transparent); }

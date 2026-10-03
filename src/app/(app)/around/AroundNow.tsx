@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 import { useToast } from "@/components/ui/Toast";
-import { MiraVoice, RootHeader, StateNote } from "@/components/mira/Frame";
+import { RootHeader } from "@/components/mira/Frame";
+import { LiveNowCard, SkyCard, skyAt, type LiveStat } from "@/components/mira/LiveNow";
+import { HelpNextCard } from "@/components/mira/HelpNext";
+import { clockIn } from "@/domain/daylight";
 import { EvidenceGlyph, EvidenceLedger } from "@/components/mira/Evidence";
 import { BriefMap } from "@/components/mira/BriefMap";
 import { SafetyUpdatesSection } from "@/components/app/SafetyUpdates";
@@ -131,6 +133,18 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
   };
 
   const notes = now?.notes ?? [];
+  // The same three facts as Home, for here or for the chosen place.
+  const openNow = ranked.filter((p) => { const h = hoursState(p, localNow ?? undefined, 0, clock?.getTime()); return h.kind === "open_24h" || h.kind === "open_now" || h.kind === "listed_open"; });
+  const nearestOpen = openNow[0] ?? null;
+  const helpState: LiveStat["state"] = !now?.help ? "loading" : now.help.evidence.state === "failed" ? "failed" : "ok";
+  const stats: LiveStat[] = [
+    { label: "Help Points open now", value: `${openNow.length}/${now?.help?.points.length ?? 0}`, state: helpState },
+    place && here
+      ? { label: "walk from you", value: walkNow?.way && !walkNow.error ? `${Math.round(walkNow.way.route.minutes)} min` : "—", state: !walkNow ? "loading" : walkNow.error ? "failed" : "ok" }
+      : { label: "to the nearest", value: nearestOpen ? `${nearestOpen.minutes} min` : "—", state: helpState },
+    { label: notes.length === 1 ? "note from people" : "notes from people", value: String(notes.length), state: !now || now.notes === null ? "loading" : "ok" },
+  ];
+  const line = nearestOpen ? <><strong className="font-semibold text-[color:var(--sky-ink)]">{nearestOpen.name}</strong> is {hoursWords(hoursState(nearestOpen, localNow ?? undefined, 0, clock?.getTime()))}, about {nearestOpen.minutes} min {place ? "from it" : "away"}. Staffing isn’t verified.</> : null;
   const mapPins = ranked.slice(0, 8).filter((p) => !osmOnly || !p.id.startsWith("g:")).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, icon: HELP_ICON[p.cls] ?? "pin", strong: HELP_CLASSES[p.cls].emergency }));
 
   return (
@@ -145,85 +159,84 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
         </button>
 
         {!focus ? (
-          <section className="mt-6">
-            <MiraVoice size="lg">I can show what I know around you — Help Points open now, notes from people, local reports — or around any place you’re thinking of going.</MiraVoice>
-            <div className="mt-4 grid gap-2">
-              <button type="button" onClick={() => { rememberLocationChoice(true); void loc.request(); }} className="mira-primary w-full"><Icon name="locate" className="size-5" />{loc.status === "asking" ? "Finding you…" : "Use my location"}</button>
-              <button type="button" onClick={() => setSearch(true)} className="min-h-12 w-full rounded-2xl font-semibold ring-1 ring-line-strong">Check a place instead</button>
-            </div>
-            {loc.status === "denied" ? <StateNote className="mt-3" title="Location is off for Mira">Allow it in your browser’s site settings to see what’s around you. Checking a place works without it.</StateNote> : loc.status === "unavailable" ? <StateNote className="mt-3" title="Couldn’t find you">Try again outdoors, or check a place by name.</StateNote> : null}
-          </section>
+          <div className="mt-5">
+            <LiveNowCard now={clock} point={null} area={null} stats={[]} line={null} footer={null} locating={loc.status === "asking"} locationState={loc.status} onLocate={() => { rememberLocationChoice(true); void loc.request(); }} />
+            <div className="mt-3"><HelpNextCard check={null} impactLine={null} signedIn={signedIn} country={country.iso ?? null} /></div>
+          </div>
         ) : (
           <>
-            <BriefMap className="mt-4 h-60" tiles={tiles} me={here ? { lat: here.lat, lon: here.lon } : null} start={place || here ? null : focus} end={place ? { lat: place.lat, lon: place.lon } : null} follow={!place && Boolean(here)} route={walkNow?.way && !walkNow.way.route.approximate ? walkNow.way.route.geometry : null} lighting={walkNow?.way?.lighting?.segments ?? null} pins={mapPins} notes={notes.map((n) => ({ id: n.id, lat: n.lat, lon: n.lon }))} label={place ? `Map around ${place.name}` : "Map around you"} />
+            {/* 1. What's true here, now — the same sky card as Home, for you or for the place you chose. */}
+            <div className="mt-5">
+              {place ? (
+                <SkyCard state={skyAt(clock, focus)} label={`Around ${place.name}, now`} eyebrow="Around this place, now" aside={clock ? clockIn(clock) : null} title={<span className="line-clamp-2">{place.name}</span>} strip={clock ? { from: clock, point: focus } : null} stats={stats} line={line} />
+              ) : (
+                <LiveNowCard now={clock} point={focus} area={loc.area} stats={stats} line={line} footer={null} locating={false} locationState={loc.status} onLocate={() => undefined} />
+              )}
+            </div>
 
             {place ? (
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                <button type="button" onClick={planHere} className="mira-primary col-span-3 w-full"><Icon name="route" className="size-5" />Plan going here</button>
-                <button type="button" onClick={() => { handOffAsk(`What should I know before going to ${place.name}?`); router.push("/mira"); }} className="col-span-2 inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-surface text-sm font-semibold ring-1 ring-line-strong"><Icon name="sparkle" className="size-4 text-accent" />Ask Mira about it</button>
-                <button type="button" onClick={() => void savePlace()} disabled={saving} className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-2xl bg-surface text-sm font-semibold ring-1 ring-line-strong"><Icon name="star" className="size-4" />{saving ? "Saving…" : "Save"}</button>
+              <div className="mt-3 flex gap-2">
+                <button type="button" onClick={planHere} className="mira-primary min-h-12 flex-1"><Icon name="route" className="size-5" />Plan going here</button>
+                <button type="button" onClick={() => { handOffAsk(`What should I know before going to ${place.name}?`); router.push("/mira"); }} aria-label="Ask Mira about it" className="m-card grid size-12 shrink-0 place-items-center"><Icon name="sparkle" className="size-5 text-accent" /></button>
+                <button type="button" onClick={() => void savePlace()} disabled={saving} aria-label={saving ? "Saving" : "Save this place"} className="m-card grid size-12 shrink-0 place-items-center"><Icon name="star" className="size-5" /></button>
               </div>
             ) : null}
 
-            <EvidenceLedger className="mt-4" title={place ? "Around this place, now" : "Around you, now"} label="What Mira knows here" items={claims.map((c) => (c.kind === "failed" ? { ...c, action: { label: "Try again", onClick: () => setRetry((n) => n + 1) } } : c))} />
+            {/* 2. One tap: what you see here (about the chosen place, when there is one). */}
+            <div className="mt-3">
+              <HelpNextCard check={null} impactLine={null} signedIn={signedIn} country={country.iso ?? null} spot={place ? { lat: place.lat, lon: place.lon, name: place.name } : null} title={place ? "Add what you know about it" : "Add what you see here"} />
+            </div>
+
+            {/* 3. The map answers "where": you, Help Points, released notes, the walk there. */}
+            <BriefMap className="mt-6 h-60" tiles={tiles} me={here ? { lat: here.lat, lon: here.lon } : null} start={place || here ? null : focus} end={place ? { lat: place.lat, lon: place.lon } : null} follow={!place && Boolean(here)} route={walkNow?.way && !walkNow.way.route.approximate ? walkNow.way.route.geometry : null} lighting={walkNow?.way?.lighting?.segments ?? null} pins={mapPins} notes={notes.map((n) => ({ id: n.id, lat: n.lat, lon: n.lon }))} label={place ? `Map around ${place.name}` : "Map around you"} />
 
             {ranked.length ? (
-              <section aria-labelledby="help-near-h" className="mt-6">
-                <h2 id="help-near-h" className="m-label">Help Points nearby · listed hours, staffing not verified</h2>
-                <ul className="m-card mt-2 divide-y divide-line overflow-hidden">
+              <section aria-labelledby="help-near-h" className="mt-8">
+                <div className="flex items-baseline justify-between gap-2">
+                  <h2 id="help-near-h" className="m-h">Help Points nearby</h2>
+                  <span className="text-xs text-ink-subtle">listed hours · staffing not verified</span>
+                </div>
+                <ul className="m-card mt-3 divide-y divide-line overflow-hidden">
                   {ranked.slice(0, 4).map((p) => {
                     const h = hoursState(p, localNow ?? undefined, 0, clock?.getTime());
                     return (
                       <li key={p.id} className="flex items-center gap-3 px-4 py-3">
-                        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-xl bg-sunken"><Icon name={HELP_ICON[p.cls] ?? "pin"} className="size-[18px] text-ink-muted" /></span>
+                        <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-sunken"><Icon name={HELP_ICON[p.cls] ?? "pin"} className="size-4 text-ink-muted" /></span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-semibold">{p.name}</span>
                           <span className="line-clamp-2 block text-[0.8125rem] text-ink-muted">{HELP_CLASSES[p.cls].label} · about {p.minutes} min walk · {hoursWords(h)}</span>
                         </span>
-                        <a href={`https://www.google.com/maps/dir/?api=1&destination=${p.lat.toFixed(5)},${p.lon.toFixed(5)}&travelmode=walking`} target="_blank" rel="noopener noreferrer" aria-label={`Directions to ${p.name}`} className="grid size-11 shrink-0 place-items-center rounded-full bg-sunken"><Icon name="arrow" className="size-4" /></a>
+                        <a href={`https://www.google.com/maps/dir/?api=1&destination=${p.lat.toFixed(5)},${p.lon.toFixed(5)}&travelmode=walking`} target="_blank" rel="noopener noreferrer" aria-label={`Directions to ${p.name}`} className="grid size-10 shrink-0 place-items-center rounded-full bg-sunken"><Icon name="arrow" className="size-4" /></a>
                       </li>
                     );
                   })}
                 </ul>
-                <p className="mt-1 text-xs text-ink-subtle">Walking minutes are by distance; the route isn’t checked.</p>
+                <p className="mt-1.5 px-1 text-xs text-ink-subtle">Walking minutes are by distance; the route isn’t checked.</p>
               </section>
             ) : null}
 
-            <section aria-labelledby="people-h" className="mt-7">
+            <section aria-labelledby="people-h" className="mt-8">
               <div className="flex items-baseline justify-between gap-2">
-                <h2 id="people-h" className="text-[1.0625rem] font-semibold">From people here</h2>
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-subtle"><EvidenceGlyph kind="people" />Released notes</span>
+                <h2 id="people-h" className="m-h">From people here</h2>
+                <span className="inline-flex items-center gap-1.5 text-xs text-ink-subtle"><EvidenceGlyph kind="people" />Released notes</span>
               </div>
               {now?.notes === null ? <p role="status" className="mt-2 text-sm text-ink-muted">Checking notes…</p> : notes.length ? (
-                <ul className="mt-2 space-y-2">
+                <ul className="mt-3 space-y-2">
                   {notes.slice(0, 3).map((n) => (
-                    <li key={n.id} className="rounded-2xl bg-people-soft/60 px-4 py-3">
+                    <li key={n.id} className="rounded-2xl bg-people-soft/50 px-4 py-3">
                       <p className="text-[0.95rem] font-medium">{n.text}</p>
                       <p className="mt-0.5 text-xs text-ink-muted">Week of {n.week} · {n.timeBand} · {Math.round(haversineMeters(focus, n) / 10) * 10} m away</p>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="mt-2 text-sm text-ink-muted">No released notes {place ? "around this place" : "around you"} yet. Notes appear only once several people say similar things, so a quiet area may simply be new to Mira.</p>
+                <p className="mt-2 text-sm text-ink-muted">No released notes {place ? "around this place" : "around you"} yet. Notes appear once several people say similar things — yours could be the first.</p>
               )}
-              <p className="mt-4 text-sm font-semibold">Noticed something? It takes a few seconds.</p>
-              <div className="m-scroll-x -mx-4 mt-2 px-4 pb-1">
-                {[
-                  { href: "/report?from=around", icon: "flag", label: "Something happened", hint: "Private report" },
-                  { href: "/contribute#checks", icon: "check", label: "Answer a Mira Check", hint: "Was it open?" },
-                  { href: "/contribute", icon: "lamp", label: "Was the way lit?", hint: "After a walk" },
-                  { href: "/contribute", icon: "pin", label: "A place is wrong", hint: "Closed, moved" },
-                ].map((c) => (
-                  <Link key={c.label} href={c.href} className="m-card m-press flex min-w-[9.5rem] shrink-0 flex-col gap-1 p-3">
-                    <Icon name={c.icon} className="size-5 text-people" />
-                    <span className="text-sm font-semibold leading-tight">{c.label}</span>
-                    <span className="text-xs text-ink-muted">{c.hint}</span>
-                  </Link>
-                ))}
-              </div>
             </section>
 
-            <div id="updates" className="mt-7 scroll-mt-4">
+            <EvidenceLedger className="mt-8" title="The details" label="What Mira knows here" items={claims.map((c) => (c.kind === "failed" ? { ...c, action: { label: "Try again", onClick: () => setRetry((n) => n + 1) } } : c))} />
+
+            <div id="updates" className="mt-8 scroll-mt-4">
               <SafetyUpdatesSection point={focus} heading={place ? `Local updates near ${place.name}` : "Local updates near you"} />
             </div>
           </>

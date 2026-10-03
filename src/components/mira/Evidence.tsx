@@ -56,19 +56,19 @@ export interface EvidenceItem {
 export function EvidenceRow({ item }: { item: EvidenceItem }) {
   const muted = item.kind === "none" || item.kind === "nodata" || item.kind === "pending";
   return (
-    <li className="flex gap-3 py-3">
-      <span aria-hidden className={cx("mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl", item.kind === "people" ? "bg-people-soft text-people" : item.topic === "Daylight" || item.topic === "Lighting" ? "bg-dusk-soft text-dusk" : "bg-sunken text-ink-muted")}>
-        <Icon name={item.icon ?? "info"} className="size-[18px]" />
+    <li className="flex gap-3 py-3.5">
+      <span aria-hidden className={cx("mt-0.5 grid size-8 shrink-0 place-items-center rounded-full", item.kind === "people" ? "bg-people-soft text-people" : item.topic === "Daylight" || item.topic === "Lighting" ? "bg-dusk-soft text-dusk" : "bg-sunken text-ink-muted")}>
+        <Icon name={item.icon ?? "info"} className="size-4" />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
           <p className="m-label">{item.topic}</p>
-          <p className="inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-ink-subtle">
+          <p className="inline-flex items-center gap-1.5 text-[0.7rem] font-medium text-ink-subtle">
             <EvidenceGlyph kind={item.kind} />
             {EVIDENCE_LABEL[item.kind]}
           </p>
         </div>
-        <p className={cx("mt-0.5 text-[0.95rem] leading-snug", muted ? "text-ink-muted" : "text-ink")}>{item.claim}</p>
+        <p className={cx("mt-0.5 text-[0.9375rem] leading-snug", muted ? "text-ink-muted" : "text-ink")}>{item.claim}</p>
         {item.source ? <p className="mt-0.5 text-xs text-ink-subtle">{item.source}</p> : null}
         {item.action ? (
           <button type="button" onClick={item.action.onClick} className="mt-1 min-h-11 text-sm font-semibold text-accent-strong">
@@ -85,9 +85,9 @@ export function EvidenceLedger({ items, title = "What Mira checked", label, clas
   const order: EvidenceKind[] = ["checked", "estimate", "people", "pending", "failed", "nodata", "none"];
   const sorted = [...items].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
   return (
-    <section aria-label={label ?? title} className={cx("m-card px-4 pt-3", className)}>
+    <section aria-label={label ?? title} className={cx("m-card px-4 pt-3.5", className)}>
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[0.95rem] font-semibold">{title}</h3>
+        <h3 className="m-h">{title}</h3>
         <EvidenceKey />
       </div>
       <ul className="divide-y divide-line">{sorted.map((item) => <EvidenceRow key={item.id} item={item} />)}</ul>

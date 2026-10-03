@@ -13,6 +13,7 @@ import { EmergencyPill } from "@/components/app/EmergencyPill";
 import { useToast } from "@/components/ui/Toast";
 import { cx } from "@/components/ui/cx";
 import { RootHeader } from "@/components/mira/Frame";
+import { SkyCard, skyAt } from "@/components/mira/LiveNow";
 import { EvidenceGlyph, EVIDENCE_LABEL, type EvidenceKind } from "@/components/mira/Evidence";
 import { api } from "@/lib/api-client";
 import { takeHandedOffAsk } from "@/lib/ask-handoff";
@@ -93,7 +94,7 @@ function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; o
     setPendingDestination(d);
     router.push("/around");
   };
-  const shell = "mt-2 overflow-hidden rounded-[var(--radius-tile)] bg-surface ring-1 ring-line";
+  const shell = "m-card mt-2 overflow-hidden";
   switch (card.type) {
     case "trip": {
       const mode = card.mode ?? "walk";
@@ -340,7 +341,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
       <div className="z-10 bg-canvas px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className="mx-auto max-w-xl">
           <RootHeader emailAlerts={emailAlerts} leading={<MiraPulse size={22} state={sending ? "thinking" : "observing"} />} eyebrow={here ? `${loc.area ?? "Near you"}${clock ? ` · ${clockIn(clock)}` : ""}` : "Places, plans and what’s around"} title="Mira" />
-          {planActive ? (
+          {planActive && (plan || planDraft?.loop || planDraft?.destination.query.trim() || (planDraft?.origin.kind === "named" && planDraft.origin.query.trim())) ? (
             <div className="mt-3 flex items-center gap-3 rounded-2xl bg-accent-soft/70 px-3 py-2.5">
               <Icon name="route" className="size-5 shrink-0 text-accent-strong" />
               <div className="min-w-0 flex-1">
@@ -359,15 +360,18 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
         <div className="mx-auto flex max-w-xl flex-col gap-4">
           {empty ? (
             <div className="animate-rise">
-              <p className="m-display max-w-[18ch]">Ask about a place, a time, or a plan.</p>
-              <p className="mt-3 text-[0.95rem] text-ink-muted">Mira answers with what it can check — daylight, lit streets, Help Points open then, local updates — and says what it can’t. It never calls a place good or bad.</p>
-              <div className="mt-6 space-y-4">
+              {here && clock ? (
+                <SkyCard state={skyAt(clock, here)} label="What Mira can see right now" eyebrow="What I can see right now" aside={loc.area ?? null} title={`${clockIn(clock)} · ${skyAt(clock, here) === "dark" ? "Dark now" : skyAt(clock, here) === "uncertain" ? "Twilight" : "Daylight"}`} strip={{ from: clock, point: here, hours: 12 }} className="mb-6" />
+              ) : null}
+              <p className="text-[1.625rem] font-semibold leading-tight tracking-[-0.035em]">Ask about a place, a time, or a plan.</p>
+              <p className="mt-2 text-[0.9375rem] text-ink-muted">I answer with what I can check — daylight, lit streets, Help Points open then, local updates — and say what I can’t. I never call a place good or bad.</p>
+              <div className="mt-7 space-y-5">
                 {STARTERS.map((g) => (
                   <section key={g.title} aria-label={g.title}>
                     <h2 className="m-label flex items-center gap-1.5"><Icon name={g.icon} className="size-3.5" />{g.title}</h2>
                     <div className="mt-2 grid gap-2">
                       {g.asks.map((q) => (
-                        <button key={q} type="button" onClick={() => void send(q)} disabled={sending} className="m-card m-press flex min-h-12 items-center gap-3 px-4 py-3 text-left text-[0.95rem]">
+                        <button key={q} type="button" onClick={() => void send(q)} disabled={sending} className="m-card m-press flex min-h-12 items-center gap-3 px-4 py-3 text-left text-[0.9375rem]">
                           <span className="flex-1">{q}</span><Icon name="arrow" className="size-4 text-ink-subtle" />
                         </button>
                       ))}

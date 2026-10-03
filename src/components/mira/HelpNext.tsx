@@ -8,6 +8,7 @@ import { outcomeMessage, type ContributionOutcome } from "@/components/app/Check
 import { api } from "@/lib/api-client";
 import { recordUsage } from "@/lib/usage-signal";
 import type { Category } from "@/domain/report/taxonomy";
+import { setPendingReportSpot } from "@/lib/location-store";
 
 type Check = { id: string; question: string; placeName: string; options: Array<{ value: string; label: string }> };
 
@@ -24,7 +25,7 @@ const QUICK: Array<{ c: Category; icon: string; label: string; tone: "dusk" | "p
  * Mira Check is answered inline; a quick observation opens the private report with this spot and the
  * category already chosen. Impact is counted from her own receipts only (never a leaderboard).
  */
-export function HelpNextCard({ check, impactLine, signedIn, country }: { check: Check | null; impactLine: string | null; signedIn: boolean; country: string | null }) {
+export function HelpNextCard({ check, impactLine, signedIn, country, spot = null, title = "Add what you see here" }: { spot?: { lat: number; lon: number; name: string } | null; title?: string; check: Check | null; impactLine: string | null; signedIn: boolean; country: string | null }) {
   const router = useRouter();
   const [answered, setAnswered] = useState<{ text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -37,13 +38,16 @@ export function HelpNextCard({ check, impactLine, signedIn, country }: { check: 
     if (r.ok) recordUsage("check");
     setAnswered({ text: r.ok ? (r.data.outcome ? outcomeMessage(r.data.outcome, r.data.recorded) : outcomeMessage("pending" as ContributionOutcome, r.data.recorded)) : r.message });
   };
-  // The report screen uses her live position ("Around where you are now"); no spot is handed over.
-  const report = (c: Category) => router.push(`/report?c=${c}&from=home`);
+  // Near her, the report uses her live position ("Around where you are now"); about a chosen place, that place.
+  const report = (c: Category) => {
+    if (spot) setPendingReportSpot({ lat: spot.lat, lon: spot.lon, name: spot.name });
+    router.push(`/report?c=${c}&from=home`);
+  };
 
   return (
     <section aria-labelledby="help-next-h" className="rounded-[1.5rem] bg-people-soft/45 px-4 pb-3.5 pt-3.5">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 id="help-next-h" className="text-[0.9375rem] font-semibold tracking-[-0.01em]">Add what you see here</h2>
+        <h2 id="help-next-h" className="text-[0.9375rem] font-semibold tracking-[-0.01em]">{title}</h2>
         <p className="shrink-0 text-xs font-medium text-people">One tap · private</p>
       </div>
 
