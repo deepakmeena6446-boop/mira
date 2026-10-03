@@ -59,7 +59,7 @@ export function InstallCard({ variant, onDismiss }: { variant: "row" | "card"; o
   }
 
   return (
-    <div className="mt-4 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-card)] animate-rise">
+    <div className="mt-4 m-card p-4 shadow-[var(--shadow-card)] animate-rise">
       <div className="flex items-start gap-3">
         <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-accent"><Icon name="plus" className="size-5" /></span>
         <div className="min-w-0 flex-1">

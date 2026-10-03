@@ -31,7 +31,7 @@ export function BriefMap({ tiles, start, end, route, lighting, pins = [], notes 
   const places = [...(start && !me ? [{ id: "start", name: "Start", lat: start.lat, lon: start.lon, icon: "pin" }] : []), ...pins];
   return (
     <div className={cx("relative overflow-hidden rounded-[var(--radius-tile)] bg-sunken ring-1 ring-line", className ?? "h-56")}>
-      <WorldMap tiles={tiles} me={me} dest={end ?? (follow && me ? null : start)} route={route} lighting={lighting ?? null} places={places} notes={notes} follow={follow} padding={{ top: 36, bottom: 36, left: 36, right: 36 }} label={label} className="absolute inset-0" onPlaceClick={onPinClick ? (p) => onPinClick(p.id) : undefined} />
+      <WorldMap tiles={tiles} me={me} dest={end ?? (follow && me ? null : start)} route={route} lighting={lighting ?? null} places={places} notes={notes} follow={follow} padding={{ top: 36, bottom: 36, left: 36, right: 36 }} label={label} cooperative className="absolute inset-0" onPlaceClick={onPinClick ? (p) => onPinClick(p.id) : undefined} />
     </div>
   );
 }

@@ -27,7 +27,7 @@ test("S1 early walk compares mapped options and preserves evidence on map", asyn
   await expect(comparison).toContainText("No eligible planned-time service source");
   await comparison.getByRole("button", { name: /Different mapped walk/ }).click();
   await expect(comparison.getByRole("button", { name: /Different mapped walk/ })).toHaveAttribute("aria-pressed", "true");
-  await page.goto("/around/map");
+  await page.goto("/around/map/classic");
   await expect(page.getByRole("region", { name: "Plan options" })).toContainText("OpenStreetMap imported walking graph");
   await expect(page.getByRole("region", { name: "Plan options" }).getByRole("button", { name: /Different mapped walk/ })).toHaveAttribute("aria-pressed", "true");
 });

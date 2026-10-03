@@ -118,7 +118,7 @@ export function SafetyUpdatesSection({ point, heading = "Safety updates", classN
     );
   } else if (data) {
     body = (
-      <div className="mt-2 rounded-[var(--radius-card)] bg-surface px-4 py-3 shadow-[var(--shadow-card)]">
+      <div className="mt-2 m-card px-4 py-3">
         <p className="font-semibold">{ui(summaryLine(data))}</p>
         <p className="mt-0.5 text-xs text-ink-muted">
           Official advisories {data.counts.official} · News reports {data.counts.news} · Community reports: not in the beta

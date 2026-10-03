@@ -109,6 +109,7 @@ export function WorldMap({
   padding = { top: 140, bottom: 320, left: 40, right: 40 },
   className,
   label,
+  cooperative = false,
 }: {
   tiles: { url: string; attribution: string; styleUrl?: string | null; nightStyleUrl?: string | null; nightUrl?: string | null; provider?: string };
   me: LngLat | null;
@@ -133,6 +134,8 @@ export function WorldMap({
   onArea?: (name: string | null) => void;
   padding?: { top: number; bottom: number; left: number; right: number };
   className?: string;
+  /** A map inside a scrolling page: one finger (or a plain wheel) scrolls the page; two fingers move the map. */
+  cooperative?: boolean;
   label: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -191,6 +194,7 @@ export function WorldMap({
           attributionControl: { compact: true },
           dragRotate: false,
           pitchWithRotate: false,
+          cooperativeGestures: cooperative,
         });
         map.touchZoomRotate.disableRotation();
         // A tap right after a long-press shouldn't also count as a map tap.

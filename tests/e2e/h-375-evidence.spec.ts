@@ -18,7 +18,7 @@ test("375 px walk shows lighting before Start, with accessible details and no ho
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   await page.getByRole("button", { name: "🏠 Home" }).click();
   await expect(page.getByText("Saved as Home")).toBeVisible();
-  await page.goto("/around/map");
+  await page.goto("/around/map/classic");
   await page.getByRole("button", { name: /Home/ }).first().click();
   await expect(page.getByRole("region", { name: "Lighting evidence before starting" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
@@ -30,7 +30,7 @@ test("375 px Help Points, Emergency, arrival and Contribute remain usable", asyn
   test.skip(info.project.name !== "mobile", "one 375 px browser is enough");
   const { ctx, page } = await newUser(browser, "Leena");
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto("/around/map");
+  await page.goto("/around/map/classic");
   await page.getByRole("button", { name: "Help Points near me" }).click();
   await expect(page.getByRole("dialog", { name: "Help Points near you" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);

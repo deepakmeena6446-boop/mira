@@ -20,16 +20,16 @@ export default async function ReleasesPage() {
       <Link href="/admin/reports" className="inline-flex min-h-11 items-center self-start font-semibold text-accent hover:underline">
         ← Review queue
       </Link>
-      <h1 className="text-2xl font-bold">Public community summaries</h1>
+      <h1 className="m-display">Public community summaries</h1>
       <p className="text-ink-muted">
         These are the weekly, thresholded summaries currently shown in Know. Remove one immediately if it poses a privacy risk; the removal is audited.
       </p>
       {releases.length === 0 ? (
-        <p className="rounded-[var(--radius-card)] border border-line bg-surface p-6 text-ink-muted">No summaries are currently public.</p>
+        <p className="m-card p-6 text-ink-muted">No summaries are currently public.</p>
       ) : (
         <ul className="flex flex-col gap-3">
           {releases.map((r) => (
-            <li key={r.id} className="rounded-[var(--radius-card)] border border-line bg-surface p-5">
+            <li key={r.id} className="m-card p-5">
               <p className="text-sm text-ink-muted">
                 Week of {formatIstDate(r.releaseWeek)} · cell {r.cellId} · {r.timeBand} · expires {formatIstDate(r.expiresAt)}
               </p>

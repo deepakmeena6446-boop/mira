@@ -7,10 +7,10 @@ import { listPlaces } from "@/server/account/places";
 import { listContacts } from "@/server/account/contacts";
 import { currentTrip } from "@/server/trips";
 import { smtpConfigured } from "@/server/config/env";
-import { HomeScreen } from "../../HomeScreen";
+import { HomeScreen } from "../../../HomeScreen";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Map · Around" };
+export const metadata: Metadata = { title: "Map (classic)", robots: { index: false } };
 
 export default async function MapPage() {
   const sql = getSql();

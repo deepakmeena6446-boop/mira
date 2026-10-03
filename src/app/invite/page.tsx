@@ -15,7 +15,7 @@ export default async function InvitePage() {
   const contact = await contactInviteView(getSql(), token);
   if (contact) {
     return (
-      <section aria-labelledby="inv-h" className="animate-rise rounded-[var(--radius-card)] bg-surface p-7 shadow-[var(--shadow-card)]">
+      <section aria-labelledby="inv-h" className="animate-rise m-card p-7">
         <Avatar name={contact.owner} size={64} />
         <h1 id="inv-h" className="mt-4 text-2xl font-semibold">
           {contact.owner} wants you as a trusted contact
@@ -44,7 +44,7 @@ export default async function InvitePage() {
       revoked: "The person who invited you has withdrawn this invitation. There's nothing you need to do.",
     }[invite.status];
     return (
-      <section aria-labelledby="inv-h" className="rounded-[var(--radius-card)] border border-line bg-surface p-6">
+      <section aria-labelledby="inv-h" className="m-card p-6">
         <h1 id="inv-h" className="text-2xl font-semibold">
           Invitation not available
         </h1>
@@ -54,7 +54,7 @@ export default async function InvitePage() {
   }
 
   return (
-    <section aria-labelledby="inv-h" className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-line bg-surface p-6">
+    <section aria-labelledby="inv-h" className="flex flex-col gap-4 m-card p-6">
       <h1 id="inv-h" className="text-2xl font-semibold">
         Be a check-in contact for one journey
       </h1>

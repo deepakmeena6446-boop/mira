@@ -11,8 +11,8 @@ export const metadata: Metadata = { title: "Sign in" };
 export default async function AdminLoginPage() {
   if (await getAdmin(getSql(), systemClock)) redirect("/admin/reports");
   return (
-    <div className="mx-auto max-w-sm rounded-[var(--radius-card)] border border-line bg-surface p-6">
-      <h1 className="text-2xl font-bold">Sign in</h1>
+    <div className="mx-auto max-w-sm m-card p-6">
+      <h1 className="m-display">Sign in</h1>
       <p className="mt-1 mb-5 text-sm text-ink-muted">For Mira moderators. There is no public account.</p>
       <LoginForm />
     </div>

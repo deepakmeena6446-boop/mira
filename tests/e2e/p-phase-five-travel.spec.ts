@@ -143,7 +143,7 @@ test("S4 arrival check-in and explicit return are two private confirmed journeys
     const { intent } = route.request().postDataJSON() as { intent: MovementIntent };
     await route.fulfill({ json: fixtureOptions(intent) });
   });
-  await owner.page.goto("/around/map");
+  await owner.page.goto("/around/map/classic");
   await owner.page.getByRole("radio", { name: "Use foreground location" }).check();
   await owner.page.getByRole("button", { name: "Start chosen journey" }).click();
   await expect(owner.page.getByText("Nobody is notified.", { exact: false })).toBeVisible();

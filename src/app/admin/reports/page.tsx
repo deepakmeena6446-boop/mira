@@ -25,7 +25,7 @@ export default async function QueuePage({ searchParams }: PageProps<"/admin/repo
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Review queue</h1>
+        <h1 className="m-display">Review queue</h1>
         <div className="flex items-center gap-2">
           <Link href="/admin/releases" className="inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold text-accent hover:bg-accent-soft">
             Public summaries
@@ -33,7 +33,7 @@ export default async function QueuePage({ searchParams }: PageProps<"/admin/repo
           <SignOutButton />
         </div>
       </div>
-      <p className="rounded-[var(--radius-control)] border border-accent/30 bg-accent-soft px-4 py-3 font-medium">
+      <p className="rounded-2xl bg-accent-soft px-4 py-3 font-medium">
         Approval permits aggregation only; it never publishes this report.
       </p>
       <nav aria-label="Filter by status">
@@ -52,9 +52,9 @@ export default async function QueuePage({ searchParams }: PageProps<"/admin/repo
         </ul>
       </nav>
       {reports.length === 0 ? (
-        <p className="rounded-[var(--radius-card)] border border-line bg-surface p-6 text-ink-muted">No {status} reports.</p>
+        <p className="m-card p-6 text-ink-muted">No {status} reports.</p>
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-card)] border border-line bg-surface">
+        <div className="overflow-x-auto m-card">
           <table className="w-full min-w-[640px] text-left text-sm">
             <caption className="sr-only">{status} reports, oldest first</caption>
             <thead className="border-b border-line bg-sunken">

@@ -53,7 +53,7 @@
   --radius-xs: 0.5rem;
   --radius-control: 0.75rem;
   --radius-button: 0.875rem;
-  --radius-card: 1rem;
+  --radius-card: 1.25rem; /* Phase 2: the same corner as Phase 1 cards (--radius-tile) */
   --radius-lg: 1.5rem;
   /* Cards on the canvas get a hairline, not a floating shadow. Over-map chrome uses --shadow-float. */
   --shadow-card: 0 0 0 1px var(--color-line);
@@ -271,6 +271,13 @@
 .maplibregl-ctrl-group {
   border-radius: var(--radius-control) !important;
   box-shadow: var(--shadow-float) !important;
+}
+/* Maps inside a page ask for two fingers / Ctrl-scroll; the hint uses the app's ink and type. */
+.maplibregl-cooperative-gesture-screen {
+  background: rgb(20 33 61 / 0.55) !important;
+  color: #fff !important;
+  font: 600 0.9375rem/1.35 var(--font-sans, inherit) !important;
+  padding: 1.25rem !important;
 }
 
 /* Nearby place pins on the map (WorldMap). The button is the dot; the name floats below. */
@@ -558,6 +565,9 @@
 :root[data-journey="open"] .m-actionbar, .m-actionbar[data-edge] { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
 .m-dock { position: fixed; inset-inline: 0; bottom: calc(var(--tabbar-space) + 0.5rem); z-index: 35; padding-inline: 0.75rem; pointer-events: none; }
 .m-dock > * { pointer-events: auto; }
+/* A fixed-height panel (the map's sheet) keeps its last line clear of the journey dock, only while one shows. */
+.m-dock-aware { padding-bottom: 1rem; }
+body:has(.m-dock) .m-dock-aware { padding-bottom: 5.75rem; }
 .m-scroll-x { display: flex; gap: 0.5rem; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
 .m-scroll-x::-webkit-scrollbar { display: none; }
 @media (min-width: 1024px) {

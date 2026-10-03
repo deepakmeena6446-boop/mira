@@ -153,7 +153,7 @@ export async function shareLinkFor(address: string): Promise<string> {
 
 /** Open the explicit map and choose a destination in its existing route sheet. */
 export async function openRoute(page: Page, name = DEST) {
-  await page.goto("/around/map");
+  await page.goto("/around/map/classic");
   await page.getByRole("button", { name: /Search a place or address/ }).click();
   await page.getByPlaceholder("Search a place or address").fill(name);
   await page.getByRole("button", { name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first().click();

@@ -36,12 +36,12 @@ export default async function ReportDetailPage({ params }: PageProps<"/admin/rep
       <Link href={`/admin/reports?status=${report.status}`} className="inline-flex min-h-11 items-center self-start font-semibold text-accent hover:underline">
         ← Back to {report.status} queue
       </Link>
-      <p className="rounded-[var(--radius-control)] border border-accent/30 bg-accent-soft px-4 py-3 font-medium">
+      <p className="rounded-2xl bg-accent-soft px-4 py-3 font-medium">
         Approval permits aggregation only; it never publishes this report.
       </p>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
-        <section aria-labelledby="summary-h" className="h-fit rounded-[var(--radius-card)] border border-line bg-surface p-5">
-          <h1 id="summary-h" className="text-xl font-bold">
+        <section aria-labelledby="summary-h" className="h-fit m-card p-5">
+          <h1 id="summary-h" className="m-title">
             {CATEGORY_LABEL[report.category as Category]} <span className="text-base font-medium capitalize text-ink-muted">· {report.status}</span>
           </h1>
           <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">

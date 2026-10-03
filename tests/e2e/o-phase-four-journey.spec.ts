@@ -87,7 +87,7 @@ test("a selected plan requires a separate start confirmation and proximity check
     sessionStorage.setItem("mira.plan.v1", JSON.stringify({ savedAt: Date.now(), draft: { version: 1, touched: true, activity: "Walk to the library", origin: { kind: "named", query: "Start", resolution: { source: "search", name: "Start", point: from, placeId: "start" } }, destination: { query: "Library", resolution: { source: "search", name: "Library", point: to, placeId: "library" } }, loop: false, departureLocal: local, timeZone: "Asia/Kolkata", mode: "walk", constraints: "" } }));
   }, { from, to });
   await owner.page.route("**/api/plan/options", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ state: "ready", checkedAt: new Date().toISOString(), source: "OpenStreetMap imported walking graph", sourceAt: new Date().toISOString(), scope: "test route", options: [{ id: "walk-0", label: "Shortest mapped walk", minutes: 15, meters: 1000, geometry: [[from.lon, from.lat], [to.lon, to.lat]], evidence: [{ status: "known", claim: "Mapped walking time estimate", value: 15, scope: { kind: "route", ref: "test route" }, source: { id: "osm-walking-graph", label: "OpenStreetMap", observedAt: new Date().toISOString(), expiresAt: null } }] }], daylight: { status: "unknown", claim: "Daylight", scope: { kind: "area", ref: "test" }, reason: "not_checked", retryable: false }, service: { status: "unknown", claim: "Service", scope: { kind: "route", ref: "test" }, reason: "unsupported", retryable: false }, detail: "One mapped path." }) }));
-  await owner.page.goto("/around/map");
+  await owner.page.goto("/around/map/classic");
   await owner.page.getByRole("radio", { name: "Use foreground location" }).check();
   await expect(owner.page.getByRole("button", { name: "Start chosen journey" })).toBeVisible();
   const before = await (await owner.page.request.get("/api/trips/current")).json();
@@ -115,7 +115,7 @@ test("S1 loop offers a manual check-in, keeps location optional until confirmed,
     sessionStorage.setItem("mira.plan.v1", JSON.stringify({ savedAt: Date.now(), draft: { version: 1, touched: true, activity: "Early run", origin: { kind: "named", query: "North Gate", resolution: { source: "search", name: "North Gate", point: from, placeId: "north" } }, destination: { query: "", resolution: null }, loop: true, departureLocal: local, timeZone: "Asia/Kolkata", mode: "walk", constraints: "" } }));
   }, { lat: GEO.latitude, lon: GEO.longitude });
   await owner.page.route("**/api/plan/options", async (route) => route.fulfill({ json: { state: "missing", options: [], checkedAt: new Date().toISOString(), source: null, sourceAt: null, scope: "fixture", detail: "No mapped loop in this fixture", daylight: { status: "unknown", reason: "not_checked" }, service: { status: "unknown", reason: "unsupported" } } }));
-  await owner.page.goto("/around/map");
+  await owner.page.goto("/around/map/classic");
   await expect(owner.page.getByRole("status").filter({ hasText: "No mapped loop in this fixture" })).toBeVisible();
   await owner.page.getByRole("radio", { name: "Use foreground location" }).check();
   await expect(owner.page.getByRole("button", { name: "Start manual journey" })).toBeVisible();

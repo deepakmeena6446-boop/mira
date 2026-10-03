@@ -27,6 +27,8 @@ import { AccountSection, PushSection } from "./MeSections";
 import { PersonalSections } from "./PersonalSections";
 
 const EMOJIS = [["🏠", "Home"], ["🎓", "College"], ["💼", "Work"], ["🏋️", "Gym"], ["⭐", "Favourite"]] as const;
+/** The kinds a person can turn off (the API's list; airports and stores aren't suggested as help on their own). */
+const EXCLUDABLE: HelpClass[] = ["hospital", "police", "transit", "hotel", "pharmacy", "fuel"];
 const CONTACT_STATE: Record<Contact["status"], string> = { accepted: "Trusted · can follow when you share", phone: "On WhatsApp · you send the link", invited: "Invited · hasn’t accepted yet", invite_failed: "Invite didn’t send" };
 
 /**
@@ -175,7 +177,7 @@ export function MeScreen({ user, places: initialPlaces, contacts, modes, emailAl
 
         <Group id="help" label="Help Points Mira suggests" className="mt-7" note="Turn off any kind of place you’d rather not be pointed to — when you feel unsafe or along your routes.">
           <div className="flex flex-wrap gap-2 p-4">
-            {(Object.keys(HELP_CLASSES) as HelpClass[]).map((c) => {
+            {EXCLUDABLE.map((c) => {
               const on = !exclude.includes(c);
               return <Chip key={c} role="switch" on={on} icon={HELP_ICON[c] ?? "pin"} onClick={async () => {
                 const next = on ? [...exclude, c] : exclude.filter((x) => x !== c);

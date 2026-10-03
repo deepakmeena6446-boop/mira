@@ -78,7 +78,7 @@ test("You groups people, places, contributions and settings in the same language
   // Help Point kinds are many-of-many switches that persist.
   const fuel = page.getByRole("region", { name: "Help Points Mira suggests" }).getByRole("switch", { name: /Fuel station/ });
   await expect(fuel).toHaveAttribute("aria-checked", "true");
-  await fuel.click();
+  await Promise.all([page.waitForResponse((r) => new URL(r.url()).pathname === "/api/me" && r.request().method() === "PATCH" && r.ok()), fuel.click()]);
   await expect(fuel).toHaveAttribute("aria-checked", "false");
   await page.reload();
   await expect(page.getByRole("region", { name: "Help Points Mira suggests" }).getByRole("switch", { name: /Fuel station/ })).toHaveAttribute("aria-checked", "false");
@@ -93,4 +93,23 @@ test("You groups people, places, contributions and settings in the same language
   await expect(page.getByRole("dialog")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
   await ctx.close();
+});
+
+test("the full map never asks for GPS by itself, uses the same frame as the journey, and asks before locating", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("mira.welcomed", "1");
+    const state = window as unknown as { geoCalls: number };
+    state.geoCalls = 0;
+    Object.defineProperty(navigator.geolocation, "getCurrentPosition", { configurable: true, value: () => { state.geoCalls++; } });
+  });
+  await page.goto("/around/map");
+  await expect(page.getByRole("button", { name: "I feel unsafe" })).toBeVisible();
+  const sheet = page.getByRole("region", { name: "On the map" });
+  await expect(sheet.getByRole("button", { name: /Check a place/ })).toBeVisible();
+  await expect(sheet).toContainText("See what’s around you");
+  await expect(sheet).toContainText("Press and hold anywhere on the map");
+  expect(await page.evaluate(() => (window as unknown as { geoCalls: number }).geoCalls)).toBe(0);
+  await sheet.getByRole("button", { name: "Use my location" }).click();
+  expect(await page.evaluate(() => (window as unknown as { geoCalls: number }).geoCalls)).toBe(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
 });

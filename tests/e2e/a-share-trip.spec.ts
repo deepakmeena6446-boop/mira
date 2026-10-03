@@ -20,7 +20,7 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     await expect(owner.page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Home", "Mira", "Around", "Journeys"]);
 
     // Around → map → one tap on the saved place → context → Start with Mira.
-    await owner.page.goto("/around/map");
+    await owner.page.goto("/around/map/classic");
     await expect(owner.page.getByRole("heading", { name: "Where are you going?", exact: true })).toBeVisible();
     await expect(owner.page.getByRole("link", { name: /Emergency call, 112/ })).toHaveAttribute("href", "tel:112");
     await owner.page.getByRole("button", { name: /Home/ }).first().click();
