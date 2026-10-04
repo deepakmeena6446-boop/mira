@@ -154,7 +154,7 @@ Live sharing is off. Mira doesn&apos;t keep a record of the trip.
           <p className="mt-4 text-sm text-ink-muted">If you&apos;re worried, call {trip.name} first. In an emergency, call your local emergency number.</p>
         )}
         <p className="mt-4 flex items-center gap-2 text-xs text-ink-subtle">
-          <MiraPulse size={12} /> Shared privately with you on Mira. Only their latest spot is shown, and this link stops working shortly after the trip ends.
+          <MiraPulse size={12} /> Shared privately with you on Mira. You see their latest spot and where they&rsquo;re heading (a saved place only roughly), and this link stops working shortly after the trip ends.
         </p>
       </section>
     </main>

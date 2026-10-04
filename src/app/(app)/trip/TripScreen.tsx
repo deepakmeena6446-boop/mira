@@ -40,6 +40,7 @@ import type { Contact } from "@/server/account/contacts";
 import { localTimeInZone } from "@/domain/opening-hours";
 import type { AlertState } from "@/domain/journey";
 import { clockIn } from "@/domain/daylight";
+import { LEFT_NOTE } from "@/app/(app)/trips/left-note";
 
 const time = (iso: string | number) => clockIn(iso);
 const names = (list: string[]) => (list.length <= 2 ? list.join(" and ") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`);
@@ -141,11 +142,12 @@ export function TripScreen({
   // Kept in a ref so `refresh` stays stable: callbacks and effects below depend on it.
   const leave = useRef<(signedOut: boolean) => void>(() => {});
   useEffect(() => {
-    leave.current = (signedOut) => {
-      toast(signedOut ? "You're signed out here, so this journey isn't running on this device any more." : "This journey was closed on another device. Nothing is being shared, and nobody will be alerted.", "info");
+    // A toast here was wiped by the move to Journeys (re-audit RA2), so Journeys says it; it knows whether she's signed in.
+    leave.current = () => {
+      try { sessionStorage.setItem(LEFT_NOTE, "1"); } catch { /* private mode: Journeys still shows the true state */ }
       router.replace("/trips");
     };
-  }, [router, toast]);
+  }, [router]);
   const refresh = useCallback(async () => {
     const r = await api<{ trip: TripView | null; safetyNet?: SafetyNet }>("/api/trips/current");
     if (r.ok && r.data.trip) { setTrip(r.data.trip); publishTrip(r.data.trip); }
@@ -483,7 +485,12 @@ export function TripScreen({
           </p>
           {trip.alert === "sent" ? (
             <p className="mt-2 max-w-sm text-sm text-ink-muted animate-rise">
-              {(() => { const told = trip.sharedWith.filter((c) => c.alertDelivery === "sent").map((c) => c.name); return `${told.length ? names(told) : "The people Mira emailed"} ${told.length === 1 ? "was" : "were"} told you missed your check-in. Mira is emailing them now that this journey is over — call them if you can.`; })()}
+              {(() => {
+                const told = trip.sharedWith.filter((c) => c.alertDelivery === "sent").map((c) => c.name);
+                // The all-clear goes only after I'm here / End, to alerted contacts still on the journey (re-audit RA3 N1).
+                const allClear = (trip.state === "arrived" || trip.state === "ended") && told.length > 0;
+                return `${told.length ? names(told) : "The people Mira emailed"} ${told.length === 1 ? "was" : "were"} told you missed your check-in. ${allClear ? "Mira is trying to email them that this journey is over — call them too if you can." : "Mira can't send them an all-clear from here, so call or message them to say you're okay."}`;
+              })()}
             </p>
           ) : null}
           {/* The one question after a journey (or nothing): a Mira Check that helps the next person. */}
@@ -712,7 +719,7 @@ export function TripScreen({
 
               {confirmEnd ? (
                 <div className="rounded-xl bg-surface p-4">
-                  <p className="font-semibold">End the {noun}? Live sharing stops{alertsOn ? " and nobody is told if you don't arrive" : ""}.</p>
+                  <p className="font-semibold">End the {noun}? Live sharing stops{trip.state === "missed" ? (trip.sharedWith.some((c) => c.alertDelivery === "sent") ? ", and the people Mira alerted get an email that you ended it" : "") : alertsOn ? " and nobody is told if you don't arrive" : ""}.</p>
                   <div className="mt-3 flex gap-2">
                     <Button variant="danger" onClick={() => act("end")} busy={busy === "end"}>End trip</Button>
                     <Button variant="ghost" onClick={() => setConfirmEnd(false)}>Keep going</Button>

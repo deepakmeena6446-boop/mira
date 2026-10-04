@@ -1,15 +1,7 @@
 import "server-only";
 import { hmacHex } from "@/server/crypto";
+import { isoWeek } from "@/domain/aggregation";
 
-/** Monday-start ISO week, "2026-W40": the salt, so a network hash can't link one person's reports across weeks. */
-function isoWeek(d: Date): string {
-  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  const day = t.getUTCDay() || 7;
-  t.setUTCDate(t.getUTCDate() + 4 - day);
-  const year = t.getUTCFullYear();
-  const week = Math.ceil(((t.getTime() - Date.UTC(year, 0, 1)) / 86_400_000 + 1) / 7);
-  return `${year}-W${String(week).padStart(2, "0")}`;
-}
 
 /**
  * Which network a report came from, coarsely and privately (audit P14-001): a keyed hash of the IPv4 /24 or IPv6 /48,

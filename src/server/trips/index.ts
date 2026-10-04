@@ -470,12 +470,12 @@ export async function addLocation(sql: postgres.Sql, userId: string, id: string,
 export async function sharedTrip(sql: postgres.Sql, token: string, now: Date) {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return null;
   const hash = hashToken("invite", `trip:${token}`);
-  type J = { id: string; state: JourneyState; dest_name: string; dest_lat: number; dest_lon: number; eta_at: Date; closed_at: Date | null; name: string; via_contact: boolean; mode: JourneyMode; auto_arrival: boolean; check_requested_at: Date | null; tz: string | null };
+  type J = { id: string; state: JourneyState; dest_name: string; dest_lat: number; dest_lon: number; eta_at: Date; closed_at: Date | null; name: string; via_contact: boolean; mode: JourneyMode; auto_arrival: boolean; check_requested_at: Date | null; tz: string | null; saved_place: boolean };
   const [j] = await sql<J[]>`
-    SELECT j.id, j.state, j.dest_name, j.dest_lat, j.dest_lon, j.eta_at, j.closed_at, u.name, false AS via_contact, j.mode, j.auto_arrival, j.check_requested_at, j.tz
+    SELECT j.id, j.state, j.dest_name, j.dest_lat, j.dest_lon, j.eta_at, j.closed_at, u.name, false AS via_contact, j.mode, j.auto_arrival, j.check_requested_at, j.tz, j.saved_place_id IS NOT NULL AS saved_place
     FROM journeys j JOIN users u ON u.id = j.user_id WHERE j.share_token_hash = ${hash}
     UNION ALL
-    SELECT j.id, j.state, j.dest_name, j.dest_lat, j.dest_lon, j.eta_at, j.closed_at, u.name, (c.accepted_at IS NOT NULL AND c.encrypted_email IS NOT NULL) AS via_contact, j.mode, j.auto_arrival, j.check_requested_at, j.tz
+    SELECT j.id, j.state, j.dest_name, j.dest_lat, j.dest_lon, j.eta_at, j.closed_at, u.name, (c.accepted_at IS NOT NULL AND c.encrypted_email IS NOT NULL) AS via_contact, j.mode, j.auto_arrival, j.check_requested_at, j.tz, j.saved_place_id IS NOT NULL AS saved_place
     FROM trip_contacts tc JOIN journeys j ON j.id = tc.journey_id JOIN users u ON u.id = j.user_id
     -- A contact's own link: an accepted email contact, or one she sends it to on WhatsApp. Removing the contact revokes it.
     JOIN contacts c ON c.id = tc.contact_id AND (c.accepted_at IS NOT NULL OR c.phone_enc IS NOT NULL)
@@ -493,7 +493,9 @@ export async function sharedTrip(sql: postgres.Sql, token: string, now: Date) {
     state: j.state,
     name,
     destination: j.dest_name,
-    dest: { lat: j.dest_lat, lon: j.dest_lon },
+    // A saved place (often Home) is shown to link holders only to ~100 m: the exact point is her address (audit P06-006).
+    dest: j.saved_place ? { lat: Math.round(j.dest_lat * 1000) / 1000, lon: Math.round(j.dest_lon * 1000) / 1000 } : { lat: j.dest_lat, lon: j.dest_lon },
+    destApprox: j.saved_place,
     etaAt: new Date(j.eta_at).toISOString(),
     /** The traveller's time zone (IANA), so the ETA is shown in her local time with its label. Null: unknown (shown in UTC). */
     tz: j.tz,

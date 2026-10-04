@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 import { Sheet, StateNote } from "@/components/mira/Frame";
 import { api } from "@/lib/api-client";
-import { freshLocation, locationUsable } from "@/lib/location-store";
+import { freshLocation, locationUsable, useClock } from "@/lib/location-store";
 import { keepTripRoute } from "@/lib/trip-route";
 import { activeTripMessage, tripStartExtras } from "@/lib/trip-start";
 import { recordUsage } from "@/lib/usage-signal";
@@ -16,6 +16,7 @@ import { haversineMeters } from "@/domain/pilot";
 import type { MovementIntent } from "@/domain/plan-contract";
 import type { Contact } from "@/server/account/contacts";
 import type { TripView } from "@/server/trips";
+import { clockIn } from "@/domain/daylight";
 
 export type GoTarget = {
   intent: MovementIntent | null;
@@ -28,6 +29,8 @@ export type GoTarget = {
   minutes: number | null;
   geometry: Array<[number, number]> | null;
   fastest: boolean;
+  /** The time she chose in the plan (epoch ms): when to arrive by, or when she meant to leave. */
+  plannedAt?: { kind: "arrive_by" | "depart_at"; at: number } | null;
 };
 
 const names = (xs: string[]) => (xs.length <= 2 ? xs.join(" and ") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
@@ -57,9 +60,20 @@ export function GoSheet({ open, onClose, target, signedIn, emailAlerts, onSignIn
   }, [open, signedIn, contacts]);
   // A provider time gets a little slack; a walk's ETA is computed by the server from the route.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- re-derive the default when the chosen option changes
-    if (target.minutes) setEta(Math.min(235, Math.max(5, Math.ceil(target.minutes * (target.loop ? 1 : 1.25)) + 5)));
-  }, [target.minutes, target.loop]);
+    // "Arrive by 10:49" is her own check-in time: it used to be dropped for a 30-min default (audit P13-002).
+    const until = target.plannedAt?.kind === "arrive_by" ? Math.ceil((target.plannedAt.at - Date.now()) / 60_000) : null;
+    const next = until !== null && until >= 5 && until <= 235 ? until : target.minutes ? Math.min(235, Math.max(5, Math.ceil(target.minutes * (target.loop ? 1 : 1.25)) + 5)) : null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- re-derive the default when the chosen option or planned time changes
+    if (next !== null) setEta(next);
+  }, [target.minutes, target.loop, target.plannedAt?.kind, target.plannedAt?.at]);
+  const clock = useClock();
+  const plannedNote = (() => {
+    const p = target.plannedAt;
+    if (!p || !clock) return null;
+    const mins = Math.round((p.at - clock.getTime()) / 60_000);
+    if (p.kind === "arrive_by") return mins > 235 ? `Your plan says arrive by ${clockIn(p.at)} — more than 4 hours away. Start closer to the time, or choose a check-in below.` : mins >= 5 ? `Your plan says arrive by ${clockIn(p.at)}, so your check-in is set to then.` : null;
+    return mins > 20 ? `Your plan is for ${clockIn(p.at)}. Starting now begins the journey now, and the check-in counts from now.` : null;
+  })();
 
   const eligible = (contacts ?? []).filter((c) => c.status === "accepted" || c.phone);
   const chosen = eligible.filter((c) => picked.includes(c.id));
@@ -181,14 +195,15 @@ export function GoSheet({ open, onClose, target, signedIn, emailAlerts, onSignIn
 
         <section aria-labelledby="go-when">
           <h3 id="go-when" className="font-semibold">{target.loop || !target.to ? "Check in after" : target.mode === "walk" ? "Check-in time" : "When do you expect to arrive?"}</h3>
+          {plannedNote ? <p className="mt-1 text-sm font-medium text-ink">{plannedNote}</p> : null}
           {target.mode === "walk" && target.to && !target.loop ? (
             <p className="mt-1 text-sm text-ink-muted">Mira sets your check-in from the route time{target.minutes ? ` (about ${Math.round(target.minutes)} min)` : ""} plus a little spare. You can add 10 minutes on the way.</p>
           ) : (
             <div className="mt-2 flex flex-wrap gap-2">
-              {[15, 30, 45, 60, 90, 120].map((m) => (
+              {[15, 30, 45, 60, 90, 120, 180].map((m) => (
                 <button key={m} type="button" aria-pressed={eta === m} onClick={() => setEta(m)} className={cx("min-h-11 rounded-full px-4 text-sm font-semibold ring-1", eta === m ? "bg-accent text-accent-ink ring-accent" : "bg-surface ring-line-strong")}>{m < 60 ? `${m} min` : `${m / 60} h`}</button>
               ))}
-              {![15, 30, 45, 60, 90, 120].includes(eta) ? <span className="inline-flex min-h-11 items-center rounded-full bg-accent px-4 text-sm font-semibold text-accent-ink">{eta} min</span> : null}
+              {![15, 30, 45, 60, 90, 120, 180].includes(eta) ? <span className="inline-flex min-h-11 items-center rounded-full bg-accent px-4 text-sm font-semibold text-accent-ink">{eta} min</span> : null}
             </div>
           )}
         </section>

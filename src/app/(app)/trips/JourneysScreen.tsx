@@ -16,6 +16,7 @@ import { placeName, planLine, planStartsAt, planTitle } from "@/domain/plan-name
 import { modeWords } from "@/domain/travel-prefs";
 import type { TripSummary, TripView } from "@/server/trips";
 import { clockIn } from "@/domain/daylight";
+import { LEFT_NOTE } from "./left-note";
 
 type Saved = { id: string; draft: PlanDraft; createdAt: string; expiresAt: string };
 
@@ -48,6 +49,13 @@ export function JourneysScreen({ signedIn, emailAlerts, active, recent }: { sign
   const [saved, setSaved] = useState<{ plans: Saved[] | null; failed: string | null }>({ plans: signedIn ? null : [], failed: null });
   const [busy, setBusy] = useState<string | null>(null);
   const [signIn, setSignIn] = useState(false);
+  const [leftNote, setLeftNote] = useState(false);
+  useEffect(() => {
+    let note = false;
+    try { note = sessionStorage.getItem(LEFT_NOTE) === "1"; sessionStorage.removeItem(LEFT_NOTE); } catch { /* storage blocked */ }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read a one-time note left by the journey screen
+    if (note) setLeftNote(true);
+  }, []);
 
   useEffect(() => {
     if (!signedIn) return;
@@ -78,6 +86,11 @@ export function JourneysScreen({ signedIn, emailAlerts, active, recent }: { sign
     <div className="m-screen bg-companion">
       <div className="m-screen-inner">
         <RootHeader title="Journeys" emailAlerts={emailAlerts} eyebrow="Now, coming up, and the last day" />
+        {leftNote ? (
+          <p role="status" className="mt-4 m-card px-4 py-3 text-sm">
+            {signedIn ? "Your journey was closed on another device. Nothing is being shared, and nobody will be alerted." : "You're signed out here, so your journey isn't running on this device any more."}
+          </p>
+        ) : null}
 
         {/* 1. Now: the journey you're on — the same glance as the journey screen. */}
         <section aria-labelledby="now-h" className="mt-5">

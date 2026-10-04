@@ -43,11 +43,11 @@ describe("after-arrival journey check", () => {
   it("distinguishes a definitive no-check from an expired question", async () => {
     api.mockResolvedValueOnce(response("none"));
     show();
-    expect(await screen.findByText("Nothing needed from you this time.")).toBeInTheDocument();
+    expect(await screen.findByText("No question from Mira this time.")).toBeInTheDocument();
     cleanup();
     api.mockResolvedValueOnce(response("none", [{ ...ready, expiresAt: new Date(Date.now() - 1000).toISOString() }]));
     show();
-    expect(await screen.findByText("Nothing needed from you this time.")).toBeInTheDocument();
+    expect(await screen.findByText("No question from Mira this time.")).toBeInTheDocument();
     expect(screen.queryByText("Was this place open?")).not.toBeInTheDocument();
   });
 

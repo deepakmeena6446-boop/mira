@@ -67,12 +67,6 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
   const request = loc.request;
   useEffect(() => { if (idle && shouldAutoLocate()) void request(); }, [idle, request]);
   useEffect(() => {
-    // Text typed before the app was ready (slow phones) is kept, not wiped by hydration (audit P09-004).
-    const early = (window as { __miraEarly?: { text: Record<string, string> } }).__miraEarly?.text.ask;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time pickup of pre-hydration input
-    if (early) setAsk(early);
-  }, []);
-  useEffect(() => {
     // Device storage exists only after mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setUsage(usageMode());
@@ -160,6 +154,16 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
     handOffAsk(t);
     router.push("/mira");
   };
+  useEffect(() => {
+    // Text typed before the app was ready (slow phones) is kept, not wiped by hydration (audit P09-004).
+    const kept = (window as { __miraEarly?: { text: Record<string, string> } }).__miraEarly?.text;
+    const early = kept?.ask;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time pickup of pre-hydration input
+    if (early) setAsk(early);
+    // She already pressed Enter: send it now rather than make her press again (re-audit RA2).
+    if (early && kept?.__submitted === "ask") { delete kept.__submitted; submitAsk(early); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, at mount
+  }, []);
 
   const greeting = clock ? greetingFor(clock) : null;
   const t = useT();

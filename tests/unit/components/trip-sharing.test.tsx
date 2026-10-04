@@ -51,7 +51,8 @@ describe("active journey consent and fresh position controls", () => {
     Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
     await act(async () => { document.dispatchEvent(new Event("visibilitychange")); });
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/trips"));
-    expect(mocks.toast).toHaveBeenCalledWith(expect.stringMatching(/closed on another device.*nobody will be alerted/), "info");
+    // Journeys says why (a toast here was wiped by the navigation — re-audit RA2).
+    expect(sessionStorage.getItem("mira.trip.leftNote")).toBe("1");
   });
 
   it("after a miss, receipts name only who was actually alerted; people added later are said not to be (audit P0-4)", async () => {

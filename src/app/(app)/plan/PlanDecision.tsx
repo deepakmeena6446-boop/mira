@@ -253,6 +253,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
     minutes: loop ? loopMinutes : minutes,
     geometry: way && !way.route.approximate ? way.route.geometry : null,
     fastest: selected === 0,
+    plannedAt: instant ? { kind: draft?.timeKind === "arrive_by" ? "arrive_by" : "depart_at", at: instant.getTime() } : null,
   };
   const save = async () => {
     if (!draft) return;

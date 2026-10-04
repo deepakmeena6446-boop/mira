@@ -46,3 +46,22 @@ describe("Go with Mira: a lost reply to Start (audit P09-001)", () => {
     expect(mocks.fresh).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("Go with Mira uses the time she planned (audit P13-002)", () => {
+  beforeEach(() => mocks.api.mockImplementation(async (path: string) => (path === "/api/me/contacts" ? { ok: true, data: { contacts: [] } } : { ok: true, status: 200, data: { trip } })));
+  it("an arrive-by time becomes the check-in, and is sent as the ETA", async () => {
+    const ride: GoTarget = { ...target, mode: "ride", minutes: null, plannedAt: { kind: "arrive_by", at: Date.now() + 50 * 60_000 } };
+    render(<GoSheet open onClose={() => {}} target={ride} signedIn emailAlerts onSignIn={() => {}} />);
+    await act(async () => {});
+    expect(screen.getByText(/Your plan says arrive by .*, so your check-in is set to then\./)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Start — just me" }));
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    expect(posts()[0][1].body.etaMinutes).toBeGreaterThanOrEqual(49);
+    expect(posts()[0][1].body.etaMinutes).toBeLessThanOrEqual(50);
+  });
+  it("a plan for later says that Start begins now", async () => {
+    render(<GoSheet open onClose={() => {}} target={{ ...target, plannedAt: { kind: "depart_at", at: Date.now() + 6 * 3_600_000 } }} signedIn emailAlerts onSignIn={() => {}} />);
+    await act(async () => {});
+    expect(screen.getByText(/Starting now begins the journey now/)).toBeInTheDocument();
+  });
+});

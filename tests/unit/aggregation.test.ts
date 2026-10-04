@@ -32,8 +32,15 @@ describe("computeReleases", () => {
     expect(computeReleases(sameNet, T, new Map())).toMatchObject({ releases: [], skipped: [{ reason: "not_enough_networks" }] });
     const twoNets = actors(5, "c").map((a, i) => rep(a, { networkHash: i < 4 ? "net-1" : "net-2" }));
     expect(computeReleases(twoNets, T, new Map()).releases).toHaveLength(0);
-    const threeNets = actors(5, "d").map((a, i) => rep(a, { networkHash: `net-${i % 3}` }));
-    expect(computeReleases(threeNets, T, new Map()).releases).toHaveLength(1);
+    // Hashes are only comparable within one salt week, so these land Wed–Sun of one ISO week (and not in one burst).
+    const sunday = new Date("2026-10-04T12:00:00Z");
+    const threeNets = actors(5, "d").map((a, i) => rep(a, { networkHash: `net-${i % 3}`, submittedAt: new Date(sunday.getTime() - i * 86_400_000) }));
+    expect(computeReleases(threeNets, sunday, new Map()).releases).toHaveLength(1);
+  });
+  it("one network over three weeks is still one network: weekly salts can't be compared (re-audit RA5)", () => {
+    const week = 7 * 86_400_000;
+    const spread = actors(5, "e").map((a, i) => rep(a, { networkHash: `salted-week-${i % 3}`, submittedAt: new Date(T.getTime() - (i % 3) * week) }));
+    expect(computeReleases(spread, T, new Map())).toMatchObject({ releases: [], skipped: [{ reason: "not_enough_networks" }] });
   });
   it("publishes one coarse release at five independent contributors", () => {
     const { releases } = computeReleases(actors(5).map((a) => rep(a)), T, new Map());
