@@ -76,7 +76,9 @@ export function walkTimeClaim(o: WayOption | null, mode: "walk" | "ride" | "tran
   return { id: "time", kind: "estimate", topic, icon: "clock", claim: `About ${Math.round(o.route.minutes)} min · ${(o.route.meters / 1000).toFixed(1)} km${arrive}`, source: o.route.approximate ? "Straight-line estimate — not a street route" : mode === "walk" ? `${provider} at an average walking pace` : `${provider} · current traffic and service at your time are not checked` };
 }
 
-export function notesClaim(notes: CommunityNote[] | null, where = "on this way"): Claim {
+/** `"failed"`: the check didn't answer — never shown as "no notes" (audit L06-004). */
+export function notesClaim(notes: CommunityNote[] | null | "failed", where = "on this way"): Claim {
+  if (notes === "failed") return { id: "notes", kind: "failed", topic: "From people", icon: "community", claim: "Mira couldn’t check community notes just now." };
   if (!notes) return { id: "notes", kind: "pending", topic: "From people", icon: "community", claim: "Checking community notes…" };
   if (!notes.length) return { id: "notes", kind: "nodata", topic: "From people", icon: "community", claim: `No released community notes ${where}. No notes is not the same as no concerns.` };
   const latest = notes[0];

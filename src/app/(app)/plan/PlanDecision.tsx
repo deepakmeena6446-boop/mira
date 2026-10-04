@@ -38,7 +38,7 @@ export type Situation = "go" | "run" | "travel";
 type Mode = "walk" | "ride" | "transit";
 type WalkAnswer = { route: WayOption["route"]; lighting: RouteLighting | null; lightingEvidence: EvidenceState<RouteLighting>; helpPoints: HelpPoint[]; helpEvidence: EvidenceState<HelpPoint[]>; notes: CommunityNote[]; alternatives: Array<Omit<WayOption, never>> };
 type ModeAnswer = { mode: Mode; route: (WayOption["route"] & { provider: string }) | null; arrivalHelp: HelpPoint[]; arrivalEvidence?: EvidenceState<HelpPoint[]> };
-type Ways = { key: string; ways: WayOption[]; notes: CommunityNote[] | null; error: string | null; noRoute?: boolean };
+type Ways = { key: string; ways: WayOption[]; notes: CommunityNote[] | null | "failed"; error: string | null; noRoute?: boolean };
 
 const SITUATIONS: Array<{ id: Situation; label: string; icon: string }> = [
   { id: "go", label: "Going somewhere", icon: "route" },
@@ -134,7 +134,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
     let live = true;
     void api<WalkAnswer | ModeAnswer>("/api/geo/route", { body: { from: { lat: origin.lat, lon: origin.lon }, to: { lat: dest.lat, lon: dest.lon }, ...(mode === "walk" ? {} : { mode }), ...(osmOnly ? { source: "osm" } : {}) } }).then((r) => {
       if (!live) return;
-      if (!r.ok) return setWays({ key: wayKey, ways: [], notes: null, error: r.code === "too_far" ? (mode === "walk" ? "That’s further than a walk Mira can follow. Try a ride or transit." : r.message) : r.network ? "You’re offline. Your plan is kept; Mira will check when you’re connected." : "Mira couldn’t check the way just now." });
+      if (!r.ok) return setWays({ key: wayKey, ways: [], notes: "failed", error: r.code === "too_far" ? (mode === "walk" ? "That’s further than a walk Mira can follow. Try a ride or transit." : r.message) : r.network ? "You’re offline. Your plan is kept; Mira will check when you’re connected." : "Mira couldn’t check the way just now." });
       if ("mode" in r.data) {
         const m = r.data;
         setWays({ key: wayKey, notes: null, error: null, noRoute: !m.route, ways: m.route ? [{ route: m.route, lighting: null, helpPoints: m.arrivalHelp, helpEvidence: m.arrivalEvidence }] : [{ route: { meters: 0, minutes: 0, geometry: [], approximate: true }, lighting: null, helpPoints: m.arrivalHelp, helpEvidence: m.arrivalEvidence }] });
@@ -167,20 +167,21 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   // Around the place that matters: the destination (or the start of a loop).
   const focus = loop ? origin : dest;
   const focusKey = complete && focus ? `${focus.lat.toFixed(3)},${focus.lon.toFixed(3)}` : "";
-  type Around = { key: string; notes: CommunityNote[] | null; updates: { evidence: EvidenceState<SafetyUpdatesData> } | "failed" | null; country: CountryContext | null; zone?: string | null };
+  type Around = { key: string; notes: CommunityNote[] | null | "failed"; updates: { evidence: EvidenceState<SafetyUpdatesData> } | "failed" | null; country: CountryContext | null; zone?: string | null };
   const [around, setAroundState] = useState<Around | null>(null);
   const setAround = (key: string, patch: Partial<Omit<Around, "key">>) => setAroundState((a) => ({ ...(a?.key === key ? a : { key, notes: null, updates: null, country: null }), ...patch }));
   useEffect(() => {
     if (!focusKey || !focus) return;
     let live = true;
     const at = { lat: focus.lat, lon: focus.lon };
-    void api<{ notes: CommunityNote[] }>("/api/community/nearby", { body: at }).then((r) => { if (live) setAround(focusKey, { notes: r.ok ? r.data.notes : [] }); });
+    void api<{ notes: CommunityNote[] }>("/api/community/nearby", { body: at }).then((r) => { if (live) setAround(focusKey, { notes: r.ok ? r.data.notes : "failed" }); });
     void api<{ evidence: EvidenceState<SafetyUpdatesData> }>("/api/safety-updates", { body: { ...at, window: 7 } }).then((r) => { if (live) setAround(focusKey, { updates: r.ok ? r.data : "failed" }); });
     void api<{ country: CountryContext }>("/api/geo/reverse", { body: { ...at, ...(osmOnly ? { source: "osm" } : {}) } }).then((r) => { if (live && r.ok) setAround(focusKey, { country: r.data.country }); });
     void api<{ timeZone: string | null }>("/api/geo/zone", { body: at }).then((r) => { if (live) setAround(focusKey, { zone: r.ok ? r.data.timeZone : null }); });
     return () => { live = false; };
+    // `retry`: the ledger's "Try again" re-checks notes and local updates too, not only the way (audit L06-005).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusKey]);
+  }, [focusKey, retry]);
   const aroundNow = around?.key === focusKey ? around : null;
 
   // Times are the place's, not the phone's (audit P05-001: a 10 PM walk in Lisbon was briefed on India time as daylight).
@@ -330,11 +331,12 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   const litShare = way?.lighting ? (() => { const l = way.lighting.summary; return l.lit + l.poles + l.dark > 0 ? `${l.lit + l.poles}%` : null; })() : null;
   const planNotes = !loop && mode === "walk" ? currentWays?.notes ?? null : aroundNow?.notes ?? null;
   const planStats: LiveStat[] = [
-    { label: loop ? "Help Points open near your start" : mode === "walk" ? "Help Points open on the way" : "Help Points open where you arrive", value: helpList ? `${openThen}/${helpList.length}` : "…", state: helpList ? "ok" : "loading" },
+    // A failed check reads as failed, not "0/0" or a spinner that never ends (audit L06-006).
+    { label: loop ? "Help Points open near your start" : mode === "walk" ? "Help Points open on the way" : "Help Points open where you arrive", value: currentWays?.error ? "—" : helpList ? `${openThen}/${helpList.length}` : "…", state: currentWays?.error ? "failed" : helpList ? "ok" : "loading" },
     loop || mode !== "walk"
-      ? { label: "notes from people", value: planNotes ? String(planNotes.length) : "…", state: planNotes ? "ok" : "loading" }
+      ? { label: "notes from people", value: planNotes === "failed" ? "—" : planNotes ? String(planNotes.length) : "…", state: planNotes === "failed" ? "failed" : planNotes ? "ok" : "loading" }
       : { label: "mapped as lit", value: litShare ?? "—", state: currentWays ? (litShare ? "ok" : "none") : "loading" },
-    ...(mode === "walk" && !loop ? [{ label: "notes from people", value: planNotes ? String(planNotes.length) : "…", state: (planNotes ? "ok" : "loading") as LiveStat["state"] }] : []),
+    ...(mode === "walk" && !loop ? [{ label: "notes from people", value: planNotes === "failed" ? "—" : planNotes ? String(planNotes.length) : "…", state: (planNotes === "failed" ? "failed" : planNotes ? "ok" : "loading") as LiveStat["state"] }] : []),
   ];
 
   const lit = (w: WayOption) => { const l = w.lighting?.summary; return l && l.lit + l.poles + l.dark > 0 ? l.lit + l.poles : null; };
