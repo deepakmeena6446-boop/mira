@@ -187,7 +187,7 @@ describe("emergency numbers", () => {
 
 describe("Hinglish safety wording (owner report 2026-10-04)", () => {
   it("a refusal in Hinglish is not a verdict; a Hinglish verdict still is", () => {
-    for (const t of ["Main kisi route ko safe nahi bol sakti.", "Safe hai ya nahi, ye main nahi bata sakti.", "Main safe routes judge nahi kar sakti, par plan kar sakti hoon.", "Jab tak safe feel na karo, wahin ruko."]) expect(companionOutputIssue(t, [])).toBeNull();
+    for (const t of ["Main kisi route ko safe nahi bol sakti.", "Safe hai ya nahi, ye main nahi bata sakti.", "Main safe routes judge nahi kar sakti, par plan kar sakti hoon.", "Main safe/unsafe judge nahi kar sakti.", "Main safe-unsafe judge nahi kar sakti.", "Jab tak safe feel na karo, wahin ruko."]) expect(companionOutputIssue(t, [])).toBeNull();
     for (const t of ["Ye route safe hai.", "Ye route safe nahi hai.", "Woh area khatarnak hai."]) expect(companionOutputIssue(t, [])).toBe("safety_verdict");
   });
   it("Mira's chat can skip the verdict filter but still catches a made-up emergency number", () => {

@@ -94,7 +94,7 @@ const HINGLISH_ALLOWED = [
   rx(String.raw`${B}${HINGLISH_VERDICT}(?:\s+(?:ya|or)\s+${HINGLISH_VERDICT})?\s+(?:hai\s+)?(?:ye\s+|yeh\s+|main\s+|mai\s+|mein\s+)*(?:nahi|nahin|nhi|na)\s+(?:bol|keh|kah|bata|bta|maan|judge|decide|tay|guarantee|promise)\p{L}*`),
   rx(String.raw`${B}(?:un)?safe\s+(?:feel|mehsoos|mahsoos)\s*(?:(?:na|nahi|nahin)\s+)?(?:kar|ho|hu|hoon|nahi)\p{L}*`),
   // "main safe routes judge nahi kar sakti", "kaunsa area safe hai ye decide nahi kar sakti"
-  rx(String.raw`${B}${HINGLISH_VERDICT}(?:\s+[\p{L}']+){0,3}?\s+(?:judge|decide|tay|guarantee|confirm|verify)\s+(?:nahi|nahin|nhi|na)\s+(?:kar|ho)\p{L}*`),
+  rx(String.raw`${B}${HINGLISH_VERDICT}(?:\s*[/-]\s*${HINGLISH_VERDICT})?(?:\s+[\p{L}']+){0,3}?\s+(?:judge|decide|tay|guarantee|confirm|verify)\s+(?:nahi|nahin|nhi|na)\s+(?:kar|ho)\p{L}*`),
 ];
 
 const OTHER_ALLOWED = [
