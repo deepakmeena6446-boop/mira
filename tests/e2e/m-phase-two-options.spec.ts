@@ -23,8 +23,8 @@ test("S1 early walk compares mapped options and preserves evidence on map", asyn
   await expect(comparison.getByRole("button", { name: /Shortest mapped walk/ })).toBeVisible();
   await expect(comparison.getByRole("button", { name: /Different mapped walk/ })).toBeVisible();
   await expect(comparison).toContainText("dark");
-  await comparison.getByText("Sources, freshness and limits").click();
-  await expect(comparison).toContainText("No eligible planned-time service source");
+  await comparison.getByText("Sources and what Mira can’t see").click();
+  await expect(comparison).toContainText("Mira can’t check services at that time");
   await comparison.getByRole("button", { name: /Different mapped walk/ }).click();
   await expect(comparison.getByRole("button", { name: /Different mapped walk/ })).toHaveAttribute("aria-pressed", "true");
   // The chosen option is kept with the tab's plan across a reload.
@@ -39,9 +39,9 @@ test("S2 late transit says future service is unknown", async ({ page }) => {
   await page.goto("/plan?planStep=options");
   await expect(page.getByRole("region", { name: "Plan options" }).getByRole("button", { name: /mapped walk/ })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Plan options" })).toContainText("Transit: confirm directly");
-  await page.getByText("Sources, freshness and limits").click();
-  await expect(page.getByRole("region", { name: "Plan options" })).toContainText("No eligible planned-time service source");
-  await expect(page.getByRole("region", { name: "Plan options" })).toContainText("Opening hours, lighting and staffing");
+  await page.getByText("Sources and what Mira can’t see").click();
+  await expect(page.getByRole("region", { name: "Plan options" })).toContainText("Mira can’t check services at that time");
+  await expect(page.getByRole("region", { name: "Plan options" })).toContainText("Mira can’t see opening hours, lighting, staffing");
 });
 
 test("S1 early loop shows the fixture coverage gap and a later daylight alternative", async ({ page }) => {
@@ -50,9 +50,9 @@ test("S1 early loop shows the fixture coverage gap and a later daylight alternat
   await page.goto("/plan?planStep=options");
   const comparison = page.getByRole("region", { name: "Plan options" });
   await expect(comparison).toContainText("No suitable mapped loop in the checked fixture");
-  await expect(comparison).toContainText("dark · approximate solar calculation");
-  await expect(comparison).toContainText("Calculated daylight by about 2026-10-07 06:45");
-  await expect(comparison).toContainText("Lighting remains unknown");
+  await expect(comparison).toContainText("dark (approximate)");
+  await expect(comparison).toContainText("Daylight by about 2026-10-07 06:45");
+  await expect(comparison).toContainText("120 minutes later");
 });
 
 test("S3 missing network reports an explicit coverage gap", async ({ page }) => {
@@ -73,10 +73,10 @@ test("a failed mapped check keeps local daylight and offers an explicit retry", 
   });
   await page.goto("/plan?planStep=options");
   const comparison = page.getByRole("region", { name: "Plan options" });
-  await expect(comparison).toContainText("Route check failed");
-  await expect(comparison).toContainText("Calculated daylight: dark");
-  await expect(comparison).toContainText("Your plan stays here");
-  await comparison.getByRole("button", { name: "Retry mapped check" }).click();
+  await expect(comparison).toContainText("Couldn’t check routes");
+  await expect(comparison).toContainText("Daylight: dark");
+  await expect(comparison).toContainText("Your plan is kept");
+  await comparison.getByRole("button", { name: "Try again" }).click();
   await expect(comparison.getByRole("button", { name: /Shortest mapped walk/ })).toBeVisible();
   expect(requests).toBe(2);
 });

@@ -64,7 +64,7 @@ describe("active journey consent and fresh position controls", () => {
     expect(box).toHaveTextContent("accepted the missed-check-in message for someone who is no longer on this journey");
     expect(box).toHaveTextContent("Fictional Chitra hasn't been alerted — call or message them directly.");
     expect(box).not.toHaveTextContent(/message for Fictional Chitra/);
-    expect(document.body).not.toHaveTextContent(/Mira attempts an email to Fictional Chitra/);
+    expect(document.body).not.toHaveTextContent(/Mira will try to email Fictional Chitra/);
   });
 
   it("an arrived event reviews the return without starting or sharing, preserving the old event and explicit choices", async () => {
@@ -104,9 +104,9 @@ describe("active journey consent and fresh position controls", () => {
     // Wait for the completed UI transition, rather than racing the promise after the API invocation.
     await waitFor(() => expect(screen.queryByRole("button", { name: "Confirm chosen recipients" })).toBeNull(), { timeout: 5000 });
     expect(mocks.api).toHaveBeenCalledWith(`/api/trips/${trip.id}/share`, { body: { recipientIds: [noor], idempotencyKey: expect.any(String) } });
-    fireEvent.click(screen.getByRole("button", { name: "Invalidate copied live link" }));
+    fireEvent.click(screen.getByRole("button", { name: "Stop this link" }));
     expect(mocks.api.mock.calls.filter(([path]) => String(path).endsWith("/revoke"))).toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "Confirm invalidate copied live link" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, stop this link" }));
     expect(await screen.findByRole("button", { name: "Create a new private live link" })).toBeInTheDocument();
   }, 15_000);
 

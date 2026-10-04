@@ -144,7 +144,7 @@ test("S4 arrival check-in and explicit return are two private confirmed journeys
     await route.fulfill({ json: fixtureOptions(intent) });
   });
   await owner.page.goto("/plan?planStep=options");
-  await owner.page.getByRole("radio", { name: "Use foreground location" }).check();
+  await owner.page.getByRole("radio", { name: "Share my location while Mira is open" }).check();
   await owner.page.getByRole("button", { name: "Start chosen journey" }).click();
   await expect(owner.page.getByText("Nobody is notified.", { exact: false })).toBeVisible();
   // Location is on for her, so a watch is running; static Chromium GPS can then fail the start's maximumAge:0 request.

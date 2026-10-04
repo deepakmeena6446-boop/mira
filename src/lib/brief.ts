@@ -1,7 +1,8 @@
 /**
  * Mira Brief builders (docs/phase1-ux/01 §1): API evidence → labelled claims. Pure functions over
- * existing response shapes; no fetching, no React. Every claim says how Mira knows it, and the
- * absence of evidence is always worded as absence, never as reassurance.
+ * existing response shapes; no fetching, no React. Every claim leads with the fact and says how Mira
+ * knows it in a word or two; the absence of evidence is worded as absence, never as reassurance. What
+ * no source can see is said once per screen, by blindSpotsClaim — not repeated on every row.
  */
 import type { EvidenceState } from "@/domain/evidence-state";
 import type { RouteLighting } from "@/domain/lighting";
@@ -36,7 +37,7 @@ export function daylightClaim(at: Date | null, point: { lat: number; lon: number
   const next = outlook.changeTo === "daylight" ? "daylight from" : state === "dark" && outlook.changeTo === "uncertain" ? "twilight from" : outlook.changeTo === "dark" ? "dark from" : "changes";
   const change = outlook.changeAt ? ` · ${next} about ${clockIn(outlook.changeAt, timeZone)}` : "";
   const words = state === "daylight" ? `Daylight ${label}` : state === "dark" ? `Dark ${label}` : `Twilight ${label}`;
-  return { id: "daylight", kind: "checked", topic: "Daylight", icon: "sun", claim: `${words}${change}`, source: "Solar calculation for open sky · weather and shade not included" };
+  return { id: "daylight", kind: "checked", topic: "Daylight", icon: "sun", claim: `${words}${change}`, source: "Solar calculation" };
 }
 
 /** Lighting along one way, from the route's own evidence. */
@@ -48,24 +49,24 @@ export function lightingClaim(o: WayOption | null): Claim {
   if (e?.state === "unavailable") return { id: "lighting", kind: "none", topic: "Lighting", icon: "lamp", claim: "No lighting source is available for this way." };
   const l = o.lighting;
   const known = l ? l.summary.lit + l.summary.poles + l.summary.dark : 0;
-  if (!l || known === 0) return { id: "lighting", kind: "nodata", topic: "Lighting", icon: "lamp", claim: "No source has mapped street lights on this way yet. That says nothing either way about tonight.", source: e && "sources" in e ? `Checked: ${e.sources.map((s) => s.source.replace(/^MIRA\b/, "Mira")).join(", ")}` : undefined };
+  if (!l || known === 0) return { id: "lighting", kind: "nodata", topic: "Lighting", icon: "lamp", claim: "No street lights mapped on this way yet.", source: e && "sources" in e ? `Checked: ${e.sources.map((s) => s.source.replace(/^MIRA\b/, "Mira")).join(", ")}` : undefined };
   const walkers = l.confirmed?.lit || l.confirmed?.dark;
-  return { id: "lighting", kind: walkers ? "people" : "checked", topic: "Lighting", icon: "lamp", claim: lightingEvidenceLine(e, l), source: `${sourceList(l)} · mapped data can be years old` };
+  return { id: "lighting", kind: walkers ? "people" : "checked", topic: "Lighting", icon: "lamp", claim: lightingEvidenceLine(e, l), source: sourceList(l) };
 }
 
 /** Help Points along a way (or near a place), with what their listed hours say at that time. */
 export function helpClaim(points: HelpPoint[], evidence: EvidenceState<HelpPoint[]> | undefined, at: LocalTime | null, where = "on this way", atLabel = "then"): Claim {
   if (!evidence) return { id: "help", kind: "pending", topic: "Help Points", icon: "shield", claim: "Looking for Help Points…" };
-  if (evidence.state === "failed") return { id: "help", kind: "failed", topic: "Help Points", icon: "shield", claim: "Mira couldn’t check Help Points just now. That doesn’t mean there are none." };
+  if (evidence.state === "failed") return { id: "help", kind: "failed", topic: "Help Points", icon: "shield", claim: "Mira couldn’t check Help Points just now." };
   if (evidence.state === "unavailable") return { id: "help", kind: "none", topic: "Help Points", icon: "shield", claim: "Help Point sources aren’t available here." };
-  if (!points.length) return { id: "help", kind: "nodata", topic: "Help Points", icon: "shield", claim: `None found ${where} in the sources checked. That doesn’t mean none exist.` };
+  if (!points.length) return { id: "help", kind: "nodata", topic: "Help Points", icon: "shield", claim: `None found ${where} in the sources checked.` };
   const states = points.map((p) => hoursState(p, at ?? undefined));
   const open = states.filter((h) => h.kind === "open_24h" || h.kind === "listed_open" || h.kind === "open_now").length;
   const closed = states.filter((h) => h.kind === "closed").length;
   const kinds = [...new Set(points.map((p) => HELP_CLASSES[p.cls].label.toLowerCase()))].slice(0, 3).join(", ");
-  const timePart = at ? ` · ${open} listed open ${atLabel}${closed ? `, ${closed} listed closed` : ""}` : "";
+  const timePart = at ? ` · ${open} open ${atLabel}${closed ? `, ${closed} closed` : ""}` : "";
   const sources = [...new Set(points.map((p) => SOURCE_SHORT[p.hoursSource ?? p.source]))].join(" + ");
-  return { id: "help", kind: "checked", topic: "Help Points", icon: "shield", claim: `${plural(points.length, "Help Point")} ${where} (${kinds})${timePart}`, source: `${sources} listings · staffing and access not verified${evidence.state === "partial" ? " · some sources couldn’t be checked" : ""}` };
+  return { id: "help", kind: "checked", topic: "Help Points", icon: "shield", claim: `${plural(points.length, "Help Point")} ${where} (${kinds})${timePart}`, source: `${sources} · listed hours${evidence.state === "partial" ? " · some sources couldn’t be checked" : ""}` };
 }
 
 export function walkTimeClaim(o: WayOption | null, mode: "walk" | "ride" | "transit", arriveAt: Date | null, timeZone: string | null): Claim {
@@ -73,16 +74,20 @@ export function walkTimeClaim(o: WayOption | null, mode: "walk" | "ride" | "tran
   if (!o) return { id: "time", kind: "pending", topic, icon: "clock", claim: "Finding the way…" };
   const arrive = arriveAt ? ` · arrive about ${clockIn(arriveAt, timeZone)}` : "";
   const provider = o.route.provider === "google" ? "Google route" : o.route.provider === "osm" ? "OpenStreetMap route" : o.route.provider === "estimate" ? "Straight-line estimate" : "Mapped route";
-  return { id: "time", kind: "estimate", topic, icon: "clock", claim: `About ${Math.round(o.route.minutes)} min · ${(o.route.meters / 1000).toFixed(1)} km${arrive}`, source: o.route.approximate ? "Straight-line estimate — not a street route" : mode === "walk" ? `${provider} at an average walking pace` : `${provider} · current traffic and service at your time are not checked` };
+  return { id: "time", kind: "estimate", topic, icon: "clock", claim: `About ${Math.round(o.route.minutes)} min · ${(o.route.meters / 1000).toFixed(1)} km${arrive}`, source: o.route.approximate ? "Straight-line estimate — not a street route" : mode === "walk" ? `${provider} at an average walking pace` : `${provider} · no live traffic` };
 }
 
-/** `"failed"`: the check didn't answer — never shown as "no notes" (audit L06-004). */
-export function notesClaim(notes: CommunityNote[] | null | "failed", where = "on this way"): Claim {
-  if (notes === "failed") return { id: "notes", kind: "failed", topic: "From people", icon: "community", claim: "Mira couldn’t check community notes just now." };
-  if (!notes) return { id: "notes", kind: "pending", topic: "From people", icon: "community", claim: "Checking community notes…" };
-  if (!notes.length) return { id: "notes", kind: "nodata", topic: "From people", icon: "community", claim: `No released community notes ${where}. No notes is not the same as no concerns.` };
+/**
+ * Released community notes — a row only when there are some. Publishing notes is off in this beta
+ * (PUBLIC_AGGREGATE_RELEASES), so an empty list is the normal answer and the row is left out (`null`)
+ * rather than advertising notes that can't appear. `"failed"`: the check didn't answer — said as
+ * failed, never as "no notes" (audit L06-004).
+ */
+export function notesClaim(notes: CommunityNote[] | null | "failed", where = "on this way"): Claim | null {
+  if (notes === "failed") return { id: "notes", kind: "failed", topic: "From people", icon: "community", claim: "Mira couldn’t check notes from people just now." };
+  if (!notes?.length) return null;
   const latest = notes[0];
-  return { id: "notes", kind: "people", topic: "From people", icon: "community", claim: `${plural(notes.length, "note")} ${where} · latest: “${latest.text}”`, source: `Released only when several people say similar things · week of ${latest.week} · ${latest.timeBand}` };
+  return { id: "notes", kind: "people", topic: "From people", icon: "community", claim: `${plural(notes.length, "note")} ${where} · latest: “${latest.text}”`, source: `Several people agreed · week of ${latest.week} · ${latest.timeBand}` };
 }
 
 export function updatesClaim(answer: { evidence: EvidenceState<SafetyUpdatesData> } | null | "failed", where = "near there"): Claim {
@@ -90,26 +95,33 @@ export function updatesClaim(answer: { evidence: EvidenceState<SafetyUpdatesData
   if (answer === "failed" || answer.evidence.state === "failed") return { id: "updates", kind: "failed", topic: "Local updates", icon: "info", claim: "Mira couldn’t check recent local reports just now." };
   if (!("data" in answer.evidence)) return { id: "updates", kind: "none", topic: "Local updates", icon: "info", claim: "Local news isn’t available for this area." };
   const d = answer.evidence.data;
-  if (!d.updates.length) return { id: "updates", kind: "nodata", topic: "Local updates", icon: "info", claim: `No recent women-safety reports found ${where} in the past ${d.windowDays} days. This doesn’t mean nothing happened.`, source: answer.evidence.state === "partial" ? "Some sources couldn’t be checked" : "Official sources and news, as published" };
+  if (!d.updates.length) return { id: "updates", kind: "nodata", topic: "Local updates", icon: "info", claim: `No recent women-safety reports found ${where} in the past ${d.windowDays} days.`, source: answer.evidence.state === "partial" ? "Some sources couldn’t be checked" : "Official sources and news, as published" };
   const latest = d.updates[0];
-  return { id: "updates", kind: "checked", topic: "Local updates", icon: "info", claim: `${plural(d.updates.length, "report")} ${where} in the past ${d.windowDays} days · latest: ${CATEGORY_LABEL[latest.category] ?? "report"}, ${ageLabel(latest.publishedAt).toLowerCase()}`, source: `${latest.publisher} and others, as published · not a rating of the area` };
+  return { id: "updates", kind: "checked", topic: "Local updates", icon: "info", claim: `${plural(d.updates.length, "report")} ${where} in the past ${d.windowDays} days · latest: ${CATEGORY_LABEL[latest.category] ?? "report"}, ${ageLabel(latest.publishedAt).toLowerCase()}`, source: `${latest.publisher} and others, as published` };
 }
 
-/** What Mira has no source for. Always shown, so the brief never looks complete when it isn't. */
+/**
+ * What Mira has no source for: the screen's one "can't see" line. Always shown, so the brief never
+ * looks complete when it isn't; the rows above keep at most a qualifier word ("listed hours").
+ */
 export function blindSpotsClaim(mode: "walk" | "ride" | "transit" | "loop"): Claim {
   const extra = mode === "ride" ? "driver details, " : mode === "transit" ? "whether services run at your time, " : "";
-  return { id: "blind", kind: "none", topic: "Mira can’t see", icon: "eye", claim: `${extra}crowds, live incidents, or whether a light works tonight.`.replace(/^./, (c) => c.toUpperCase()), source: "No live source for these. Your own judgement comes first." };
+  return { id: "blind", kind: "none", topic: "What Mira can’t see", icon: "eye", claim: `${extra}whether a Help Point is staffed, crowds, live incidents, or whether a light works tonight.`.replace(/^./, (c) => c.toUpperCase()), source: "Your own judgement comes first." };
 }
 
-/** Listed-hours words for one Help Point at a time (always with its source; never "staffed"). */
-export function hoursWords(h: HoursState): string {
+/**
+ * Hours words for one Help Point, fact first; never "staffed". Hours taken from a listing end in
+ * "(listed)" — unless `listed: false`, for rows under a heading that already says "listed hours".
+ */
+export function hoursWords(h: HoursState, { listed = true }: { listed?: boolean } = {}): string {
+  const q = listed ? " (listed)" : "";
   switch (h.kind) {
-    case "open_24h": return "open 24 hours (listed)";
+    case "open_24h": return `open 24 hours${q}`;
     case "open_now": return "open now";
-    case "listed_open": return `listed open until ${clock12(h.closesAt)}`;
-    case "closing": return `listed closing ${clock12(h.closesAt)}`;
-    case "closed": return "listed closed";
-    case "listed": return "hours listed, unclear";
+    case "listed_open": return `open until ${clock12(h.closesAt)}${q}`;
+    case "closing": return `closes ${clock12(h.closesAt)}${q}`;
+    case "closed": return `closed${h.listed ? q : ""}`;
+    case "listed": return "hours unclear";
     default: return "hours not known";
   }
 }

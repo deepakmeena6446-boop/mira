@@ -77,7 +77,7 @@ export function HelpNextCard({ check, impactLine, signedIn, country, spot = null
       </div>
       <p className="mt-2.5 text-[0.72rem] leading-snug text-ink-subtle">
         {impactLine ? <><strong className="font-semibold text-ink">{impactLine}</strong> </> : null}
-        {signedIn ? "It helps the next person. Only what several people agree on ever shows as a note." : "No account needed. It helps the next person, and is never shown as-is."}
+        {signedIn ? "What you report is never shown publicly." : "No account needed. What you report is never shown publicly."}
       </p>
     </section>
   );

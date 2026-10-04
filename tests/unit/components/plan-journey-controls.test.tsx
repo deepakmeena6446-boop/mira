@@ -57,8 +57,8 @@ describe("chosen journey explicit consent and stable retry", () => {
     vi.setSystemTime(new Date(now.getTime() + 40 * 60_000));
     setPlanDraft({ ...currentPlanDraft()!, activity: "Fictional revised destination", destination: place("Fictional station", 28.71), journeyMode: "location", recipientIds: [noor] });
     show(true); await act(async () => {});
-    expect(screen.getByRole("radio", { name: "Use foreground location" })).toBeDisabled();
-    expect(screen.getByRole("radio", { name: "Private manual journey" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Share my location while Mira is open" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "Private, on this phone" })).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "Review journey update" }));
     expect(readLocalCheckIn()).toEqual(entry); expect(readLocalJourney()?.plan).toEqual(oldPlan);
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
@@ -161,8 +161,8 @@ describe("chosen journey explicit consent and stable retry", () => {
       : path === "/api/trips" ? { ok: false, status: 409, code: "trip_active", message: "You already have a trip running.", network: false }
       : path === "/api/trips/current" ? { ok: true, data: { trip: { destination: { name: "Fictional gym" }, autoArrival: true } } }
       : { ok: true, data: {} });
-    show(true); await screen.findByRole("radio", { name: "Use foreground location" });
-    fireEvent.click(screen.getByRole("radio", { name: "Use foreground location" }));
+    show(true); await screen.findByRole("radio", { name: "Share my location while Mira is open" });
+    fireEvent.click(screen.getByRole("radio", { name: "Share my location while Mira is open" }));
     fireEvent.click(await screen.findByRole("checkbox", { name: /Fictional Noor/ }));
     prepare(); confirm();
     expect(await screen.findByText(/You already have a journey running to Fictional gym\. Nothing new started, and nobody was told about this one/)).toBeInTheDocument();
@@ -172,14 +172,14 @@ describe("chosen journey explicit consent and stable retry", () => {
 
   it("denied assisted location posts nothing and offers a separately confirmed private manual fallback", async () => {
     mocks.location.mockResolvedValue({ status: "denied", point: null, at: Date.now(), area: null });
-    show(true); await screen.findByRole("radio", { name: "Use foreground location" });
-    fireEvent.click(screen.getByRole("radio", { name: "Use foreground location" }));
+    show(true); await screen.findByRole("radio", { name: "Share my location while Mira is open" });
+    fireEvent.click(screen.getByRole("radio", { name: "Share my location while Mira is open" }));
     prepare();
     expect(mocks.location).not.toHaveBeenCalled();
     confirm();
-    expect(await screen.findByText(/Retry or use the private manual journey/)).toBeInTheDocument();
+    expect(await screen.findByText(/Try again, or start a private journey/)).toBeInTheDocument();
     expect(posts()).toHaveLength(0);
-    fireEvent.click(screen.getByRole("radio", { name: "Private manual journey" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Private, on this phone" }));
     expect(currentPlanDraft()?.journeyMode).toBe("manual");
     prepare(); confirm();
     expect(readLocalJourney()).not.toBeNull();
@@ -190,7 +190,7 @@ describe("chosen journey explicit consent and stable retry", () => {
   it("recipient choices survive the versioned draft and remount but cannot share or start before confirmation", async () => {
     let view = show(true);
     await act(async () => {});
-    fireEvent.click(screen.getByRole("radio", { name: "Use foreground location" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Share my location while Mira is open" }));
     fireEvent.click(await screen.findByRole("checkbox", { name: /Fictional Noor/ }));
     expect(screen.getByRole("checkbox", { name: /Fictional Ava/ })).not.toBeChecked();
     const restored = parsePlanSession(sessionStorage.getItem("mira.plan.v1"), Date.now());
@@ -199,7 +199,7 @@ describe("chosen journey explicit consent and stable retry", () => {
     view.unmount(); view = show(true); await act(async () => {});
     expect(await screen.findByRole("checkbox", { name: /Fictional Noor/ })).toBeChecked();
     prepare();
-    expect(screen.getByText(/Selected recipients: Fictional Noor/)).toBeInTheDocument();
+    expect(screen.getByText(/Sharing with Fictional Noor/)).toBeInTheDocument();
     expect(posts()).toHaveLength(0); expect(mocks.location).not.toHaveBeenCalled();
     confirm();
     await waitFor(() => expect(posts()).toHaveLength(1));
@@ -215,7 +215,7 @@ describe("chosen journey explicit consent and stable retry", () => {
     });
     mocks.location.mockResolvedValueOnce(fix(28.69)).mockResolvedValueOnce(fix(28.6901));
     show(true); await act(async () => {});
-    fireEvent.click(screen.getByRole("radio", { name: "Use foreground location" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Share my location while Mira is open" }));
     prepare(); confirm();
     expect(await screen.findByText("Fictional network response lost")).toBeInTheDocument();
     const firstBody = structuredClone(posts()[0][1].body);
@@ -234,7 +234,7 @@ describe("chosen journey explicit consent and stable retry", () => {
       return { ok: false, network: true, message: "Fictional network response lost" };
     });
     show(true); await act(async () => {});
-    fireEvent.click(screen.getByRole("radio", { name: "Use foreground location" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Share my location while Mira is open" }));
     prepare(); confirm();
     await screen.findByText("Fictional network response lost");
     vi.setSystemTime(new Date(now.getTime() + 31_000));
