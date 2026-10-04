@@ -55,7 +55,7 @@ test("S1 first-time guest chooses a mapped 4:45 AM run loop without GPS, progres
   await expect(page.getByRole("button", { name: /Fixture out-and-back/ })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("img", { name: /Route overview: Fixture out-and-back/ })).toBeVisible();
   await page.getByRole("button", { name: "Start chosen journey" }).click();
-  await expect(page.getByText("Only you can see this tab journey.", { exact: false })).toBeVisible();
+  await expect(page.getByText("Only you can see this journey.", { exact: false })).toBeVisible();
   expect(tripPosts).toBe(0);
   await page.getByRole("button", { name: "Confirm start" }).click();
   await expect(page).toHaveURL(/\/trip\/local$/);
@@ -183,8 +183,8 @@ test("missing place and service providers keep an arrival deadline usable throug
   await page.getByLabel("Planned local time").fill(arrival);
   await page.getByLabel("Time zone (IANA)").fill("Asia/Kolkata");
   await page.getByRole("button", { name: "Compare my options" }).click();
-  await expect(page.getByRole("region", { name: "Plan options" })).toContainText("Your current location will not be substituted");
-  await expect(page.getByText(/With your 30-minute manual estimate, depart about/)).toBeVisible();
+  await expect(page.getByRole("region", { name: "Plan options" })).toContainText("Mira won’t swap in your current location");
+  await expect(page.getByText(/with your 30-minute estimate, depart about/)).toBeVisible();
   await page.getByRole("button", { name: "Start manual journey" }).click();
   await page.getByRole("button", { name: "Confirm start" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Confirm the named places directly" })).toBeVisible();

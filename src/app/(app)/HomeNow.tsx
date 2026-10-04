@@ -112,12 +112,15 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
   const stats: LiveStat[] = [
     { label: "Help Points open now", value: `${openNow.length}/${helpTotal}`, state: helpState },
     { label: "to the nearest", value: nearestOpen ? `${nearestOpen.minutes} min` : "—", state: helpState },
-    { label: nearNow?.notes === 1 ? "note from people" : "notes from people", value: String(nearNow?.notes ?? 0), state: !nearNow || nearNow.notes === null ? "loading" : nearNow.notesFailed ? "failed" : "ok" },
+    // Released notes count only when there are some: publishing is off in this beta, so a stat that is
+    // always 0 would advertise something that can't appear.
+    ...(nearNow?.notes ? [{ label: nearNow.notes === 1 ? "note from people" : "notes from people", value: String(nearNow.notes), state: "ok" as const }] : []),
   ];
+  // Home's one limitation line: staffing (Around says it in its "What Mira can't see").
   const line = nearestOpen ? (
     <><strong className="font-semibold text-[color:var(--sky-ink)]">{nearestOpen.name}</strong> is {hoursWords(hoursState(nearestOpen, localNow ?? undefined, 0, clock?.getTime()))}, about {nearestOpen.minutes} min away. Staffing isn’t verified.</>
   ) : nearNow?.help && !nearNow.help.failed ? (
-    helpTotal ? <>None of the {helpTotal} Help Points near you is listed open right now. Emergency is always one tap away.</> : <>No Help Points found within a short walk in the sources checked — that doesn’t mean none exist.</>
+    helpTotal ? <>None of the {helpTotal} Help Points near you is listed open right now. Emergency is always one tap away.</> : <>No Help Points found within a short walk in the sources Mira checked.</>
   ) : null;
 
   const startPlanTo = (to: { label: string; lat: number; lon: number; id: string }) => {

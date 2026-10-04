@@ -35,7 +35,7 @@ test("active journey resumes with truthful position age and immediate support", 
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
     document.dispatchEvent(new Event("visibilitychange"));
   });
-  await expect(owner.page.getByRole("status").filter({ hasText: "Foreground location is on" })).toBeVisible();
+  await expect(owner.page.getByRole("status").filter({ hasText: "Location on while this screen is open" })).toBeVisible();
   await owner.page.reload();
   await openJourneyMore(owner.page);
   await expect(owner.page.getByRole("status").filter({ hasText: "Last position shared" })).toBeVisible();
@@ -57,7 +57,7 @@ test("active journey resumes with truthful position age and immediate support", 
   expect(routeRequests).toBe(0); // Never reuse the retained watch point after explicit acquisition fails.
   await nextReviewAcquisition(owner.page, "fresh");
   await owner.page.getByRole("button", { name: "Check mapped walk to this place" }).click();
-  await expect(owner.page.getByRole("status").filter({ hasText: "Mapped walk from the checked position" })).toContainText("Access, staffing and opening remain unverified");
+  await expect(owner.page.getByRole("status").filter({ hasText: "Mapped walk from where you are" })).toContainText("about 7 min");
   expect(routeRequests).toBe(1);
   await owner.page.getByRole("button", { name: "Change journey to this place" }).click();
   await expect(owner.page.getByText(/Your existing contacts and live link stay the same/)).toBeVisible();
@@ -88,7 +88,7 @@ test("a selected plan requires a separate start confirmation and proximity check
   }, { from, to });
   await owner.page.route("**/api/plan/options", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ state: "ready", checkedAt: new Date().toISOString(), source: "OpenStreetMap imported walking graph", sourceAt: new Date().toISOString(), scope: "test route", options: [{ id: "walk-0", label: "Shortest mapped walk", minutes: 15, meters: 1000, geometry: [[from.lon, from.lat], [to.lon, to.lat]], evidence: [{ status: "known", claim: "Mapped walking time estimate", value: 15, scope: { kind: "route", ref: "test route" }, source: { id: "osm-walking-graph", label: "OpenStreetMap", observedAt: new Date().toISOString(), expiresAt: null } }] }], daylight: { status: "unknown", claim: "Daylight", scope: { kind: "area", ref: "test" }, reason: "not_checked", retryable: false }, service: { status: "unknown", claim: "Service", scope: { kind: "route", ref: "test" }, reason: "unsupported", retryable: false }, detail: "One mapped path." }) }));
   await owner.page.goto("/plan?planStep=options");
-  await owner.page.getByRole("radio", { name: "Use foreground location" }).check();
+  await owner.page.getByRole("radio", { name: "Share my location while Mira is open" }).check();
   await expect(owner.page.getByRole("button", { name: "Start chosen journey" })).toBeVisible();
   const before = await (await owner.page.request.get("/api/trips/current")).json();
   expect(before.trip).toBeNull();
@@ -119,7 +119,7 @@ test("S1 loop offers a manual check-in, keeps location optional until confirmed,
   await owner.page.route("**/api/plan/options", async (route) => route.fulfill({ json: { state: "missing", options: [], checkedAt: new Date().toISOString(), source: null, sourceAt: null, scope: "fixture", detail: "No mapped loop in this fixture", daylight: { status: "unknown", reason: "not_checked" }, service: { status: "unknown", reason: "unsupported" } } }));
   await owner.page.goto("/plan?planStep=options");
   await expect(owner.page.getByRole("status").filter({ hasText: "No mapped loop in this fixture" })).toBeVisible();
-  await owner.page.getByRole("radio", { name: "Use foreground location" }).check();
+  await owner.page.getByRole("radio", { name: "Share my location while Mira is open" }).check();
   await expect(owner.page.getByRole("button", { name: "Start manual journey" })).toBeVisible();
   expect((await (await owner.page.request.get("/api/trips/current")).json()).trip).toBeNull();
   await owner.page.getByRole("button", { name: "Start manual journey" }).click();

@@ -122,7 +122,7 @@ export function ReportScreen({ preset, from = null, emailAlerts = false }: { pre
               <Icon name="check" className="mira-draw size-7" />
             </span>
             <h1 className="m-display mt-4">Thank you.</h1>
-            <p className="mt-2 text-ink-muted">It&apos;s private. If others report something similar here, it can become a community note. Mira never shows one person&apos;s report.</p>
+            <p className="mt-2 text-ink-muted">It&apos;s kept private and never shown publicly. Reports may be reviewed, and each one is deleted within 30 days.</p>
             <div className="mt-6 grid gap-2">
               <button type="button" className="mira-primary w-full" onClick={() => (window.history.length > 1 ? router.back() : router.push("/"))}>Done</button>
               <button type="button" className="min-h-12 w-full rounded-2xl bg-surface font-semibold ring-1 ring-line-strong" onClick={() => { setDone(false); setCategory(null); setNote(""); }}>Report something else</button>

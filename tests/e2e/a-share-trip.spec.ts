@@ -38,7 +38,7 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     const started = (await (await owner.page.request.get("/api/trips/current")).json()).trip;
     expect(started.sharedWith).toEqual([expect.objectContaining({ id: starts[0].recipientIds[0], name: "Mum", linkDelivery: "sent" })]);
     await expect(owner.page.getByText("Sharing enabled")).toBeVisible();
-    await expect(owner.page.getByText("The email provider accepted a journey link for Mum. Receipt and viewing are unknown.")).toBeVisible();
+    await expect(owner.page.getByText("Emailed your link to Mum — Mira can’t see if it’s been opened.")).toBeVisible();
     await expect(owner.page.getByRole("link", { name: /Emergency call, 112/ })).toHaveAttribute("href", "tel:112");
     await expect(owner.page.getByRole("button", { name: /Send my live link/ })).toBeEnabled();
 

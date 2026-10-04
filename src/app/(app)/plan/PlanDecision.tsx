@@ -214,7 +214,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
     if (!complete || !draft) return [];
     const list: Claim[] = [];
     if (loop) {
-      list.push(loopPlan?.key !== loopKey ? { id: "route", kind: "pending", topic: "Route", icon: "route", claim: "Looking for a mapped loop…" } : loopReady ? { id: "route", kind: "estimate", topic: "Route", icon: "route", claim: `${loopReady.options.length} mapped loop${loopReady.options.length === 1 ? "" : "s"} near ${loopMinutes} min at your pace`, source: "OpenStreetMap walking graph · access from your start not verified" } : { id: "route", kind: "none", topic: "Route", icon: "route", claim: "Mira can’t map a loop here yet — it only has a walking graph for a few areas.", source: "You can still check daylight and Help Points near your start, and go with Mira for a set time." });
+      list.push(loopPlan?.key !== loopKey ? { id: "route", kind: "pending", topic: "Route", icon: "route", claim: "Looking for a mapped loop…" } : loopReady ? { id: "route", kind: "estimate", topic: "Route", icon: "route", claim: `${loopReady.options.length} mapped loop${loopReady.options.length === 1 ? "" : "s"} near ${loopMinutes} min at your pace`, source: "OpenStreetMap paths" } : { id: "route", kind: "none", topic: "Route", icon: "route", claim: "Mira can’t map a loop here yet — it only has a walking graph for a few areas.", source: "You can still check daylight and Help Points near your start, and go with Mira for a set time." });
       // One daylight line when start and finish agree; two only when it changes during the run.
       const endAt = departAt ? new Date(departAt.getTime() + loopMinutes * 60_000) : null;
       const same = departAt && endAt && sun ? daylightAt(departAt, sun) === daylightAt(endAt, sun) : true;
@@ -223,15 +223,16 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
       list.push(startHelp?.key === loopKey ? helpClaim(startHelp.points, startHelp.evidence, helpAt, "within a short walk of your start", "when you start") : helpClaim([], undefined, null));
     } else {
       if (currentWays?.error) list.push({ id: "time", kind: "failed", topic: mode === "walk" ? "Walk time" : "Travel time", icon: "clock", claim: currentWays.error });
-      else if (currentWays?.noRoute) list.push({ id: "time", kind: "none", topic: "Travel time", icon: "clock", claim: "No provider travel time for this. You’ll set your own check-in time.", source: "Planned-time service isn’t checked by Mira" });
+      else if (currentWays?.noRoute) list.push({ id: "time", kind: "none", topic: "Travel time", icon: "clock", claim: "No travel time for this. You’ll set your own check-in time." });
       else list.push(walkTimeClaim(currentWays ? way : null, mode, arriveAt, zone));
       list.push(mode === "walk" ? daylightClaim(departAt, sun, zone, "when you set off") : daylightClaim(arriveAt ?? departAt, dest, zone, arriveAt ? "when you arrive" : "at that time"));
       if (mode === "walk") list.push(currentWays?.error ? { id: "lighting", kind: "none", topic: "Lighting", icon: "lamp", claim: "Not checked — the way couldn’t be found." } : lightingClaim(currentWays ? way : null));
-      else list.push({ id: "lighting", kind: "none", topic: "Lighting", icon: "lamp", claim: "Street lighting is checked for walking ways only. Mira checks the last walk from where you arrive when you plan it.", source: "Not a gap in your plan — just not applicable" });
+      else list.push({ id: "lighting", kind: "none", topic: "Lighting", icon: "lamp", claim: "Checked for walks only — plan the walk from where you arrive to see it." });
       list.push(currentWays?.error ? { id: "help", kind: "none", topic: "Help Points", icon: "shield", claim: "Not checked — the way couldn’t be found." } : helpClaim(way?.helpPoints ?? [], currentWays ? way?.helpEvidence : undefined, mode === "walk" ? helpAt : arriveAt ? localTimeInZone(arriveAt, zone) : helpAt, mode === "walk" ? "on this way" : "within 500 m of where you arrive", mode === "walk" ? "when you pass" : "when you arrive"));
     }
     const notes = !loop && mode === "walk" ? currentWays?.notes ?? null : aroundNow?.notes ?? null;
-    list.push(notesClaim(notes, !loop && mode === "walk" ? "on this way" : loop ? "near your start" : "near where you arrive"));
+    const notesRow = notesClaim(notes, !loop && mode === "walk" ? "on this way" : loop ? "near your start" : "near where you arrive");
+    if (notesRow) list.push(notesRow);
     list.push(updatesClaim(aroundNow?.updates ?? null, loop ? "near your start" : "near there"));
     const c = aroundNow?.country;
     if (situation === "travel" && c) {
@@ -330,13 +331,13 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   const openThen = helpList ? helpList.filter((p) => { const h = hoursState(p, helpLocal ?? undefined); return h.kind === "open_24h" || h.kind === "listed_open" || h.kind === "open_now"; }).length : 0;
   const litShare = way?.lighting ? (() => { const l = way.lighting.summary; return l.lit + l.poles + l.dark > 0 ? `${l.lit + l.poles}%` : null; })() : null;
   const planNotes = !loop && mode === "walk" ? currentWays?.notes ?? null : aroundNow?.notes ?? null;
+  // Released notes count only when there are some (publishing is off in this beta; never an always-0 stat).
+  const noteCount = Array.isArray(planNotes) ? planNotes.length : 0;
   const planStats: LiveStat[] = [
     // A failed check reads as failed, not "0/0" or a spinner that never ends (audit L06-006).
     { label: loop ? "Help Points open near your start" : mode === "walk" ? "Help Points open on the way" : "Help Points open where you arrive", value: currentWays?.error ? "—" : helpList ? `${openThen}/${helpList.length}` : "…", state: currentWays?.error ? "failed" : helpList ? "ok" : "loading" },
-    loop || mode !== "walk"
-      ? { label: "notes from people", value: planNotes === "failed" ? "—" : planNotes ? String(planNotes.length) : "…", state: planNotes === "failed" ? "failed" : planNotes ? "ok" : "loading" }
-      : { label: "mapped as lit", value: litShare ?? "—", state: currentWays ? (litShare ? "ok" : "none") : "loading" },
-    ...(mode === "walk" && !loop ? [{ label: "notes from people", value: planNotes === "failed" ? "—" : planNotes ? String(planNotes.length) : "…", state: (planNotes === "failed" ? "failed" : planNotes ? "ok" : "loading") as LiveStat["state"] }] : []),
+    ...(mode === "walk" && !loop ? [{ label: "mapped as lit", value: litShare ?? "—", state: (currentWays ? (litShare ? "ok" : "none") : "loading") as LiveStat["state"] }] : []),
+    ...(noteCount ? [{ label: noteCount === 1 ? "note from people" : "notes from people", value: String(noteCount), state: "ok" as const }] : []),
   ];
 
   const lit = (w: WayOption) => { const l = w.lighting?.summary; return l && l.lit + l.poles + l.dark > 0 ? l.lit + l.poles : null; };
@@ -451,7 +452,6 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
                     </button>
                   ))}
                 </div>
-                <p className="mt-1 text-xs text-ink-subtle">Not a ranking. Each way shows what Mira could check; you choose.</p>
               </section>
             ) : null}
 

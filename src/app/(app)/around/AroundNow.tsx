@@ -107,7 +107,8 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
     }
     claims.push(daylightClaim(clock, focus, country.timezone ?? zone, "now"));
     claims.push(helpClaim(now?.help?.points ?? [], now?.help?.evidence, localNow, place ? "within a short walk of it" : "within a short walk", "now"));
-    claims.push(notesClaim(now?.notes ?? null, place ? "around it" : "around you"));
+    const notesRow = notesClaim(now?.notes ?? null, place ? "around it" : "around you");
+    if (notesRow) claims.push(notesRow);
     claims.push(updatesClaim(now?.updates ?? null, place ? "near there" : "near you"));
     claims.push(blindSpotsClaim("walk"));
   }
@@ -132,7 +133,8 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
     toast(r.ok ? `Saved ${place.name} to your places` : r.message, r.ok ? undefined : "error");
   };
 
-  const notesFailed = now?.notes === "failed";
+  // Released notes show only when there are some: publishing is off in this beta, so an empty list is
+  // the usual answer and nothing advertises notes that can't appear. A failed check is in the ledger.
   const notes = Array.isArray(now?.notes) ? now.notes : [];
   // The same three facts as Home, for here or for the chosen place.
   const openNow = ranked.filter((p) => { const h = hoursState(p, localNow ?? undefined, 0, clock?.getTime()); return h.kind === "open_24h" || h.kind === "open_now" || h.kind === "listed_open"; });
@@ -143,13 +145,14 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
     place && here
       ? { label: "walk from you", value: walkNow?.way && !walkNow.error ? `${Math.round(walkNow.way.route.minutes)} min` : "—", state: !walkNow ? "loading" : walkNow.error ? "failed" : "ok" }
       : { label: "to the nearest", value: nearestOpen ? `${nearestOpen.minutes} min` : "—", state: helpState },
-    { label: notes.length === 1 ? "note from people" : "notes from people", value: notesFailed ? "—" : String(notes.length), state: !now || now.notes === null ? "loading" : notesFailed ? "failed" : "ok" },
+    ...(notes.length ? [{ label: notes.length === 1 ? "note from people" : "notes from people", value: String(notes.length), state: "ok" as const }] : []),
   ];
-  // Same sentences as Home's card, so "none open" reads the same on both screens.
+  // Same sentences as Home's card, so "none open" reads the same on both screens. Staffing is said
+  // once, in the ledger's "What Mira can't see".
   const helpTotal = now?.help?.points.length ?? 0;
-  const line = nearestOpen ? <><strong className="font-semibold text-[color:var(--sky-ink)]">{nearestOpen.name}</strong> is {hoursWords(hoursState(nearestOpen, localNow ?? undefined, 0, clock?.getTime()))}, about {nearestOpen.minutes} min {place ? "from it" : "away"}. Staffing isn’t verified.</>
+  const line = nearestOpen ? <><strong className="font-semibold text-[color:var(--sky-ink)]">{nearestOpen.name}</strong> is {hoursWords(hoursState(nearestOpen, localNow ?? undefined, 0, clock?.getTime()))}, about {nearestOpen.minutes} min {place ? "from it" : "away"}.</>
     : now?.help && now.help.evidence.state !== "failed"
-      ? helpTotal ? <>None of the {helpTotal} Help Points near {place ? "it" : "you"} is listed open right now. Emergency is always one tap away.</> : <>No Help Points found within a short walk in the sources checked — that doesn’t mean none exist.</>
+      ? helpTotal ? <>None of the {helpTotal} Help Points near {place ? "it" : "you"} is listed open right now. Emergency is always one tap away.</> : <>No Help Points found within a short walk in the sources Mira checked.</>
       : null;
   const mapPins = ranked.slice(0, 8).filter((p) => !osmOnly || !p.id.startsWith("g:")).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, icon: HELP_ICON[p.cls] ?? "pin", strong: HELP_CLASSES[p.cls].emergency }));
 
@@ -203,7 +206,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
               <section aria-labelledby="help-near-h" className="mt-8">
                 <div className="flex items-baseline justify-between gap-2">
                   <h2 id="help-near-h" className="m-h">Help Points nearby</h2>
-                  <span className="text-xs text-ink-subtle">listed hours · staffing not verified</span>
+                  <span className="text-xs text-ink-subtle">listed hours · minutes by distance</span>
                 </div>
                 <ul className="m-card mt-3 divide-y divide-line overflow-hidden">
                   {ranked.slice(0, 4).map((p) => {
@@ -213,23 +216,22 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
                         <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-sunken"><Icon name={HELP_ICON[p.cls] ?? "pin"} className="size-4 text-ink-muted" /></span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-semibold">{p.name}</span>
-                          <span className="line-clamp-2 block text-[0.8125rem] text-ink-muted">{HELP_CLASSES[p.cls].label} · about {p.minutes} min walk · {hoursWords(h)}</span>
+                          <span className="line-clamp-2 block text-[0.8125rem] text-ink-muted">{HELP_CLASSES[p.cls].label} · about {p.minutes} min walk · {hoursWords(h, { listed: false })}</span>
                         </span>
                         <a href={`https://www.google.com/maps/dir/?api=1&destination=${p.lat.toFixed(5)},${p.lon.toFixed(5)}&travelmode=walking`} target="_blank" rel="noopener noreferrer" aria-label={`Directions to ${p.name}`} className="grid size-10 shrink-0 place-items-center rounded-full bg-sunken"><Icon name="arrow" className="size-4" /></a>
                       </li>
                     );
                   })}
                 </ul>
-                <p className="mt-1.5 px-1 text-xs text-ink-subtle">Walking minutes are by distance; the route isn’t checked.</p>
               </section>
             ) : null}
 
-            <section aria-labelledby="people-h" className="mt-8">
-              <div className="flex items-baseline justify-between gap-2">
-                <h2 id="people-h" className="m-h">From people here</h2>
-                <span className="inline-flex items-center gap-1.5 text-xs text-ink-subtle"><EvidenceGlyph kind="people" />Released notes</span>
-              </div>
-              {now?.notes === null ? <p role="status" className="mt-2 text-sm text-ink-muted">Checking notes…</p> : notesFailed ? <p role="status" className="mt-2 text-sm text-ink-muted">Mira couldn’t check notes just now. That isn’t the same as there being none.</p> : notes.length ? (
+            {notes.length ? (
+              <section aria-labelledby="people-h" className="mt-8">
+                <div className="flex items-baseline justify-between gap-2">
+                  <h2 id="people-h" className="m-h">From people here</h2>
+                  <span className="inline-flex items-center gap-1.5 text-xs text-ink-subtle"><EvidenceGlyph kind="people" />Several people agreed</span>
+                </div>
                 <ul className="mt-3 space-y-2">
                   {notes.slice(0, 3).map((n) => (
                     <li key={n.id} className="rounded-2xl bg-people-soft/50 px-4 py-3">
@@ -238,10 +240,8 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
                     </li>
                   ))}
                 </ul>
-              ) : (
-                <p className="mt-2 text-sm text-ink-muted">No released notes {place ? "around this place" : "around you"} yet. Notes appear once several people say similar things — yours could be the first.</p>
-              )}
-            </section>
+              </section>
+            ) : null}
 
             <EvidenceLedger className="mt-8" title="The details" label="What Mira knows here" items={claims.map((c) => (c.kind === "failed" ? { ...c, action: { label: "Try again", onClick: () => setRetry((n) => n + 1) } } : c))} />
 
