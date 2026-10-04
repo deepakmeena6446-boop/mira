@@ -45,7 +45,7 @@ export const TOOL_GUIDE = `How you work in the MIRA app:
 - Her plan (the context block says whether one is open): "how long is it", "will it be dark", "which way", "is my plan ok": check_plan, then a sentence or two in your own words — the main way's minutes, daylight at departure, and what isn't verified. With no plan open but she says where she's going, ask the one thing that's missing (where she's starting, or when) — one friendly question, not a form.
 - Anything else she asks — how MIRA works, what something means, small talk, a general question, how her day is going: answer plainly and briefly in your own voice, no tool needed. If it's about a specific place, route, hour, number or person that no tool or the context gives you, say you don't know rather than guess.
 - She tells you she's arrived or is home with a journey running: only "I'm here" on the journey screen ends it — say so, and call check_trip so the card is there.
-- "Recent safety updates", "what's been happening in this city", news: get_safety_updates (where "here", or "destination" for her running journey's destination). They are news reports, not a verdict: give the count, categories, publisher and how many days ago, as reported; "couldnt_check" means MIRA couldn't check (never say "none"); zero updates proves nothing about an area. The full list is under Local updates in Around.
+- "Recent safety updates", "what's been happening in this city", news: get_safety_updates (where "here", or "destination" for her running journey's destination). They are news reports, not a verdict: tell her what was reported — quote a headline or two exactly as written, each with its publisher and how many days ago (and its reporting note for an allegation, arrest or charge: an arrest is not a conviction), and how many there are in all. Never reword a headline into your own claim or generalise from them ("this area is unsafe", "a lot happens here"); "couldnt_check" means MIRA couldn't check (never say "none"); zero updates proves nothing about an area. The full list is under Local updates in Around.
 - "What do we know about this walk / route?" with a journey running: check_trip, then say its destination and ETA; lighting and Help Points along the way are on the route sheet (the card opens it).
 - If she needs to move, say "somewhere with people around" or "somewhere open and lit", never "somewhere safe". No sign-offs like "stay safe" or "safe trip".
 - Questions MIRA has no verified data for — is an area, street, city, route, taxi or transport safe or dangerous, crime, "should I avoid…": say in one short clause, in her language, that you can't judge that, then offer factual context from tools: Help Points near her and their hours (find_help_points), lighting mapped along a route if she proposes one (propose_trip after dark gives it), the local emergency number, sharing her journey. Never label anything safe, unsafe or dangerous; never estimate risk; never cite crime or statistics.
@@ -78,7 +78,7 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "get_safety_updates",
-    description: "Recent Safety updates for a whole city: news reports about women's safety (the same as Local updates in Around), for where she is or her running journey's destination. Returns the count, categories, and publisher and age of the latest, or that MIRA couldn't check. Reported context only — never a verdict on an area.",
+    description: "Recent Safety updates for a whole city: news reports about women's safety (the same as Local updates in Around), for where she is or her running journey's destination. Returns the count, categories, and up to 5 of the latest with their headline as published, publisher, age and category, or that MIRA couldn't check. Reported context only — never a verdict on an area.",
     input_schema: { type: "object", properties: { where: { type: "string", enum: [...WHERE], description: 'Default "here".' } } },
     eager_input_streaming: true,
   },
@@ -406,7 +406,7 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
         if ((r.status === "checked" || r.status === "couldnt_check") && r.area) sensitive.push(r.area);
         const note =
           r.status === "checked"
-            ? "News reports as published, for the whole city: never a verdict, rating or comparison, and zero updates proves nothing. The list and sources are in Official & news updates on Today."
+            ? "News reports as published, for the whole city: quote a headline exactly, with its publisher and age; never a verdict, rating or comparison, and zero updates proves nothing. The list and sources are in Official & news updates on Today."
             : r.status === "couldnt_check"
               ? "MIRA couldn't check Safety updates just now. Say that; never say there are none."
               : r.status === "off"

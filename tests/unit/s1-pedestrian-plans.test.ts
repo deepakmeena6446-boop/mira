@@ -44,9 +44,29 @@ describe("pedestrian planning completion", () => {
     expect(result.options[0].evidence[0]).toMatchObject({ source: { id: "osm-walking-graph" } });
     expect(result.daylight).toMatchObject({ status: "known", value: "dark" });
     expect(result.timeAlternatives?.[0]).toMatchObject({ local: "2026-10-07T06:30", minutesLater: 105 });
-    expect(result.constraints).toMatchObject([{ text: "step-free", status: "not_checked" }]);
+    expect(result.constraints).toEqual([{ text: "step-free", status: "not_checked", reason: "Mira can't check step-free access yet." }]);
     expect(resolvePlanOptions({ ...input, intent: { ...plan, paceMinutesPerKm: 12 } }).options[0].minutes).toBe(10);
     expect(loopTargetMeters({ ...plan, loopTarget: { kind: "duration", value: 30 } })).toBe(5_000);
+  });
+  it("answers a lighting requirement from the lighting mapped along each way; one plain line for each it can't check", () => {
+    const lit = { ...plan, loop: false, destination: { kind: "named" as const, query: "Fictional destination", resolution: { source: "search" as const, point: points[2] } }, constraints: ["well-lit", "step-free", "low cost", "roshni wala rasta", "quiet park"] };
+    const result = resolvePlanOptions({ ...input, intent: lit, to: points[2], routes: planRoutes(graph, points[0], points[2]), lighting: [72, null] });
+    expect(result.options).toHaveLength(2);
+    const [first, second] = result.options.map((o) => o.label);
+    expect(result.constraints).toEqual([
+      { text: "well-lit", status: "checked", reason: `${first}: 72% mapped as lit or with street lamps; ${second}: lighting not known. Mapped lighting, not whether the lamps work tonight.` },
+      { text: "step-free", status: "not_checked", reason: "Mira can't check step-free access yet." },
+      { text: "low cost", status: "not_checked", reason: "Mira can't check cost yet." },
+      { text: "roshni wala rasta", status: "checked", reason: expect.stringContaining("72% mapped as lit") },
+      { text: "quiet park", status: "not_checked", reason: "Mira can't check how busy it is yet." },
+    ]);
+    expect(JSON.stringify(result.constraints)).not.toMatch(/imported graph does not establish/);
+    expect(resolvePlanOptions({ ...input, intent: lit, lighting: [null, null] }).constraints?.[0].reason).toBe("Lighting isn't mapped along these ways, so Mira can't say how lit they are.");
+    expect(resolvePlanOptions({ ...input, intent: lit, lighting: "failed" }).constraints?.[0]).toMatchObject({ status: "not_checked", reason: "Mira couldn't check lighting along these ways just now." });
+    expect(resolvePlanOptions({ ...input, intent: { ...lit, constraints: ["lit streets", "luggage"] }, routes: null }).constraints).toEqual([
+      { text: "lit streets", status: "not_checked", reason: "There's no mapped way yet to check lighting along." },
+      { text: "luggage", status: "not_checked", reason: "Mira can't check this yet." },
+    ]);
   });
   it("derives each arrive-by departure from that option without treating arrival time as departure", () => {
     const intent = { ...plan, loop: false, destination: { kind: "named" as const, query: "Fictional destination", resolution: { source: "search" as const, point: points[2] } }, timeKind: "arrive_by" as const };
