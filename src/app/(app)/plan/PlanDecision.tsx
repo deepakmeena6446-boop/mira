@@ -105,7 +105,14 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   }, [hydrated]);
 
   const update = useCallback((patch: Partial<PlanDraft>) => { if (draft) setPlanDraft({ ...draft, ...patch, touched: true, selection: undefined }); }, [draft]);
-  const chooseSituation = (s: Situation) => { setSituation(s); setSelected(0); if (draft) setPlanDraft(preset({ ...draft, activity: "", loop: false, savedId: undefined }, s, here ? { lat: here.lat, lon: here.lon } : null)); };
+  const chooseSituation = (s: Situation) => {
+    setSituation(s);
+    setSelected(0);
+    if (draft) setPlanDraft(preset({ ...draft, activity: "", loop: false, savedId: undefined }, s, here ? { lat: here.lat, lon: here.lon } : null));
+    // Keep ?for= in step, or a refresh reads the old situation as "a new one chosen on Home" and wipes this plan (audit P13-001).
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("for")) { url.searchParams.set("for", s); window.history.replaceState(null, "", url); }
+  };
 
   const origin = draft ? pointOf(draft.origin) : null;
   const dest = draft && !draft.loop ? pointOf(draft.destination) : null;

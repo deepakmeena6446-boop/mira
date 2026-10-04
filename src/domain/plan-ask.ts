@@ -3,8 +3,21 @@ import { resolvedDestination, resolvedOrigin, type PlanDraft } from "./plan-stat
 import { deterministicIntentHints, applyIntentHints, type MovementIntentHints } from "./plan-intent";
 import { laterDaylight, type PlanOptionsResult } from "./plan-options";
 import { shouldSeedPlan } from "./ask-routing";
+import { clock12 } from "./opening-hours";
 
 export type PlanAskAnswer = { text: string; next: "edit_plan" | "review_options"; evidence: PlanOptionsResult | null };
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "2026-10-04T21:05" → "4 Oct, 9:05 PM": Mira's replies never show ISO stamps (audit L02-002, R14). */
+export function localWhen(local: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local);
+  return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]}, ${clock12(Number(m[4]) * 60 + Number(m[5]))}` : local;
+}
+/** A data snapshot's date only ("24 Sep 2026"). */
+function snapshotDate(at: string | null | undefined): string {
+  const m = at ? /^(\d{4})-(\d{2})-(\d{2})/.exec(at) : null;
+  return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}` : "unknown";
+}
 
 /** A time in prose is a hint, never an absolute departure without a date and zone. */
 export function explicitTimeHint(message: string): string | null {
@@ -61,12 +74,12 @@ export function answerPlanQuestion(message: string, plan: MovementIntent | null,
     const first = evidence.options[0];
     const alternatives = evidence.options.slice(1).map((option) => `${option.label}: about ${Math.round(option.minutes)} minutes over ${(option.meters / 1000).toFixed(1)} km`).join("; ");
     const later = evidence.timeAlternatives?.[0];
-    const timeOption = later ? ` A later departure with calculated daylight is ${later.local.replace("T", " ")} (${later.timeZone}); changing time does not verify lighting or activity.` : "";
-    return { text: `${daylight} ${first.label}: about ${Math.round(first.minutes)} minutes over ${(first.meters / 1000).toFixed(1)} km.${alternatives ? ` Alternatives: ${alternatives}.` : " No distinct mapped alternative was found."} Time uses your chosen or stated assumed pace, not a measured running speed. Source: ${evidence.source ?? "unknown"}, snapshot ${evidence.sourceAt ?? "unknown"}, ${evidence.scope}. Access from the starting place to the graph, lighting, activity and live conditions are unverified.${timeOption} Review and choose an option; starting or sharing requires separate confirmation.`, next: "review_options", evidence };
+    const timeOption = later ? ` A later departure with calculated daylight is ${localWhen(later.local)} (${later.timeZone}); changing time does not verify lighting or activity.` : "";
+    return { text: `${daylight} ${first.label}: about ${Math.round(first.minutes)} minutes over ${(first.meters / 1000).toFixed(1)} km.${alternatives ? ` Alternatives: ${alternatives}.` : " No distinct mapped alternative was found."} Time uses your chosen or stated assumed pace, not a measured running speed. Source: ${evidence.source ?? "unknown"}, data from ${snapshotDate(evidence.sourceAt)}. Access from the starting place to the graph, lighting, activity and live conditions are unverified.${timeOption} Review and choose an option; starting or sharing requires separate confirmation.`, next: "review_options", evidence };
   }
   if (plan.loop) {
     const later = evidence.daylight.status === "known" && evidence.daylight.value === "dark" ? laterDaylight(plan.departure.local, plan.departure.timeZone, from) : null;
-    const timeOption = later ? ` Calculated daylight begins by about ${later.local.replace("T", " ")} (${plan.departure.timeZone}), ${later.minutesLater} minutes later. This is a solar calculation, not a lighting or route check.` : "";
+    const timeOption = later ? ` Calculated daylight begins by about ${localWhen(later.local)} (${plan.departure.timeZone}), ${later.minutesLater} minutes later. This is a solar calculation, not a lighting or route check.` : "";
     return { text: `${daylight}${timeOption} No eligible mapped loop was found: ${evidence.detail} Choose a different loop distance or starting place, change the departure time, or retain a manual plan. Lighting, activity and live conditions remain unverified.`, next: "edit_plan", evidence };
   }
   if (evidence.state !== "ready") return { text: `${daylight} I cannot compare mapped walking paths: ${evidence.detail} Ride and transit service, lighting and opening hours at the planned time are unverified. You can edit the place or time and retry.`, next: "edit_plan", evidence };
@@ -74,5 +87,5 @@ export function answerPlanQuestion(message: string, plan: MovementIntent | null,
   if (!fastest) return { text: `${daylight} No checked option was returned. Retry the route comparison; no route or service is confirmed.`, next: "edit_plan", evidence };
   const alternate = evidence.options.length > 1 ? ` A distinct mapped alternative takes about ${Math.round(evidence.options[1].minutes)} minutes.` : " No distinct mapped alternative met the graph rules.";
   const modeLimit = plan.mode === "walk" ? "This is a mapped pedestrian estimate at the stated assumed pace, not a safety comparison." : `You selected ${plan.mode}; this mapped walk is only a reference. ${plan.mode === "ride" ? "Driver, pickup and last-leg access" : "Service hours, stops and last-leg access"} are not verified for your planned time. Confirm with the operator or provider before relying on that mode.`;
-  return { text: `${daylight} ${fastest.label} is about ${Math.round(fastest.minutes)} minutes over ${(fastest.meters / 1000).toFixed(1)} km.${alternate} Source: ${fastest.evidence[0].status === "known" ? fastest.evidence[0].source.label : "unknown"}, snapshot ${evidence.sourceAt ?? "unknown"}, for ${evidence.scope}. ${fastest.departureLocal ? ` Departure ${fastest.departureLocal} (${fastest.timeZone ?? plan.departure.timeZone})${fastest.arrivalLocal ? `; estimated arrival ${fastest.arrivalLocal}` : ""}.` : ""} ${modeLimit} Ride and transit service, lighting and opening hours at the planned time remain unverified. Review the options before choosing a journey; starting or sharing requires a separate confirmation.`, next: "review_options", evidence };
+  return { text: `${daylight} ${fastest.label} is about ${Math.round(fastest.minutes)} minutes over ${(fastest.meters / 1000).toFixed(1)} km.${alternate} Source: ${fastest.evidence[0].status === "known" ? fastest.evidence[0].source.label : "unknown"}, data from ${snapshotDate(evidence.sourceAt)}. ${fastest.departureLocal ? ` Leaving ${localWhen(fastest.departureLocal)} (${fastest.timeZone ?? plan.departure.timeZone})${fastest.arrivalLocal ? `; arriving about ${clock12(Number(fastest.arrivalLocal.slice(11, 13)) * 60 + Number(fastest.arrivalLocal.slice(14, 16)))}` : ""}.` : ""} ${modeLimit} Ride and transit service, lighting and opening hours at the planned time remain unverified. Review the options before choosing a journey; starting or sharing requires a separate confirmation.`, next: "review_options", evidence };
 }

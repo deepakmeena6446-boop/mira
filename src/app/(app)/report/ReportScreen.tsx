@@ -38,6 +38,15 @@ function bandFor(d: Date): "day" | "evening" | "late" {
   return h >= 6 && h < 18 ? "day" : h >= 18 && h < 22 ? "evening" : "late";
 }
 
+const UNSENT = "mira.report.unsent.";
+/** The key of a send that may have reached the server, per category, for this tab. */
+function unsentKey(category: Category): string | null {
+  try { return sessionStorage.getItem(UNSENT + category); } catch { return null; }
+}
+function rememberUnsent(category: Category, key: string | null) {
+  try { if (key) sessionStorage.setItem(UNSENT + category, key); else sessionStorage.removeItem(UNSENT + category); } catch { /* private mode: same-screen retry still reuses keyRef */ }
+}
+
 export function ReportScreen({ preset, from = null, emailAlerts = false }: { preset: Category | null; from?: ReportFrom | null; emailAlerts?: boolean }) {
   const router = useRouter();
   // Same frame as every screen: back on the left, the Support pair where it always is.
@@ -62,7 +71,8 @@ export function ReportScreen({ preset, from = null, emailAlerts = false }: { pre
   const [error, setError] = useState<string | null>(null);
   const keyRef = useRef("");
   useEffect(() => {
-    keyRef.current = crypto.randomUUID();
+    // A send whose reply was lost keeps its key for this category, so Back and the same tile again can't file it twice (audit P09-002).
+    keyRef.current = (category && unsentKey(category)) || crypto.randomUUID();
   }, [category]);
   const pii = useMemo(() => detectPii(note), [note]);
   const tile = TILES.find((t) => t.category === category) ?? (category === "other" ? { category: "other" as Category, icon: "dots", label: "Something else", hint: "", group: "happened" as ReportGroup } : null);
@@ -94,9 +104,12 @@ export function ReportScreen({ preset, from = null, emailAlerts = false }: { pre
     setBusy(false);
     if (r.ok) {
       recordUsage("report");
+      rememberUnsent(category, null);
       setDone(true);
-    }
-    else setError(r.network ? "Not sent — check your connection. Your note is still here." : r.message);
+    } else if (r.network) {
+      rememberUnsent(category, keyRef.current);
+      setError("We couldn't confirm it was sent. Check your connection and send again — it won't be filed twice. Your note is still here.");
+    } else setError(r.message);
   };
 
   if (done) {

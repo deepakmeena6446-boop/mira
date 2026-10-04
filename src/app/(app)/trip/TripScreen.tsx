@@ -156,7 +156,8 @@ export function TripScreen({
   }, []);
 
   useEffect(() => {
-    const p = setInterval(refresh, 20_000);
+    // 10 s: a second device shows I'm here / End / +10 min from elsewhere within seconds, not ~20 (audit P18-002).
+    const p = setInterval(refresh, 10_000);
     const onVisible = () => { if (document.visibilityState === "visible") void refresh(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { clearInterval(p); document.removeEventListener("visibilitychange", onVisible); };
@@ -366,6 +367,10 @@ export function TripScreen({
       setTrip(r.data.trip);
       if (action === "arrive") haptic("arrived");
       if (action === "extend") toast("Added 10 minutes. Take your time.");
+    } else if (r.status === 409 || r.code === "invalid_extension") {
+      // Another device got there first (audit P18-002): show what actually happened instead of an error over a stale card.
+      await refresh();
+      if (stillOpen.current) toast("This journey was changed on another device. You're seeing the latest now.", "info");
     } else toast(r.message, "error");
   };
 
