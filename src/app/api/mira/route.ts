@@ -9,6 +9,7 @@ import { getEnv } from "@/server/config/env";
 import { respond, type MiraCard, type MiraTurn } from "@/server/providers/companion";
 import type { MiraEvent } from "@/server/providers/companion/types";
 import { MIRA_DAILY_MAX, MIRA_GUEST_DAILY_MAX } from "@/domain/limits";
+import { shouldSeedPlan } from "@/domain/ask-routing";
 
 export const dynamic = "force-dynamic";
 
@@ -108,6 +109,10 @@ export const POST = handle(async (req: Request) => {
           open = false;
         }
       };
+      // A turn that starts or uses a plan always ends with the plan card, so there's a way from the chat to the plan
+      // ("Complete plan") even before anything can be checked.
+      const planTurn = Boolean(plan) || shouldSeedPlan(message);
+      let planCard = false;
       try {
         for await (const ev of respond(sql, user, message, history, context, modelAllowed, plan)) {
           if (ev.type === "history") {
@@ -117,8 +122,12 @@ export const POST = handle(async (req: Request) => {
           if (ev.type === "usage") continue; // server-only (respond() consumes it; never forwarded)
           if (ev.type === "text" && !ev.private) text += ev.delta;
           if (ev.type === "card") {
+            if (ev.card.type === "plan_brief") planCard = true;
             const kept = storableCard(ev.card);
             if (kept) cards.push(kept);
+          }
+          if (ev.type === "done" && planTurn && !planCard) {
+            send({ type: "card", card: { type: "plan_brief", next: "edit_plan", state: "not_checked", checkedAt: now.toISOString(), source: null, sourceAt: null, scope: null, options: [], daylight: null } });
           }
           send(ev);
         }

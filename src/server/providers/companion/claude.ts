@@ -405,7 +405,7 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
       case "propose_trip": {
         const savedPlace = typeof input.saved_place === "string" ? saved.find((p) => p.label.toLowerCase() === (input.saved_place as string).toLowerCase()) : undefined;
         const ref = typeof input.place_ref === "string" ? refs.get(input.place_ref) : undefined;
-        const dest = savedPlace ? { name: savedPlace.label, lat: savedPlace.lat, lon: savedPlace.lon } : ref ? { name: ref.name, lat: ref.lat, lon: ref.lon } : null;
+        const dest = savedPlace ? { name: savedPlace.label, lat: savedPlace.lat, lon: savedPlace.lon, savedPlaceId: savedPlace.id } : ref ? { name: ref.name, lat: ref.lat, lon: ref.lon } : null;
         if (!dest) return { result: { error: "Unknown destination. Use a saved place label or a place_ref from find_nearby / find_help_points." } };
         const mode = (input.mode as MiraTripMode | undefined) ?? "walk";
         const { context: known, ...t } = await tools.proposeTrip(dest, mode);

@@ -20,7 +20,7 @@ export type MiraHelpPoint = {
 /** Streamed events from Mira to the chat UI (NDJSON over /api/mira). */
 export type MiraCard =
   /** `email`: whether MIRA can email the contacts at all (absent on cards saved before it was recorded). */
-  | { type: "trip"; destination: { name: string; lat: number; lon: number }; minutes: number | null; contacts: string[]; mode?: MiraTripMode; email?: boolean; whatsapp?: string[] }
+  | { type: "trip"; destination: { name: string; lat: number; lon: number; savedPlaceId?: string }; minutes: number | null; contacts: string[]; mode?: MiraTripMode; email?: boolean; whatsapp?: string[] }
   | { type: "places"; title: string; places: Array<{ name: string; kind: string; distanceM?: number; lat: number; lon: number }> }
   | { type: "help_points"; title: string; points: MiraHelpPoint[] }
   | { type: "report"; category: string; label: string }

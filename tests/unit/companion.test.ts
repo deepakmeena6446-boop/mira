@@ -104,7 +104,11 @@ describe("Mira (scripted engine)", () => {
     expect(info.text).toMatch(/has not yet been verified by MIRA/);
     expect(info.cards[0].type).toBe("sos");
     const uk = await run("what's the emergency number here?");
-    expect(uk.text).toMatch(/United Kingdom, Reviewed call options: 999/);
+    expect(uk.text).toMatch(/United Kingdom, reviewed call options: 999/);
+    // Naming the country she's in is "here" — no "not where you are now" (re-audit RA4).
+    const named = await run("what's the emergency number in the United Kingdom?", tools({ emergencyFor: () => GB } as never));
+    expect(named.text).not.toMatch(/not where you are now/);
+    expect(named.cards[0]?.type).toBe("sos");
   });
   it("answers safety judgements with 'not enough verified information', then facts", async () => {
     const r = await run("Is this neighbourhood safe at night?");

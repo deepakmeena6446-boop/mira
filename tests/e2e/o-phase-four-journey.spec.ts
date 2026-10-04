@@ -100,6 +100,8 @@ test("a selected plan requires a separate start confirmation and proximity check
   await expect(owner.page.getByText("A fresh, accurate position near your chosen origin is needed.", { exact: false })).toBeVisible();
   expect((await (await owner.page.request.get("/api/trips/current")).json()).trip).toBeNull();
   await owner.ctx.setGeolocation(GEO);
+  // Location is on for her, so a watch is running; static Chromium GPS can then fail a maximumAge:0 request (see above).
+  await nextReviewAcquisition(owner.page, "fresh");
   await owner.page.getByRole("button", { name: "Confirm start" }).click();
   await owner.page.waitForURL("**/trip");
   await expect(owner.page.getByText("Only people you send your live link to can follow.")).toBeVisible();

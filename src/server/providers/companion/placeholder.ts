@@ -84,7 +84,8 @@ function emergencyFacts(c: CountryContext): string {
   const where = c.countryName ?? "this country";
   if (!p) return `${noNumberReason(c)} Use the Emergency options button for that explanation.`;
   const help = c.helplines.map((h) => `${h.number} (${h.name})`);
-  return `In ${where}, ${emergencyLine(c)}${help.length ? ` Helplines: ${help.join(", ")}.` : ""}`;
+  const line = emergencyLine(c);
+  return `In ${where}, ${line.charAt(0).toLowerCase()}${line.slice(1)}${help.length ? ` Helplines: ${help.join(", ")}.` : ""}`;
 }
 
 // Marks location-derived fragments inside a reply: streamed, never stored (see MiraEvent).
@@ -125,7 +126,7 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     const help = ctx.hasLocation ? await tools.findHelpPoints("emergency") : { points: [], failed: false };
     reply = `If you're in danger right now, ${emergencySentence(ctx.country)}. Head towards people and lit, open places if you can.${home ? " Your journey home is on the card below if you want to share it." : ""}`;
     if (help.points.length) cards.push({ type: "help_points", title: "Nearest Help Points", points: help.points });
-    if (home) cards.push(tripCard(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon })));
+    if (home) cards.push(tripCard(await tools.proposeTrip({ name: home.label, lat: home.lat, lon: home.lon, savedPlaceId: home.id })));
     yield* speak(reply.replace(/[ \t\n]+/g, " ").trim());
     for (const card of cards) yield { type: "card", card };
     yield { type: "done" };
@@ -155,8 +156,10 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     // is said to be for there; otherwise where she is, with the Emergency card.
     const named = /\b(?:in|for)\s+([\p{L}\p{M} .'-]{2,80})\s*[?.!]*$/iu.exec(m)?.[1]?.trim();
     const there = named ? tools.emergencyFor?.(named) ?? null : null;
-    if (named && there) reply = `${emergencyFacts(there)} That's for ${there.countryName}, not where you are now.`;
-    else if (named) reply = `I don't have a reviewed profile for ${named}. Check an official local source; your phone's own emergency call works anywhere.`;
+    // Naming the country she's in is the same as asking "here" (re-audit RA4: "…not where you are now" while in Delhi).
+    const here = Boolean(there && ctx0.country.iso && there.iso === ctx0.country.iso);
+    if (named && there && !here) reply = `${emergencyFacts(there)} That's for ${there.countryName}. If you're somewhere else right now, the Emergency button shows the numbers for where you are.`;
+    else if (named && !there) reply = `I don't have a reviewed profile for ${named}. Check an official local source; your phone's own emergency call works anywhere.`;
     else {
       reply = emergencyFacts(ctx0.country);
       cards.push({ type: "sos", contacts: await tools.trustedContacts() });
@@ -186,7 +189,7 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
             ? "I couldn't check Help Points just now — the map lookup failed. The Emergency button works either way."
             : "I don't have Help Point results to show right now. That doesn't mean there are none nearby.";
     if (help.length) cards.push({ type: "help_points", title: uneasy ? "Nearest Help Points" : "Help Points near you", points: help });
-    if (uneasy && offerHome) cards.push(tripCard(await tools.proposeTrip({ name: offerHome.label, lat: offerHome.lat, lon: offerHome.lon })));
+    if (uneasy && offerHome) cards.push(tripCard(await tools.proposeTrip({ name: offerHome.label, lat: offerHome.lat, lon: offerHome.lon, savedPlaceId: offerHome.id })));
   } else if (running && RX.trip.test(m)) {
     const left = Math.round((new Date(running.etaAt).getTime() - Date.now()) / 60_000);
     reply = `You're on your way to ${running.destination.name}${running.state === "missed" ? ", past your ETA" : left >= 0 ? `, ETA in about ${left} min` : ""}. Lighting and Help Points along the way are on the route sheet — tap the card to open your journey.`;
@@ -194,7 +197,7 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
   } else if (named || RX.home.test(m)) {
     const target = named ?? home;
     if (target) {
-      const t = await tools.proposeTrip({ name: target.label, lat: target.lat, lon: target.lon });
+      const t = await tools.proposeTrip({ name: target.label, lat: target.lat, lon: target.lon, savedPlaceId: target.id });
       reply = hinglish
         ? `Chalo, ${target.label} chalte hain${t.minutes ? priv(` — lagbhag ${t.minutes} min ka walk`) : ""}. ${circleLine(t, true)}`
         : `Let's get you to ${target.label}${t.minutes ? priv(` — about a ${t.minutes}-minute walk`) : ""}. ${circleLine(t, false)}`;
@@ -229,7 +232,7 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     reply = part === "night"
       ? `It's ${clock}. ${running ? `You're on your way to ${running.destination.name}.` : home ? `Getting late — want me to share your walk to ${home.label}?` : "Getting late — if you're heading out, I can share your journey live."}`
       : `It's ${clock} where you are.`;
-    if (part === "night" && offerHome) cards.push(tripCard(await tools.proposeTrip({ name: offerHome.label, lat: offerHome.lat, lon: offerHome.lon })));
+    if (part === "night" && offerHome) cards.push(tripCard(await tools.proposeTrip({ name: offerHome.label, lat: offerHome.lat, lon: offerHome.lon, savedPlaceId: offerHome.id })));
   } else if (RX.hello.test(m) && m.length < 40) {
     const ctx = ctx0;
     const where = ctx.area ? (ctx.area.toLowerCase().startsWith("near") ? ctx.area.charAt(0).toLowerCase() + ctx.area.slice(1) : "in " + ctx.area) : null;
@@ -243,7 +246,7 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     reply = hinglish
       ? `Hi${sp}! ${ctx.area ? priv(`Tum ${ctx.area.replace(/^Near /, "")} ke paas ho. `) : ""}${part === "night" ? "Kaafi late ho gaya hai — ghar tak ki walk share kar doon?" : "Kahan ja rahi ho?"}`
       : `${open} ${where ? priv(`Looks like you're ${where}. `) : ""}${ask}`;
-    if (ctx.late && offerHome) cards.push(tripCard(await tools.proposeTrip({ name: offerHome.label, lat: offerHome.lat, lon: offerHome.lon })));
+    if (ctx.late && offerHome) cards.push(tripCard(await tools.proposeTrip({ name: offerHome.label, lat: offerHome.lat, lon: offerHome.lon, savedPlaceId: offerHome.id })));
     if (running) cards.push(statusCard(running));
   } else if (RX.thanks.test(m)) {
     reply = hinglish ? "Koi baat nahi! Main yahin hoon." : part === "night" ? "Anytime 🌙 I'm around if you head out again." : "Anytime. I'm here whenever you're heading out.";
@@ -262,7 +265,7 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     reply = `I can't answer that one yet. Right now I'm best at sharing your journey, finding Help Points and what's open nearby, and private reports — try "take me home" or "find Help Points nearby". If you're not okay right now, use “I feel unsafe” or Emergency at the top of the screen.`;
     if (part === "night" && offerHome) {
       reply += ` It's late, so here's your walk to ${offerHome.label} if you want it.`;
-      cards.push(tripCard(await tools.proposeTrip({ name: offerHome.label, lat: offerHome.lat, lon: offerHome.lon })));
+      cards.push(tripCard(await tools.proposeTrip({ name: offerHome.label, lat: offerHome.lat, lon: offerHome.lon, savedPlaceId: offerHome.id })));
     }
   }
 

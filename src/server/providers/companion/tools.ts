@@ -159,7 +159,7 @@ export function miraTools(sql: postgres.Sql, user: User | null, ctx: MiraContext
         .map((p) => ({ name: p.name, label: HELP_CLASSES[p.cls].label, emoji: HELP_CLASSES[p.cls].emoji, minutes: p.minutes, hours: hoursLine(p), source: SOURCE_NAME[p.source], lat: p.lat, lon: p.lon }));
       return { points, failed: false };
     },
-    async proposeTrip(dest: { name: string; lat: number; lon: number }, mode: MiraTripMode = "walk") {
+    async proposeTrip(dest: { name: string; lat: number; lon: number; savedPlaceId?: string }, mode: MiraTripMode = "walk") {
       const email = emailConfigured();
       if (mode !== "walk") {
         // Ride / transit: MIRA doesn't estimate those here; Home plans it and asks her for the ETA.

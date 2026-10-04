@@ -31,6 +31,7 @@ import type { EvidenceState } from "@/domain/evidence-state";
 import type { HabitSuggestion } from "@/domain/habits";
 import type { SavedPlace } from "@/server/account/places";
 import type { SavedPlan } from "@/server/account/saved-plans";
+import { LocationAsk } from "@/components/app/LocationOnOpen";
 
 type Noticed = { id: string; icon: string; tone: "accent" | "dusk" | "people"; eyebrow: string; title: string; detail: string; kind: "checked" | "people" | "estimate"; onOpen: () => void };
 type Near = { key: string; help: { points: HelpPoint[]; failed: boolean } | null; notes: number | null; notesFailed: boolean };
@@ -195,6 +196,9 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
             <button type="button" onClick={() => setSignIn(true)} className="min-h-11 shrink-0 rounded-full px-1 text-[0.875rem] font-semibold text-accent-strong">Sign in</button>
           )}
         </div>
+
+        {/* First open only: may Mira use location? In the page, never over it. */}
+        <LocationAsk />
 
         {/* 1. Mira knows: what's true around you, right now. */}
         <div className="mt-5">

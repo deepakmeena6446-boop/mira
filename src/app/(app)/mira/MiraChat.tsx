@@ -27,7 +27,7 @@ import { clearPlanDraft, setPlanDraft, usePlanDraft, usePlanHydrated } from "@/l
 import { planTitle, whenWords } from "@/domain/plan-name";
 import { draftFromAsk } from "@/domain/plan-ask";
 import { arrivalIntent, shouldSeedPlan, immediateSupportIntent } from "@/domain/ask-routing";
-import { activeTripMessage } from "@/lib/trip-start";
+import { activeTripMessage, tripStartExtras } from "@/lib/trip-start";
 import { haptic } from "@/lib/haptics";
 import { refreshCurrentTrip } from "@/lib/current-trip-store";
 
@@ -64,7 +64,7 @@ function deviceTimeZone(): string | null {
   }
 }
 
-type StartTrip = (d: { name: string; lat: number; lon: number }) => Promise<void>;
+type StartTrip = (d: { name: string; lat: number; lon: number; savedPlaceId?: string }) => Promise<void>;
 
 /** Starting a trip can wait on a location fix: show it's working and ignore repeat taps. */
 function TripCardButton({ label, onStart }: { label: string; onStart: () => Promise<void> }) {
@@ -123,7 +123,7 @@ function TripStatusCard({ card, shell }: { card: Extract<MiraCard, { type: "trip
   );
 }
 
-function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; onTrip: StartTrip; onComparePlace: (d: { name: string; lat: number; lon: number }) => void; onStartHere: () => void }) {
+function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; onTrip: StartTrip; onComparePlace: (d: { name: string; lat: number; lon: number; savedPlaceId?: string }) => void; onStartHere: () => void }) {
   const router = useRouter();
   const show = (d: { name: string; lat: number; lon: number; kind?: string }) => {
     setPendingDestination(d);
@@ -354,7 +354,8 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
     if (!user) return setSignIn(true);
     const l = await freshLocation();
     if (!l.point) return toast("Turn on location so I can start your trip.", "error");
-    const r = await api("/api/trips", { body: { from: { lat: l.point.lat, lon: l.point.lon }, to: dest, share: false } });
+    // A saved place travels as itself, so its live link shows it only roughly (audit P06-006).
+    const r = await api("/api/trips", { body: { from: { lat: l.point.lat, lon: l.point.lon }, to: { name: dest.name, lat: dest.lat, lon: dest.lon }, share: false, ...tripStartExtras(dest.savedPlaceId) } });
     if (r.ok) {
       recordUsage("journey");
       router.push("/trip");
@@ -369,9 +370,9 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
     else toast(r.message, "error");
   };
   // Conversation → decision: hand the place to Plan, from where she is (only if location is already on).
-  const comparePlace = (d: { name: string; lat: number; lon: number }) => {
+  const comparePlace = (d: { name: string; lat: number; lon: number; savedPlaceId?: string }) => {
     const draft = newPlanDraft(new Date(), deviceTimeZone() ?? "UTC");
-    setPlanDraft({ ...draft, touched: true, activity: `Go to ${d.name}`.slice(0, 160), ...(here ? { origin: { kind: "device", use: "from_here", point: { lat: here.lat, lon: here.lon } } } : {}), destination: { query: d.name.slice(0, 160), resolution: { source: "selected_point", name: d.name, point: { lat: d.lat, lon: d.lon } } } });
+    setPlanDraft({ ...draft, touched: true, activity: `Go to ${d.name}`.slice(0, 160), ...(here ? { origin: { kind: "device", use: "from_here", point: { lat: here.lat, lon: here.lon } } } : {}), destination: { query: d.name.slice(0, 160), resolution: d.savedPlaceId ? { source: "saved_place", placeId: d.savedPlaceId, name: d.name, point: { lat: d.lat, lon: d.lon } } : { source: "selected_point", name: d.name, point: { lat: d.lat, lon: d.lon } } } });
     router.push("/plan?for=go");
   };
 

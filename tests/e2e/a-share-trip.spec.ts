@@ -59,7 +59,7 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     const live = await (await mum.page.request.get(`/api/t/${link.split("/t/")[1]}`)).json();
     expect(live).toMatchObject({ state: "active", name: "Priya", destination: "Home" });
     // Only the latest point — no trail, no email, no user id.
-    expect(Object.keys(live).sort()).toEqual(["alertsViewer", "checkRequested", "dest", "destination", "etaAt", "location", "mode", "name", "state", "tz"]); // tz: her local time zone label for the ETA
+    expect(Object.keys(live).sort()).toEqual(["alertsViewer", "checkRequested", "dest", "destApprox", "destination", "etaAt", "location", "mode", "name", "state", "tz"]); // tz: her local time zone label for the ETA
     expect(live.alertsViewer).toBe(true); // This selected accepted contact is eligible for an email attempt.
     expect(Object.keys(live.location ?? {}).sort()).toEqual(["ageSeconds", "at", "lat", "lon"]);
 
