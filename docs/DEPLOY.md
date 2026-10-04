@@ -22,6 +22,7 @@ The desired declarative topology is recorded in [`.railway/railway.ts`](../.rail
 ## 0. Before you start (owner-held accounts)
 
 - Railway account with an active plan. Volume backups and point-in-time recovery currently require **Pro** (verified in the dashboard on 2026-10-04); approve the plan cost before upgrading. Railway CLI: `brew install railway` (or `npm i -g @railway/cli`), then `railway login`.
+- The required worker `ALWAYS` restart policy needs a paid Railway plan. Free/Trial does not support it and limits `ON_FAILURE` to 10 restarts ([Railway restart policy](https://docs.railway.com/deployments/restart-policy), dashboard verified 2026-10-04). A free staging deployment has this explicit reliability limitation; confirm the active deployment policy rather than trusting an API update response. Do not treat it as meeting the production topology.
 - A domain you control for the final production URL; staging uses a separate domain or subdomain.
 - Resend account with that domain verified (step 6). Start DNS verification first: it can take a while.
 - Google Cloud project: a **server** Maps key, a **browser** Maps key, and an OAuth client.

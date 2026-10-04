@@ -44,7 +44,7 @@ npx web-push generate-vapid-keys   # VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY
 | `web` | `npm run build` | `node_modules/.bin/next start` | `node dist/migrate.mjs` | `/api/health/live` (timeout 120) | ON_FAILURE ×10 |
 | `worker` | `npm run worker:build` | `node dist/worker.mjs` | — | — | ALWAYS |
 
-Commands: docs/DEPLOY.md §1. Verify with `railway environment config --json`.
+Commands: docs/DEPLOY.md §1. Verify with `railway environment config --json` and the active deployment manifest. Free/Trial does not support ALWAYS and caps ON_FAILURE at 10 restarts; the required worker policy needs a paid plan ([Railway restart policy](https://docs.railway.com/deployments/restart-policy)). Record any owner-approved free staging limitation; it does not satisfy the production topology.
 
 ## 5. Environment variables
 
