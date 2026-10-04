@@ -12,7 +12,7 @@ Never paste a secret into chat, a commit, CI logs or this file. Read values from
 
 ## 1. Owner accounts (start these first — DNS and reviews take time)
 
-- [ ] Railway plan active (the trial has expired on the current account — a paid plan is needed before `railway init`).
+- [ ] Railway plan and billing approved. Volume backups and point-in-time recovery require Pro (dashboard verified 2026-10-04); verify the current plan rather than assuming a trial has expired.
 - [ ] A domain you control, e.g. `mira.example.org` (plus `staging.mira.example.org`).
 - [ ] Optional: Resend account with a verified sending domain (SPF, DKIM, DMARC) — only for invites and the automatic missed-arrival email. WhatsApp contacts need nothing.
 - [ ] Google Cloud: the existing Maps keys get API + referrer restrictions (step 5), a budget alert and per-API quotas; create the sign-in OAuth client (step 6).
@@ -35,7 +35,7 @@ npx web-push generate-vapid-keys   # VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY
 - [ ] `postgis` service from image `postgis/postgis:17-3.5` with `POSTGRES_USER=mira`, `POSTGRES_DB=mira`, `PGDATA=/var/lib/postgresql/data/pgdata`.
 - [ ] Set `POSTGRES_PASSWORD` **before** its first boot; attach a volume at `/var/lib/postgresql/data`.
 - [ ] No public TCP proxy on `postgis` (private network only).
-- [ ] Enable daily volume backups, retention ≤ 30 days.
+- [ ] On Pro, enable daily volume backups, retention ≤ 30 days. Take and verify a staging backup before migrations; stop for an owner decision if backups are unavailable on the current plan.
 
 ## 4. Create `web` and `worker` with their settings
 
@@ -69,7 +69,7 @@ Set on **web** (all before the first deploy, with `--skip-deploys`), then refere
 | `PUBLIC_BETA_STRICT` | `on` (web only) |
 | `PUBLIC_AGGREGATE_RELEASES` | `off` (web and worker) |
 | `CLIENT_IP_HEADER` / `TRUSTED_PROXY_HOPS` | `x-real-ip` / `1` |
-| `GOOGLE_MAPS_SERVER_KEY` | Places API (New), Routes API, Geocoding API only |
+| `GOOGLE_MAPS_SERVER_KEY` | Enable and allow Places API (New), Routes API, Geocoding API and Time Zone API |
 | `GOOGLE_MAPS_BROWSER_KEY` | Map Tiles API only; HTTP referrer `https://<your domain>/*` (must match `APP_BASE_URL`) |
 | `GOOGLE_PLACES_HOURS` | `on` |
 | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | both or neither |
@@ -88,7 +88,7 @@ Set on **web** (all before the first deploy, with `--skip-deploys`), then refere
 | `RAILPACK_NODE_VERSION` | — | `24` on web and worker |
 | `GOOGLE_MAX_CALLS_PER_MIN` / `GOOGLE_MAX_CALLS_PER_DAY` | 600 / 20000 per process | over → OpenStreetMap fallback |
 | `MIRA_GLOBAL_DAILY_MAX` / `MIRA_DAILY_TOKEN_MAX` | 5000 msgs / 2M tokens | over → scripted Mira |
-| `MIRA_MODEL` | `claude-sonnet-5` | |
+| `MIRA_MODEL` | `claude-sonnet-5-5` | leave unset for this release |
 | `SAFETY_UPDATES` | `gdelt` | `off` hides the section honestly |
 | `SAFETY_CLASSIFIER_MODEL` | `claude-opus-5` | |
 | `RESEND_API_KEY`, `EMAIL_FROM` | unset | `MIRA <alerts@your-verified-domain>`; adds invites + automatic missed-arrival email |
@@ -96,7 +96,9 @@ Set on **web** (all before the first deploy, with `--skip-deploys`), then refere
 
 **Development only — never in production:** `SMTP_*` (Mailpit), `ALLOW_DEMO_SIGNIN=on`, `SAFETY_UPDATES=fixture`, `MAPBOX_TOKEN` (unused).
 
-**Worker** (by reference `${{web.NAME}}`): `DATABASE_URL APP_BASE_URL SESSION_SECRET DATA_ENCRYPTION_KEY ADMIN_PASSWORD_HASH PILOT_MANIFEST_PATH MAP_TILE_URL RESEND_API_KEY EMAIL_FROM PUBLIC_AGGREGATE_RELEASES VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT GOOGLE_MAPS_SERVER_KEY GOOGLE_PLACES_HOURS OVERPASS_URL`, plus `NODE_ENV=production`. The map keys let the worker prepare MIRA Checks; without them checks are silently dropped.
+With Claude configured and budget available, every Mira message uses Claude, including guest and everyday questions. Guests are capped at 25 replies per network per day; signed-in users at 60/day. Guest traffic also spends the shared budget. Set `MIRA_GLOBAL_DAILY_MAX` explicitly and confirm the Anthropic monthly spend limit. Staging ceilings: Google 300/min and 10000/day per process, Mira 1500/day.
+
+**Worker** (by reference `${{web.NAME}}`): `DATABASE_URL APP_BASE_URL SESSION_SECRET DATA_ENCRYPTION_KEY ADMIN_PASSWORD_HASH PILOT_MANIFEST_PATH MAP_TILE_URL PUBLIC_AGGREGATE_RELEASES VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT GOOGLE_MAPS_SERVER_KEY GOOGLE_PLACES_HOURS GOOGLE_MAX_CALLS_PER_MIN OVERPASS_URL`, plus `NODE_ENV=production` and `RAILPACK_NODE_VERSION=24`. Add `RESEND_API_KEY EMAIL_FROM` by reference only when email is configured on web. The map keys let the worker prepare MIRA Checks; without them checks are silently dropped.
 
 ## 6. Google sign-in
 
@@ -137,7 +139,7 @@ curl -s  $BASE/api/health/ready                 # {"status":"ready"} within ~1 m
 curl -sI $BASE/ | grep -iE 'strict-transport|content-security'
 ```
 
-- [ ] Sign in at `/admin/login`, open `/api/health/ready` in the same browser: `contactEmailProvider: "resend"`, `mira: "claude"`, worker heartbeat < 60 s.
+- [ ] Sign in at `/admin/login`, open `/api/health/ready` in the same browser: `contactEmailProvider: "resend"` if enabled, otherwise `"none"`; `mira: "claude"`, worker heartbeat < 60 s.
 - [ ] Uptime monitor on `/api/health/ready` (1–5 min, phone alert).
 
 ## 11. Smoke test

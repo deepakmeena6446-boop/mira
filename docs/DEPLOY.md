@@ -21,7 +21,7 @@ The desired declarative topology is recorded in [`.railway/railway.ts`](../.rail
 
 ## 0. Before you start (owner-held accounts)
 
-- Railway account (Hobby or Pro). Railway CLI: `brew install railway` (or `npm i -g @railway/cli`), then `railway login`.
+- Railway account with an active plan. Volume backups and point-in-time recovery currently require **Pro** (verified in the dashboard on 2026-10-04); approve the plan cost before upgrading. Railway CLI: `brew install railway` (or `npm i -g @railway/cli`), then `railway login`.
 - A domain you control for the final production URL; staging uses a separate domain or subdomain.
 - Resend account with that domain verified (step 6). Start DNS verification first: it can take a while.
 - Google Cloud project: a **server** Maps key, a **browser** Maps key, and an OAuth client.
@@ -109,9 +109,11 @@ railway variable set PILOT_MANIFEST_PATH=data/pilot/manifest.json $S
 railway variable set 'MAP_TILE_URL=https://tile.openstreetmap.org/{z}/{x}/{y}.png' $S
 railway variable set MAP_STYLE_URL=https://tiles.openfreemap.org/styles/positron $S
 railway variable set CLIENT_IP_HEADER=x-real-ip TRUSTED_PROXY_HOPS=1 $S
+# Explicit ceilings; confirm the intended limits with the owner before setting them.
+railway variable set GOOGLE_MAX_CALLS_PER_MIN=300 GOOGLE_MAX_CALLS_PER_DAY=10000 MIRA_GLOBAL_DAILY_MAX=1500 $S
 # OpenStreetMap: Overpass is the "mapped as lit" lighting source (required); Photon/Nominatim are fallbacks.
 railway variable set OVERPASS_URL=https://overpass-api.de/api/interpreter PLACE_SEARCH_URL=https://photon.komoot.io REVERSE_GEOCODER_URL=https://nominatim.openstreetmap.org $S
-# Email (Resend; required for this public beta; see step 6).
+# Email (Resend; optional; set both variables only when enabling email; see step 6).
 railway variable set RESEND_API_KEY --stdin $S
 railway variable set 'EMAIL_FROM=MIRA <alerts@your-domain>' $S
 # Live providers required for this public beta
@@ -129,9 +131,11 @@ railway variable set ANTHROPIC_API_KEY --stdin $S
 W="--service worker --skip-deploys"
 railway variable set NODE_ENV=production RAILPACK_NODE_VERSION=24 $W
 # The worker also needs the map lookups: its contributions job finds Help Points along finished walks (MIRA Checks).
-for k in DATABASE_URL APP_BASE_URL SESSION_SECRET DATA_ENCRYPTION_KEY ADMIN_PASSWORD_HASH PILOT_MANIFEST_PATH MAP_TILE_URL RESEND_API_KEY EMAIL_FROM PUBLIC_AGGREGATE_RELEASES VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT GOOGLE_MAPS_SERVER_KEY GOOGLE_PLACES_HOURS OVERPASS_URL; do
+for k in DATABASE_URL APP_BASE_URL SESSION_SECRET DATA_ENCRYPTION_KEY ADMIN_PASSWORD_HASH PILOT_MANIFEST_PATH MAP_TILE_URL PUBLIC_AGGREGATE_RELEASES VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT GOOGLE_MAPS_SERVER_KEY GOOGLE_PLACES_HOURS GOOGLE_MAX_CALLS_PER_MIN OVERPASS_URL; do
   railway variable set "$k=\${{web.$k}}" $W
 done
+# Only when email is configured on web:
+railway variable set 'RESEND_API_KEY=${{web.RESEND_API_KEY}}' 'EMAIL_FROM=${{web.EMAIL_FROM}}' $W
 ```
 
 | Variable | Service | Required | Notes |
@@ -155,7 +159,7 @@ done
 | `GOOGLE_MAPS_SERVER_KEY`, `GOOGLE_PLACES_HOURS` | web, worker | public beta | See step 7. The worker uses them to prepare MIRA Checks. |
 | `GOOGLE_MAPS_BROWSER_KEY` | web | public beta | Map Tiles; see step 7. |
 | `ANTHROPIC_API_KEY` | web | public beta | Mira on Claude and the Safety update relevance check; unset = scripted Mira, ambiguous headlines left out. |
-| `MIRA_MODEL` | web | optional | Default `claude-sonnet-5`. Changing it redeploys (no code change needed). |
+| `MIRA_MODEL` | web | optional | Default `claude-sonnet-5-5`; leave unset for this release. Changing it redeploys (no code change needed). |
 | `MIRA_DAILY_TOKEN_MAX` | web | optional | Mira's tokens/day across everyone (default 2,000,000). Over it, the scripted Mira answers until midnight UTC. |
 | `SAFETY_UPDATES` | web | optional | `gdelt` (default) or `off`. `fixture` is refused under strict mode. |
 | `SAFETY_CLASSIFIER_MODEL` | web | optional | Relevance check for ambiguous headlines (default `claude-opus-5`, low effort). |
@@ -226,10 +230,10 @@ How MIRA uses it (`src/server/mail/resend.ts`): `POST https://api.resend.com/ema
 
 ## 7. Google Maps and sign-in
 
-- **Server key** (`GOOGLE_MAPS_SERVER_KEY`): API restrictions **Places API (New), Routes API, Geocoding API** only. Railway's egress IPs aren't static unless you enable static outbound IPs (Pro), so add an IP application restriction only if you have them. Set per-API **quotas** and a **budget alert** in Google Cloud.
+- **Server key** (`GOOGLE_MAPS_SERVER_KEY`): enable and restrict the key to **Places API (New), Routes API, Geocoding API and Time Zone API**. Time Zone API supplies the journey's local time zone. Railway's egress IPs aren't static unless you enable static outbound IPs (Pro), so add an IP application restriction only if you have them. Set per-API **quotas** and a **budget alert** in Google Cloud.
 - **Browser key** (`GOOGLE_MAPS_BROWSER_KEY`): application restriction **HTTP referrers** `https://<your domain>/*`; API restriction **Map Tiles API** only. The server creates the tile session with `Referer: <APP_BASE_URL>/`, so the referrer restriction must match `APP_BASE_URL` exactly — otherwise every map silently falls back to OpenFreeMap (log: `geo.google_tiles_failed`). Tile sessions use `region: IN` (one shared session, one border convention). The CSP already allows `https://tile.googleapis.com` when this key is set.
 - **Google sign-in** (when enabled): OAuth client type *Web application*, authorised redirect URI **`https://<your domain>/api/auth/google/callback`**, authorised JavaScript origin `https://<your domain>`. The consent screen is a top-level navigation. The CSP adds `https://accounts.google.com` to `form-action` when `AUTH_GOOGLE_ID` is set, in case sign-in starts from a form POST.
-- **Anthropic**: set a monthly spend limit in the console. MIRA also caps Mira at 60 messages per person per day and `MIRA_GLOBAL_DAILY_MAX` overall.
+- **Anthropic**: confirm a monthly spend limit in the console. With the provider configured and budget available, every Mira message goes to Claude, including everyday questions and guests. Signed-in users are capped at 60 replies per day; guests at 25 per network per day. Guest use contributes to the shared spend. Set `MIRA_GLOBAL_DAILY_MAX` explicitly (staging: 1500/day), alongside `MIRA_DAILY_TOKEN_MAX`; leave `MIRA_MODEL` unset to use `claude-sonnet-5-5`.
 
 ## 8. Monitoring
 
@@ -242,7 +246,7 @@ How MIRA uses it (`src/server/mail/resend.ts`): `POST https://api.resend.com/ema
 
 ## 9. Backups, rollback, secrets
 
-- **Backups**: *postgis → volume → Backups*: enable daily backups, retention ≤ 30 days (privacy policy). After any restore, let the worker run a pass **before** serving traffic, so expired journeys and reports are purged again.
+- **Backups**: *postgis → Backups*: volume backups and point-in-time recovery require Pro (dashboard verified 2026-10-04). Confirm plan cost with the owner before upgrading. Take and verify a staging backup before migrating; enable daily production backups, retention ≤ 30 days (privacy policy). A local database dump is a different recovery mechanism and requires an explicit owner decision if used instead of the requested volume backup. After any restore, let the worker run a pass **before** serving traffic, so expired journeys and reports are purged again.
 - **Rollback**: dashboard → *web → Deployments → previous → Rollback* (and the same for worker). Migrations are forward-only: rolling code back across a migration is safe only if the old code tolerates the new schema (additive migrations do). There is no down-migration. Restore the volume backup if a migration must be undone.
 - **Rotate** a secret by setting it again (it redeploys). Never rotate `DATA_ENCRYPTION_KEY` in place: existing ciphertext would become unreadable.
 - Keep `web` at **1 replica** for the beta: the Google call budget is per process, and more replicas would also need `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` and a `deploymentId` (see `node_modules/next/dist/docs/01-app/02-guides/self-hosting.md`).
