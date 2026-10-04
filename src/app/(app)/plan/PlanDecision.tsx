@@ -32,12 +32,13 @@ import type { TileConfig } from "@/server/providers/geo/tiles";
 import { PlaceSheet, WhenSheet, whenWords, type PickedPlace } from "./PlanSheets";
 import { loopWord, placeName, planTitle } from "@/domain/plan-name";
 import { GoSheet, type GoTarget } from "./GoSheet";
+import { clockIn } from "@/domain/daylight";
 
 export type Situation = "go" | "run" | "travel";
 type Mode = "walk" | "ride" | "transit";
 type WalkAnswer = { route: WayOption["route"]; lighting: RouteLighting | null; lightingEvidence: EvidenceState<RouteLighting>; helpPoints: HelpPoint[]; helpEvidence: EvidenceState<HelpPoint[]>; notes: CommunityNote[]; alternatives: Array<Omit<WayOption, never>> };
 type ModeAnswer = { mode: Mode; route: (WayOption["route"] & { provider: string }) | null; arrivalHelp: HelpPoint[]; arrivalEvidence?: EvidenceState<HelpPoint[]> };
-type Ways = { key: string; ways: WayOption[]; notes: CommunityNote[] | null; error: string | null; noRoute?: boolean };
+type Ways = { key: string; ways: WayOption[]; notes: CommunityNote[] | null | "failed"; error: string | null; noRoute?: boolean };
 
 const SITUATIONS: Array<{ id: Situation; label: string; icon: string }> = [
   { id: "go", label: "Going somewhere", icon: "route" },
@@ -105,7 +106,14 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   }, [hydrated]);
 
   const update = useCallback((patch: Partial<PlanDraft>) => { if (draft) setPlanDraft({ ...draft, ...patch, touched: true, selection: undefined }); }, [draft]);
-  const chooseSituation = (s: Situation) => { setSituation(s); setSelected(0); if (draft) setPlanDraft(preset({ ...draft, activity: "", loop: false, savedId: undefined }, s, here ? { lat: here.lat, lon: here.lon } : null)); };
+  const chooseSituation = (s: Situation) => {
+    setSituation(s);
+    setSelected(0);
+    if (draft) setPlanDraft(preset({ ...draft, activity: "", loop: false, savedId: undefined }, s, here ? { lat: here.lat, lon: here.lon } : null));
+    // Keep ?for= in step, or a refresh reads the old situation as "a new one chosen on Home" and wipes this plan (audit P13-001).
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("for")) { url.searchParams.set("for", s); window.history.replaceState(null, "", url); }
+  };
 
   const origin = draft ? pointOf(draft.origin) : null;
   const dest = draft && !draft.loop ? pointOf(draft.destination) : null;
@@ -126,7 +134,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
     let live = true;
     void api<WalkAnswer | ModeAnswer>("/api/geo/route", { body: { from: { lat: origin.lat, lon: origin.lon }, to: { lat: dest.lat, lon: dest.lon }, ...(mode === "walk" ? {} : { mode }), ...(osmOnly ? { source: "osm" } : {}) } }).then((r) => {
       if (!live) return;
-      if (!r.ok) return setWays({ key: wayKey, ways: [], notes: null, error: r.code === "too_far" ? (mode === "walk" ? "That’s further than a walk Mira can follow. Try a ride or transit." : r.message) : r.network ? "You’re offline. Your plan is kept; Mira will check when you’re connected." : "Mira couldn’t check the way just now." });
+      if (!r.ok) return setWays({ key: wayKey, ways: [], notes: "failed", error: r.code === "too_far" ? (mode === "walk" ? "That’s further than a walk Mira can follow. Try a ride or transit." : r.message) : r.network ? "You’re offline. Your plan is kept; Mira will check when you’re connected." : "Mira couldn’t check the way just now." });
       if ("mode" in r.data) {
         const m = r.data;
         setWays({ key: wayKey, notes: null, error: null, noRoute: !m.route, ways: m.route ? [{ route: m.route, lighting: null, helpPoints: m.arrivalHelp, helpEvidence: m.arrivalEvidence }] : [{ route: { meters: 0, minutes: 0, geometry: [], approximate: true }, lighting: null, helpPoints: m.arrivalHelp, helpEvidence: m.arrivalEvidence }] });
@@ -159,20 +167,21 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   // Around the place that matters: the destination (or the start of a loop).
   const focus = loop ? origin : dest;
   const focusKey = complete && focus ? `${focus.lat.toFixed(3)},${focus.lon.toFixed(3)}` : "";
-  type Around = { key: string; notes: CommunityNote[] | null; updates: { evidence: EvidenceState<SafetyUpdatesData> } | "failed" | null; country: CountryContext | null; zone?: string | null };
+  type Around = { key: string; notes: CommunityNote[] | null | "failed"; updates: { evidence: EvidenceState<SafetyUpdatesData> } | "failed" | null; country: CountryContext | null; zone?: string | null };
   const [around, setAroundState] = useState<Around | null>(null);
   const setAround = (key: string, patch: Partial<Omit<Around, "key">>) => setAroundState((a) => ({ ...(a?.key === key ? a : { key, notes: null, updates: null, country: null }), ...patch }));
   useEffect(() => {
     if (!focusKey || !focus) return;
     let live = true;
     const at = { lat: focus.lat, lon: focus.lon };
-    void api<{ notes: CommunityNote[] }>("/api/community/nearby", { body: at }).then((r) => { if (live) setAround(focusKey, { notes: r.ok ? r.data.notes : [] }); });
+    void api<{ notes: CommunityNote[] }>("/api/community/nearby", { body: at }).then((r) => { if (live) setAround(focusKey, { notes: r.ok ? r.data.notes : "failed" }); });
     void api<{ evidence: EvidenceState<SafetyUpdatesData> }>("/api/safety-updates", { body: { ...at, window: 7 } }).then((r) => { if (live) setAround(focusKey, { updates: r.ok ? r.data : "failed" }); });
     void api<{ country: CountryContext }>("/api/geo/reverse", { body: { ...at, ...(osmOnly ? { source: "osm" } : {}) } }).then((r) => { if (live && r.ok) setAround(focusKey, { country: r.data.country }); });
     void api<{ timeZone: string | null }>("/api/geo/zone", { body: at }).then((r) => { if (live) setAround(focusKey, { zone: r.ok ? r.data.timeZone : null }); });
     return () => { live = false; };
+    // `retry`: the ledger's "Try again" re-checks notes and local updates too, not only the way (audit L06-005).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focusKey]);
+  }, [focusKey, retry]);
   const aroundNow = around?.key === focusKey ? around : null;
 
   // Times are the place's, not the phone's (audit P05-001: a 10 PM walk in Lisbon was briefed on India time as daylight).
@@ -180,8 +189,9 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   // picked herself is never replaced.
   const countryZone = aroundNow?.zone ?? aroundNow?.country?.timezone ?? null;
   useEffect(() => {
-    if (!draft || !countryZone || !validZone(countryZone) || sameClock(draft.timeZone || deviceZone(), countryZone) || (draft.timeZone && draft.timeZone !== deviceZone())) return;
-    setPlanDraft({ ...draft, timeZone: countryZone });
+    // A zone Mira filled in from an earlier place is not her choice: a new place replaces it (re-audit RA5: Lisbon stayed on Kolkata time).
+    if (!draft || !countryZone || !validZone(countryZone) || sameClock(draft.timeZone || deviceZone(), countryZone) || (draft.timeZone && draft.timeZone !== deviceZone() && !draft.timeZoneAuto)) return;
+    setPlanDraft({ ...draft, timeZone: countryZone, timeZoneAuto: true });
   }, [countryZone, draft]);
   // Zone not known, but the place is far east or west of the phone's clock: say so rather than plan on the phone's time.
   const zoneUnsure = Boolean(focus && aroundNow && aroundNow.zone === null && !countryZone && Math.abs(focus.lon / 15 - -new Date().getTimezoneOffset() / 60) > 2.5);
@@ -245,6 +255,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
     minutes: loop ? loopMinutes : minutes,
     geometry: way && !way.route.approximate ? way.route.geometry : null,
     fastest: selected === 0,
+    plannedAt: instant ? { kind: draft?.timeKind === "arrive_by" ? "arrive_by" : "depart_at", at: instant.getTime() } : null,
   };
   const save = async () => {
     if (!draft) return;
@@ -313,18 +324,19 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   // ── Sky card facts ────────────────────────────────────────────────────────────────────────
   const checking = (!loop && !currentWays) || (loop && loopPlan?.key !== loopKey);
   const verb = loop ? loopName.toLowerCase() : mode === "walk" ? "walk" : mode === "ride" ? "ride" : "by transit";
-  const tripTitle = loop ? `${loopMinutes} min ${verb}` : minutes ? `${Math.round(minutes)} min ${verb}${arriveAt ? ` · arrive ${arriveAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", ...(zone ? { timeZone: zone } : {}) })}` : ""}` : currentWays?.error ? "Couldn’t check the way" : currentWays?.noRoute ? "No travel time available" : "…";
+  const tripTitle = loop ? `${loopMinutes} min ${verb}` : minutes ? `${Math.round(minutes)} min ${verb}${arriveAt ? ` · arrive ${clockIn(arriveAt, zone)}` : ""}` : currentWays?.error ? "Couldn’t check the way" : currentWays?.noRoute ? "No travel time available" : "…";
   const helpList = loop ? (startHelp?.key === loopKey ? startHelp.points : null) : currentWays ? way?.helpPoints ?? [] : null;
   const helpLocal = mode === "walk" || loop ? helpAt : arriveAt ? localTimeInZone(arriveAt, zone) : helpAt;
   const openThen = helpList ? helpList.filter((p) => { const h = hoursState(p, helpLocal ?? undefined); return h.kind === "open_24h" || h.kind === "listed_open" || h.kind === "open_now"; }).length : 0;
   const litShare = way?.lighting ? (() => { const l = way.lighting.summary; return l.lit + l.poles + l.dark > 0 ? `${l.lit + l.poles}%` : null; })() : null;
   const planNotes = !loop && mode === "walk" ? currentWays?.notes ?? null : aroundNow?.notes ?? null;
   const planStats: LiveStat[] = [
-    { label: loop ? "Help Points open near your start" : mode === "walk" ? "Help Points open on the way" : "Help Points open where you arrive", value: helpList ? `${openThen}/${helpList.length}` : "…", state: helpList ? "ok" : "loading" },
+    // A failed check reads as failed, not "0/0" or a spinner that never ends (audit L06-006).
+    { label: loop ? "Help Points open near your start" : mode === "walk" ? "Help Points open on the way" : "Help Points open where you arrive", value: currentWays?.error ? "—" : helpList ? `${openThen}/${helpList.length}` : "…", state: currentWays?.error ? "failed" : helpList ? "ok" : "loading" },
     loop || mode !== "walk"
-      ? { label: "notes from people", value: planNotes ? String(planNotes.length) : "…", state: planNotes ? "ok" : "loading" }
+      ? { label: "notes from people", value: planNotes === "failed" ? "—" : planNotes ? String(planNotes.length) : "…", state: planNotes === "failed" ? "failed" : planNotes ? "ok" : "loading" }
       : { label: "mapped as lit", value: litShare ?? "—", state: currentWays ? (litShare ? "ok" : "none") : "loading" },
-    ...(mode === "walk" && !loop ? [{ label: "notes from people", value: planNotes ? String(planNotes.length) : "…", state: (planNotes ? "ok" : "loading") as LiveStat["state"] }] : []),
+    ...(mode === "walk" && !loop ? [{ label: "notes from people", value: planNotes === "failed" ? "—" : planNotes ? String(planNotes.length) : "…", state: (planNotes === "failed" ? "failed" : planNotes ? "ok" : "loading") as LiveStat["state"] }] : []),
   ];
 
   const lit = (w: WayOption) => { const l = w.lighting?.summary; return l && l.lit + l.poles + l.dark > 0 ? l.lit + l.poles : null; };
@@ -485,7 +497,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
 
       <PlaceSheet open={sheet === "origin"} onClose={() => setSheet(null)} title={situation === "travel" ? "Where are you arriving?" : "Starting from"} onPick={(p) => pick("origin", p)} saved={places} near={here ? { lat: here.lat, lon: here.lon } : null} allowHere osmOnly={osmOnly} />
       <PlaceSheet open={sheet === "destination"} onClose={() => setSheet(null)} title={situation === "travel" ? "Where are you staying?" : "Where to?"} onPick={(p) => pick("destination", p)} saved={places} near={origin ?? (here ? { lat: here.lat, lon: here.lon } : null)} allowHere={false} osmOnly={osmOnly} />
-      <WhenSheet open={sheet === "when"} onClose={() => setSheet(null)} local={draft.departureLocal} zone={zone} timeKind={draft.timeKind ?? "depart_at"} allowArrive={!loop} quick={situation} deviceZone={deviceZone()} onChange={(p) => update({ ...(p.local ? { departureLocal: p.local, timeHint: null } : {}), ...(!draft.timeZone ? { timeZone: zone } : {}), ...(p.zone && validZone(p.zone) ? { timeZone: p.zone } : {}), ...(p.timeKind ? { timeKind: p.timeKind } : {}) })} />
+      <WhenSheet open={sheet === "when"} onClose={() => setSheet(null)} local={draft.departureLocal} zone={zone} timeKind={draft.timeKind ?? "depart_at"} allowArrive={!loop} quick={situation} deviceZone={deviceZone()} onChange={(p) => update({ ...(p.local ? { departureLocal: p.local, timeHint: null } : {}), ...(!draft.timeZone ? { timeZone: zone } : {}), ...(p.zone && validZone(p.zone) ? { timeZone: p.zone, timeZoneAuto: false } : {}), ...(p.timeKind ? { timeKind: p.timeKind } : {}) })} />
       <PlaceSheet open={legSheet?.kind === "place" || legSheet?.kind === "stop"} onClose={() => setLegSheet(null)} title={legSheet?.kind === "stop" ? "Next stop" : "Coming back to"} onPick={pickLegPlace} saved={places} near={dest ?? (here ? { lat: here.lat, lon: here.lon } : null)} allowHere={false} osmOnly={osmOnly} />
       <WhenSheet open={legSheet?.kind === "when"} onClose={() => setLegSheet(null)} local={draft.legs?.[legSheet?.index ?? -1]?.departureLocal ?? ""} zone={draft.legs?.[legSheet?.index ?? -1]?.timeZone || zone} timeKind={draft.legs?.[legSheet?.index ?? -1]?.timeKind ?? "depart_at"} allowArrive quick="go" deviceZone={deviceZone()} title={/^return\b/i.test(draft.legs?.[legSheet?.index ?? -1]?.label ?? "") ? "When are you heading back?" : "When does this leg start?"} after={instant} onChange={(p) => { const i = legSheet?.index ?? -1; const legs = [...(draft.legs ?? [])]; if (!legs[i]) return; legs[i] = { ...legs[i], ...(p.local ? { departureLocal: p.local, timeHint: null } : {}), ...(p.zone && validZone(p.zone) ? { timeZone: p.zone } : !legs[i].timeZone ? { timeZone: zone } : {}), ...(p.timeKind ? { timeKind: p.timeKind } : {}) }; setLegs(legs); }} />
       <GoSheet open={sheet === "go"} onClose={() => setSheet(null)} target={goTarget} signedIn={signedIn} emailAlerts={emailAlerts} onSignIn={() => { setSheet(null); setSignIn(true); }} />

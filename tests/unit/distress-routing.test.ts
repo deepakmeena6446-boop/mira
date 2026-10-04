@@ -20,6 +20,8 @@ const DISTRESS = [
 const ORDINARY = [
   "can you help me find a pharmacy", "walk home from Hindu College at 10 pm", "is there a metro near here", "I'm afraid the shop closes at 9",
   "plan dinner then the way back", "what's the emergency number in Japan", "report a broken street light",
+  // re-audit RA4: requests that only look urgent
+  "where can I get help with my plan", "can you inform my sister when I land", "alert my mum once I reach",
 ];
 
 describe("distress never gets a route question (audit P0-6)", () => {

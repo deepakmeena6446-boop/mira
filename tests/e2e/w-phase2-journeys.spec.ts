@@ -83,8 +83,10 @@ test("You groups people, places, contributions and settings in the same language
   await page.reload();
   await expect(page.getByRole("region", { name: "Help Points Mira suggests" }).getByRole("switch", { name: /Fuel station/ })).toHaveAttribute("aria-checked", "false");
 
-  // Without a fresh position Mira names no country's numbers, and says the phone's own call still works.
-  await expect(page.getByRole("region", { name: "Emergency where you are" })).toContainText("Your phone’s own emergency call always works");
+  // The country Mira confirmed (Delhi fix) is kept for 24 h, so You lists its numbers and says the phone's own call works everywhere (audit P0-1).
+  const emergency = page.getByRole("region", { name: "Emergency in India" });
+  await expect(emergency.getByRole("link", { name: /112/ })).toBeVisible();
+  await expect(emergency).toContainText("Your phone’s own emergency call works everywhere");
 
   // Leaving a first-name account is confirmed in a sheet that says it deletes the account.
   await page.getByRole("button", { name: /^Sign out/ }).click();

@@ -50,6 +50,19 @@ export async function fixtureClockedGps(page: Page) {
   }, GEO);
 }
 
+/**
+ * TEST-ONLY: Chromium's emulated geolocation keeps the timestamp of the moment it was set, so minutes into a test
+ * every fix looks minutes old and MIRA rightly refuses it as stale (a real phone stamps each fix when it's taken).
+ * Re-apply the latest emulated position every 30 s so fixes stay current; a test that moves her still wins.
+ */
+export function keepGpsFresh(ctx: BrowserContext, start: { latitude: number; longitude: number }) {
+  let latest: { latitude: number; longitude: number; accuracy?: number } | null = start;
+  const set = ctx.setGeolocation.bind(ctx);
+  ctx.setGeolocation = async (g) => { latest = g; return set(g); };
+  const timer = setInterval(() => { if (latest) set(latest).catch(() => {}); }, 30_000);
+  ctx.on("close", () => clearInterval(timer));
+}
+
 export async function apiReport(request: APIRequestContext, body: Record<string, unknown>) {
   return request.post("/api/reports", { headers: SAME_ORIGIN, data: { idempotencyKey: crypto.randomUUID(), ...body } });
 }
@@ -95,6 +108,7 @@ export function testClientIp(): string {
  */
 export async function newUser(browser: Browser, name: string): Promise<{ ctx: BrowserContext; page: Page }> {
   const ctx = await browser.newContext({ geolocation: GEO, permissions: ["geolocation"], extraHTTPHeaders: { "x-forwarded-for": testClientIp() } });
+  keepGpsFresh(ctx, GEO);
   const page = await ctx.newPage();
   await fixtureIndiaReverse(page);
   await page.goto("/");

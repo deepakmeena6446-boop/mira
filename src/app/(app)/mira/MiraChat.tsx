@@ -27,7 +27,9 @@ import { clearPlanDraft, setPlanDraft, usePlanDraft, usePlanHydrated } from "@/l
 import { planTitle, whenWords } from "@/domain/plan-name";
 import { draftFromAsk } from "@/domain/plan-ask";
 import { arrivalIntent, shouldSeedPlan, immediateSupportIntent } from "@/domain/ask-routing";
-import { activeTripMessage } from "@/lib/trip-start";
+import { activeTripMessage, tripStartExtras } from "@/lib/trip-start";
+import { haptic } from "@/lib/haptics";
+import { refreshCurrentTrip } from "@/lib/current-trip-store";
 
 interface Msg {
   id: string;
@@ -62,7 +64,7 @@ function deviceTimeZone(): string | null {
   }
 }
 
-type StartTrip = (d: { name: string; lat: number; lon: number }) => Promise<void>;
+type StartTrip = (d: { name: string; lat: number; lon: number; savedPlaceId?: string }) => Promise<void>;
 
 /** Starting a trip can wait on a location fix: show it's working and ignore repeat taps. */
 function TripCardButton({ label, onStart }: { label: string; onStart: () => Promise<void> }) {
@@ -95,7 +97,33 @@ function Fact({ kind, children, label }: { kind: EvidenceKind; children: React.R
   );
 }
 
-function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; onTrip: StartTrip; onComparePlace: (d: { name: string; lat: number; lon: number }) => void; onStartHere: () => void }) {
+/** The open journey in the chat: open it, or say "I'm here" right from the card (re-audit RA4: it took one more screen). */
+function TripStatusCard({ card, shell }: { card: Extract<MiraCard, { type: "trip_status" }>; shell: string }) {
+  const toast = useToast();
+  const [state, setState] = useState<"open" | "busy" | "arrived">(card.state === "active" || card.state === "missed" ? "open" : "arrived");
+  const arrive = async () => {
+    setState("busy");
+    const id = card.id ?? (await api<{ trip: { id: string } | null }>("/api/trips/current").then((r) => (r.ok ? r.data.trip?.id : undefined)));
+    const r = id ? await api(`/api/trips/${id}/arrive`, { body: {} }) : null;
+    if (r?.ok) { haptic("arrived"); setState("arrived"); refreshCurrentTrip(); }
+    else { setState("open"); toast(r?.message ?? "This journey has already finished.", "error"); }
+  };
+  return (
+    <div className={cx(shell, "p-4")}>
+      <Link href="/trip" className="flex items-center gap-3">
+        <MiraPulse size={16} state="with-you" />
+        <span className="flex-1">
+          <span className="block font-semibold">{state === "arrived" ? `Arrived at ${card.destination}` : `On the way to ${card.destination}`}</span>
+          <span className="block text-sm text-ink-muted">{state === "arrived" ? "Your journey is closed. Nobody will be alerted." : `ETA ${clockIn(card.etaAt)}`}</span>
+        </span>
+        <Icon name="chevron" className="text-ink-subtle" />
+      </Link>
+      {state !== "arrived" ? <button type="button" onClick={arrive} disabled={state === "busy"} className="mt-3 min-h-11 w-full rounded-full bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-60">I&apos;m here</button> : null}
+    </div>
+  );
+}
+
+function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; onTrip: StartTrip; onComparePlace: (d: { name: string; lat: number; lon: number; savedPlaceId?: string }) => void; onStartHere: () => void }) {
   const router = useRouter();
   const show = (d: { name: string; lat: number; lon: number; kind?: string }) => {
     setPendingDestination(d);
@@ -161,16 +189,7 @@ function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; o
         </div>
       );
     case "trip_status":
-      return (
-        <Link href="/trip" className={cx(shell, "flex items-center gap-3 p-4")}>
-          <MiraPulse size={16} state="with-you" />
-          <span className="flex-1">
-            <span className="block font-semibold">On the way to {card.destination}</span>
-            <span className="block text-sm text-ink-muted">ETA {new Date(card.etaAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
-          </span>
-          <Icon name="chevron" className="text-ink-subtle" />
-        </Link>
-      );
+      return <TripStatusCard card={card} shell={shell} />;
     case "save_place":
       return (
         <Link href="/me#places" className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-full bg-surface px-5 font-semibold text-ink ring-1 ring-line-strong">
@@ -181,7 +200,7 @@ function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; o
       const ready = card.state === "ready";
       return (
         <section className={cx(shell, "p-4")} aria-label="Plan evidence">
-          <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Plan evidence</h2><span className="text-xs text-ink-subtle">checked {new Date(card.checkedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>
+          <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Plan evidence</h2><span className="text-xs text-ink-subtle">checked {clockIn(card.checkedAt)}</span></div>
           <ul className="mt-1 divide-y divide-line">
             {card.state === "not_checked" ? <Fact kind="pending" label="Needs you">Route check not started — places and time needed first</Fact> : ready ? <Fact kind="estimate">{card.options.length} mapped walking option{card.options.length === 1 ? "" : "s"}{card.options[0] ? ` · fastest about ${Math.round(card.options[0].minutes)} min` : ""}</Fact> : <Fact kind={card.state === "failed" ? "failed" : "none"}>Mapped walking route: {card.state === "failed" ? "the check failed" : card.state === "stale" ? "the map snapshot is too old" : "not available for this area"}</Fact>}
             {card.daylight ? <Fact kind={card.daylight.status === "known" ? "checked" : "none"}>{card.daylight.status === "known" ? `Daylight: ${String(card.daylight.value)} · ${card.daylight.source.label}` : "Daylight not calculated yet"}</Fact> : null}
@@ -244,14 +263,14 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
     // "I'm home" during a live journey: telling Mira doesn't end it. Say so before she puts the phone away,
     // or her contacts get a missed-check-in alert while she's safe.
     if (user && arrivalIntent(message)) {
-      const current = await api<{ trip: { destination: { name: string }; etaAt: string; state: string } | null }>("/api/trips/current");
+      const current = await api<{ trip: { id: string; destination: { name: string }; etaAt: string; state: string } | null }>("/api/trips/current");
       const trip = current.ok ? current.data.trip : null;
       if (trip && (trip.state === "active" || trip.state === "missed")) {
         setInput("");
         setMsgs((m) => [
           ...m,
           { id: `u${Date.now()}`, role: "user", text: message, cards: [] },
-          { id: `a${Date.now()}`, role: "assistant", text: "Glad you're there. Telling me doesn't end your journey — only “I'm here” does. Until you tap it, Mira treats you as still on the way, and anyone following could be told you missed your check-in.", cards: [{ type: "trip_status", destination: trip.destination.name, etaAt: trip.etaAt, state: trip.state }] },
+          { id: `a${Date.now()}`, role: "assistant", text: "Glad you're there. Telling me doesn't end your journey — only “I'm here” does. Until you tap it, Mira treats you as still on the way, and anyone following could be told you missed your check-in.", cards: [{ type: "trip_status", id: trip.id, destination: trip.destination.name, etaAt: trip.etaAt, state: trip.state }] },
         ]);
         return;
       }
@@ -335,18 +354,25 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
     if (!user) return setSignIn(true);
     const l = await freshLocation();
     if (!l.point) return toast("Turn on location so I can start your trip.", "error");
-    const r = await api("/api/trips", { body: { from: { lat: l.point.lat, lon: l.point.lon }, to: dest, share: false } });
+    // A saved place travels as itself, so its live link shows it only roughly (audit P06-006).
+    const r = await api("/api/trips", { body: { from: { lat: l.point.lat, lon: l.point.lon }, to: { name: dest.name, lat: dest.lat, lon: dest.lon }, share: false, ...tripStartExtras(dest.savedPlaceId) } });
     if (r.ok) {
       recordUsage("journey");
       router.push("/trip");
       router.refresh();
-    } else if (r.code === "trip_active") toast(await activeTripMessage(), "error"); // never swap in the other journey
+    } else if (r.code === "trip_active") {
+      // Never swap in the other journey; say so in the chat with that journey's card to open (re-audit RA2: a toast had no way there).
+      const current = await api<{ trip: { id: string; destination: { name: string }; etaAt: string; state: string } | null }>("/api/trips/current");
+      const open = current.ok ? current.data.trip : null;
+      const text = await activeTripMessage();
+      setMsgs((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text, cards: open ? [{ type: "trip_status", id: open.id, destination: open.destination.name, etaAt: open.etaAt, state: open.state }] : [] }]);
+    }
     else toast(r.message, "error");
   };
   // Conversation → decision: hand the place to Plan, from where she is (only if location is already on).
-  const comparePlace = (d: { name: string; lat: number; lon: number }) => {
+  const comparePlace = (d: { name: string; lat: number; lon: number; savedPlaceId?: string }) => {
     const draft = newPlanDraft(new Date(), deviceTimeZone() ?? "UTC");
-    setPlanDraft({ ...draft, touched: true, activity: `Go to ${d.name}`.slice(0, 160), ...(here ? { origin: { kind: "device", use: "from_here", point: { lat: here.lat, lon: here.lon } } } : {}), destination: { query: d.name.slice(0, 160), resolution: { source: "selected_point", name: d.name, point: { lat: d.lat, lon: d.lon } } } });
+    setPlanDraft({ ...draft, touched: true, activity: `Go to ${d.name}`.slice(0, 160), ...(here ? { origin: { kind: "device", use: "from_here", point: { lat: here.lat, lon: here.lon } } } : {}), destination: { query: d.name.slice(0, 160), resolution: d.savedPlaceId ? { source: "saved_place", placeId: d.savedPlaceId, name: d.name, point: { lat: d.lat, lon: d.lon } } : { source: "selected_point", name: d.name, point: { lat: d.lat, lon: d.lon } } } });
     router.push("/plan?for=go");
   };
 

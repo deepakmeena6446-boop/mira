@@ -16,6 +16,8 @@ export const MIN_ETA_MS = 5 * 60_000;
 export const MAX_JOURNEY_MS = 4 * 3600_000;
 export const MISS_GRACE_MS = 10 * 60_000;
 export const EXPIRE_AFTER_ETA_MS = 30 * 60_000;
+/** However late the worker sent the alert, the link and "Are you okay?" stay this long after it (audit L06-002). */
+export const LINK_AFTER_ALERT_MS = 15 * 60_000;
 /** Closed journeys are hard-deleted this long after closing (spec: within 24 h). */
 export const PURGE_AFTER_CLOSE_MS = 6 * 3600_000;
 /** A claimed alert with no recorded outcome after this long is shown as unconfirmed. */

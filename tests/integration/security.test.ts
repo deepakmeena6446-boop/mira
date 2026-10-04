@@ -47,7 +47,7 @@ const PUBLIC_KEYS = new Set([
   "places", "id", "name", "kind", "lat", "lon", "distanceM", "hours", "label", "precise", "route", "meters", "minutes", "geometry",
   "approximate", "along", "notes", "text", "polarity", "timeBand", "week", "status", "checks", "database", "worker",
   "workerHeartbeatAgeSeconds", "pilotMapData", "contactEmail", "contactAlertProblems24h", "received", "error", "code", "message", "fields",
-  "state", "destination", "dest", "etaAt", "location", "at", "ageSeconds", "alertsViewer",
+  "state", "destination", "dest", "destApprox", "etaAt", "location", "at", "ageSeconds", "alertsViewer",
   // Street lighting along a route: statuses and shares only (no voters, no counts per person).
   "lighting", "segments", "coords", "summary", "sources", "lit", "dark", "poles", "unknown", "walkers", "osm", "confirmed",
   // Help Points and route options: places and routes only (class, hours as listed, source, position along the route).

@@ -2,7 +2,7 @@ import "server-only";
 import type postgres from "postgres";
 import { z } from "zod";
 import { placeLabel } from "@/server/http/person-name";
-import { EXPIRE_AFTER_ETA_MS, MAX_JOURNEY_MS, MIN_ETA_MS, displayAlertState, purgeAt, validateNewEta, type AlertState, type JourneyState } from "@/domain/journey";
+import { EXPIRE_AFTER_ETA_MS, LINK_AFTER_ALERT_MS, MAX_JOURNEY_MS, MIN_ETA_MS, displayAlertState, purgeAt, validateNewEta, type AlertState, type JourneyState } from "@/domain/journey";
 import { haversineMeters } from "@/domain/pilot";
 import { decryptText, encryptText, hashToken, hmacHex, randomToken } from "@/server/crypto";
 import { ApiError, conflict, notFound } from "@/server/http/errors";
@@ -18,6 +18,8 @@ import type { User } from "@/server/session/user";
 import { hourIn, isValidTimeZone } from "@/lib/time";
 import { onTripArrived } from "@/server/trips/on-arrival";
 import { captureCheckEvidence } from "@/server/contributions";
+import { EMAILED_ON_TRIP } from "@/server/journey/email-recipients";
+import { stopEmailsUrl } from "@/server/account/contacts";
 
 export const ARRIVAL_RADIUS_M = 75;
 export const ARRIVAL_DWELL_MS = 45_000;
@@ -111,7 +113,8 @@ export interface TripView {
   alert: AlertState;
   shareUrl: string | null;
   /**
-   * Her Circle on this journey. `viaEmail`: MIRA emails them (an accepted email contact); `notified`: that
+   * Her Circle on this journey. `viaEmail`: MIRA emails them on this journey (chosen as an email
+   * recipient when she shared or asked them to check on her, not re-read from the Circle: P02-007); `notified`: that
    * email was accepted by the provider. `whatsapp`: a wa.me link with their own live link, for her to send
    * (open journeys only). MIRA can't know whether she pressed Send in WhatsApp, so nothing claims it.
    */
@@ -152,7 +155,7 @@ type Row = {
 async function toView(sql: postgres.Sql, r: Row, now: Date): Promise<TripView> {
   const [contacts, [loc]] = await Promise.all([
     sql<{ id: string; name: string; notified: boolean; via_email: boolean; phone_enc: string | null; share_token_enc: string | null; link_delivery: AlertState; alert_delivery: AlertState | "sending"; check_delivery: AlertState }[]>`
-      SELECT c.id, c.name, tc.notified_at IS NOT NULL AS notified, (c.accepted_at IS NOT NULL AND c.encrypted_email IS NOT NULL) AS via_email, c.phone_enc, tc.share_token_enc, tc.link_delivery, tc.alert_delivery, tc.check_delivery
+      SELECT c.id, c.name, tc.notified_at IS NOT NULL AS notified, ${sql.unsafe(EMAILED_ON_TRIP)} AS via_email, c.phone_enc, tc.share_token_enc, tc.link_delivery, tc.alert_delivery, tc.check_delivery
       FROM trip_contacts tc JOIN contacts c ON c.id = tc.contact_id WHERE tc.journey_id = ${r.id} AND tc.revoked_at IS NULL ORDER BY c.name`,
     sql<{ lat: number; lon: number; at: Date }[]>`SELECT lat, lon, at FROM trip_locations WHERE journey_id = ${r.id} ORDER BY at DESC LIMIT 1`,
   ]);
@@ -162,7 +165,7 @@ async function toView(sql: postgres.Sql, r: Row, now: Date): Promise<TripView> {
     state: r.state,
     destination: { name: r.dest_name, lat: r.dest_lat, lon: r.dest_lon },
     etaAt: new Date(r.eta_at).toISOString(),
-    expiresAt: new Date(new Date(r.eta_at).getTime() + EXPIRE_AFTER_ETA_MS).toISOString(),
+    expiresAt: new Date(Math.max(new Date(r.eta_at).getTime() + EXPIRE_AFTER_ETA_MS, r.alert_claimed_at ? new Date(r.alert_claimed_at).getTime() + LINK_AFTER_ALERT_MS : 0)).toISOString(),
     routeMeters: r.route_meters,
     extended: r.extended,
     alert: displayAlertState(r.alert_state, r.alert_claimed_at ? new Date(r.alert_claimed_at) : null, now),
@@ -278,7 +281,7 @@ export async function startTrip(sql: postgres.Sql, user: User, input: z.infer<ty
     created.links.map(async (l) => {
       if (!l.email) return; // WhatsApp contact: she sends the link herself from the journey screen
       if (!await deliveryConsent(sql, created.row.id, l.contactId)) return;
-      const mail = tripSharedEmail({ contactName: l.name, ownerName: user.name.split(" ")[0], destination: input.to?.name ?? "where they are", minutesToEta, etaAt: eta, tz, liveUrl: new URL(`/t/${l.token}`, getEnv().APP_BASE_URL).toString(), mode: input.to ? input.mode : "other" });
+      const mail = tripSharedEmail({ contactName: l.name, ownerName: user.name.split(" ")[0], destination: input.to?.name ?? "where they are", minutesToEta, etaAt: eta, tz, liveUrl: new URL(`/t/${l.token}`, getEnv().APP_BASE_URL).toString(), mode: input.to ? input.mode : "other", stopUrl: stopEmailsUrl(l.email) });
       const sent = await emailContact(l.email, mail.subject, mail.text).catch(() => ({ ok: false }));
       await sql`UPDATE trip_contacts SET link_delivery = ${sent.ok ? "sent" : "definite" in sent && sent.definite ? "failed" : "unconfirmed"}, notified_at = ${sent.ok ? now : null} WHERE journey_id = ${created.row.id} AND contact_id = ${l.contactId} AND revoked_at IS NULL`;
     }),
@@ -332,7 +335,7 @@ export async function shareTrip(sql: postgres.Sql, user: User, id: string, recip
   for (const link of result.links) {
     if (!link.email) continue;
     if (!await deliveryConsent(sql, id, link.contactId)) continue;
-    const mail = tripSharedEmail({ contactName: link.name, ownerName: user.name.split(" ")[0], destination: result.trip.dest_name, minutesToEta: Math.max(0, Math.round((new Date(result.trip.eta_at).getTime() - now.getTime()) / 60_000)), etaAt: new Date(result.trip.eta_at), tz: result.trip.tz, liveUrl: liveLink(link.token), mode: result.trip.auto_arrival ? result.trip.mode : "other" });
+    const mail = tripSharedEmail({ contactName: link.name, ownerName: user.name.split(" ")[0], destination: result.trip.dest_name, minutesToEta: Math.max(0, Math.round((new Date(result.trip.eta_at).getTime() - now.getTime()) / 60_000)), etaAt: new Date(result.trip.eta_at), tz: result.trip.tz, liveUrl: liveLink(link.token), mode: result.trip.auto_arrival ? result.trip.mode : "other", stopUrl: stopEmailsUrl(link.email) });
     const sent = await emailContact(link.email, mail.subject, mail.text).catch(() => ({ ok: false, definite: false }));
     await sql`UPDATE trip_contacts SET link_delivery = ${sent.ok ? "sent" : sent.definite ? "failed" : "unconfirmed"}, notified_at = ${sent.ok ? now : null} WHERE journey_id = ${id} AND contact_id = ${link.contactId} AND revoked_at IS NULL`;
   }
@@ -384,10 +387,12 @@ export async function tellMyPeopleNow(sql: postgres.Sql, user: User, id: string,
   });
   const told: string[] = [], failed: string[] = [], unconfirmed: string[] = [];
   const whatsapp = links.filter((link) => link.phone).map((link) => ({ name: link.name, url: whatsappLink(link.phone!, checkOnMeMessage(liveLink(link.token))) })).sort((a, b) => a.name.localeCompare(b.name));
+  // The others this same email is claimed for (check_delivery 'claimed' above), so each email says who else MIRA is emailing (L02-005).
+  const others = Math.max(0, links.filter((link) => link.email).length - 1);
   for (const link of links) {
     if (!link.email) continue;
     if (!await deliveryConsent(sql, id, link.contactId)) continue;
-    const mail = checkOnMeEmail({ ownerName: user.name.split(" ")[0], liveUrl: liveLink(link.token) });
+    const mail = checkOnMeEmail({ ownerName: user.name.split(" ")[0], liveUrl: liveLink(link.token), others });
     const sent = await emailContact(link.email, mail.subject, mail.text).catch(() => ({ ok: false, definite: false }));
     const delivery = sent.ok ? "sent" : sent.definite ? "failed" : "unconfirmed";
     (sent.ok ? told : sent.definite ? failed : unconfirmed).push(link.name);
@@ -470,12 +475,12 @@ export async function addLocation(sql: postgres.Sql, userId: string, id: string,
 export async function sharedTrip(sql: postgres.Sql, token: string, now: Date) {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return null;
   const hash = hashToken("invite", `trip:${token}`);
-  type J = { id: string; state: JourneyState; dest_name: string; dest_lat: number; dest_lon: number; eta_at: Date; closed_at: Date | null; name: string; via_contact: boolean; mode: JourneyMode; auto_arrival: boolean; check_requested_at: Date | null; tz: string | null };
+  type J = { id: string; state: JourneyState; dest_name: string; dest_lat: number; dest_lon: number; eta_at: Date; closed_at: Date | null; name: string; via_contact: boolean; mode: JourneyMode; auto_arrival: boolean; check_requested_at: Date | null; tz: string | null; saved_place: boolean };
   const [j] = await sql<J[]>`
-    SELECT j.id, j.state, j.dest_name, j.dest_lat, j.dest_lon, j.eta_at, j.closed_at, u.name, false AS via_contact, j.mode, j.auto_arrival, j.check_requested_at, j.tz
+    SELECT j.id, j.state, j.dest_name, j.dest_lat, j.dest_lon, j.eta_at, j.closed_at, u.name, false AS via_contact, j.mode, j.auto_arrival, j.check_requested_at, j.tz, j.saved_place_id IS NOT NULL AS saved_place
     FROM journeys j JOIN users u ON u.id = j.user_id WHERE j.share_token_hash = ${hash}
     UNION ALL
-    SELECT j.id, j.state, j.dest_name, j.dest_lat, j.dest_lon, j.eta_at, j.closed_at, u.name, (c.accepted_at IS NOT NULL AND c.encrypted_email IS NOT NULL) AS via_contact, j.mode, j.auto_arrival, j.check_requested_at, j.tz
+    SELECT j.id, j.state, j.dest_name, j.dest_lat, j.dest_lon, j.eta_at, j.closed_at, u.name, ${sql.unsafe(EMAILED_ON_TRIP)} AS via_contact, j.mode, j.auto_arrival, j.check_requested_at, j.tz, j.saved_place_id IS NOT NULL AS saved_place
     FROM trip_contacts tc JOIN journeys j ON j.id = tc.journey_id JOIN users u ON u.id = j.user_id
     -- A contact's own link: an accepted email contact, or one she sends it to on WhatsApp. Removing the contact revokes it.
     JOIN contacts c ON c.id = tc.contact_id AND (c.accepted_at IS NOT NULL OR c.phone_enc IS NOT NULL)
@@ -493,7 +498,9 @@ export async function sharedTrip(sql: postgres.Sql, token: string, now: Date) {
     state: j.state,
     name,
     destination: j.dest_name,
-    dest: { lat: j.dest_lat, lon: j.dest_lon },
+    // A saved place (often Home) is shown to link holders only to ~100 m: the exact point is her address (audit P06-006).
+    dest: j.saved_place ? { lat: Math.round(j.dest_lat * 1000) / 1000, lon: Math.round(j.dest_lon * 1000) / 1000 } : { lat: j.dest_lat, lon: j.dest_lon },
+    destApprox: j.saved_place,
     etaAt: new Date(j.eta_at).toISOString(),
     /** The traveller's time zone (IANA), so the ETA is shown in her local time with its label. Null: unknown (shown in UTC). */
     tz: j.tz,

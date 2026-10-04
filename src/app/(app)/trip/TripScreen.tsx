@@ -39,8 +39,10 @@ import { SavedReturnReview } from "@/components/app/SavedReturnReview";
 import type { Contact } from "@/server/account/contacts";
 import { localTimeInZone } from "@/domain/opening-hours";
 import type { AlertState } from "@/domain/journey";
+import { clockIn } from "@/domain/daylight";
+import { LEFT_NOTE } from "@/app/(app)/trips/left-note";
 
-const time = (iso: string | number) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+const time = (iso: string | number) => clockIn(iso);
 const names = (list: string[]) => (list.length <= 2 ? list.join(" and ") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`);
 const deliveryLabel = (state: AlertState | undefined) => state === "sent" ? "accepted by email provider; receipt unknown" : state === "failed" ? "email rejected" : state === "claimed" ? "email attempt in progress" : state === "unconfirmed" ? "email acceptance unconfirmed" : "no email attempted";
 
@@ -86,6 +88,7 @@ export function TripScreen({
   const countryIso = country.iso;
   const osmMap = tiles.provider !== "google";
   const helpInFlight = useRef(false);
+  const helpRetry = useRef({ failures: 0, after: 0 });
   const [focus, setFocus] = useState<RankedHelpPoint | null>(null);
   const [helpRoute, setHelpRoute] = useState<{ id: string; option: PlanOption | null; detail: string } | null>(null);
   const [pendingChange, setPendingChange] = useState<RankedHelpPoint | null>(null);
@@ -139,11 +142,12 @@ export function TripScreen({
   // Kept in a ref so `refresh` stays stable: callbacks and effects below depend on it.
   const leave = useRef<(signedOut: boolean) => void>(() => {});
   useEffect(() => {
-    leave.current = (signedOut) => {
-      toast(signedOut ? "You're signed out here, so this journey isn't running on this device any more." : "This journey was closed on another device. Nothing is being shared, and nobody will be alerted.", "info");
+    // A toast here was wiped by the move to Journeys (re-audit RA2), so Journeys says it; it knows whether she's signed in.
+    leave.current = () => {
+      try { sessionStorage.setItem(LEFT_NOTE, "1"); } catch { /* private mode: Journeys still shows the true state */ }
       router.replace("/trips");
     };
-  }, [router, toast]);
+  }, [router]);
   const refresh = useCallback(async () => {
     const r = await api<{ trip: TripView | null; safetyNet?: SafetyNet }>("/api/trips/current");
     if (r.ok && r.data.trip) { setTrip(r.data.trip); publishTrip(r.data.trip); }
@@ -156,7 +160,8 @@ export function TripScreen({
   }, []);
 
   useEffect(() => {
-    const p = setInterval(refresh, 20_000);
+    // 10 s: a second device shows I'm here / End / +10 min from elsewhere within seconds, not ~20 (audit P18-002).
+    const p = setInterval(refresh, 10_000);
     const onVisible = () => { if (document.visibilityState === "visible") void refresh(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { clearInterval(p); document.removeEventListener("visibilitychange", onVisible); };
@@ -253,14 +258,19 @@ export function TripScreen({
   // Help Points around her, fetched ahead (and again once she has moved on), so "I feel unsafe" is instant.
   useEffect(() => {
     if (!open || !freshMe || helpInFlight.current) return;
-    if (help && !help.failed && haversine(help.at, freshMe) < HELP_REFETCH_M) return; // a failed lookup retries on the next fix
+    if (help && !help.failed && haversine(help.at, freshMe) < HELP_REFETCH_M) return;
+    // A failed lookup retries on a later fix, backing off 15 s → 5 min: it used to refire at once, ~289 calls a minute (audit L06-008).
+    if (Date.now() < helpRetry.current.after) return;
     helpInFlight.current = true;
     const at = freshMe;
     void api<{ helpPoints: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> }>("/api/geo/help", { body: { ...at, ...(countryIso ? { country: countryIso } : {}), ...(osmMap ? { source: "osm" } : {}) } }).then((r) => {
       helpInFlight.current = false;
       // The API answers 200 with evidence "failed" when the providers didn't respond: that's a failed lookup, not "none nearby".
       const failed = !r.ok || r.data.evidence?.state === "failed";
-      setHelp((cur) => (failed ? (cur && !cur.failed ? cur : { at, points: [], failed: true }) : { at, points: r.data.helpPoints, partial: r.data.evidence?.state === "partial" }));
+      const retry = helpRetry.current;
+      retry.failures = failed ? retry.failures + 1 : 0;
+      retry.after = failed ? Date.now() + Math.min(300_000, 15_000 * 2 ** (retry.failures - 1)) : 0;
+      setHelp((cur) => (failed ? (cur ?? { at, points: [], failed: true }) : { at, points: r.data.helpPoints, partial: r.data.evidence?.state === "partial" }));
     });
   }, [open, freshMe, help, countryIso, osmMap]);
   const placeTime = localTimeInZone(clock ?? new Date(), country.timezone);
@@ -366,6 +376,10 @@ export function TripScreen({
       setTrip(r.data.trip);
       if (action === "arrive") haptic("arrived");
       if (action === "extend") toast("Added 10 minutes. Take your time.");
+    } else if (r.status === 409 || r.code === "invalid_extension") {
+      // Another device got there first (audit P18-002): show what actually happened instead of an error over a stale card.
+      await refresh();
+      if (stillOpen.current) toast("This journey was changed on another device. You're seeing the latest now.", "info");
     } else toast(r.message, "error");
   };
 
@@ -471,7 +485,12 @@ export function TripScreen({
           </p>
           {trip.alert === "sent" ? (
             <p className="mt-2 max-w-sm text-sm text-ink-muted animate-rise">
-              {(() => { const told = trip.sharedWith.filter((c) => c.alertDelivery === "sent").map((c) => c.name); return `${told.length ? names(told) : "The people Mira emailed"} ${told.length === 1 ? "was" : "were"} told you missed your check-in. Mira is emailing them now that this journey is over — call them if you can.`; })()}
+              {(() => {
+                const told = trip.sharedWith.filter((c) => c.alertDelivery === "sent").map((c) => c.name);
+                // The all-clear goes only after I'm here / End, to alerted contacts still on the journey (re-audit RA3 N1).
+                const allClear = (trip.state === "arrived" || trip.state === "ended") && told.length > 0;
+                return `${told.length ? names(told) : "The people Mira emailed"} ${told.length === 1 ? "was" : "were"} told you missed your check-in. ${allClear ? "Mira is trying to email them that this journey is over — call them too if you can." : "Mira can't send them an all-clear from here, so call or message them to say you're okay."}`;
+              })()}
             </p>
           ) : null}
           {/* The one question after a journey (or nothing): a Mira Check that helps the next person. */}
@@ -671,7 +690,7 @@ export function TripScreen({
                     {revokeConfirm === contact.id ? <div className="mt-2 flex gap-2"><Button variant="danger" busy={busy === "sharing-revoke"} onClick={() => void sharingAction("revoke", { contactId: contact.id })}>Confirm remove {contact.name}&apos;s journey link</Button><Button variant="ghost" onClick={() => setRevokeConfirm(null)}>Keep link</Button></div> : <Button variant="secondary" className="mt-2" onClick={() => setRevokeConfirm(contact.id)}>Remove {contact.name}&apos;s journey link</Button>}
                   </li>)}</ul> : <p className="text-sm">No selected recipients. Nobody receives automatic contact emails.</p>}
                   {contactsState === "failed" ? <div role="status"><p>Contact choices could not load. Existing links are unchanged.</p><Button variant="secondary" onClick={() => setContactsState("idle")}>Retry contact choices</Button></div> : contactsState !== "ready" ? <p role="status">Loading contact choices…</p> : <>
-                    <RecipientPicker contacts={contacts.filter((contact) => !trip.sharedWith.some((recipient) => recipient.id === contact.id))} selectedIds={recipientIds} onChange={(ids) => { setRecipientIds(ids); shareActionKey.current = null; }} disabled={busy === "sharing-share"} />
+                    <RecipientPicker alreadyFollowing={trip.sharedWith.length} contacts={contacts.filter((contact) => !trip.sharedWith.some((recipient) => recipient.id === contact.id))} selectedIds={recipientIds} onChange={(ids) => { setRecipientIds(ids); shareActionKey.current = null; }} disabled={busy === "sharing-share"} />
                     {recipientIds.length ? <><p className="text-sm">Confirm live links for {names(contacts.filter((contact) => recipientIds.includes(contact.id)).map((contact) => contact.name))}? Mira attempts accepted-contact emails; WhatsApp still requires Send.</p><Button variant="primary" busy={busy === "sharing-share"} onClick={() => { shareActionKey.current ??= crypto.randomUUID(); void sharingAction("share", { recipientIds, idempotencyKey: shareActionKey.current }); }}>Confirm chosen recipients</Button></> : null}
                   </>}
                   <div className="rounded-xl bg-surface p-3 text-sm">
@@ -700,7 +719,7 @@ export function TripScreen({
 
               {confirmEnd ? (
                 <div className="rounded-xl bg-surface p-4">
-                  <p className="font-semibold">End the {noun}? Live sharing stops{alertsOn ? " and nobody is told if you don't arrive" : ""}.</p>
+                  <p className="font-semibold">End the {noun}? Live sharing stops{trip.state === "missed" ? (trip.sharedWith.some((c) => c.alertDelivery === "sent") ? ", and the people Mira alerted get an email that you ended it" : "") : alertsOn ? " and nobody is told if you don't arrive" : ""}.</p>
                   <div className="mt-3 flex gap-2">
                     <Button variant="danger" onClick={() => act("end")} busy={busy === "end"}>End trip</Button>
                     <Button variant="ghost" onClick={() => setConfirmEnd(false)}>Keep going</Button>

@@ -1,6 +1,6 @@
 import { formatPlaceDateTime, formatPlaceTime } from "@/lib/time";
 import { modeWords } from "@/domain/travel-prefs";
-import { EXPIRE_AFTER_ETA_MS } from "@/domain/journey";
+import { EXPIRE_AFTER_ETA_MS, LINK_AFTER_ALERT_MS } from "@/domain/journey";
 
 /**
  * Minimised contact emails (architecture §6): ETA and a public place name only if the
@@ -63,7 +63,18 @@ export function journeyVerb(mode: string | undefined): string {
   return phrase ? `is on the way ${phrase} to` : "is on the way to";
 }
 
-export function tripSharedEmail(args: { contactName: string; ownerName: string; destination: string; minutesToEta: number; liveUrl: string; mode?: string; etaAt?: Date; tz?: string | null }) {
+/**
+ * Who else MIRA is emailing about this, true for any number of recipients (audit L02-005: every contact was told
+ * "hasn't contacted anyone else" while Mira emailed several). `others`: the other people getting this same email.
+ */
+export function othersLine(ownerName: string, others: number): string {
+  const who = others === 1 ? "1 other person" : `${others} other people`;
+  return others > 0
+    ? `MIRA is not an emergency service. Besides you, it is emailing ${who} ${ownerName} chose about this, and no one else. If you believe they're in danger, call your local emergency number.`
+    : "MIRA is not an emergency service and hasn't contacted anyone else. If you believe they're in danger, call your local emergency number.";
+}
+
+export function tripSharedEmail(args: { contactName: string; ownerName: string; destination: string; minutesToEta: number; liveUrl: string; mode?: string; etaAt?: Date; tz?: string | null; stopUrl?: string }) {
   return {
     subject: `${args.ownerName} is sharing a trip with you`,
     text: [
@@ -74,21 +85,30 @@ export function tripSharedEmail(args: { contactName: string; ownerName: string; 
       args.liveUrl,
       "",
       "The link stops working once the trip ends. MIRA will email you once if they don't check in.",
+      // P20-002: a contact can always stop a stream of these, even after accepting.
+      ...(args.stopUrl ? ["", "Don't want emails from MIRA? Stop all MIRA emails to this address:", args.stopUrl] : []),
     ].join("\n"),
   };
 }
 
-export function tripMissedEmail(args: { ownerName: string; destination: string; minutesLate: number; liveUrl: string | null; etaAt?: Date; tz?: string | null }) {
+function linkWindow(minutesLate: number): string {
+  // The worker keeps the link at least LINK_AFTER_ALERT_MS after the alert, however late it ran.
+  const left = Math.max(Math.round(LINK_AFTER_ALERT_MS / 60_000), Math.round(EXPIRE_AFTER_ETA_MS / 60_000) - Math.max(0, minutesLate));
+  return `Their last shared location is here for about ${left} more minutes (after that the page only says they didn't check in):`;
+}
+
+export function tripMissedEmail(args: { ownerName: string; destination: string; minutesLate: number; liveUrl: string | null; etaAt?: Date; tz?: string | null; others?: number }) {
   return {
     subject: `${args.ownerName} missed their check-in on MIRA`,
     text: [
       "Hello,",
       "",
       `${args.ownerName} was expected at ${args.destination} ${about(args.minutesLate)} ago${theirTime(args.etaAt, args.tz)} and hasn't confirmed they arrived.`,
-      ...(args.liveUrl ? [`Their last shared location is here until ${Math.round(EXPIRE_AFTER_ETA_MS / 60_000)} minutes after their expected time (after that the page only says they didn't check in):`, args.liveUrl] : []),
+      // When the alert itself is late, the window may be nearly gone: say what's left, not a time already past (re-audit RA3 N4).
+      ...(args.liveUrl ? [linkWindow(args.minutesLate), args.liveUrl] : []),
       "",
       "They may simply have forgotten to tap \"I'm here\". You might want to call or message them directly.",
-      "MIRA is not an emergency service and hasn't contacted anyone else. If you believe they're in danger, call your local emergency number.",
+      othersLine(args.ownerName, args.others ?? 0),
       "",
       "This is the only alert you'll get for this trip.",
     ].join("\n"),
@@ -115,9 +135,9 @@ export function tripArrivedEmail(args: { ownerName: string; destination: string;
 
 /**
  * "Tell my people now": she asked her trusted contacts to check on her. Care wording, not an
- * SOS: a false tap should cost little, and MIRA never implies anyone else was contacted.
+ * SOS: a false tap should cost little, and the email says exactly how many others MIRA is emailing (L02-005).
  */
-export function checkOnMeEmail(args: { ownerName: string; liveUrl: string | null }) {
+export function checkOnMeEmail(args: { ownerName: string; liveUrl: string | null; others?: number }) {
   return {
     subject: `${args.ownerName} asked you to check on them`,
     text: [
@@ -127,7 +147,7 @@ export function checkOnMeEmail(args: { ownerName: string; liveUrl: string | null
       ...(args.liveUrl ? ["See where they are right now (the link works while they're sharing):", args.liveUrl] : []),
       "",
       "The best next step is usually to call or message them.",
-      "MIRA is not an emergency service and hasn't contacted anyone else. If you believe they're in danger, call your local emergency number.",
+      othersLine(args.ownerName, args.others ?? 0),
     ].join("\n"),
   };
 }

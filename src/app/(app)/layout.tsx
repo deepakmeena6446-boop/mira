@@ -16,7 +16,7 @@ async function dockTrip(): Promise<DockTrip | null> {
     if (!user) return null;
     const trip = await currentTrip(sql, user.id, systemClock.now());
     if (!trip || (trip.state !== "active" && trip.state !== "missed")) return null;
-    return { state: trip.state, destination: trip.autoArrival ? trip.destination.name : null, etaAt: trip.etaAt, following: trip.sharedWith.filter((c) => c.notified).map((c) => c.name) };
+    return { state: trip.state, destination: trip.autoArrival ? trip.destination.name : null, etaAt: trip.etaAt, following: trip.sharedWith.filter((c) => c.notified).map((c) => c.name), sharedAt: trip.lastLocation?.at ?? null };
   } catch {
     return null;
   }

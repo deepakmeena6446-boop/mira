@@ -3,9 +3,10 @@
 import type { Contact } from "@/server/account/contacts";
 
 /** Choosing a contact here proposes a recipient; no request or alert is sent. */
-export function RecipientPicker({ contacts, selectedIds, onChange, disabled = false }: { contacts: Contact[]; selectedIds: string[]; onChange: (ids: string[]) => void; disabled?: boolean }) {
+export function RecipientPicker({ contacts, selectedIds, onChange, disabled = false, alreadyFollowing = 0 }: { contacts: Contact[]; selectedIds: string[]; onChange: (ids: string[]) => void; disabled?: boolean; alreadyFollowing?: number }) {
   const eligible = contacts.filter((contact) => contact.status === "accepted" || contact.phone);
-  if (!eligible.length) return <p className="text-sm text-ink-muted">No accepted email or WhatsApp contacts available. This journey stays private.</p>;
+  // With people already on the journey, "stays private" would be false (audit P01-003).
+  if (!eligible.length) return <p className="text-sm text-ink-muted">{alreadyFollowing ? "Everyone in your Circle who can follow is already on this journey." : "No accepted email or WhatsApp contacts available. This journey stays private."}</p>;
   return <fieldset disabled={disabled} className="space-y-2 rounded-lg border border-line p-3">
     <legend className="px-1 text-sm font-semibold">Choose who follows this journey</legend>
     <p className="text-xs text-ink-muted">Unchecked contacts receive nothing. Email attempts can fail; WhatsApp still needs you to press Send.</p>

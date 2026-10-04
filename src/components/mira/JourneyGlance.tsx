@@ -4,10 +4,11 @@ import { cx } from "@/components/ui/cx";
 import { SkyCard, skyAt } from "@/components/mira/LiveNow";
 import { journeyNoun, modeWords } from "@/domain/travel-prefs";
 import type { TripView } from "@/server/trips";
+import { clockIn } from "@/domain/daylight";
 
 export type GlanceTrip = Pick<TripView, "state" | "destination" | "etaAt" | "mode" | "autoArrival"> & { sharing: boolean };
 
-const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+const time = (iso: string) => clockIn(iso);
 
 /**
  * The journey at a glance: the same sky card on the live journey screen and in Journeys, so the
@@ -39,7 +40,7 @@ export function JourneyGlance({ trip, clock, at, attention = false, distance = n
       eyebrow={missed ? "Check-in due" : trip.sharing ? "Sharing enabled" : `${noun[0].toUpperCase()}${noun.slice(1)} in progress`}
       aside={trip.autoArrival ? (clock ? `ETA ${time(trip.etaAt)}` : "ETA") : clock ? `Until ${time(trip.etaAt)}` : null}
       title={<span className="flex items-baseline justify-between gap-3"><span className="min-w-0"><span className="block text-[0.72rem] font-medium tracking-normal text-[color:var(--sky-muted)]">{trip.autoArrival ? (left > 0 ? "Expected in" : "Expected") : "Sharing for"}</span><span className={cx("block tabular-nums", left > 0 ? "text-[2.75rem] leading-none" : "text-[1.75rem]")}>{!clock ? "…" : left > 0 ? span : mins < 1 ? "now" : `${span} ago`}</span></span></span>}
-      line={<><Heading className="truncate font-semibold text-[color:var(--sky-ink)]">{trip.autoArrival ? `To ${trip.destination.name}${modeLine ? ` · ${modeLine}` : ""}` : "Sharing where you are"}</Heading>{distance !== null && trip.autoArrival ? <span>{distance < 1000 ? `${Math.round(distance / 10) * 10} m` : `${(distance / 1000).toFixed(1)} km`} to go · ETA with time to spare</span> : null}</>}
+      line={<><Heading className="truncate font-semibold text-[color:var(--sky-ink)]">{trip.autoArrival ? `To ${trip.destination.name}${modeLine ? ` · ${modeLine}` : ""}` : "Sharing where you are"}</Heading>{distance !== null && trip.autoArrival ? <span>{distance < 1000 ? `${Math.round(distance / 10) * 10} m` : `${(distance / 1000).toFixed(1)} km`} to go{left <= 0 ? " · past your ETA" : ""}</span> : null}</>}
       footer={footer}
     />
   );

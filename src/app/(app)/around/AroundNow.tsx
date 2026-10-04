@@ -31,7 +31,7 @@ import type { TileConfig } from "@/server/providers/geo/tiles";
 import { PlaceSheet, type PickedPlace } from "../plan/PlanSheets";
 
 type Place = { name: string; lat: number; lon: number; source: "search" | "saved_place" | "selected_point"; placeId?: string };
-type Area = { key: string; help: { points: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> } | null; notes: CommunityNote[] | null; updates: { evidence: EvidenceState<SafetyUpdatesData> } | "failed" | null };
+type Area = { key: string; help: { points: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> } | null; notes: CommunityNote[] | null | "failed"; updates: { evidence: EvidenceState<SafetyUpdatesData> } | "failed" | null };
 type Walk = { key: string; way: WayOption | null; error: string | null };
 
 const deviceZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch { return null; } };
@@ -74,7 +74,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
     void api<{ helpPoints: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> }>("/api/geo/help", { body: { ...at, ...(country.iso ? { country: country.iso } : {}), ...(osmOnly ? { source: "osm" } : {}) } }).then((r) => {
       if (live) setArea(areaKey, { help: r.ok ? { points: r.data.helpPoints, evidence: r.data.evidence } : { points: [], evidence: { state: "failed", sources: [], retryable: true } } });
     });
-    void api<{ notes: CommunityNote[] }>("/api/community/nearby", { body: at }).then((r) => { if (live) setArea(areaKey, { notes: r.ok ? r.data.notes : [] }); });
+    void api<{ notes: CommunityNote[] }>("/api/community/nearby", { body: at }).then((r) => { if (live) setArea(areaKey, { notes: r.ok ? r.data.notes : "failed" }); });
     void api<{ evidence: EvidenceState<SafetyUpdatesData> }>("/api/safety-updates", { body: { ...at, window: 7 } }).then((r) => { if (live) setArea(areaKey, { updates: r.ok ? r.data : "failed" }); });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -132,7 +132,8 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
     toast(r.ok ? `Saved ${place.name} to your places` : r.message, r.ok ? undefined : "error");
   };
 
-  const notes = now?.notes ?? [];
+  const notesFailed = now?.notes === "failed";
+  const notes = Array.isArray(now?.notes) ? now.notes : [];
   // The same three facts as Home, for here or for the chosen place.
   const openNow = ranked.filter((p) => { const h = hoursState(p, localNow ?? undefined, 0, clock?.getTime()); return h.kind === "open_24h" || h.kind === "open_now" || h.kind === "listed_open"; });
   const nearestOpen = openNow[0] ?? null;
@@ -142,7 +143,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
     place && here
       ? { label: "walk from you", value: walkNow?.way && !walkNow.error ? `${Math.round(walkNow.way.route.minutes)} min` : "—", state: !walkNow ? "loading" : walkNow.error ? "failed" : "ok" }
       : { label: "to the nearest", value: nearestOpen ? `${nearestOpen.minutes} min` : "—", state: helpState },
-    { label: notes.length === 1 ? "note from people" : "notes from people", value: String(notes.length), state: !now || now.notes === null ? "loading" : "ok" },
+    { label: notes.length === 1 ? "note from people" : "notes from people", value: notesFailed ? "—" : String(notes.length), state: !now || now.notes === null ? "loading" : notesFailed ? "failed" : "ok" },
   ];
   // Same sentences as Home's card, so "none open" reads the same on both screens.
   const helpTotal = now?.help?.points.length ?? 0;
@@ -228,7 +229,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
                 <h2 id="people-h" className="m-h">From people here</h2>
                 <span className="inline-flex items-center gap-1.5 text-xs text-ink-subtle"><EvidenceGlyph kind="people" />Released notes</span>
               </div>
-              {now?.notes === null ? <p role="status" className="mt-2 text-sm text-ink-muted">Checking notes…</p> : notes.length ? (
+              {now?.notes === null ? <p role="status" className="mt-2 text-sm text-ink-muted">Checking notes…</p> : notesFailed ? <p role="status" className="mt-2 text-sm text-ink-muted">Mira couldn’t check notes just now. That isn’t the same as there being none.</p> : notes.length ? (
                 <ul className="mt-3 space-y-2">
                   {notes.slice(0, 3).map((n) => (
                     <li key={n.id} className="rounded-2xl bg-people-soft/50 px-4 py-3">

@@ -8,15 +8,22 @@ const plan = movementIntentSchema.parse({ version: 1, activity: "Late return", o
 const evidence: PlanOptionsResult = { state: "ready", checkedAt: "2026-10-02T12:00:00.000Z", source: "OpenStreetMap imported walking graph", sourceAt: "2026-09-24T18:11:11.000Z", scope: "route fixture", options: [{ id: "walk-0", label: "Shortest mapped walk", minutes: 8, meters: 600, geometry: [[77.21, 28.69], [77.211, 28.691]], evidence: [{ status: "known", claim: "Mapped walking time estimate", value: 8, scope: { kind: "route", ref: "route fixture", timeZone: "Asia/Kolkata" }, source: { id: "osm-walking-graph", label: "OpenStreetMap imported walking graph", observedAt: "2026-09-24T18:11:11.000Z", expiresAt: "2027-09-24T18:11:11.000Z" } }] }], daylight: { status: "known", claim: "Daylight at planned departure", value: "dark", scope: { kind: "area", ref: "origin fixture" }, source: { id: "noaa-solar-equations", label: "NOAA solar-position calculation", observedAt: "2026-10-02T12:00:00.000Z", expiresAt: null } }, service: { status: "unknown", claim: "Ride and transit service at planned time", scope: { kind: "route", ref: "route fixture" }, reason: "unsupported", retryable: false }, detail: "One mapped walking path." };
 
 describe("Phase 3 deterministic plan reply", () => {
-  it("explains the same checked option with source, time and scope and no service invention", () => {
+  it("explains the same checked option with source and data date, and no service invention", () => {
     const answer = answerPlanQuestion("Is transit running at midnight?", plan, evidence);
     expect(answer.next).toBe("review_options");
     expect(answer.text).toContain("8 minutes");
-    expect(answer.text).toContain("2026-09-24");
-    expect(answer.text).toContain("route fixture");
+    expect(answer.text).toContain("data from 24 Sep 2026");
+    expect(answer.text).not.toContain("route fixture"); // the scope can be her coordinates: never spoken (audit L02-002)
     expect(answer.text).toContain("transit service");
     expect(answer.text).toContain("unverified");
     expect(answer.text).not.toMatch(/transit is available|safe to travel/i);
+  });
+
+  it("never prints coordinates or ISO stamps, even for a real route scope (audit L02-002)", () => {
+    const real = { ...evidence, scope: "28.69510,77.21430 → 28.69468,77.21489", options: [{ ...evidence.options[0], departureLocal: "2026-10-04T09:55", arrivalLocal: "2026-10-04T09:58", timeZone: "Asia/Kolkata" }] };
+    const text = answerPlanQuestion("What can I choose?", { ...plan, mode: "walk" }, real).text;
+    expect(text).not.toMatch(/\d+\.\d{3,}|\d{4}-\d{2}-\d{2}T/);
+    expect(text).toContain("Leaving 4 Oct, 9:55 AM (Asia/Kolkata); arriving about 9:58 AM");
   });
 
   it("gives a useful partial arrival answer and one question without a plan", () => {

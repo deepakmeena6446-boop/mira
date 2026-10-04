@@ -67,6 +67,8 @@ export function instantForLocal(local: string, timeZone: string, near: Date = ne
 
 /** Why a wall time has no single instant: "repeated" (clocks go back: it happens twice) or "skipped" (clocks go forward). */
 export function clockChangeAt(local: string, timeZone: string): "repeated" | "skipped" | null {
+  // Only a full "YYYY-MM-DDTHH:MM": an empty or partial time used to parse as 2000-01-01 and read as "skipped" (re-audit RA4).
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(local)) return null;
   const nominal = Date.parse(`${local}:00Z`);
   if (!Number.isFinite(nominal)) return null;
   let format: Intl.DateTimeFormat;
@@ -108,6 +110,7 @@ export function laterDaylight(local: string, timeZone: string, point: LatLon): {
 
 export function resolvePlanOptions(input: { graph: RouteGraph | null; routes: PlannedRoutes | null; sourceAt: Date | null; checkedAt: Date; from: LatLon; to: LatLon; local: string; timeZone: string; failed?: boolean; intent?: MovementIntent }): PlanOptionsResult {
   const { graph, routes, sourceAt, checkedAt, from, to, local, timeZone, intent } = input;
+  // Coordinates stay in the evidence ref (internal); the result's `scope` is shown and spoken, so it's words (audit L02-002).
   const scope = `${from.lat.toFixed(5)},${from.lon.toFixed(5)} → ${to.lat.toFixed(5)},${to.lon.toFixed(5)}`;
   const routeScope = { kind: "route" as const, ref: scope, timeZone };
   const areaScope = { kind: "area" as const, ref: `${from.lat.toFixed(3)},${from.lon.toFixed(3)}`, timeZone };
@@ -119,7 +122,7 @@ export function resolvePlanOptions(input: { graph: RouteGraph | null; routes: Pl
     : unknown("Daylight at planned departure", "unsupported", false, true);
   const constraints = (intent?.constraints ?? []).map((text) => ({ text, status: "not_checked" as const, reason: "The imported graph does not establish accessibility, cost, lighting, place access or live conditions. Confirm this requirement directly before choosing." }));
   const manualPlan = intent && intent.mode !== "walk" ? { mode: intent.mode, serviceEligible: false as const, nextSteps: ["Confirm operation at the planned local time with the operator or provider.", intent.mode === "ride" ? "Confirm pickup point, fare and driver availability directly." : "Confirm departure, stops, connections and last service directly.", "Confirm access at the destination and the last walking leg. No booking or service confirmation has been made."] } : undefined;
-  const base: PlanOptionsResult = { state: "missing", checkedAt: checkedAt.toISOString(), source: sourceAt ? "OpenStreetMap imported walking graph" : null, sourceAt: sourceAt?.toISOString() ?? null, scope, options: [], daylight: daylightFor(intent?.timeKind === "arrive_by" ? null : plannedInstant), service, constraints, manualPlan, targetMeters: intent?.loop ? loopTargetMeters(intent) : undefined, detail: "Walking graph has not been imported for this area." };
+  const base: PlanOptionsResult = { state: "missing", checkedAt: checkedAt.toISOString(), source: sourceAt ? "OpenStreetMap imported walking graph" : null, sourceAt: sourceAt?.toISOString() ?? null, scope: intent?.loop ? "A loop from the start you chose" : "Between the start and destination you chose", options: [], daylight: daylightFor(intent?.timeKind === "arrive_by" ? null : plannedInstant), service, constraints, manualPlan, targetMeters: intent?.loop ? loopTargetMeters(intent) : undefined, detail: "Walking graph has not been imported for this area." };
   const baselineLater = base.daylight.status === "known" && base.daylight.value === "dark" ? laterDaylight(local, timeZone, from) : null;
   base.timeAlternatives = baselineLater ? [{ ...baselineLater, timeZone, daylight: "daylight" }] : [];
   if (manualPlan) return { ...base, state: "empty", detail: "No eligible planned-time ride or transit source is enabled in this comparison. Keep a manual transfer plan and confirm operation, timing and access directly." };

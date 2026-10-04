@@ -38,7 +38,8 @@ test("guest Home shows Mira live, opens Plan, Mira and Around without requesting
   expect(await page.evaluate(() => localStorage.getItem("mira.location.skip"))).toBeNull();
   await page.getByRole("region", { name: "On the map" }).getByRole("button", { name: "Use my location" }).click();
   expect(await page.evaluate(() => (window as unknown as { geoCalls: number }).geoCalls)).toBe(1);
-  expect(await page.evaluate(() => localStorage.getItem("mira.location.skip"))).toBe("0");
+  // Her choice is recorded from the phone's answer (a refusal becomes "off"); this stub never answers, so nothing yet.
+  expect(await page.evaluate(() => localStorage.getItem("mira.location.skip"))).toBeNull();
 });
 
 test("signed-in person explicitly saves, opens and deletes a plan without starting a journey", async ({ browser }) => {

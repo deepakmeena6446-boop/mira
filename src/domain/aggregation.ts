@@ -42,6 +42,28 @@ const CATEGORY_PHRASE: Partial<Record<Category, string>> = {
 
 const BAND_PHRASE: Record<TimeBand, string> = { day: "the day", evening: "the evening", late: "late hours" };
 
+/** Monday-start ISO week, "2026-W40": the network hash's salt period. */
+export function isoWeek(d: Date): string {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const year = t.getUTCFullYear();
+  const week = Math.ceil(((t.getTime() - Date.UTC(year, 0, 1)) / 86_400_000 + 1) / 7);
+  return `${year}-W${String(week).padStart(2, "0")}`;
+}
+
+/**
+ * How many networks are *proven* different. Hashes are salted per week, so two hashes from different weeks may be the
+ * same connection: only hashes from the same week can be compared (re-audit RA5: one /24 over three weeks looked
+ * like three networks). A report with no recorded network (older) counts as its own: it never blocks, and can't help an attacker.
+ */
+export function provenNetworks(reports: Array<Pick<EligibleReport, "actorHash" | "networkHash" | "submittedAt">>): number {
+  const legacy = new Set(reports.filter((r) => !r.networkHash).map((r) => r.actorHash)).size;
+  const byWeek = new Map<string, Set<string>>();
+  for (const r of reports) if (r.networkHash) byWeek.set(isoWeek(r.submittedAt), (byWeek.get(isoWeek(r.submittedAt)) ?? new Set()).add(r.networkHash));
+  return legacy + Math.max(0, ...[...byWeek.values()].map((nets) => nets.size));
+}
+
 export interface EligibleReport {
   reportId: string;
   actorHash: string;
@@ -140,8 +162,7 @@ export function computeReleases(reports: EligibleReport[], releaseAt: Date, prev
       skipped.push({ key, reason: "below_threshold" });
       continue;
     }
-    // A report with no recorded network (older) counts as its own network: it never blocks, it just can't help an attacker.
-    if (new Set(contributions.map((c) => c.networkHash ?? `actor:${c.actorHash}`)).size < MIN_NETWORKS) {
+    if (provenNetworks(contributions) < MIN_NETWORKS) {
       skipped.push({ key, reason: "not_enough_networks" });
       continue;
     }

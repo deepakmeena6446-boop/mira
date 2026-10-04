@@ -12,6 +12,7 @@ import { EmergencyPill, LastConfirmedNote } from "@/components/app/EmergencyPill
 import { emergencyStatusNote, otherEmergencyNumbers } from "@/domain/country-context";
 import { Icon } from "@/components/ui/Icon";
 import { HELP_ICON } from "./kinds";
+import { clockIn } from "@/domain/daylight";
 
 export interface UnsafeShareAction {
   label: string;
@@ -134,7 +135,7 @@ export function UnsafeSheet({
               Right now
             </h2>
             <p className="truncate text-sm text-ink-muted">
-              {[area ? `Near ${area.replace(/^Near /, "")}` : null, now ? now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : null].filter(Boolean).join(" · ") || "Here's what you can do"}
+              {[area ? `Near ${area.replace(/^Near /, "")}` : null, now ? clockIn(now) : null].filter(Boolean).join(" · ") || "Here's what you can do"}
             </p>
           </div>
           <button type="button" aria-label="Close" onClick={onClose} className="grid size-12 shrink-0 place-items-center rounded-full bg-sunken">

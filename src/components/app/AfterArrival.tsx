@@ -39,7 +39,7 @@ export function AfterArrival({
   if (preparation.check) return <div className="mt-6 w-full max-w-sm text-left animate-rise"><CheckCard check={preparation.check} /></div>;
   return <div role="status" className="mt-6 w-full max-w-sm m-card px-5 py-4 text-sm text-ink-muted">
     <p className="font-semibold text-ink">{done}</p>
-    <p className="mt-1">{preparation.state === "none" ? "Nothing needed from you this time." : preparation.state === "later" ? "A question may still become available. You can check later in Contribute." : "Mira may have one quick question about this journey. Preparing…"}</p>
+    <p className="mt-1">{preparation.state === "none" ? "No question from Mira this time." : preparation.state === "later" ? "A question may still become available. You can check later in Contribute." : "Mira may have one quick question about this journey. Preparing…"}</p>
     {preparation.state === "later" ? <Link href="/contribute" className="mt-2 inline-flex min-h-11 items-center font-semibold text-accent-strong">Open Contribute</Link> : null}
   </div>;
 }

@@ -147,6 +147,18 @@ test("S4 arrival check-in and explicit return are two private confirmed journeys
   await owner.page.getByRole("radio", { name: "Use foreground location" }).check();
   await owner.page.getByRole("button", { name: "Start chosen journey" }).click();
   await expect(owner.page.getByText("Nobody is notified.", { exact: false })).toBeVisible();
+  // Location is on for her, so a watch is running; static Chromium GPS can then fail the start's maximumAge:0 request.
+  // TEST-ONLY: answer that one request with a fresh fix at the station (native GPS is restored right after).
+  await owner.page.evaluate((point) => {
+    const gps = navigator.geolocation;
+    const native = gps.getCurrentPosition.bind(gps);
+    gps.getCurrentPosition = (success) => {
+      gps.getCurrentPosition = native;
+      const coords = { latitude: point.lat, longitude: point.lon, accuracy: 10, altitude: null, altitudeAccuracy: null, heading: null, speed: null, toJSON() { return { latitude: point.lat, longitude: point.lon, accuracy: 10 }; } };
+      const timestamp = Date.now();
+      success({ coords, timestamp, toJSON() { return { coords: coords.toJSON(), timestamp }; } } as GeolocationPosition);
+    };
+  }, station);
   await owner.page.getByRole("button", { name: "Confirm start" }).click();
   await owner.page.waitForURL("**/trip");
   await owner.ctx.setGeolocation({ latitude: venue.lat, longitude: venue.lon });

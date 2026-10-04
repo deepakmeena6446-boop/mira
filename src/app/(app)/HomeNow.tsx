@@ -31,6 +31,7 @@ import type { EvidenceState } from "@/domain/evidence-state";
 import type { HabitSuggestion } from "@/domain/habits";
 import type { SavedPlace } from "@/server/account/places";
 import type { SavedPlan } from "@/server/account/saved-plans";
+import { LocationAsk } from "@/components/app/LocationOnOpen";
 
 type Noticed = { id: string; icon: string; tone: "accent" | "dusk" | "people"; eyebrow: string; title: string; detail: string; kind: "checked" | "people" | "estimate"; onOpen: () => void };
 type Near = { key: string; help: { points: HelpPoint[]; failed: boolean } | null; notes: number | null; notesFailed: boolean };
@@ -50,6 +51,8 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
   const router = useRouter();
   const loc = useLocation(false);
   const clock = useClock();
+  // Home doesn't send her position; when followers' view is old or empty, say how to fix it (audit P01-004).
+  const staleSpot = Boolean(live?.following.length) && (live?.sharedAt === null || (live?.sharedAt != null && clock != null && clock.getTime() - new Date(live.sharedAt).getTime() >= 120_000));
   const country = useCountry();
   const point = usableLocationPoint(loc, clock?.getTime());
   const [signIn, setSignIn] = useState(false);
@@ -64,12 +67,6 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
   const idle = loc.status === "idle";
   const request = loc.request;
   useEffect(() => { if (idle && shouldAutoLocate()) void request(); }, [idle, request]);
-  useEffect(() => {
-    // Text typed before the app was ready (slow phones) is kept, not wiped by hydration (audit P09-004).
-    const early = (window as { __miraEarly?: { text: Record<string, string> } }).__miraEarly?.text.ask;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time pickup of pre-hydration input
-    if (early) setAsk(early);
-  }, []);
   useEffect(() => {
     // Device storage exists only after mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -158,6 +155,16 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
     handOffAsk(t);
     router.push("/mira");
   };
+  useEffect(() => {
+    // Text typed before the app was ready (slow phones) is kept, not wiped by hydration (audit P09-004).
+    const kept = (window as { __miraEarly?: { text: Record<string, string> } }).__miraEarly?.text;
+    const early = kept?.ask;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time pickup of pre-hydration input
+    if (early) setAsk(early);
+    // She already pressed Enter: send it now rather than make her press again (re-audit RA2).
+    if (early && kept?.__submitted === "ask") { delete kept.__submitted; submitAsk(early); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, at mount
+  }, []);
 
   const greeting = clock ? greetingFor(clock) : null;
   const t = useT();
@@ -173,7 +180,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
           <div className="min-w-0">
             <h1 className="text-[1.625rem] font-semibold leading-tight tracking-[-0.035em]">{greeting && clock ? `${t(greetingKey(clock.getHours()))}${firstName ? `, ${firstName}` : ""}` : "Hello"}</h1>
             <p className="mt-0.5 text-[0.875rem] text-ink-muted">
-              {journeyTo !== null ? `You’re on your way${journeyTo ? ` to ${journeyTo}` : ""} — I’m with you until you check in.` : cold ? "Here’s what’s true around you right now." : "Here’s what I know around you."}
+              {journeyTo !== null ? `You’re on your way${journeyTo ? ` to ${journeyTo}` : ""} — I’m with you until you check in.${staleSpot ? " Open your journey to share where you are now." : ""}` : cold ? "Here’s what’s true around you right now." : "Here’s what I know around you."}
             </p>
           </div>
           {user ? (
@@ -189,6 +196,9 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
             <button type="button" onClick={() => setSignIn(true)} className="min-h-11 shrink-0 rounded-full px-1 text-[0.875rem] font-semibold text-accent-strong">Sign in</button>
           )}
         </div>
+
+        {/* First open only: may Mira use location? In the page, never over it. */}
+        <LocationAsk />
 
         {/* 1. Mira knows: what's true around you, right now. */}
         <div className="mt-5">

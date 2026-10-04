@@ -3,7 +3,7 @@
 // outlive sign-out or be shown to the next person on a shared phone. API responses and
 // live trip data are never cached either (private and time-sensitive).
 // v2 replaces v1, which cached personal pages; activation deletes the old cache.
-const CACHE = "mira-shell-v6";
+const CACHE = "mira-shell-v7";
 const SHELL = ["/offline.html", "/offline.js", "/daypart.js", "/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
@@ -18,6 +18,12 @@ self.addEventListener("fetch", (e) => {
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/t/") || url.pathname.startsWith("/invite") || url.pathname.startsWith("/auth/")) return;
   if (e.request.mode === "navigate") {
     e.respondWith(fetch(e.request).catch(() => caches.match("/offline.html")));
+    return;
+  }
+  // The offline page's own script and files: fresh when online, the cached copy when not. Without this the offline
+  // page loaded but /offline.js didn't, so it had no call buttons (re-audit RA1, P08-005).
+  if (SHELL.includes(url.pathname)) {
+    e.respondWith(fetch(e.request).catch(() => caches.match(url.pathname)));
     return;
   }
   if (url.pathname.startsWith("/_next/static/")) {

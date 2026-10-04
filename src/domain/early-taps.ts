@@ -23,6 +23,15 @@ export const EARLY_TAP_SCRIPT = `(function(){
     var t = e.target;
     if (t && t.getAttribute && t.getAttribute("data-early-text")) text[t.getAttribute("data-early-text")] = t.value;
   }, true);
+  // Enter in the box before the app is ready: a native submit would reload the page and lose the words (re-audit RA2).
+  document.addEventListener("submit", function (e) {
+    if (window.__miraReady) return;
+    var f = e.target, box = f && f.querySelector ? f.querySelector("[data-early-text]") : null;
+    if (!box) return;
+    e.preventDefault();
+    text[box.getAttribute("data-early-text")] = box.value;
+    text.__submitted = box.getAttribute("data-early-text");
+  }, true);
 })();`;
 
 export type EarlyTap = "unsafe" | "emergency" | "locate";

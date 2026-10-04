@@ -57,6 +57,13 @@ export async function prepareReport(sql: postgres.Sql, input: ReportInput): Prom
   return { input, narrative, cell };
 }
 
+/** A report this person already sent with this key (a retry after a lost reply), or null. */
+export async function findReplay(sql: postgres.Sql, actorHash: string, idempotencyKey: string): Promise<SubmitResult | null> {
+  const [existing] = await sql<{ id: string; status: string }[]>`
+    SELECT id, status FROM reports_private WHERE actor_hash = ${actorHash} AND idempotency_key = ${idempotencyKey}`;
+  return existing ? { replay: true, held: existing.status === "held", id: existing.id } : null;
+}
+
 export async function submitReport(sql: postgres.Sql, actorHash: string, prepared: PreparedReport, clock: Clock, userId: string | null = null, networkHash: string | null = null): Promise<SubmitResult> {
   const { input, narrative, cell } = prepared;
   const now = clock.now();
@@ -85,10 +92,9 @@ export async function submitReport(sql: postgres.Sql, actorHash: string, prepare
     ON CONFLICT (actor_hash, idempotency_key) DO NOTHING
     RETURNING id, status`;
   if (rows.length === 0) {
-    const [existing] = await sql<{ id: string; status: string }[]>`
-      SELECT id, status FROM reports_private WHERE actor_hash = ${actorHash} AND idempotency_key = ${input.idempotencyKey}`;
+    const existing = await findReplay(sql, actorHash, input.idempotencyKey);
     if (!existing) throw new ApiError(409, "conflict", "Please try again.");
-    return { replay: true, held: existing.status === "held", id: existing.id };
+    return existing;
   }
   return { replay: false, held: status === "held", id: rows[0].id };
 }

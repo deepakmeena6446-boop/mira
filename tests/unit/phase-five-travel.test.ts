@@ -68,6 +68,8 @@ describe("Phase 5 remote travel contracts", () => {
     expect(instantForLocal("2026-10-25T01:30", "Europe/Lisbon", new Date("2026-10-20T12:00:00Z"))).toBeNull();
     expect(clockChangeAt("2026-10-25T01:30", "Europe/Lisbon")).toBe("repeated");
     expect(clockChangeAt("2027-03-14T02:30", "America/New_York")).toBe("skipped");
+    // A plan seeded without a time (\"walk home\") is not a clock change, in India or anywhere (re-audit RA4).
+    for (const local of ["", "2026-10-04T", "2026-10-04"]) expect(clockChangeAt(local, "Asia/Kolkata")).toBeNull();
     expect(clockChangeAt("2026-10-03T21:00", "Asia/Kolkata")).toBeNull();
   });
 });

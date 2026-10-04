@@ -72,3 +72,13 @@ describe("current location and emergency jurisdiction", () => {
     stop();
   });
 });
+
+describe("sign-out forgets the location choice (re-audit RA1, P03-002)", () => {
+  it("the next person on this phone is asked, not located silently", () => {
+    rememberLocationChoice(true);
+    expect(shouldAutoLocate()).toBe(true);
+    clearLocation();
+    expect(shouldAutoLocate()).toBe(false);
+    expect(localStorage.getItem("mira.location.skip")).toBeNull();
+  });
+});

@@ -46,7 +46,7 @@ test("375 px Help Points, Emergency, arrival and Contribute remain usable", asyn
   await startJourney(page);
   await page.getByRole("button", { name: /I'm here/ }).click();
   await expect(page.getByText(/You made it/).first()).toBeVisible();
-  await expect(page.getByText(/Was the way lit\?|Nothing needed from you|Preparing|check later in Contribute/).first()).toBeVisible();
+  await expect(page.getByText(/Was the way lit\?|No question from Mira|Preparing|check later in Contribute/).first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   await ctx.close();
 });

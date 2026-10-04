@@ -5,8 +5,9 @@ import { usePathname } from "next/navigation";
 import { api } from "@/lib/api-client";
 
 /** The open journey as the journey bar and Home show it. */
-export type DockTrip = { state: "active" | "missed"; destination: string | null; etaAt: string; following: string[] };
-type TripLike = { state: string; destination: { name: string }; etaAt: string; autoArrival: boolean; sharedWith: Array<{ name: string; notified: boolean }> } | null;
+/** `sharedAt`: when her position last reached followers (null: not yet; undefined: not known here). */
+export type DockTrip = { state: "active" | "missed"; destination: string | null; etaAt: string; following: string[]; sharedAt?: string | null };
+type TripLike = { state: string; destination: { name: string }; etaAt: string; autoArrival: boolean; sharedWith: Array<{ name: string; notified: boolean }>; lastLocation?: { at: string } | null } | null;
 
 /**
  * One client copy of "is a journey open?" (audit P18-001 / P15-001). The server layout renders the bar once and
@@ -20,7 +21,7 @@ const emit = () => listeners.forEach((l) => l());
 
 export function dockTripFrom(trip: TripLike): DockTrip | null {
   if (!trip || (trip.state !== "active" && trip.state !== "missed")) return null;
-  return { state: trip.state, destination: trip.autoArrival ? trip.destination.name : null, etaAt: trip.etaAt, following: trip.sharedWith.filter((c) => c.notified).map((c) => c.name) };
+  return { state: trip.state, destination: trip.autoArrival ? trip.destination.name : null, etaAt: trip.etaAt, following: trip.sharedWith.filter((c) => c.notified).map((c) => c.name), sharedAt: trip.lastLocation?.at ?? null };
 }
 export function publishTrip(trip: TripLike) {
   const next = dockTripFrom(trip);

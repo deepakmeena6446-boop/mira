@@ -13,7 +13,7 @@ export interface Limit {
   windowMs: number;
 }
 
-export function dailyKey(kind: "ip" | "actor" | "global", value: string, now: Date): string {
+export function dailyKey(kind: "ip" | "actor" | "global" | "recipient", value: string, now: Date): string {
   const day = now.toISOString().slice(0, 10);
   return hmacHex(`abuse:${day}`, `${kind}:${value}`);
 }

@@ -6,6 +6,7 @@ import { resolvedDestination, resolvedOrigin } from "@/domain/plan-state";
 import { haversineMeters } from "@/domain/pilot";
 import type { PlanOptionsResult } from "@/domain/plan-options";
 import { planOptionsFor } from "./options";
+import { localWhen } from "@/domain/plan-ask";
 import type { MiraCard } from "@/server/providers/companion/types";
 
 /** Beyond this, the imported walking graph doesn't reach: the plan is checked as "too far", never guessed. */
@@ -46,14 +47,15 @@ export async function checkPlanForMira(sql: postgres.Sql, plan: MovementIntent, 
     to: plan.loop ? "a loop back to the start" : placeName(plan.destination),
     activity: plan.activity,
     mode: plan.mode,
-    departure: `${plan.departure.local.replace("T", " ")} (${plan.departure.timeZone})${plan.timeKind === "arrive_by" ? ", arrive by" : ""}`,
+    departure: `${localWhen(plan.departure.local)} (${plan.departure.timeZone})${plan.timeKind === "arrive_by" ? ", arrive by" : ""}`,
     checked: notChecked ? "no" : evidence!.state,
     ...(notChecked ? { why_not_checked: notChecked } : {}),
     daylight_at_departure: daylight,
     ways: (evidence?.options ?? []).slice(0, 3).map((o) => ({ label: o.label, minutes: Math.round(o.minutes), km: Number((o.meters / 1000).toFixed(1)) })),
     ...(evidence && evidence.state !== "ready" ? { detail: evidence.detail } : {}),
-    ...(evidence?.timeAlternatives?.[0] ? { later_daylight: `${evidence.timeAlternatives[0].local.replace("T", " ")} (${evidence.timeAlternatives[0].timeZone}), ${evidence.timeAlternatives[0].minutesLater} min later` } : {}),
-    source: evidence ? `${evidence.source ?? "unknown"}, snapshot ${evidence.sourceAt ?? "unknown"}, ${evidence.scope}` : null,
+    ...(evidence?.timeAlternatives?.[0] ? { later_daylight: `${localWhen(evidence.timeAlternatives[0].local)} (${evidence.timeAlternatives[0].timeZone}), ${evidence.timeAlternatives[0].minutesLater} min later` } : {}),
+    // No `scope`: for a route it is both points as coordinates, and Mira repeats what she is given (audit L02-002).
+    source: evidence ? `${evidence.source ?? "unknown"}, data from ${evidence.sourceAt?.slice(0, 10) ?? "an unknown date"}` : null,
     not_verified: ["lighting and activity at that time", "opening hours then", plan.mode === "walk" ? "live conditions" : `${plan.mode} service at that time`],
   };
   const card: PlanCheck["card"] = {

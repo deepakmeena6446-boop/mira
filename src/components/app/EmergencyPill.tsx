@@ -9,6 +9,7 @@ import { countryWasChosen, useCountry, useCountryConfirmedAt } from "@/lib/local
 import { ChooseCountry } from "./ChooseCountry";
 import { useOverlay, useScrimClose } from "@/lib/use-overlay";
 import { emergencyActions, emergencyStatusNote, noNumberReason, type CountryContext } from "@/domain/country-context";
+import { clockIn } from "@/domain/daylight";
 
 /** Cited country actions only. A direct dial is reserved for a verified all-service number;
  * service-specific and unknown profiles open a deterministic options sheet. No model call.
@@ -56,7 +57,7 @@ export function LastConfirmedNote({ className }: { className?: string }) {
 export function confirmedWhen(at: number, now = Date.now()): string {
   const minutes = Math.max(0, Math.round((now - at) / 60_000));
   if (minutes < 60) return minutes <= 1 ? "a minute ago" : `${minutes} min ago`;
-  const time = new Date(at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const time = clockIn(at);
   const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   return day(new Date(at)) === day(new Date(now)) ? `today at ${time}` : `yesterday at ${time}`;
 }

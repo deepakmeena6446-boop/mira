@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { newUser } from "./helpers";
 
-test("signed-in Ask starts a temporary movement plan without legacy chat or GPS", async ({ browser }) => {
+// Every message goes through one door, /api/mira (owner decision 2026-10-04); the retired /api/mira/plan must stay unused.
+test("signed-in Ask starts a temporary movement plan without GPS, through Mira's one door", async ({ browser }) => {
   const owner = await newUser(browser, "Asha");
   let legacyPosts = 0;
   let planPosts = 0;
@@ -13,6 +14,8 @@ test("signed-in Ask starts a temporary movement plan without legacy chat or GPS"
     navigator.geolocation.getCurrentPosition = (...args) => { (window as Window & { miraGeoCalls?: number }).miraGeoCalls = ((window as Window & { miraGeoCalls?: number }).miraGeoCalls ?? 0) + 1; return original(...args); };
   });
   await owner.page.goto("/mira");
+  // Location is on for her, so opening Mira may refresh it (owner decision 2026-10-04); the Ask itself must not.
+  await owner.page.evaluate(() => { (window as Window & { miraGeoCalls?: number }).miraGeoCalls = 0; });
   await owner.page.getByLabel("Message Mira").fill("Run a loop from North Gate at 4:45 AM");
   await owner.page.getByRole("button", { name: "Send" }).click();
   await expect(owner.page.getByRole("log", { name: "Conversation with Mira" })).toContainText("I have North Gate");
@@ -21,8 +24,10 @@ test("signed-in Ask starts a temporary movement plan without legacy chat or GPS"
   expect(draft.timeHint).toBe("4:45 AM");
   expect(draft.departureLocal).toBe("");
   expect(draft.timeZone).toBe("");
-  expect(legacyPosts).toBe(0);
-  expect(planPosts).toBe(1);
+  // The way on to the plan is in the chat, before anything can be checked.
+  await expect(owner.page.getByRole("log").getByRole("region", { name: "Plan evidence" })).toContainText("Route check not started");
+  expect(legacyPosts).toBe(1);
+  expect(planPosts).toBe(0);
   geoRequests = await owner.page.evaluate(() => (window as Window & { miraGeoCalls?: number }).miraGeoCalls ?? 0);
   expect(geoRequests).toBe(0);
   await owner.ctx.close();
@@ -61,9 +66,10 @@ test("Ask uses the selected plan and an ephemeral sourced response", async ({ pa
     sessionStorage.setItem("mira.plan.v1", JSON.stringify({ savedAt: Date.now(), draft: { version: 1, touched: true, activity: "Walk home", origin: { kind: "named", query: "Office", resolution: { source: "search", name: "Office", point: { lat: 28.69, lon: 77.21 } } }, destination: { query: "Home", resolution: { source: "search", name: "Home", point: { lat: 28.691, lon: 77.211 } } }, loop: false, departureLocal: "2026-10-02T21:00", timeZone: "Asia/Kolkata", mode: "walk", constraints: "" } }));
   });
   let sentPlan = false;
-  let legacyPosts = 0;
-  await page.route("**/api/mira", async (route) => { if (route.request().method() === "POST") legacyPosts++; await route.continue(); });
-  await page.route("**/api/mira/plan", async (route) => {
+  let planPosts = 0;
+  await page.route("**/api/mira/plan", async (route) => { planPosts++; await route.continue(); });
+  await page.route("**/api/mira", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
     const body = route.request().postDataJSON() as { message: string; plan: { origin: { query: string }; departure: { local: string } } };
     sentPlan = body.plan.origin.query === "Office" && body.plan.departure.local === "2026-10-02T21:00";
     await route.fulfill({ status: 200, contentType: "application/x-ndjson", body: [{ type: "text", delta: "The mapped walk is about 8 minutes. Source: OpenStreetMap snapshot 2026-09-24. Future service is unverified." }, { type: "card", card: { type: "plan_brief", next: "review_options", state: "ready", checkedAt: "2026-10-02T12:00:00.000Z", source: "OpenStreetMap imported walking graph", sourceAt: "2026-09-24T18:11:11.000Z", scope: "route fixture", options: [{ id: "walk-0", label: "Shortest mapped walk", minutes: 8, meters: 600 }], daylight: { status: "known", claim: "Daylight at departure", value: "dark", scope: { kind: "area", ref: "origin" }, source: { id: "noaa", label: "NOAA calculation", observedAt: "2026-10-02T12:00:00.000Z", expiresAt: null } } } }, { type: "done" }].map((e) => JSON.stringify(e)).join("\n") + "\n" });
@@ -74,8 +80,8 @@ test("Ask uses the selected plan and an ephemeral sourced response", async ({ pa
   const log = page.getByRole("log", { name: "Conversation with Mira" });
   await expect(log).toContainText("OpenStreetMap snapshot 2026-09-24");
   await expect(log.getByRole("link", { name: "Review options" })).toBeVisible();
-  expect(sentPlan).toBe(true);
-  expect(legacyPosts).toBe(0);
+  expect(sentPlan).toBe(true); // the open plan travels with the question (and isn't stored)
+  expect(planPosts).toBe(0);
 });
 
 test("guest danger message shows Emergency before any plan answer", async ({ page }) => {
@@ -113,8 +119,7 @@ test("active plan keeps informational tools separate from movement Ask", async (
   await owner.page.route("**/api/mira/plan", async (route) => { planPosts++; await route.continue(); });
   await owner.page.goto("/mira");
   const useLocation = owner.page.getByRole("button", { name: "Use current location for nearby questions" });
-  await expect(useLocation).toBeVisible();
-  await useLocation.click();
+  // Location is already on for her (newUser), so there's nothing to tap here.
   await expect(useLocation).toBeHidden();
   for (const [question, expected] of [["What can you do?", "I can find nearby places"], ["How do I report a broken streetlight?", "report"], ["What's open nearby?", "nearby"]] as const) {
     await owner.page.getByLabel("Message Mira").fill(question);
@@ -127,8 +132,10 @@ test("active plan keeps informational tools separate from movement Ask", async (
   expect(planPosts).toBe(0);
   await owner.page.getByLabel("Message Mira").fill("What is the emergency number in India?");
   await owner.page.getByRole("button", { name: "Send" }).click();
-  await expect(owner.page.getByRole("log", { name: "Conversation with Mira" })).toContainText("For India, MIRA's reviewed emergency profile lists");
-  expect(planPosts).toBe(1);
-  expect(legacyPosts).toBe(3);
+  await expect(owner.page.getByRole("log", { name: "Conversation with Mira" })).toContainText("In India, reviewed call options: 112");
+  // She is in India: naming it is "here", never "…not where you are now" (re-audit RA4).
+  await expect(owner.page.getByRole("log", { name: "Conversation with Mira" })).not.toContainText("not where you are now");
+  expect(planPosts).toBe(0);
+  expect(legacyPosts).toBe(4);
   await owner.ctx.close();
 });

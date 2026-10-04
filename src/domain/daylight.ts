@@ -27,12 +27,16 @@ export function daylightOutlook(at: Date, point: LatLon): DaylightOutlook | null
   return { state, changeAt: null, changeTo: null };
 }
 
-/** "6:12 PM" in the given zone (or the device's when none is known). */
-export function clockIn(at: Date, timeZone?: string | null): string {
+/**
+ * "6:12 PM" in the given zone (or the device's when none is known). One clock everywhere (audit R14): always this
+ * shape, never the device locale's "6:12 pm", "18:12" or native digits, so every screen, email and Mira agree.
+ */
+export function clockIn(at: Date | string | number, timeZone?: string | null): string {
+  const d = at instanceof Date ? at : new Date(at);
   try {
-    return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", ...(timeZone ? { timeZone } : {}) }).format(at);
+    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true, numberingSystem: "latn", ...(timeZone ? { timeZone } : {}) }).format(d);
   } catch {
-    return at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(d);
   }
 }
 

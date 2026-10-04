@@ -35,8 +35,9 @@ const DANGER_LATIN = [
   String.raw`\bf[oa]l+o*w*i?n[g']?\s+me\b`, // folowing me, follwing me, followin me
   String.raw`\bsome(?:one|1|body)\b.*\bfol+o?w`,
   String.raw`\bcall\s+(?:the\s+)?(?:police|cops|ambulance|112|100|911|999)\b`, // Mira can't — point to the dialler
-  String.raw`\bget\s+(?:me\s+)?help\b`,
-  String.raw`\b(?:alert|inform)\s+(?:my\s+)?(?:sister|brother|mom|mum|mother|dad|father|parents?|family|friends?|husband|wife|partner|didi|bhai|papa|mummy|maa)\b`,
+  // Not "get help with my plan" / "inform my sister when I land": those are requests, not distress (re-audit RA4).
+  String.raw`\bget\s+(?:me\s+)?help\b(?!\s+(?:with|for|on|planning|choosing|finding)\b)`,
+  String.raw`\b(?:alert|inform)\s+(?:my\s+)?(?:sister|brother|mom|mum|mother|dad|father|parents?|family|friends?|husband|wife|partner|didi|bhai|papa|mummy|maa)\b(?!\s+(?:when|once|after|if|before|that i(?:'m|\s+am|'ve|\s+have)?\s+(?:land|arriv|reach|got|get|home))\b)`,
   String.raw`\bbach+a+o+\b`, // bachao, bachaoo, bachchao
   String.raw`\bda+r+\s*(?:lag|lg)\w*`, // dar lag, darr lag raha, dar lg rha
   String.raw`\bmadad\b`,

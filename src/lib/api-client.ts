@@ -7,8 +7,17 @@ export type ApiResult<T> =
   | { ok: true; status: number; data: T }
   | { ok: false; status: number; code: string; message: string; fields?: string[]; network: boolean };
 
-export async function api<T>(path: string, init: { method?: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown; signal?: AbortSignal } = {}): Promise<ApiResult<T>> {
+/**
+ * How long a call may hang before the screen says so (audit L06-007: a stalled dependency used to spin "Checking…"
+ * for minutes). A timeout is reported like a lost connection — the request may still have reached the server — so
+ * callers that keep their idempotency key on `network` stay safe to retry.
+ */
+export const API_TIMEOUT_MS = 25_000;
+
+export async function api<T>(path: string, init: { method?: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown; signal?: AbortSignal; timeoutMs?: number } = {}): Promise<ApiResult<T>> {
   let res: Response;
+  const timeout = AbortSignal.timeout(init.timeoutMs ?? API_TIMEOUT_MS);
+  const signal = init.signal && typeof AbortSignal.any === "function" ? AbortSignal.any([init.signal, timeout]) : (init.signal ?? timeout);
   try {
     res = await fetch(path, {
       method: init.method ?? (init.body === undefined ? "GET" : "POST"),
@@ -19,10 +28,14 @@ export async function api<T>(path: string, init: { method?: "GET" | "POST" | "PA
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
       credentials: "same-origin",
       cache: "no-store",
-      signal: init.signal,
+      signal,
     });
   } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") throw err;
+    // The caller's own abort is rethrown as before; our timeout is a "couldn't confirm" answer.
+    if (err instanceof DOMException && err.name === "AbortError" && init.signal?.aborted) throw err;
+    if (err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError")) {
+      return { ok: false, status: 0, code: "timeout", message: "Mira is taking too long to answer. Check your connection and try again.", network: true };
+    }
     return {
       ok: false,
       status: 0,
@@ -35,6 +48,7 @@ export async function api<T>(path: string, init: { method?: "GET" | "POST" | "PA
   try {
     payload = await res.json();
   } catch {
+    if (signal.aborted && !init.signal?.aborted) return { ok: false, status: 0, code: "timeout", message: "Mira is taking too long to answer. Check your connection and try again.", network: true };
     payload = null;
   }
   if (res.ok) return { ok: true, status: res.status, data: payload as T };
