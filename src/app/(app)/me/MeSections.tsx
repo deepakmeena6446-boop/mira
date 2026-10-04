@@ -69,7 +69,7 @@ export function AccountSection({
     );
   return (
     <Section id="account" title="Your account">
-      <div className="p-5">
+      <div className="p-4">
         {durable ? (
           <p className="flex items-center gap-2 text-sm">
             <Icon name="check" className="size-4 text-mint" />
@@ -159,7 +159,7 @@ export function PushSection({ available }: { available: boolean }) {
 
   return (
     <Section id="notifications" title="Notifications">
-      <div className="p-5">
+      <div className="p-4">
         <p className="text-sm text-ink-muted">Get told on this phone, even with Mira closed: a missed check-in, someone accepting your invite, or your live location pausing. No location is in the notification.</p>
         {state === "unsupported" ? (
           <p className="mt-3 text-sm">This browser can&apos;t show notifications from Mira. On iPhone, add Mira to your Home Screen first, then open it from there.</p>

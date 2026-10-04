@@ -37,7 +37,7 @@ export function AfterArrival({
   if (hour === null) return <p className="mt-6 text-sm text-ink-muted">{done}. Checking whether Mira has one quick question…</p>;
   if (lit) return <LitQuestion route={route!} onDone={onDone} />;
   if (preparation.check) return <div className="mt-6 w-full max-w-sm text-left animate-rise"><CheckCard check={preparation.check} /></div>;
-  return <div role="status" className="mt-6 w-full max-w-sm rounded-[var(--radius-card)] bg-surface px-5 py-4 text-sm text-ink-muted shadow-[var(--shadow-card)]">
+  return <div role="status" className="mt-6 w-full max-w-sm m-card px-5 py-4 text-sm text-ink-muted">
     <p className="font-semibold text-ink">{done}</p>
     <p className="mt-1">{preparation.state === "none" ? "Nothing needed from you this time." : preparation.state === "later" ? "A question may still become available. You can check later in Contribute." : "Mira may have one quick question about this journey. Preparing…"}</p>
     {preparation.state === "later" ? <Link href="/contribute" className="mt-2 inline-flex min-h-11 items-center font-semibold text-accent-strong">Open Contribute</Link> : null}
@@ -81,9 +81,9 @@ function LitQuestion({ route, onDone }: { route: Array<[number, number]>; onDone
       onDone();
     }
   };
-  if (state === "done") return <p className="mt-6 max-w-sm rounded-[var(--radius-card)] bg-surface px-5 py-4 text-sm text-ink-muted shadow-[var(--shadow-card)] animate-rise">Thank you. That helps the next person walking here at night.</p>;
+  if (state === "done") return <p className="mt-6 max-w-sm m-card px-5 py-4 text-sm text-ink-muted animate-rise">Thank you. That helps the next person walking here at night.</p>;
   return (
-    <div className="mt-6 w-full max-w-sm rounded-[var(--radius-card)] bg-surface p-5 text-left shadow-[var(--shadow-card)] animate-rise">
+    <div className="mt-6 w-full max-w-sm m-card p-5 text-left animate-rise">
       <p className="font-semibold">Was the way lit?</p>
       <div className="mt-3 grid grid-cols-3 gap-2">
         {([["lit", "Lit"], ["partly", "Partly"], ["dark", "Not lit"]] as const).map(([v, label]) => (

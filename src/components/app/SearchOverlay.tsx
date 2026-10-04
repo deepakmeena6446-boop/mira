@@ -117,7 +117,7 @@ export function SearchOverlay({
         {savedHits.length ? (
           <section aria-label="Saved places" className="mb-4">
             <h2 className="mb-2 px-1 text-[13px] font-medium text-ink-subtle">Your places</h2>
-            <ul className="overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]">
+            <ul className="overflow-hidden m-card">
               {savedHits.map((s) => (
                 <li key={s.id} className="border-b border-line last:border-0">
                   <button type="button" onClick={() => onPick({ name: s.label, lat: s.lat, lon: s.lon, resolutionSource: "saved_place" })} className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left hover:bg-sunken">
@@ -137,7 +137,7 @@ export function SearchOverlay({
             <h2 className="mb-2 px-1 text-[13px] font-medium text-ink-subtle">Places</h2>
             {hits.length ? (
               <>
-              <ul className="overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]">
+              <ul className="overflow-hidden m-card">
                 {hits.map((h) => (
                   <li key={h.id} className="border-b border-line last:border-0">
                     <button type="button" onClick={() => onPick({ name: h.name, lat: h.lat, lon: h.lon, kind: h.kind, resolutionSource: "search" })} className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left hover:bg-sunken">
@@ -154,7 +154,7 @@ export function SearchOverlay({
               {deepFor !== q.trim() ? <p className="mt-2 px-1 text-sm text-ink-subtle">Not here? Press Search on your keyboard to look harder — addresses work too.</p> : null}
               </>
             ) : (
-              <p className="rounded-[var(--radius-card)] bg-surface p-5 text-ink-muted shadow-[var(--shadow-card)]">
+              <p className="m-card p-5 text-ink-muted">
                 {loading
                   ? "Looking…"
                   : failure ??
@@ -169,7 +169,7 @@ export function SearchOverlay({
           <button
             type="button"
             onClick={onDropPin}
-            className="mt-4 flex min-h-14 w-full items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 text-left font-semibold hover:bg-sunken"
+            className="mt-4 flex min-h-14 w-full items-center gap-3 m-card px-4 py-3 text-left font-semibold hover:bg-sunken"
           >
             <span aria-hidden className="grid size-10 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink"><Icon name="pin" className="size-5" /></span>
             Choose a spot on the map

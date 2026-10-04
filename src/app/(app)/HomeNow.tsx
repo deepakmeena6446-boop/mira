@@ -8,7 +8,9 @@ import { cx } from "@/components/ui/cx";
 import { Avatar } from "@/components/app/Avatar";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { RootHeader } from "@/components/mira/Frame";
-import { EvidenceGlyph } from "@/components/mira/Evidence";
+import { Row, RowList } from "@/components/mira/Rows";
+import { SituationChips } from "@/components/mira/Situations";
+import { greetingKey, useT } from "@/lib/i18n";
 import { LiveNowCard, type LiveStat } from "@/components/mira/LiveNow";
 import { HelpNextCard } from "@/components/mira/HelpNext";
 import { api } from "@/lib/api-client";
@@ -22,6 +24,7 @@ import { hoursWords } from "@/lib/brief";
 import { helpWeightsFor, hoursState, isNight, rankHelpPoints, type HelpPoint } from "@/domain/help-points";
 import { localTimeInZone } from "@/domain/opening-hours";
 import { newPlanDraft } from "@/domain/plan-state";
+import { planLine, planTitle } from "@/domain/plan-name";
 import { CATEGORY_LABEL, ageLabel, type SafetyUpdatesData } from "@/domain/safety-updates";
 import type { EvidenceState } from "@/domain/evidence-state";
 import type { HabitSuggestion } from "@/domain/habits";
@@ -33,12 +36,6 @@ type Near = { key: string; help: { points: HelpPoint[]; failed: boolean } | null
 type Contrib = { checks: Array<{ id: string; question: string; placeName: string; options: Array<{ value: string; label: string }> }>; impact: { line: string | null } };
 
 /** Situations, not features: each is something she is about to do. */
-const SITUATIONS = [
-  { href: "/plan?for=go", icon: "route", label: "Going somewhere" },
-  { href: "/plan?for=run", icon: "walk", label: "Run or walk" },
-  { href: "/plan?for=travel", icon: "airport", label: "Travelling" },
-  { href: "/around?check=1", icon: "search", label: "Check a place" },
-];
 
 /**
  * Home (docs/phase1-ux/01). It shows Mira instead of describing her: what is true around you right
@@ -127,7 +124,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
     const list: Noticed[] = [];
     const usual = habit ? places.find((p) => p.id === habit.placeId) : null;
     if (habit && usual) list.push({ id: "habit", icon: "route", tone: "accent", kind: "checked", eyebrow: "Your usual", title: `${usual.label} around now`, detail: `${habit.times} of your journeys at this hour · from your own history`, onOpen: () => startPlanTo(usual) });
-    if (savedPlan) list.push({ id: "plan", icon: "clock", tone: "accent", kind: "checked", eyebrow: "Saved plan", title: savedPlan.draft.activity || "Your saved plan", detail: `${savedPlan.draft.origin.kind === "named" ? savedPlan.draft.origin.query : "From here"} → ${savedPlan.draft.destination.query || "loop"} · ${savedPlan.draft.departureLocal.replace("T", " ")}`, onOpen: () => { setPlanDraft({ ...savedPlan.draft, touched: true }); router.push("/plan"); } });
+    if (savedPlan) list.push({ id: "plan", icon: "clock", tone: "accent", kind: "checked", eyebrow: "Saved plan", title: savedPlan.draft.activity.trim() ? `${savedPlan.draft.activity.trim()} · ${planTitle(savedPlan.draft)}` : planTitle(savedPlan.draft), detail: planLine(savedPlan.draft), onOpen: () => { setPlanDraft({ ...savedPlan.draft, touched: true }); router.push("/plan"); } });
     const data = updates?.key === areaKey ? updates.data : null;
     if (data && data.updates.length) {
       const latest = data.updates[0];
@@ -137,6 +134,14 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [habit, places, savedPlan, updates, areaKey]);
 
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    void api<{ notifications: Array<{ read_at: string | null }> }>("/api/me/notifications").then((r) => { if (live && r.ok) setUnread(r.data.notifications.filter((n) => !n.read_at).length); });
+    return () => { live = false; };
+  }, [user]);
+
   const submitAsk = (text: string) => {
     const t = text.trim();
     if (!t) return;
@@ -145,23 +150,31 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
   };
 
   const greeting = clock ? greetingFor(clock) : null;
+  const t = useT();
   const firstName = user?.name.split(" ")[0];
   const cold = usage === "cold";
 
   return (
-    <div className={cx("m-screen bg-companion", journeyTo !== null && "pb-[calc(var(--tabbar-space)+6rem)]")}>
+    <div className="m-screen bg-companion">
       <div className="m-screen-inner">
         <RootHeader emailAlerts={emailAlerts} leading={<Link href="/" className="mira-wordmark" aria-label="Mira home">mira<span aria-hidden>↗</span></Link>} />
 
         <div className="mt-7 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-[1.625rem] font-semibold leading-tight tracking-[-0.035em]">{greeting ? `${greeting.hello}${firstName ? `, ${firstName}` : ""}` : "Hello"}</h1>
+            <h1 className="text-[1.625rem] font-semibold leading-tight tracking-[-0.035em]">{greeting && clock ? `${t(greetingKey(clock.getHours()))}${firstName ? `, ${firstName}` : ""}` : "Hello"}</h1>
             <p className="mt-0.5 text-[0.875rem] text-ink-muted">
               {journeyTo !== null ? `You’re on your way${journeyTo ? ` to ${journeyTo}` : ""} — I’m with you until you check in.` : cold ? "Here’s what’s true around you right now." : "Here’s what I know around you."}
             </p>
           </div>
           {user ? (
-            <Link href="/me" aria-label="Your profile and settings" className="shrink-0"><Avatar name={user.name} src={user.avatarUrl} size={40} /></Link>
+            <div className="flex shrink-0 items-center gap-2">
+              {/* Updates: a contact accepted, a journey needs you. The count clears when the inbox is opened. */}
+              <Link href="/inbox" aria-label={unread ? `Updates, ${unread} new` : "Updates"} className="relative grid size-10 place-items-center rounded-full bg-surface text-ink ring-1 ring-line">
+                <Icon name="bell" className="size-[18px]" />
+                {unread ? <span aria-hidden className="absolute -right-0.5 -top-0.5 grid min-w-[1.125rem] place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-[1.125rem] text-accent-ink ring-2 ring-canvas">{unread > 9 ? "9+" : unread}</span> : null}
+              </Link>
+              <Link href="/me" aria-label="Your profile and settings"><Avatar name={user.name} src={user.avatarUrl} size={40} /></Link>
+            </div>
           ) : (
             <button type="button" onClick={() => setSignIn(true)} className="min-h-11 shrink-0 rounded-full px-1 text-[0.875rem] font-semibold text-accent-strong">Sign in</button>
           )}
@@ -179,7 +192,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
 
         {/* 3. Mira goes with you: where are you going? */}
         <section aria-labelledby="going-h" className="mt-8">
-          <h2 id="going-h" className="text-[1.0625rem] font-semibold tracking-[-0.015em]">Where are you going?</h2>
+          <h2 id="going-h" className="text-[1.0625rem] font-semibold tracking-[-0.015em]">{t("home.going")}</h2>
           <form onSubmit={(e) => { e.preventDefault(); submitAsk(ask); }} className="m-card mt-2.5 flex items-center gap-2 rounded-[1.5rem] p-1.5 pl-4 focus-within:ring-2 focus-within:ring-accent">
             <span aria-hidden><Icon name="sparkle" className="size-5 text-accent" /></span>
             <label htmlFor="home-ask" className="sr-only">Tell Mira what you’re about to do</label>
@@ -188,34 +201,15 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
               <Icon name="arrow" className="size-5" />
             </button>
           </form>
-          <div className="mt-2.5 grid grid-cols-2 gap-2">
-            {SITUATIONS.map((s) => (
-              <Link key={s.href} href={s.href} className="m-card m-press flex min-h-12 items-center gap-2.5 whitespace-nowrap px-3.5 text-[0.875rem] font-semibold">
-                <Icon name={s.icon} className="size-[18px] text-accent" />{s.label}
-              </Link>
-            ))}
-          </div>
+          <SituationChips className="mt-2.5" />
         </section>
 
         {noticed.length ? (
-          <section aria-labelledby="noticed-h" className="mt-6">
-            <h2 id="noticed-h" className="m-label">Mira noticed</h2>
-            <ul className="mt-2.5 space-y-2.5">
-              {noticed.map((n) => (
-                <li key={n.id}>
-                  <button type="button" onClick={n.onOpen} className="m-card m-press flex w-full items-center gap-3 p-3.5 text-left">
-                    <span aria-hidden className={cx("grid size-10 shrink-0 place-items-center rounded-xl", n.tone === "people" ? "bg-people-soft text-people" : n.tone === "dusk" ? "bg-dusk-soft text-dusk" : "bg-accent-soft text-accent-strong")}><Icon name={n.icon} className="size-5" /></span>
-                    <span className="min-w-0 flex-1">
-                      <span className="m-label inline-flex items-center gap-1.5"><EvidenceGlyph kind={n.kind} />{n.eyebrow}</span>
-                      <span className="block truncate font-semibold">{n.title}</span>
-                      <span className="block truncate text-[0.8125rem] text-ink-muted">{n.detail}</span>
-                    </span>
-                    <Icon name="chevron" className="size-4 text-ink-subtle" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <RowList label={t("home.noticed")} id="noticed-h" className="mt-6">
+            {noticed.map((n) => (
+              <Row key={n.id} icon={n.icon} tone={n.tone} kind={n.kind} eyebrow={n.eyebrow} title={n.title} detail={n.detail} onClick={n.onOpen} ariaLabel={`${n.eyebrow}: ${n.title}`} />
+            ))}
+          </RowList>
         ) : null}
 
         <p className="mt-8 px-1 text-center text-[0.72rem] leading-relaxed text-ink-subtle">Mira never scores a place. Every fact shows where it came from, and what Mira can’t see is said too.</p>

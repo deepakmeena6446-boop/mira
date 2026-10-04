@@ -55,8 +55,8 @@ export function ModerationPanel({ report }: { report: AdminReportDetail }) {
         </Notice>
       ) : null}
 
-      <section aria-labelledby="text-h" className="rounded-[var(--radius-card)] border border-line bg-surface p-5">
-        <h2 id="text-h" className="font-bold">Private description</h2>
+      <section aria-labelledby="text-h" className="m-card p-5">
+        <h2 id="text-h" className="m-h">Private description</h2>
         {!report.hasText ? (
           <p className="mt-2 text-ink-muted">No description was submitted{report.status === "rejected" ? " or it was deleted on rejection" : ""}.</p>
         ) : text === undefined ? (
@@ -79,7 +79,7 @@ export function ModerationPanel({ report }: { report: AdminReportDetail }) {
           </div>
         ) : (
           <div className="mt-2">
-            <p className="whitespace-pre-wrap rounded-[var(--radius-control)] bg-sunken p-3 text-mixed">{text}</p>
+            <p className="whitespace-pre-wrap rounded-xl bg-sunken p-3 text-mixed">{text}</p>
             {text && detectPii(text).length ? (
               <p className="mt-2 text-sm text-ink-muted">Detected: {[...new Set(detectPii(text).map((s) => PII_LABEL[s.type]))].join(", ")}</p>
             ) : null}
@@ -89,7 +89,7 @@ export function ModerationPanel({ report }: { report: AdminReportDetail }) {
           </div>
         )}
         {unresolvedPii && !terminal ? (
-          <div className="mt-4 rounded-[var(--radius-control)] border border-warm/40 bg-warm-soft p-4">
+          <div className="mt-4 rounded-2xl bg-warm-soft p-4">
             <p className="font-semibold">Identifying content detected</p>
             <p className="text-sm text-ink-muted">
               Approval is blocked until the detected spans are redacted. Redaction replaces them with “[removed]” in the private copy. If identifying
@@ -103,8 +103,8 @@ export function ModerationPanel({ report }: { report: AdminReportDetail }) {
       </section>
 
       {!terminal && !report.withdrawn ? (
-        <section aria-labelledby="structured-h" className="rounded-[var(--radius-card)] border border-line bg-surface p-5">
-          <h2 id="structured-h" className="font-bold">Structured fields for aggregation</h2>
+        <section aria-labelledby="structured-h" className="m-card p-5">
+          <h2 id="structured-h" className="m-h">Structured fields for aggregation</h2>
           <p className="mt-1 text-sm text-ink-muted">Only these non-identifying fields can ever contribute to a combined summary. Area: {report.cellId} (fixed).</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
@@ -156,8 +156,8 @@ export function ModerationPanel({ report }: { report: AdminReportDetail }) {
         </section>
       ) : null}
 
-      <section aria-labelledby="actions-h" className="rounded-[var(--radius-card)] border border-line bg-surface p-5">
-        <h2 id="actions-h" className="font-bold">Decision</h2>
+      <section aria-labelledby="actions-h" className="m-card p-5">
+        <h2 id="actions-h" className="m-h">Decision</h2>
         <p className="mt-1 text-sm text-ink-muted">Decisions are about publication, privacy and abuse — not about whether the reporter is telling the truth.</p>
         {terminal ? <p className="mt-3">This report was rejected. Its text was deleted; the record is removed within 24 hours.</p> : null}
 

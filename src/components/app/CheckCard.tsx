@@ -45,17 +45,17 @@ export function CheckCard({ check, onDone }: { check: Pick<CheckView, "id" | "qu
   };
   if (done) {
     return (
-      <p role="status" className="rounded-[var(--radius-card)] bg-surface px-5 py-4 text-sm text-ink-muted shadow-[var(--shadow-card)] animate-rise">
+      <p role="status" className="m-card px-4 py-3.5 text-sm text-ink-muted animate-rise">
         {done}
       </p>
     );
   }
   return (
-    <div className="rounded-[var(--radius-card)] bg-surface p-5 text-left shadow-[var(--shadow-card)] animate-rise">
+    <div className="m-card p-4 text-left animate-rise">
       <p className="font-semibold">{check.question}</p>
       <div className="mt-3 grid grid-cols-3 gap-2">
         {check.options.map((o) => (
-          <button key={o.value} type="button" disabled={state === "sending"} onClick={() => send(o.value)} className="min-h-12 rounded-[var(--radius-button)] border border-line-strong bg-surface px-2 text-sm font-semibold hover:bg-sunken disabled:opacity-60">
+          <button key={o.value} type="button" disabled={state === "sending"} onClick={() => send(o.value)} className="min-h-11 rounded-full bg-surface px-2 text-sm font-semibold ring-1 ring-line-strong hover:bg-sunken disabled:opacity-60">
             {o.label}
           </button>
         ))}

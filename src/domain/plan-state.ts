@@ -47,6 +47,8 @@ export const planDraftSchema = z.object({
   paceMinutesPerKm: paceSchema.optional(),
   destinationCountryIso: z.string().regex(/^[A-Z]{2}$/).nullable().optional(),
   legs: z.array(planLegDraftSchema).max(2).optional(),
+  /** The saved copy this tab plan was opened from, so saving again updates it instead of duplicating. */
+  savedId: z.uuid().optional(),
 }).strict();
 export type PlanDraft = z.infer<typeof planDraftSchema>;
 

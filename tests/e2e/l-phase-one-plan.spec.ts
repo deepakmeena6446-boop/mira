@@ -43,7 +43,6 @@ test("guest retains a future named-origin plan across Around, map, Mira, back an
   await expect(page.getByRole("region", { name: "Your plan", exact: true })).toContainText("North Gate → South Library");
   await expect(page.getByRole("region", { name: "Your plan, at that time" })).toBeVisible();
   await page.goto("/around/map");
-  await expect(page.getByText("Run before dawn · North Gate → South Library")).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("heading", { level: 1, name: "To South Library" })).toBeVisible();
   await page.goto("/mira");
@@ -56,7 +55,7 @@ test("guest retains a future named-origin plan across Around, map, Mira, back an
   await expect(page.getByLabel("Planned local time")).toHaveValue("2026-10-07T04:45");
   expect(queries).toEqual([{ q: "North Gate", near: null, source: "osm" }, { q: "South Library", near: null, source: "osm" }]);
   await page.goto("/around/map");
-  await expect(page.getByText("Run before dawn · North Gate → South Library")).toBeVisible();
+  await expect(page.getByRole("region", { name: "On the map" })).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { geoCalls: number }).geoCalls)).toBe(0);
   await page.goto("/plan/legs");
   expect(await page.evaluate(() => sessionStorage.getItem("mira.plan.v1"))).toContain("North Gate");
@@ -86,6 +85,6 @@ test("opening and leaving an untouched draft keeps the legacy map entry availabl
   await page.goto("/plan/legs");
   await expect(page.getByRole("textbox", { name: "From" })).toHaveValue("");
   await page.goto("/around/map");
-  await expect(page.getByRole("button", { name: /Search a place or address/ })).toBeVisible();
+  await expect(page.getByRole("region", { name: "On the map" }).getByRole("button", { name: /Check a place/ })).toBeVisible();
   await expect(page.getByText("Your plan is still being entered")).toHaveCount(0);
 });

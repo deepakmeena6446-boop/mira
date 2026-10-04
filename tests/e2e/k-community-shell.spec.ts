@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { DEST, newUser } from "./helpers";
 
-test("Home shows Mira live and one-tap contribution; Around briefs a place; legacy Today and map stay usable", async ({ browser }) => {
+test("Home shows Mira live and one-tap contribution; Around briefs a place and opens it on the full map", async ({ browser }) => {
   const { ctx, page } = await newUser(browser, "Amina");
   await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Home", "Mira", "Around", "Journeys"]);
   await expect(page.getByRole("heading", { level: 1, name: /, Amina$/ })).toBeVisible();
@@ -12,12 +12,11 @@ test("Home shows Mira live and one-tap contribution; Around briefs a place; lega
   await page.getByRole("button", { name: "Dark or broken street" }).click();
   await expect(page).toHaveURL(/\/report\?c=environment&from=home$/);
   await expect(page.getByRole("heading", { name: "Dark or broken street" })).toBeVisible();
-  // Legacy Today keeps its local pulse and place check.
-  await page.goto("/today");
-  await expect(page.getByRole("region", { name: "Local pulse" })).toBeVisible();
-  await page.getByRole("button", { name: "Check a place" }).click();
-  await page.getByPlaceholder("Check a place").fill(DEST);
-  await page.getByRole("button", { name: new RegExp(DEST) }).first().click();
+  // Around: check a place by name.
+  await page.goto("/around");
+  await page.getByRole("button", { name: /Check a place/ }).first().click();
+  await page.getByRole("dialog").getByRole("textbox").fill(DEST);
+  await page.getByRole("dialog").getByRole("button", { name: new RegExp(DEST) }).first().click();
   await expect(page).toHaveURL(/\/around$/);
   // Around opens straight into the place's own sky card, then the full map on request.
   await expect(page.getByRole("heading", { name: DEST, exact: true })).toBeVisible();

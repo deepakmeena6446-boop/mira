@@ -5,9 +5,9 @@ import { getSql } from "@/server/db/client";
 import { getUser } from "@/server/session/user";
 import { PlanScreen } from "../PlanScreen";
 
-export const metadata: Metadata = { title: "Return trip and legs" };
+export const metadata: Metadata = { title: "Detailed planner" };
 
-/** The step-based planner: return legs, multi-leg travel and saving a plan with its return. Phase 2 redesigns it. */
+/** The detailed planner: the full options comparison and confirming a changed origin for a private journey. Same language as Plan (docs/phase3). */
 export default async function PlanLegsPage() {
   const user = await getUser(getSql());
   return <PlanScreen emailAlerts={smtpConfigured()} signedIn={Boolean(user)} countries={countryRegistry().map(({ iso2, name }) => ({ iso: iso2, name }))} />;

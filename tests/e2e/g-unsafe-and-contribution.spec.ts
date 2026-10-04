@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { db, fixtureClockedGps, newUser, openRoute, testClientIp, openJourneyMore } from "./helpers";
+import { db, fixtureClockedGps, newUser, openRoute, startJourney, testClientIp, openJourneyMore } from "./helpers";
 
 test.describe("When something feels wrong — instant, deterministic help", () => {
-  test("Today: 'I feel unsafe' shows every action at once, with no Mira call, and walks to a Help Point", async ({ browser }) => {
+  test("Home: 'I feel unsafe' shows every action at once, with no Mira call, and walks to a Help Point", async ({ browser }) => {
     const { ctx, page } = await newUser(browser, "Tara");
-    await page.goto("/today");
+    await page.goto("/");
     const miraCalls: string[] = [];
     page.on("request", (r) => new URL(r.url()).pathname.startsWith("/api/mira") && miraCalls.push(r.url()));
     // Help Points are fetched ahead after her location choice; wait until they're in, then close.
@@ -46,8 +46,7 @@ test.describe("When something feels wrong — instant, deterministic help", () =
   test("Trip: the same sheet offers the live link, and a Help Point shows where it is", async ({ browser }) => {
     const { ctx, page } = await newUser(browser, "Ira");
     await openRoute(page);
-    await page.getByRole("button", { name: /Go with Mira/ }).click();
-    await page.waitForURL("**/trip");
+    await startJourney(page);
     await expect(page.getByText(/Nearest Help Point/)).toBeVisible();
     await page.getByRole("button", { name: "I feel unsafe" }).click();
     const sheet = page.getByRole("dialog", { name: "Right now" });
@@ -66,12 +65,14 @@ test.describe("Journeys that aren't walks", () => {
   test("by auto or cab: she picks the ETA, and the journey screen says how she's travelling", async ({ browser }) => {
     const { ctx, page } = await newUser(browser, "Meher");
     await openRoute(page);
-    await page.getByRole("radio", { name: "Ride / car" }).click();
+    await page.getByRole("button", { name: "Edit" }).click();
+    await page.getByRole("radio", { name: "Taxi / ride" }).click();
     // No provider driving time in the E2E env (OSM placeholder): she chooses when to expect to arrive.
-    await expect(page.getByText("The driving time from here is not known.")).toBeVisible();
-    await page.getByRole("radio", { name: "45 min" }).click();
-    await expect(page.getByText(/expected in 45 min/)).toBeVisible();
-    await page.getByRole("button", { name: /Go with Mira/ }).click();
+    await page.getByRole("button", { name: "Go with Mira" }).click();
+    const go = page.getByRole("dialog", { name: "Go with Mira" });
+    await expect(go).toContainText("When do you expect to arrive?");
+    await go.getByRole("button", { name: "45 min" }).click();
+    await go.getByRole("button", { name: /^Start/ }).click();
     await page.waitForURL("**/trip");
     await expect(page.getByRole("heading", { name: /by car or taxi/ })).toBeVisible();
     const [trip] = await db`SELECT mode, eta_at, created_at FROM journeys ORDER BY created_at DESC LIMIT 1`;
@@ -92,8 +93,7 @@ test.describe("After — one tiny factual contribution", () => {
     await fixtureClockedGps(page);
     await page.clock.setFixedTime(night);
     await openRoute(page);
-    await page.getByRole("button", { name: /Go with Mira/ }).click();
-    await page.waitForURL("**/trip");
+    await startJourney(page);
     await openJourneyMore(page);
     await page.getByRole("button", { name: "End trip without arriving" }).click();
     await page.getByRole("button", { name: "End trip", exact: true }).click();
@@ -114,9 +114,8 @@ test.describe("Degraded states are honest", () => {
     const page = await ctx.newPage();
     await page.goto("/");
     await expect(page.getByRole("region", { name: "Right now, around you" })).toBeVisible();
-    await page.goto("/today");
-    await expect(page.getByRole("button", { name: /Use my location for local context|Location is off for Mira/ })).toBeVisible();
-    await page.getByRole("button", { name: "Use my location for local context" }).click();
+    await page.getByRole("region", { name: "Right now, around you" }).getByRole("button", { name: "Use my location" }).click();
+    await expect(page.getByRole("region", { name: "Right now, around you" })).toContainText("Location is off for Mira");
     // Country not known (location off): Emergency is still one tap away, without an invented dial number.
     await page.getByRole("button", { name: "Emergency options" }).first().click();
     const options = page.getByRole("dialog", { name: "Emergency call options" });
@@ -126,8 +125,8 @@ test.describe("Degraded states are honest", () => {
     await page.getByRole("button", { name: "I feel unsafe" }).click();
     await expect(page.getByText("Turn on location to see Help Points near you.")).toBeVisible();
     await page.getByRole("button", { name: "I'm okay now" }).click();
-    await page.getByRole("button", { name: "Check a place" }).click();
-    await page.getByPlaceholder("Check a place").fill("Vishwavidyalaya");
+    await page.getByRole("region", { name: "Right now, around you" }).getByRole("link", { name: "Check a place" }).click();
+    await page.getByRole("dialog").getByRole("textbox").fill("Vishwavidyalaya");
     await expect(page.getByRole("button", { name: /Vishwavidyalaya/ }).first()).toBeVisible();
     await ctx.close();
   });

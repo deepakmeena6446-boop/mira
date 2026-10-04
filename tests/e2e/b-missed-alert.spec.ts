@@ -6,11 +6,13 @@ async function shareTrip(browser: Browser, name: string, accept: boolean) {
   const address = await addContact(owner.page, "Didi", "didi");
   const contact = accept ? await acceptContactInvite(browser, address) : null;
   await openRoute(owner.page);
+  await owner.page.getByRole("button", { name: "Go with Mira" }).click();
+  const go = owner.page.getByRole("dialog", { name: "Go with Mira" });
   if (accept) {
-    await expect(owner.page.getByRole("checkbox", { name: /Didi/ })).not.toBeChecked();
-    await owner.page.getByRole("checkbox", { name: /Didi/ }).check();
-  } else await expect(owner.page.getByRole("checkbox", { name: /Didi/ })).toHaveCount(0);
-  await owner.page.getByRole("button", { name: /Go with Mira/ }).click();
+    await expect(go.getByRole("button", { name: "Didi", exact: true })).toHaveAttribute("aria-pressed", "false");
+    await go.getByRole("button", { name: "Didi", exact: true }).click();
+  } else await expect(go.getByRole("button", { name: "Didi", exact: true })).toHaveCount(0);
+  await go.getByRole("button", { name: /^Start/ }).click();
   await owner.page.waitForURL("**/trip");
   const { trip } = await (await owner.page.request.get("/api/trips/current")).json();
   expect(trip.sharedWith.map((recipient: { name: string }) => recipient.name)).toEqual(accept ? ["Didi"] : []);

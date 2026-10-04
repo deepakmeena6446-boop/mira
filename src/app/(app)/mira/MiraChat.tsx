@@ -23,7 +23,8 @@ import { circleSharingLine } from "@/domain/companion-output";
 import { clockIn } from "@/domain/daylight";
 import { useDaypart } from "@/lib/daypart-store";
 import { hasPlanWork, intentFromDraft, intentFromLeg, newPlanDraft } from "@/domain/plan-state";
-import { setPlanDraft, usePlanDraft, usePlanHydrated } from "@/lib/plan-store";
+import { clearPlanDraft, setPlanDraft, usePlanDraft, usePlanHydrated } from "@/lib/plan-store";
+import { planTitle, whenWords } from "@/domain/plan-name";
 import { draftFromAsk } from "@/domain/plan-ask";
 import { askUsesPlan, shouldSeedPlan, immediateSupportIntent } from "@/domain/ask-routing";
 
@@ -342,7 +343,8 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   const empty = (user ? loaded : true) && msgs.length === 0;
   const night = useDaypart() === "night";
   const starters = night ? [...NIGHT_STARTERS, ...STARTERS] : STARTERS;
-  const planLine = plan ? `${plan.origin.kind === "device" ? "From where you are" : plan.origin.query}${plan.loop ? " · loop" : ` → ${plan.destination?.query}`}` : planDraft?.activity || "A plan in progress";
+  // The same name the plan has in Plan, Home and Journeys, so it is clear which plan Mira means.
+  const planLine = planDraft ? [planTitle(planDraft), planDraft.departureLocal && planDraft.timeZone ? whenWords(planDraft.departureLocal, planDraft.timeZone) : null].filter(Boolean).join(" · ") : "A plan in progress";
 
   return (
     <div className="flex h-dvh flex-col bg-canvas">
@@ -357,6 +359,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
                 <p className="truncate text-xs text-ink-muted">Movement plan questions use checked evidence and are not saved to chat history.</p>
               </div>
               <Link href="/plan" className="min-h-10 shrink-0 rounded-full bg-surface px-3 py-2 text-sm font-semibold text-accent-strong">Open</Link>
+              <button type="button" onClick={clearPlanDraft} aria-label="Start a new plan" title="New plan" className="grid size-10 shrink-0 place-items-center rounded-full bg-surface text-accent-strong"><Icon name="plus" className="size-[18px]" /></button>
             </div>
           ) : null}
         </div>

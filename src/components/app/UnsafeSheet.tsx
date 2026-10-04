@@ -197,13 +197,13 @@ export function UnsafeSheet({
           ) : null}
         </div>
 
-        {change ? <button type="button" onClick={change.onReview} className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-card)] border border-line p-4 text-left"><Icon name="route" className="shrink-0" /><span className="min-w-0"><span className="block font-semibold">{change.label}</span><span className="block text-sm text-ink-muted">{change.detail}</span></span></button> : null}
+        {change ? <button type="button" onClick={change.onReview} className="m-card m-press mt-3 flex min-h-12 w-full items-center gap-3 p-4 text-left"><span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-xl bg-sunken text-ink"><Icon name="route" className="size-5" /></span><span className="min-w-0"><span className="block font-semibold">{change.label}</span><span className="block text-sm text-ink-muted">{change.detail}</span></span></button> : null}
 
         {/* 2. Tell people */}
         {tell ? <TellMyPeople tell={tell} /> : peopleLoading ? <p role="status" className="mt-3 text-sm text-ink-muted">Checking your Circle…</p> : null}
         {share ? (
-          <button type="button" onClick={() => void share.onShare()} className="mt-3 flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-line p-4 text-left">
-            <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink">
+          <button type="button" onClick={() => void share.onShare()} className="m-card m-press mt-3 flex w-full items-center gap-3 p-4 text-left">
+            <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-xl bg-sunken text-ink">
               <Icon name="share" />
             </span>
             <span className="min-w-0 flex-1">

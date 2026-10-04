@@ -45,7 +45,7 @@ export function HelpPointList({ points, evidence, onPick, defaultOpen = false }:
         <p className="mt-2 text-sm text-ink-muted">{helpPointsLine(points, evidence)}. Other places may exist.</p>
       ) : (
         <>
-          <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="mt-2 flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5 text-left">
+          <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="mt-2 flex min-h-12 w-full items-center gap-3 m-card px-4 py-2.5 text-left">
             <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink">
               <Icon name={HELP_ICON[nearest.cls] ?? "pin"} className="size-[18px]" />
             </span>
@@ -58,7 +58,7 @@ export function HelpPointList({ points, evidence, onPick, defaultOpen = false }:
             <Icon name="chevron" className={open ? "size-4 rotate-90 transition-transform" : "size-4 transition-transform"} />
           </button>
           {open ? (
-            <ul className="mt-2 divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
+            <ul className="mt-2 divide-y divide-line overflow-hidden m-card">
               {points.map((p) => (
                 <li key={p.id}>
                   <button type="button" disabled={!onPick} onClick={() => onPick?.(p)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left enabled:hover:bg-sunken">

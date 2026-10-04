@@ -33,11 +33,10 @@ test("guest Home shows Mira live, opens Plan, Mira and Around without requesting
   await expect(page).toHaveURL(/\/around$/);
   await expect(page.getByRole("region", { name: "Right now, around you" })).toBeVisible();
   await page.goto("/around/map");
-  await expect(page).toHaveURL(/\/around\/map$/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
   expect(await page.evaluate(() => (window as unknown as { geoCalls: number }).geoCalls)).toBe(0);
   expect(await page.evaluate(() => localStorage.getItem("mira.location.skip"))).toBeNull();
-  await page.getByRole("button", { name: "Use my location for local context", exact: true }).click();
+  await page.getByRole("region", { name: "On the map" }).getByRole("button", { name: "Use my location" }).click();
   expect(await page.evaluate(() => (window as unknown as { geoCalls: number }).geoCalls)).toBe(1);
   expect(await page.evaluate(() => localStorage.getItem("mira.location.skip"))).toBe("0");
 });
@@ -57,14 +56,19 @@ test("signed-in person explicitly saves, opens and deletes a plan without starti
   await page.getByRole("button", { name: /Saved plan.*Visit the museum/ }).click();
   await expect(page).toHaveURL(/\/plan$/);
   await expect(page.getByText("Which “Central Station” did you mean? Tap to choose.")).toBeVisible();
+  // Journeys lists the saved plan Home just opened once — as this tab's plan, by its derived name.
   await page.goto("/trips");
-  await expect(page.getByRole("region", { name: "Saved plans" })).toContainText("Visit the museum");
-  await page.getByRole("region", { name: "Saved plans" }).getByRole("link", { name: "Open plan" }).click();
+  const upcoming = page.getByRole("region", { name: "Coming up" });
+  await expect(upcoming).toContainText("Visit the museum");
+  await expect(upcoming).toContainText("Saved · open now");
+  await expect(upcoming.getByRole("button", { name: /^Open plan/ })).toHaveCount(0);
+  await upcoming.getByRole("link", { name: "Continue plan: To Museum" }).click();
   await expect(page).toHaveURL(/\/plan$/);
   await expect(page.getByText("Which “Museum” did you mean? Tap to choose.")).toBeVisible();
   await page.goto("/trips");
-  await page.getByRole("region", { name: "Saved plans" }).getByRole("button", { name: "Delete plan" }).click();
-  await expect(page.getByRole("region", { name: "Saved plans" })).toContainText("No saved plans.");
+  await upcoming.getByRole("button", { name: "Delete plan" }).click();
+  await expect(upcoming).toContainText("In this tab");
+  expect((await (await page.request.get("/api/me/plans")).json()).plans).toHaveLength(0);
   await expect(page.getByText("No journey right now")).toBeVisible();
   await owner.ctx.close();
 });

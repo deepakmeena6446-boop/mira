@@ -28,6 +28,9 @@ export function JourneyDock({ trip }: { trip: DockTrip | null }) {
   const title = !trip ? "Private check-in running" : missed ? "Check-in due — are you okay?" : trip.destination ? `On your way to ${trip.destination}` : "Sharing where you are";
   const detail = !trip ? "On this device only · no location" : [left === null ? null : left > 0 ? `${left} min left` : "ETA passed", trip.following.length ? `${trip.following.join(", ")} can follow` : "Only people you send your link to can follow"].filter(Boolean).join(" · ");
   return (
+    <>
+    {/* The dock floats over the page; this spacer lets every screen scroll its last row clear of it. */}
+    <div aria-hidden className="h-20" />
     <div className="m-dock">
       <Link href={trip ? "/trip" : "/trip/local"} aria-label={`Open your journey: ${title}`} className={cx("mx-auto flex max-w-xl items-center gap-3 rounded-full py-2 pl-4 pr-2 shadow-[var(--shadow-float)] ring-1", missed ? "bg-warm-soft ring-warm/40" : "bg-surface ring-line")}>
         <MiraPulse size={16} state={missed ? "attention" : "with-you"} ambient />
@@ -40,5 +43,6 @@ export function JourneyDock({ trip }: { trip: DockTrip | null }) {
         </span>
       </Link>
     </div>
+    </>
   );
 }

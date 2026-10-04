@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { GEO, SAME_ORIGIN, adminPage, apiReport, db, newUser, nextIstMonday, openRoute, runAggregation } from "./helpers";
+import { GEO, SAME_ORIGIN, adminPage, apiReport, db, newUser, nextIstMonday, runAggregation } from "./helpers";
 
 const HERE = { lat: GEO.latitude, lon: GEO.longitude };
 
@@ -67,14 +67,10 @@ test.describe("Reports — private until reviewed, public only as thresholded no
     expect(json.notes).toHaveLength(1);
     expect(json.notes[0].text).toBe("Multiple reviewed observations mention poor lighting in this area during late hours.");
     expect(JSON.stringify(json)).not.toMatch(/Dark stretch|SECRET|harassment|actor|report_id/i);
-    // Released, thresholded notes now make the community visible on Today; the lone report stays private.
-    await me.page.goto("/today");
-    await expect(me.page.getByRole("heading", { name: /Today/ })).toBeVisible();
-    await expect(me.page.getByRole("region", { name: "Local pulse" }).getByText(/poor lighting in this area/)).toBeVisible();
+    // Released, thresholded notes make the community visible in Around; the lone report stays private.
+    await me.page.goto("/around");
+    await expect(me.page.getByRole("region", { name: "From people here" }).getByText(/poor lighting in this area/)).toBeVisible();
     await expect(me.page.locator("main")).not.toContainText("SECRET-SINGLE-REPORT");
-    await openRoute(me.page);
-    await expect(me.page.getByText(/poor lighting in this area/)).toBeVisible();
-    await expect(me.page.getByText(/Why am I seeing this\?/)).toBeVisible();
     await admin.context().close();
     await me.ctx.close();
   });

@@ -44,12 +44,12 @@ export function InstallCard({ variant, onDismiss }: { variant: "row" | "card"; o
 
   if (variant === "row") {
     return (
-      <div className="px-5 py-2">
-        <button type="button" onClick={install} className="flex min-h-12 w-full items-center gap-3 text-left">
-          <Icon name="plus" className="size-5 text-accent" />
+      <div className="px-4 py-3">
+        <button type="button" onClick={install} className="m-press flex min-h-12 w-full items-center gap-3 text-left">
+          <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent-strong"><Icon name="plus" className="size-[18px]" /></span>
           <span className="flex-1">
             <span className="block font-semibold">Install Mira</span>
-            <span className="block text-sm text-ink-muted">Opens in one tap, full screen, like any app</span>
+            <span className="block text-[0.8125rem] leading-snug text-ink-muted">Opens in one tap, full screen, like any app</span>
           </span>
           <Icon name="chevron" className="size-4 text-ink-subtle" />
         </button>
@@ -59,7 +59,7 @@ export function InstallCard({ variant, onDismiss }: { variant: "row" | "card"; o
   }
 
   return (
-    <div className="mt-4 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-card)] animate-rise">
+    <div className="mt-4 m-card p-4 shadow-[var(--shadow-card)] animate-rise">
       <div className="flex items-start gap-3">
         <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-accent"><Icon name="plus" className="size-5" /></span>
         <div className="min-w-0 flex-1">

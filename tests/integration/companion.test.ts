@@ -288,7 +288,7 @@ describe("Journey companion: time zones, habits, Trips", () => {
     const mail = (await mailsTo(email)).find((m) => m.Subject.includes("sharing a trip"))!;
     const text = await mailText(mail.ID);
     expect(text).toMatch(/is on the way by transit to Home/);
-    expect(text).toMatch(/around \d{1,2}:\d{2} [ap]m E[DS]T, their time/);
+    expect(text).toMatch(/around \d{1,2}:\d{2} [AP]M E[DS]T, their time/);
     expect(text).not.toMatch(/IST|auto or cab|metro or bus/);
     const token = /\/t\/([A-Za-z0-9_-]+)/.exec(text)![1];
 

@@ -7,7 +7,7 @@ import { haversineMeters } from "@/domain/pilot";
 import { getEnv } from "@/server/config/env";
 import { badRequest, forbidden } from "@/server/http/errors";
 import type { GeoProvider } from "@/server/providers/geo";
-import { PLACE_KEY_RE, decidePending, placeSignalsFor, recordPlaceSignal, type ReceiptOutcome } from "./receipts";
+import { PLACE_KEY_RE, decidePending, notifyConfirmedContributions, placeSignalsFor, recordPlaceSignal, type ReceiptOutcome } from "./receipts";
 import { prepareChecks } from "./checks";
 
 export { captureCheckEvidence, prepareChecks, listChecks, answerCheck, type CheckView } from "./checks";
@@ -101,8 +101,9 @@ export async function placeStatusFor(sql: postgres.Sql, placeKeys: string[], at:
 // ── Worker ──────────────────────────────────────────────────────────────────────────
 
 /** The `contributions` worker job: prepare captured checks, then decide/expire pending receipts. */
-export async function runContributionsJob(sql: postgres.Sql, geo: GeoProvider, now: Date): Promise<{ checksReady: number; checksNone: number; checked: number; verified: number; contradicted: number }> {
+export async function runContributionsJob(sql: postgres.Sql, geo: GeoProvider, now: Date): Promise<{ checksReady: number; checksNone: number; checked: number; verified: number; contradicted: number; announced: number }> {
   const prepared = await prepareChecks(sql, geo, now, { limit: 20 });
   const decided = await decidePending(sql, now, 300);
-  return { checksReady: prepared.ready, checksNone: prepared.none, ...decided };
+  const announced = await notifyConfirmedContributions(sql, now);
+  return { checksReady: prepared.ready, checksNone: prepared.none, ...decided, announced };
 }

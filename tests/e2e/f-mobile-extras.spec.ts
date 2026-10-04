@@ -37,13 +37,13 @@ test.describe("Mobile extras — long-press report, inbox, time of day, installa
     const owner = await newUser(browser, "Kiran");
     const address = await addContact(owner.page, "Maa", "maa");
     const contact = await acceptContactInvite(browser, address);
-    await owner.page.goto("/today");
+    await owner.page.goto("/");
     await expect(owner.page.getByRole("link", { name: "Updates, 2 new" })).toBeVisible(); // welcome + accepted
     await owner.page.getByRole("link", { name: /Updates/ }).click();
     await expect(owner.page.getByRole("heading", { name: "Updates" })).toBeVisible();
     await expect(owner.page.getByText("Maa accepted your invite")).toBeVisible();
     await expect(owner.page.getByText("Welcome to MIRA, Kiran")).toBeVisible();
-    await owner.page.goto("/today");
+    await owner.page.goto("/");
     await expect(owner.page.getByRole("link", { name: "Updates", exact: true })).toBeVisible(); // read now
     await owner.ctx.close();
     await contact.ctx.close();

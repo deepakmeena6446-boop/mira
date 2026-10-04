@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
+import { useT } from "@/lib/i18n";
 import { useCountry } from "@/lib/locale-store";
 import { useOverlay } from "@/lib/use-overlay";
 import { emergencyActions, emergencyStatusNote, noNumberReason, type CountryContext } from "@/domain/country-context";
@@ -16,6 +17,7 @@ export function EmergencyPill({ className, variant = "pill" }: { className?: str
   const actions = emergencyActions(country);
   const direct = actions.length === 1 && actions[0].scope === "all" ? actions[0] : null;
   const [explain, setExplain] = useState(false);
+  const t = useT();
   const styles = {
     pill: "inline-flex min-h-12 shrink-0 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-sm font-semibold text-ink shadow-[var(--shadow-float)]",
     quiet: "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[0.8125rem] font-semibold text-ink ring-[1.5px] ring-ink/80",
@@ -28,8 +30,10 @@ export function EmergencyPill({ className, variant = "pill" }: { className?: str
     return <a href={`tel:${direct.number}`} aria-label={`Emergency call, ${direct.number}`} className={cx(styles, className)}>{icon}<span>{variant === "link" ? `call ${direct.number}` : `Emergency ${direct.number}`}</span></a>;
   }
   return <>
-    <button type="button" onClick={() => setExplain(true)} aria-haspopup="dialog" className={cx(styles, className)}>
-      {icon}<span>{actions.length === 1 && actions[0].scope === "service" ? `${actions[0].label} ${actions[0].number}` : "Emergency options"}</span>
+    {/* In the compact header the unknown-country label is just "Emergency" so the Support pair stays on one line
+        beside any title; the accessible name still says it opens options. */}
+    <button type="button" onClick={() => setExplain(true)} aria-haspopup="dialog" aria-label={variant === "quiet" && !(actions.length === 1 && actions[0].scope === "service") ? "Emergency options" : undefined} className={cx(styles, className)}>
+      {icon}<span>{actions.length === 1 && actions[0].scope === "service" ? `${actions[0].label} ${actions[0].number}` : variant === "quiet" ? t("support.emergency") : "Emergency options"}</span>
     </button>
     <EmergencyOptionsSheet open={explain} onClose={() => setExplain(false)} country={country} actions={actions} />
   </>;

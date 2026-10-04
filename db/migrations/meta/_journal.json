@@ -176,6 +176,13 @@
       "when": 1790996236560,
       "tag": "0024_trip_recipient_delivery",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791056682673,
+      "tag": "0025_contribution_notified",
+      "breakpoints": true
     }
   ]
 }

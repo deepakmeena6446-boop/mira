@@ -4,31 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
+import { useT } from "@/lib/i18n";
 
 /**
  * Phase 1 roots (docs/phase1-ux/01 §2): Home · Mira · Around · Journeys. Plan is a flow opened from a
  * situation, Profile is the avatar on Home, and Support (I feel unsafe · Emergency) sits on every root.
- * `NEXT_PUBLIC_MIRA_GO_ENTRY=go` restores Go · Journeys · You; `=legacy` the five-tab Today.
  */
 const TABS = [
-  { href: "/", label: "Home", icon: "home", match: ["/", "/today", "/plan"] },
-  { href: "/mira", label: "Mira", icon: "sparkle", match: ["/mira"] },
-  { href: "/around", label: "Around", icon: "pin", match: ["/around", "/contribute", "/report"] },
-  { href: "/trips", label: "Journeys", icon: "route", match: ["/trips", "/trip"] },
+  { href: "/", label: "Home", key: "tab.home", icon: "home", match: ["/", "/plan", "/me", "/circle", "/privacy", "/inbox"] },
+  { href: "/mira", label: "Mira", key: "tab.mira", icon: "sparkle", match: ["/mira"] },
+  { href: "/around", label: "Around", key: "tab.around", icon: "pin", match: ["/around", "/contribute", "/report"] },
+  { href: "/trips", label: "Journeys", key: "tab.journeys", icon: "route", match: ["/trips", "/trip"] },
 ] as const;
-const GO_TABS = [
-  { href: "/", label: "Go", icon: "home", match: ["/", "/today", "/plan", "/around", "/mira", "/contribute", "/report"] },
-  { href: "/trips", label: "Journeys", icon: "route", match: ["/trips", "/trip"] },
-  { href: "/me", label: "You", icon: "user", match: ["/me", "/circle", "/inbox", "/privacy"] },
-] as const;
-const LEGACY_TABS = [
-  { href: "/", label: "Today", icon: "home", match: ["/", "/today", "/trips", "/trip"] },
-  { href: "/around", label: "Around", icon: "pin", match: ["/around"] },
-  { href: "/mira", label: "Mira", icon: "sparkle", match: ["/mira"] },
-  { href: "/contribute", label: "Contribute", icon: "contribute", match: ["/contribute", "/report"] },
-  { href: "/me", label: "You", icon: "user", match: ["/me", "/circle", "/inbox", "/privacy"] },
-] as const;
-
 function active(path: string, match: readonly string[]) {
   return match.some((m) => (m === "/" ? path === "/" : path === m || path.startsWith(`${m}/`)));
 }
@@ -39,23 +26,23 @@ function active(path: string, match: readonly string[]) {
  */
 export function TabBar() {
   const path = usePathname() ?? "/";
-  const entry = process.env.NEXT_PUBLIC_MIRA_GO_ENTRY;
-  const tabs = entry === "legacy" ? LEGACY_TABS : entry === "go" ? GO_TABS : TABS;
+  const tabs = TABS;
+  const t = useT();
   return (
     <nav aria-label="Main" className="mira-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
-      <ul className={cx("mx-auto grid h-[var(--tabbar-h)] max-w-xl", tabs.length === 3 ? "grid-cols-3" : tabs.length === 4 ? "grid-cols-4" : "grid-cols-5")}>
-        {tabs.map((t) => {
-          const on = active(path, t.match);
+      <ul className="mx-auto grid h-[var(--tabbar-h)] max-w-xl grid-cols-4">
+        {tabs.map((tab) => {
+          const on = active(path, tab.match);
           return (
-            <li key={t.href} className="relative">
+            <li key={tab.href} className="relative">
               <Link
-                href={t.href}
+                href={tab.href}
                 aria-current={on ? "page" : undefined}
                 className={cx("flex min-h-12 h-full flex-col items-center justify-center gap-1 text-[0.72rem] font-medium transition-colors duration-150", on ? "text-accent" : "text-ink-muted hover:text-ink")}
               >
                 {on ? <span aria-hidden className="absolute inset-x-5 top-0 h-0.5 rounded-b-full bg-accent" /> : null}
-                <Icon name={t.icon} className="size-[22px]" />
-                <span className="max-w-full truncate px-0.5">{t.label}</span>
+                <Icon name={tab.icon} className="size-[22px]" />
+                <span className="max-w-full truncate px-0.5">{t(tab.key)}</span>
               </Link>
             </li>
           );

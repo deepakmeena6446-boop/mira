@@ -143,7 +143,7 @@ test("S4 arrival check-in and explicit return are two private confirmed journeys
     const { intent } = route.request().postDataJSON() as { intent: MovementIntent };
     await route.fulfill({ json: fixtureOptions(intent) });
   });
-  await owner.page.goto("/around/map");
+  await owner.page.goto("/plan?planStep=options");
   await owner.page.getByRole("radio", { name: "Use foreground location" }).check();
   await owner.page.getByRole("button", { name: "Start chosen journey" }).click();
   await expect(owner.page.getByText("Nobody is notified.", { exact: false })).toBeVisible();
@@ -155,18 +155,19 @@ test("S4 arrival check-in and explicit return are two private confirmed journeys
   const arrived = (await (await owner.page.request.get("/api/trips/current")).json()).trip;
   expect(arrived).toMatchObject({ state: "arrived", sharedWith: [] });
   await owner.page.getByRole("button", { name: "Review return journey" }).click();
-  await expect(owner.page).toHaveURL(/\/plan(\/legs)?\?planStep=options$/);
-  await expect(owner.page.getByRole("region", { name: "Plan options" })).toBeVisible();
+  // The return opens in Plan, as its own brief; the arrival leg stays with it.
+  await expect(owner.page).toHaveURL(/\/plan$/);
+  await expect(owner.page.getByRole("heading", { level: 1, name: "To Station" })).toBeVisible();
   const retained = await owner.page.evaluate(() => JSON.parse(sessionStorage.getItem("mira.plan.v1") ?? "null")?.draft);
   expect(retained.origin.query).toBe("Venue"); expect(retained.destination.query).toBe("Station");
   expect(retained.legs[0].label).toBe("Arrive at event");
   expect(retained.timeZone).toBe("Asia/Kolkata");
   expect((await (await owner.page.request.get("/api/trips/current")).json()).trip).toMatchObject({ id: arrived.id, state: "arrived" });
-  await owner.page.getByRole("radio", { name: "Use foreground location" }).check();
-  await owner.page.getByRole("button", { name: "Start chosen journey" }).click();
-  await expect(owner.page.getByText("Nobody is notified.", { exact: false })).toBeVisible();
+  await owner.page.getByRole("button", { name: /^(Go with Mira|Go now)$/ }).click();
+  const go = owner.page.getByRole("dialog", { name: "Go with Mira" });
+  await expect(go).toContainText("Nobody is contacted.");
   expect((await (await owner.page.request.get("/api/trips/current")).json()).trip).toMatchObject({ id: arrived.id, state: "arrived" });
-  await owner.page.getByRole("button", { name: "Confirm start" }).click();
+  await go.getByRole("button", { name: "Start — just me" }).click();
   await owner.page.waitForURL("**/trip");
   const returning = (await (await owner.page.request.get("/api/trips/current")).json()).trip;
   expect(returning.id).not.toBe(arrived.id);

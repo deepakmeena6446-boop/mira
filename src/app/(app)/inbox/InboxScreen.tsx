@@ -1,20 +1,22 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MiraPulse } from "@/components/app/MiraPulse";
 import { Icon } from "@/components/ui/Icon";
-import { cx } from "@/components/ui/cx";
+import { SafetyAccess } from "@/components/app/SafetyAccess";
+import { StateNote } from "@/components/mira/Frame";
+import { Row, RowList, type RowTone } from "@/components/mira/Rows";
 import { api } from "@/lib/api-client";
 import { useClock } from "@/lib/location-store";
 import type { InboxItem } from "@/server/providers/notify";
 
-const ICON: Record<string, string> = {
-  welcome: "sparkle",
-  contact_accepted: "check-circle",
-  trip_missed: "timer",
-  location_paused: "wifi-off",
+const KIND: Record<string, { icon: string; tone: RowTone }> = {
+  welcome: { icon: "sparkle", tone: "accent" },
+  contact_accepted: { icon: "check-circle", tone: "people" },
+  trip_missed: { icon: "timer", tone: "warm" },
+  trip_alert_failed: { icon: "info", tone: "warm" },
+  location_paused: { icon: "wifi-off", tone: "warm" },
+  contribution_confirmed: { icon: "community", tone: "people" },
 };
 
 function ago(iso: string, now: number): string {
@@ -25,54 +27,37 @@ function ago(iso: string, now: number): string {
   return new Date(iso).toLocaleDateString([], { day: "numeric", month: "short" });
 }
 
-/** Updates from Mira: contacts accepting, missed check-ins, paused location. */
-export function InboxScreen({ signedIn, initial }: { signedIn: boolean; initial: InboxItem[] }) {
+/** Updates from Mira (docs/phase2-ux/00 §4): contacts accepting, missed check-ins, paused location. */
+export function InboxScreen({ signedIn, initial, emailAlerts }: { signedIn: boolean; initial: InboxItem[]; emailAlerts: boolean }) {
   const router = useRouter();
   const now = useClock()?.getTime() ?? null; // null during server render: times appear after hydration
   const hasUnread = initial.some((n) => !n.read_at);
   useEffect(() => {
-    // Opening the inbox reads everything; the badge on Home clears next time it loads.
+    // Opening the inbox reads everything; the bell on Home clears next time it loads.
     if (hasUnread) void api("/api/me/notifications", { body: {} });
   }, [hasUnread]);
 
   return (
-    <div className="bg-companion min-h-dvh px-4 pb-[calc(var(--tabbar-space)+2rem)] pt-[max(1rem,env(safe-area-inset-top))]">
-      <div className="mx-auto max-w-xl">
-        <header className="flex items-center gap-3 py-2">
-          <button type="button" onClick={() => (window.history.length > 1 ? router.back() : router.push("/"))} aria-label="Back" className="grid size-11 place-items-center rounded-full bg-surface shadow-[var(--shadow-card)]">
-            <Icon name="back" className="size-5" />
-          </button>
-          <h1 className="text-2xl font-semibold">Updates</h1>
+    <div className="m-screen bg-companion">
+      <div className="m-screen-inner">
+        <header className="flex items-center justify-between gap-3">
+          <button type="button" onClick={() => (window.history.length > 1 ? router.back() : router.push("/"))} aria-label="Back" className="grid size-11 shrink-0 place-items-center rounded-full bg-surface ring-1 ring-line"><Icon name="back" className="size-5" /></button>
+          <SafetyAccess emailAlerts={emailAlerts} compact className="min-w-0" />
         </header>
+        <h1 className="m-display mt-5">Updates</h1>
+        <p className="mt-1 text-[0.95rem] text-ink-muted">When someone accepts your invite, or a journey needs you. Never anything about where you are.</p>
 
         {!signedIn ? (
-          <p className="mt-6 text-ink-muted">Sign in to get updates from Mira about your trips and trusted contacts.</p>
+          <StateNote className="mt-6" title="Sign in for updates">Mira tells you here about your journeys and the people in your Circle.</StateNote>
         ) : initial.length === 0 ? (
-          <div className="mt-16 flex flex-col items-center text-center animate-rise">
-            <MiraPulse size={24} />
-            <p className="mt-4 text-lg font-semibold">All quiet</p>
-            <p className="mt-1 max-w-xs text-ink-muted">I&apos;ll let you know here when a contact accepts, or if something needs your attention on a trip.</p>
-          </div>
+          <StateNote className="mt-6" title="All quiet">I’ll let you know here when a contact accepts, or if something needs your attention on a journey.</StateNote>
         ) : (
-          <ul className="mt-4 space-y-2.5">
+          <RowList label={hasUnread ? `${initial.filter((n) => !n.read_at).length} new` : "Latest"} id="updates-h" className="mt-7">
             {initial.map((n) => {
-              const body = (
-                <div className="flex gap-3">
-                  <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-sunken text-ink"><Icon name={ICON[n.kind] ?? "info"} className="size-5" /></span>
-                  <div className="min-w-0 flex-1">
-                    <p className="flex items-baseline justify-between gap-2">
-                      <span className="font-semibold leading-snug">{n.title}</span>
-                      <span className="shrink-0 text-xs text-ink-subtle">{now ? ago(n.created_at, now) : ""}</span>
-                    </p>
-                    <p className="text-sm text-ink-muted text-mixed">{n.body}</p>
-                  </div>
-                  {!n.read_at ? <span className="mt-1.5 size-2.5 shrink-0 rounded-full bg-accent" aria-label="New" /> : null}
-                </div>
-              );
-              const cls = cx("block rounded-[var(--radius-card)] bg-surface p-4 shadow-[var(--shadow-card)] animate-rise", !n.read_at && "ring-2 ring-accent/30");
-              return <li key={n.id}>{n.href ? <Link href={n.href} className={cls}>{body}</Link> : <div className={cls}>{body}</div>}</li>;
+              const k = KIND[n.kind] ?? { icon: "info", tone: "ink" as RowTone };
+              return <Row key={n.id} icon={k.icon} tone={k.tone} eyebrow={now ? ago(n.created_at, now) : " "} title={n.title} detail={n.body} wrap mark={!n.read_at} href={n.href ?? undefined} />;
             })}
-          </ul>
+          </RowList>
         )}
       </div>
     </div>
