@@ -32,6 +32,7 @@ import type { TileConfig } from "@/server/providers/geo/tiles";
 import { PlaceSheet, WhenSheet, whenWords, type PickedPlace } from "./PlanSheets";
 import { loopWord, placeName, planTitle } from "@/domain/plan-name";
 import { GoSheet, type GoTarget } from "./GoSheet";
+import { clockIn } from "@/domain/daylight";
 
 export type Situation = "go" | "run" | "travel";
 type Mode = "walk" | "ride" | "transit";
@@ -320,7 +321,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   // ── Sky card facts ────────────────────────────────────────────────────────────────────────
   const checking = (!loop && !currentWays) || (loop && loopPlan?.key !== loopKey);
   const verb = loop ? loopName.toLowerCase() : mode === "walk" ? "walk" : mode === "ride" ? "ride" : "by transit";
-  const tripTitle = loop ? `${loopMinutes} min ${verb}` : minutes ? `${Math.round(minutes)} min ${verb}${arriveAt ? ` · arrive ${arriveAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", ...(zone ? { timeZone: zone } : {}) })}` : ""}` : currentWays?.error ? "Couldn’t check the way" : currentWays?.noRoute ? "No travel time available" : "…";
+  const tripTitle = loop ? `${loopMinutes} min ${verb}` : minutes ? `${Math.round(minutes)} min ${verb}${arriveAt ? ` · arrive ${clockIn(arriveAt, zone)}` : ""}` : currentWays?.error ? "Couldn’t check the way" : currentWays?.noRoute ? "No travel time available" : "…";
   const helpList = loop ? (startHelp?.key === loopKey ? startHelp.points : null) : currentWays ? way?.helpPoints ?? [] : null;
   const helpLocal = mode === "walk" || loop ? helpAt : arriveAt ? localTimeInZone(arriveAt, zone) : helpAt;
   const openThen = helpList ? helpList.filter((p) => { const h = hoursState(p, helpLocal ?? undefined); return h.kind === "open_24h" || h.kind === "listed_open" || h.kind === "open_now"; }).length : 0;

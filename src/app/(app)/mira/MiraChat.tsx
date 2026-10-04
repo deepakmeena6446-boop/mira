@@ -166,7 +166,7 @@ function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; o
           <MiraPulse size={16} state="with-you" />
           <span className="flex-1">
             <span className="block font-semibold">On the way to {card.destination}</span>
-            <span className="block text-sm text-ink-muted">ETA {new Date(card.etaAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+            <span className="block text-sm text-ink-muted">ETA {clockIn(card.etaAt)}</span>
           </span>
           <Icon name="chevron" className="text-ink-subtle" />
         </Link>
@@ -181,7 +181,7 @@ function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; o
       const ready = card.state === "ready";
       return (
         <section className={cx(shell, "p-4")} aria-label="Plan evidence">
-          <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Plan evidence</h2><span className="text-xs text-ink-subtle">checked {new Date(card.checkedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div>
+          <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Plan evidence</h2><span className="text-xs text-ink-subtle">checked {clockIn(card.checkedAt)}</span></div>
           <ul className="mt-1 divide-y divide-line">
             {card.state === "not_checked" ? <Fact kind="pending" label="Needs you">Route check not started — places and time needed first</Fact> : ready ? <Fact kind="estimate">{card.options.length} mapped walking option{card.options.length === 1 ? "" : "s"}{card.options[0] ? ` · fastest about ${Math.round(card.options[0].minutes)} min` : ""}</Fact> : <Fact kind={card.state === "failed" ? "failed" : "none"}>Mapped walking route: {card.state === "failed" ? "the check failed" : card.state === "stale" ? "the map snapshot is too old" : "not available for this area"}</Fact>}
             {card.daylight ? <Fact kind={card.daylight.status === "known" ? "checked" : "none"}>{card.daylight.status === "known" ? `Daylight: ${String(card.daylight.value)} · ${card.daylight.source.label}` : "Daylight not calculated yet"}</Fact> : null}

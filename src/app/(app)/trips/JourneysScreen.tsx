@@ -15,6 +15,7 @@ import { hasPlanWork, type PlanDraft } from "@/domain/plan-state";
 import { placeName, planLine, planStartsAt, planTitle } from "@/domain/plan-name";
 import { modeWords } from "@/domain/travel-prefs";
 import type { TripSummary, TripView } from "@/server/trips";
+import { clockIn } from "@/domain/daylight";
 
 type Saved = { id: string; draft: PlanDraft; createdAt: string; expiresAt: string };
 
@@ -29,7 +30,7 @@ function clockAt(iso: string, tz: string | null): string {
   let device = "";
   try { device = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { /* unnamed */ }
   const zone = tz ?? "UTC";
-  const t = new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: zone });
+  const t = clockIn(iso, zone);
   if (zone === device) return t;
   const abbr = new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "short" }).formatToParts(new Date(iso)).find((p) => p.type === "timeZoneName")?.value;
   return abbr ? `${t} ${abbr}` : t;

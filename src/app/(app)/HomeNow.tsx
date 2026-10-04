@@ -50,6 +50,8 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
   const router = useRouter();
   const loc = useLocation(false);
   const clock = useClock();
+  // Home doesn't send her position; when followers' view is old or empty, say how to fix it (audit P01-004).
+  const staleSpot = Boolean(live?.following.length) && (live?.sharedAt === null || (live?.sharedAt != null && clock != null && clock.getTime() - new Date(live.sharedAt).getTime() >= 120_000));
   const country = useCountry();
   const point = usableLocationPoint(loc, clock?.getTime());
   const [signIn, setSignIn] = useState(false);
@@ -173,7 +175,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
           <div className="min-w-0">
             <h1 className="text-[1.625rem] font-semibold leading-tight tracking-[-0.035em]">{greeting && clock ? `${t(greetingKey(clock.getHours()))}${firstName ? `, ${firstName}` : ""}` : "Hello"}</h1>
             <p className="mt-0.5 text-[0.875rem] text-ink-muted">
-              {journeyTo !== null ? `You’re on your way${journeyTo ? ` to ${journeyTo}` : ""} — I’m with you until you check in.` : cold ? "Here’s what’s true around you right now." : "Here’s what I know around you."}
+              {journeyTo !== null ? `You’re on your way${journeyTo ? ` to ${journeyTo}` : ""} — I’m with you until you check in.${staleSpot ? " Open your journey to share where you are now." : ""}` : cold ? "Here’s what’s true around you right now." : "Here’s what I know around you."}
             </p>
           </div>
           {user ? (

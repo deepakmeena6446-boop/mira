@@ -79,6 +79,12 @@ describe("Mira capabilities questions", () => {
 });
 
 describe("Mira (scripted engine)", () => {
+  it.each(["how do I delete my data?", "can I download my information", "what do you keep about me"])("points data-rights questions to the real controls: %s (audit P15-005)", async (message) => {
+    const r = await run(message);
+    expect(r.text).toMatch(/Download my data/);
+    expect(r.text).toMatch(/Delete my account/);
+    expect(r.cards).toEqual([]);
+  });
   it("proposes a trip home — never starts one by itself", async () => {
     const r = await run("take me home");
     expect(r.text).toMatch(/Home/);

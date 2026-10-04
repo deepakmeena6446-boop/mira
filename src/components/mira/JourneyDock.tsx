@@ -28,7 +28,10 @@ export function JourneyDock({ trip: initial }: { trip: DockTrip | null }) {
   const missed = trip?.state === "missed";
   const left = trip && clock ? Math.round((new Date(trip.etaAt).getTime() - clock.getTime()) / 60_000) : null;
   const title = !trip ? "Private check-in running" : missed ? "Check-in due — are you okay?" : trip.destination ? `On your way to ${trip.destination}` : "Sharing where you are";
-  const detail = !trip ? "On this device only · no location" : [left === null ? null : left > 0 ? `${left} min left` : "ETA passed", trip.following.length ? `${trip.following.join(", ")} can follow` : "Only people you send your link to can follow"].filter(Boolean).join(" · ");
+  // Position is sent only while the journey screen is open: say how old the followers' view is (audit P01-004).
+  const sharedMin = trip?.sharedAt && clock ? Math.floor((clock.getTime() - new Date(trip.sharedAt).getTime()) / 60_000) : null;
+  const spot = !trip?.following.length || trip.sharedAt === undefined ? null : trip.sharedAt === null ? "no spot shared yet" : sharedMin !== null && sharedMin >= 2 ? `spot from ${sharedMin} min ago` : null;
+  const detail = !trip ? "On this device only · no location" : [left === null ? null : left > 0 ? `${left} min left` : "ETA passed", trip.following.length ? `${trip.following.join(", ")} can follow` : "Only people you send your link to can follow", spot].filter(Boolean).join(" · ");
   return (
     <>
     {/* The dock floats over the page; this spacer lets every screen scroll its last row clear of it. */}

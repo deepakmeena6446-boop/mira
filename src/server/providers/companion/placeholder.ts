@@ -249,6 +249,9 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     reply = hinglish ? "Koi baat nahi! Main yahin hoon." : part === "night" ? "Anytime 🌙 I'm around if you head out again." : "Anytime. I'm here whenever you're heading out.";
   } else if (RX.who.test(m)) {
     reply = `I'm Mira, your travel companion. I can share your journey live with people you trust, find Help Points and what's open around you, and help you report something privately. I'm not an emergency service — for that, ${emergencySentence(ctx0.country)}.`;
+  } else if (/\b(?:delete|erase|remove|export|download|see|copy of)\b.{0,30}\b(?:my\s+)?(?:data|account|history|information|info)\b|\bprivacy\b|\bwhat do you (?:keep|store|know about me)\b/i.test(m)) {
+    // Data rights get the real controls, not a route plan or "can't answer" (audit P15-005).
+    reply = `Your data is yours. Under You → "Download my data" you get everything Mira keeps as one file, and "Delete my account" erases your places, people, journeys and chat. The Privacy page says what's kept and for how long.`;
   } else if (tools.openPlan?.() || shouldSeedPlan(m)) {
     // No model: the same deterministic plan answer the Plan screen's evidence supports.
     const plan = tools.openPlan?.() ?? null;

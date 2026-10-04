@@ -39,8 +39,9 @@ import { SavedReturnReview } from "@/components/app/SavedReturnReview";
 import type { Contact } from "@/server/account/contacts";
 import { localTimeInZone } from "@/domain/opening-hours";
 import type { AlertState } from "@/domain/journey";
+import { clockIn } from "@/domain/daylight";
 
-const time = (iso: string | number) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+const time = (iso: string | number) => clockIn(iso);
 const names = (list: string[]) => (list.length <= 2 ? list.join(" and ") : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`);
 const deliveryLabel = (state: AlertState | undefined) => state === "sent" ? "accepted by email provider; receipt unknown" : state === "failed" ? "email rejected" : state === "claimed" ? "email attempt in progress" : state === "unconfirmed" ? "email acceptance unconfirmed" : "no email attempted";
 
@@ -86,6 +87,7 @@ export function TripScreen({
   const countryIso = country.iso;
   const osmMap = tiles.provider !== "google";
   const helpInFlight = useRef(false);
+  const helpRetry = useRef({ failures: 0, after: 0 });
   const [focus, setFocus] = useState<RankedHelpPoint | null>(null);
   const [helpRoute, setHelpRoute] = useState<{ id: string; option: PlanOption | null; detail: string } | null>(null);
   const [pendingChange, setPendingChange] = useState<RankedHelpPoint | null>(null);
@@ -254,14 +256,19 @@ export function TripScreen({
   // Help Points around her, fetched ahead (and again once she has moved on), so "I feel unsafe" is instant.
   useEffect(() => {
     if (!open || !freshMe || helpInFlight.current) return;
-    if (help && !help.failed && haversine(help.at, freshMe) < HELP_REFETCH_M) return; // a failed lookup retries on the next fix
+    if (help && !help.failed && haversine(help.at, freshMe) < HELP_REFETCH_M) return;
+    // A failed lookup retries on a later fix, backing off 15 s → 5 min: it used to refire at once, ~289 calls a minute (audit L06-008).
+    if (Date.now() < helpRetry.current.after) return;
     helpInFlight.current = true;
     const at = freshMe;
     void api<{ helpPoints: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> }>("/api/geo/help", { body: { ...at, ...(countryIso ? { country: countryIso } : {}), ...(osmMap ? { source: "osm" } : {}) } }).then((r) => {
       helpInFlight.current = false;
       // The API answers 200 with evidence "failed" when the providers didn't respond: that's a failed lookup, not "none nearby".
       const failed = !r.ok || r.data.evidence?.state === "failed";
-      setHelp((cur) => (failed ? (cur && !cur.failed ? cur : { at, points: [], failed: true }) : { at, points: r.data.helpPoints, partial: r.data.evidence?.state === "partial" }));
+      const retry = helpRetry.current;
+      retry.failures = failed ? retry.failures + 1 : 0;
+      retry.after = failed ? Date.now() + Math.min(300_000, 15_000 * 2 ** (retry.failures - 1)) : 0;
+      setHelp((cur) => (failed ? (cur ?? { at, points: [], failed: true }) : { at, points: r.data.helpPoints, partial: r.data.evidence?.state === "partial" }));
     });
   }, [open, freshMe, help, countryIso, osmMap]);
   const placeTime = localTimeInZone(clock ?? new Date(), country.timezone);
@@ -676,7 +683,7 @@ export function TripScreen({
                     {revokeConfirm === contact.id ? <div className="mt-2 flex gap-2"><Button variant="danger" busy={busy === "sharing-revoke"} onClick={() => void sharingAction("revoke", { contactId: contact.id })}>Confirm remove {contact.name}&apos;s journey link</Button><Button variant="ghost" onClick={() => setRevokeConfirm(null)}>Keep link</Button></div> : <Button variant="secondary" className="mt-2" onClick={() => setRevokeConfirm(contact.id)}>Remove {contact.name}&apos;s journey link</Button>}
                   </li>)}</ul> : <p className="text-sm">No selected recipients. Nobody receives automatic contact emails.</p>}
                   {contactsState === "failed" ? <div role="status"><p>Contact choices could not load. Existing links are unchanged.</p><Button variant="secondary" onClick={() => setContactsState("idle")}>Retry contact choices</Button></div> : contactsState !== "ready" ? <p role="status">Loading contact choices…</p> : <>
-                    <RecipientPicker contacts={contacts.filter((contact) => !trip.sharedWith.some((recipient) => recipient.id === contact.id))} selectedIds={recipientIds} onChange={(ids) => { setRecipientIds(ids); shareActionKey.current = null; }} disabled={busy === "sharing-share"} />
+                    <RecipientPicker alreadyFollowing={trip.sharedWith.length} contacts={contacts.filter((contact) => !trip.sharedWith.some((recipient) => recipient.id === contact.id))} selectedIds={recipientIds} onChange={(ids) => { setRecipientIds(ids); shareActionKey.current = null; }} disabled={busy === "sharing-share"} />
                     {recipientIds.length ? <><p className="text-sm">Confirm live links for {names(contacts.filter((contact) => recipientIds.includes(contact.id)).map((contact) => contact.name))}? Mira attempts accepted-contact emails; WhatsApp still requires Send.</p><Button variant="primary" busy={busy === "sharing-share"} onClick={() => { shareActionKey.current ??= crypto.randomUUID(); void sharingAction("share", { recipientIds, idempotencyKey: shareActionKey.current }); }}>Confirm chosen recipients</Button></> : null}
                   </>}
                   <div className="rounded-xl bg-surface p-3 text-sm">

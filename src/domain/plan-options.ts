@@ -67,6 +67,8 @@ export function instantForLocal(local: string, timeZone: string, near: Date = ne
 
 /** Why a wall time has no single instant: "repeated" (clocks go back: it happens twice) or "skipped" (clocks go forward). */
 export function clockChangeAt(local: string, timeZone: string): "repeated" | "skipped" | null {
+  // Only a full "YYYY-MM-DDTHH:MM": an empty or partial time used to parse as 2000-01-01 and read as "skipped" (re-audit RA4).
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(local)) return null;
   const nominal = Date.parse(`${local}:00Z`);
   if (!Number.isFinite(nominal)) return null;
   let format: Intl.DateTimeFormat;
