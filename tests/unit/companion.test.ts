@@ -545,13 +545,34 @@ describe("Mira on Claude: hardened tools and the output guard", () => {
 });
 
 describe("Safety updates summary (pure)", () => {
-  it("a failed or unavailable check is couldn't check, never none; a ready check gives counts, categories, publisher and age", () => {
+  it("a failed or unavailable check is couldn't check, never none; a ready check gives counts, categories and the latest headlines with publisher and age", () => {
     expect(safetyUpdatesSummary({ state: "failed", sources: [], retryable: true }, "Delhi")).toEqual({ status: "couldnt_check", area: "Delhi" });
     expect(safetyUpdatesSummary({ state: "unavailable", sources: [], retryable: false }, null)).toEqual({ status: "couldnt_check", area: null });
     const at = new Date("2026-09-27T12:00:00Z");
-    const update: SafetyUpdate = { id: "u1", title: "t", translatedTitle: null, summary: null, category: "transport", reporting: "arrest_reported", reportedLocation: null, locationPrecision: "city", publishedAt: "2026-09-25T09:00:00Z", eventYear: null, publisher: "thehindu.com", originalUrl: "https://x", sourceType: "news", sourceCount: 2, sources: [], sensitive: false, retrievedAt: "2026-09-27T00:00:00Z" };
-    const r = safetyUpdatesSummary({ state: "ready", sources: [{ source: "gdelt", state: "ready" }], data: { area: { name: "Delhi", precision: "city", countryIso: "IN", countryName: "India" }, windowDays: 7, updates: [update], counts: { official: 0, news: 1 }, community: "unavailable_in_beta", checkedAt: at.toISOString() } }, "Delhi", at);
-    expect(r).toMatchObject({ status: "checked", area: "Delhi", count: 1, partial: false, categories: [{ category: "Transport", updates: 1 }], latest: [{ publisher: "thehindu.com", age_days: 2, reporting: "Arrest reported, not a conviction", sources: 2, official: false }] });
-    expect(JSON.stringify(r)).not.toMatch(/"title"|https:/); // no headlines or links go to the model
+    const update: SafetyUpdate = { id: "u1", title: "Man arrested for harassing woman on metro", translatedTitle: null, summary: null, category: "transport", reporting: "arrest_reported", reportedLocation: null, locationPrecision: "city", publishedAt: "2026-09-25T09:00:00Z", eventYear: null, publisher: "thehindu.com", originalUrl: "https://x", sourceType: "news", sourceCount: 2, sources: [], sensitive: false, retrievedAt: "2026-09-27T00:00:00Z" };
+    const data = (updates: SafetyUpdate[]) => ({ area: { name: "Delhi", precision: "city" as const, countryIso: "IN", countryName: "India" }, windowDays: 7 as const, updates, counts: { official: 0, news: updates.length }, community: "unavailable_in_beta" as const, checkedAt: at.toISOString() });
+    const r = safetyUpdatesSummary({ state: "ready", sources: [{ source: "gdelt", state: "ready" }], data: data([update]) }, "Delhi", at);
+    expect(r).toMatchObject({
+      status: "checked", area: "Delhi", count: 1, partial: false, categories: [{ category: "Transport", updates: 1 }],
+      latest: [{ headline: "Man arrested for harassing woman on metro", publisher: "thehindu.com", age_days: 2, first_seen: "2026-09-25", category: "Transport", reporting: "Arrest reported, not a conviction", sources: 2, official: false }],
+    });
+    expect(JSON.stringify(r)).not.toMatch(/https:/); // links stay in the app
+    expect(JSON.stringify(r)).not.toMatch(/headline_translation/); // only when MIRA has a translation
+
+    const many = Array.from({ length: 8 }, (_, i) => ({ ...update, id: `u${i}`, title: `Report ${i}` }));
+    const r8 = safetyUpdatesSummary({ state: "ready", sources: [{ source: "gdelt", state: "ready" }], data: data(many) }, "Delhi", at);
+    expect(r8).toMatchObject({ count: 8 });
+    expect(r8.status === "checked" && r8.latest.map((l) => l.headline)).toEqual(["Report 0", "Report 1", "Report 2", "Report 3", "Report 4"]);
+    const es = safetyUpdatesSummary({ state: "ready", sources: [{ source: "gdelt", state: "ready" }], data: data([{ ...update, title: "Detienen a hombre por acosar a mujer en el metro", translatedTitle: "Man detained for harassing woman on the metro" }]) }, "Delhi", at);
+    expect(es).toMatchObject({ latest: [{ headline: "Detienen a hombre por acosar a mujer en el metro", headline_translation: "Man detained for harassing woman on the metro" }] });
+  });
+
+  it("the guide lets Mira quote a headline with its publisher and age, and never generalise to the area", () => {
+    const line = TOOL_GUIDE.split("\n").find((l) => l.includes("get_safety_updates"));
+    expect(line).toMatch(/quote a headline/);
+    expect(line).toMatch(/publisher and how many days ago/);
+    expect(line).toMatch(/not a verdict/);
+    expect(line).toMatch(/this area is unsafe/);
+    expect(line).toMatch(/never say "none"/);
   });
 });

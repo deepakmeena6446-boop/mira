@@ -7,11 +7,48 @@ import { resolvedDestination, resolvedOrigin } from "./plan-state";
 export type OptionState = "ready" | "missing" | "empty" | "stale" | "failed";
 export type PlanOption = { id: string; label: string; minutes: number; meters: number; geometry: [number, number][]; evidence: PlanEvidence[]; kind?: "walk" | "run" | "loop" | "out_and_back"; departureLocal?: string; arrivalLocal?: string; timeZone?: string; steps?: { name: string | null; highway: string; lengthM: number }[]; originAccessMeters?: number; daylight?: PlanEvidence };
 export type PlanOptionsResult = { state: OptionState; checkedAt: string; source: string | null; sourceAt: string | null; scope: string; options: PlanOption[]; daylight: PlanEvidence; service: PlanEvidence; detail: string;
-  constraints?: { text: string; status: "not_checked"; reason: string }[];
+  constraints?: PlanRequirement[];
   timeAlternatives?: { local: string; timeZone: string; minutesLater: number; daylight: "daylight"; note?: string }[];
   manualPlan?: { mode: "ride" | "transit"; serviceEligible: false; nextSteps: string[] };
   targetMeters?: number;
 };
+
+/** A requirement she typed, and what MIRA can say about it: lighting from mapped data, the rest plainly not checked. */
+export type PlanRequirement = { text: string; status: "checked" | "not_checked"; reason: string };
+
+/** "well-lit", "lit streets", "street lights", "roshni": answered from the lighting mapped along each way. */
+export const LIGHTING_REQUIREMENT = /(?<![\p{L}\p{N}])(?:well[- ]?lit|lit|lighting|lights?|street ?lights?|street ?lamps?|lamps?|bright|roshni|roshani|ujala|ujaala)(?![\p{L}\p{N}])|रोशनी|उजाला/iu;
+
+/** What MIRA can't check yet, named plainly; anything else is "this". Step-free first: "step-free" isn't about cost. */
+const UNSUPPORTED: Array<[RegExp, string]> = [
+  [/step[- ]?free|wheel ?chair|accessib|stairs|steps|ramps?|lifts?|elevators?|prams?|strollers?|buggy/i, "step-free access"],
+  [/cheap|low[- ]cost|cost|budget|price|fare|free/i, "cost"],
+  [/busy|crowd|people around|populated|quiet|lonely|deserted|isolated/i, "how busy it is"],
+  [/cctv|cameras?/i, "CCTV"],
+  [/toilets?|restrooms?|washrooms?|bathrooms?/i, "toilets along the way"],
+  [/police|guards?|security/i, "police or security presence"],
+];
+
+/**
+ * One short line per requirement. `lighting`, per option in order: the share mapped as lit or with
+ * street lamps (null when nothing is mapped along it), or "failed" when the lighting check failed;
+ * absent when no lighting was looked up.
+ */
+export function planRequirements(texts: string[], options: Pick<PlanOption, "label">[], lighting?: Array<number | null> | "failed"): PlanRequirement[] {
+  return texts.map((text) => {
+    if (LIGHTING_REQUIREMENT.test(text)) {
+      if (!options.length) return { text, status: "not_checked", reason: "There's no mapped way yet to check lighting along." };
+      if (lighting === "failed") return { text, status: "not_checked", reason: "Mira couldn't check lighting along these ways just now." };
+      if (!lighting) return { text, status: "not_checked", reason: "Mira hasn't checked lighting along these ways." };
+      const parts = options.map((o, i) => `${o.label}: ${lighting[i] == null ? "lighting not known" : `${lighting[i]}% mapped as lit or with street lamps`}`);
+      return lighting.some((l) => l != null)
+        ? { text, status: "checked", reason: `${parts.join("; ")}. Mapped lighting, not whether the lamps work tonight.` }
+        : { text, status: "checked", reason: "Lighting isn't mapped along these ways, so Mira can't say how lit they are." };
+    }
+    const what = UNSUPPORTED.find(([re]) => re.test(text))?.[1];
+    return { text, status: "not_checked", reason: what ? `Mira can't check ${what} yet.` : "Mira can't check this yet." };
+  });
+}
 
 /** Shared comparison identity includes every assumption that can change a choice. */
 export function planOptionsKey(intent: MovementIntent): string {
@@ -108,7 +145,11 @@ export function laterDaylight(local: string, timeZone: string, point: LatLon): {
   return null;
 }
 
-export function resolvePlanOptions(input: { graph: RouteGraph | null; routes: PlannedRoutes | null; sourceAt: Date | null; checkedAt: Date; from: LatLon; to: LatLon; local: string; timeZone: string; failed?: boolean; intent?: MovementIntent }): PlanOptionsResult {
+/**
+ * `lighting`: for a lighting requirement, the lit share per route (see planRequirements), looked up by the
+ * caller for the same routes in the same order.
+ */
+export function resolvePlanOptions(input: { graph: RouteGraph | null; routes: PlannedRoutes | null; sourceAt: Date | null; checkedAt: Date; from: LatLon; to: LatLon; local: string; timeZone: string; failed?: boolean; intent?: MovementIntent; lighting?: Array<number | null> | "failed" }): PlanOptionsResult {
   const { graph, routes, sourceAt, checkedAt, from, to, local, timeZone, intent } = input;
   // Coordinates stay in the evidence ref (internal); the result's `scope` is shown and spoken, so it's words (audit L02-002).
   const scope = `${from.lat.toFixed(5)},${from.lon.toFixed(5)} → ${to.lat.toFixed(5)},${to.lon.toFixed(5)}`;
@@ -120,7 +161,7 @@ export function resolvePlanOptions(input: { graph: RouteGraph | null; routes: Pl
   const daylightFor = (instant: Date | null): PlanEvidence => instant && Math.abs(from.lat) <= 72
     ? (() => { const value = daylightAt(instant, from); return value === "uncertain" ? unknown("Daylight at planned departure", "conflicting", false, true) : { status: "known" as const, claim: "Daylight at planned departure", value, scope: areaScope, source: { id: "noaa-solar-equations", label: "NOAA solar-position calculation (approximate; weather and shade excluded)", observedAt: checkedAt.toISOString(), expiresAt: null } }; })()
     : unknown("Daylight at planned departure", "unsupported", false, true);
-  const constraints = (intent?.constraints ?? []).map((text) => ({ text, status: "not_checked" as const, reason: "The imported graph does not establish accessibility, cost, lighting, place access or live conditions. Confirm this requirement directly before choosing." }));
+  const constraints = planRequirements(intent?.constraints ?? [], []);
   const manualPlan = intent && intent.mode !== "walk" ? { mode: intent.mode, serviceEligible: false as const, nextSteps: ["Confirm operation at the planned local time with the operator or provider.", intent.mode === "ride" ? "Confirm pickup point, fare and driver availability directly." : "Confirm departure, stops, connections and last service directly.", "Confirm access at the destination and the last walking leg. No booking or service confirmation has been made."] } : undefined;
   const base: PlanOptionsResult = { state: "missing", checkedAt: checkedAt.toISOString(), source: sourceAt ? "OpenStreetMap imported walking graph" : null, sourceAt: sourceAt?.toISOString() ?? null, scope: intent?.loop ? "A loop from the start you chose" : "Between the start and destination you chose", options: [], daylight: daylightFor(intent?.timeKind === "arrive_by" ? null : plannedInstant), service, constraints, manualPlan, targetMeters: intent?.loop ? loopTargetMeters(intent) : undefined, detail: "Walking graph has not been imported for this area." };
   const baselineLater = base.daylight.status === "known" && base.daylight.value === "dark" ? laterDaylight(local, timeZone, from) : null;
@@ -152,5 +193,5 @@ export function resolvePlanOptions(input: { graph: RouteGraph | null; routes: Pl
   const later = laterDaylight(departureLocal, timeZone, from);
   const daylight = options[0].daylight!;
   const timeAlternatives = daylight.status === "known" && daylight.value === "dark" && later ? [{ ...later, timeZone, daylight: "daylight" as const, ...(intent?.timeKind === "arrive_by" ? { note: "This is a later departure. It requires changing your requested arrival time." } : {}) }] : [];
-  return { ...base, state: "ready", options, daylight, timeAlternatives, detail: intent?.loop ? `${options.length} mapped loop/out-and-back option${options.length === 1 ? "" : "s"} near your requested distance. Time uses the assumed pace; access from the starting place to the graph is not verified.` : options.length > 1 ? "Compare distance and time; neither path is a safety recommendation." : "One mapped walking path is available; no distinct alternate met the route criteria." };
+  return { ...base, state: "ready", options, daylight, timeAlternatives, constraints: planRequirements(intent?.constraints ?? [], options, input.lighting), detail: intent?.loop ? `${options.length} mapped loop/out-and-back option${options.length === 1 ? "" : "s"} near your requested distance. Time uses the assumed pace; access from the starting place to the graph is not verified.` : options.length > 1 ? "Compare distance and time; neither path is a safety recommendation." : "One mapped walking path is available; no distinct alternate met the route criteria." };
 }

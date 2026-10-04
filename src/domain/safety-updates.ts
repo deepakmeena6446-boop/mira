@@ -263,18 +263,22 @@ const POLICE = [W("police|polic[ií]a|polizei|polizia|polisi|gendarmerie|garda|s
 const TARGETING = [W("targets?|targeting|targeted|preying|preys|approach(?:es|ing)? (?:lone |young )?(?:women|girls)|lone women|women travell?ers|solo women")];
 
 /** Not a place she moves through: online abuse, trolling, deepfakes, cyber-crime. */
-const ONLINE = [W("(?:harass\\p{L}*|abus\\p{L}*|threaten\\p{L}*|stalk\\p{L}*|bull(?:y|ied|ying)|trolled|targeted) online|online (?:harassment|abuse|trolling|stalking|threats?|bullying|hate)|cyber\\p{L}*|trolls?|trolled|trolling|deepfakes?|morphed|sextortion|social media|obscene (?:messages?|posts?|comments?|calls?)|(?:stalk|harass|abus|threat)\\p{L}* (?:\\p{L}+ ){0,3}on (?:instagram|facebook|whatsapp|twitter|snapchat|telegram)")];
+const ONLINE = [W("(?:harass\\p{L}*|abus\\p{L}*|threaten\\p{L}*|stalk\\p{L}*|bull(?:y|ied|ying)|trolled|targeted) online|online (?:harassment|abuse|trolling|stalking|threats?|bullying|hate)|cyber\\p{L}*|trolls?|trolled|trolling|deepfakes?|morphed|sextortion|obscene (?:messages?|posts?|comments?|calls?)|(?:stalk|harass|abus|threat)\\p{L}* (?:\\p{L}+ ){0,3}on (?:instagram|facebook|whatsapp|twitter|snapchat|telegram)")];
+/** "Woman shares video of harassment on metro on social media": how it surfaced, not where it happened. */
+const SOCIAL_MEDIA = [W("social media")];
 
 /**
- * Court procedure (bail, hearings, trials, verdicts, sentences) is a past incident's legal
- * process, not present context: excluded unless an official source issues it as an advisory.
+ * Court procedure (hearings, trials, verdicts, sentences) is a past incident's legal process,
+ * not present context: excluded unless an official source issues it as an advisory.
  */
 const COURT = [
-  W("bail|bailed|hearings?|hear (?:a |the )?pleas?|pleas?|trials?(?! rooms?)|verdicts?|jailed|jail terms?|sentenc\\p{L}*|acquit\\p{L}*|convict\\p{L}*|found guilty|pleads? guilty|life imprisonment|rigorous imprisonment|years in (?:jail|prison)|(?<!food )courts?|hc|high court|supreme court|condenad[oa]s?|absuelt[oa]s?|juicio|julgamento|condamn[ée]e?s?|procès|verurteilt|prozess|vonis|sidang"),
-  S("जमानत|अदालत|कोर्ट|判決|懲役|裁判|선고|징역|재판|法院|判决|محكمة"),
+  W("hearings?|hear (?:a |the )?pleas?|pleas?|trials?(?! rooms?)|verdicts?|jailed|jail terms?|sentenc\\p{L}*|acquit\\p{L}*|convict\\p{L}*|found guilty|pleads? guilty|life imprisonment|rigorous imprisonment|years in (?:jail|prison)|condenad[oa]s?|absuelt[oa]s?|juicio|julgamento|condamn[ée]e?s?|procès|verurteilt|prozess|vonis|sidang"),
+  S("判決|懲役|裁判|선고|징역|재판|判决"),
 ];
+/** A court named at the arrest stage ("arrested, produced in court", "bail", "HC"): often a current incident's next step. */
+const COURT_MENTION = [W("bail|bailed|(?<!food )courts?|hc|high court|supreme court"), S("जमानत|अदालत|कोर्ट|法院|محكمة")];
 
-/** A protest, march or outrage. Excluded when it comes before the incident: then the story is the protest. */
+/** A protest, march or outrage. When it comes before the incident the story may be the protest: the classifier decides. */
 const PROTEST = [W("protests?|protesters?|protested|protesting|(?:women|students|residents|activists|people|villagers|locals|hundreds|thousands|families|parents) (?:march\\p{L}*|hold (?:a )?(?:protest|march|vigil)|stage (?:a )?protest)|candle-?(?:light)? march\\p{L}*|march(?:es)? against|demand\\p{L}* justice|seek\\p{L}* justice|justice for|outrage (?:over|after|as|at|against)|sparks? outrage|public outrage|draws? outrage|dharna|sit-in|agitation|bandh|vigils?")];
 const INCIDENT = [...SEXUAL, ...SEXUAL_WITH_TARGET, ...HARASSMENT, ...ABDUCTION, ...GBV, ...TRAFFICKING, ...SPIKING];
 
@@ -288,15 +292,27 @@ const EXCLUDE_TOPICS: Array<[string, RegExp[]]> = [
   ["historical", [W("anniversary|years after|decades after|years ago|decades ago|years on|years since|decades? on|decades since|a year since|cold case|looking back|remember(?:ing|s)|throwback|in the (?:19|20)\\d0s")]],
   ["opinion", [W("opinion|op-?ed|editorial|column|essay|blog|podcast|explainer|analysis|in an interview|exclusive interview|book review|why we must|it'?s time|we need to talk|perspective")]],
   ["roundup", [W("round-?up|top (?:news|stories)|news (?:highlights|wrap|bulletin)|live updates?|(?:morning|evening|daily|news) briefing|headlines|digest|what happened today|crime news today|news in brief")]],
-  ["politics_policy", [W("elections?|electoral|polls? (?:campaign|body)|campaign(?:ing|s)? (?:trail|rally)|manifesto|promises?|pledges?|vows?|rally|rallies|opposition|minister (?:says|said|announces?|slams|lauds)|parliament|assembly (?:session|polls)|lok sabha|rajya sabha|bill|legislation|amendment|ordinance|scheme|yojana|policy|budget|allocat\\p{L}*|lawmakers?|mp says|mla says|senator|congressman|governor says|president says|prime minister|new law|laws? (?:to|on|against)|guidelines|initiative|visits|visited|condemn\\p{L}*|condol\\p{L}*|(?:commission|panel) (?:chief|chairperson|head)|launch(?:es|ed)? (?:a |new )?(?:\\p{L}+ ){0,2}(?:programme|program|app|portal)")]],
+  ["politics_policy", [W("elections?|electoral|polls? (?:campaign|body)|campaign(?:ing|s)? (?:trail|rally)|manifesto|promises?|pledges?|vows?|rally|rallies|opposition|minister (?:says|said|announces?|slams|lauds)|parliament|assembly (?:session|polls)|lok sabha|rajya sabha|legislation|amendment|ordinance|yojana|budget|allocat\\p{L}*|lawmakers?|mp says|mla says|senator|congressman|governor says|president says|prime minister|new law|laws? (?:to|on|against)|guidelines|initiative|(?:commission|panel) (?:chief|chairperson|head)|launch(?:es|ed)? (?:a |new )?(?:\\p{L}+ ){0,2}(?:programme|program|app|portal)")]],
   ["awareness_event", [W("awareness|sensiti[sz]ation|self-?defen[cs]e|workshops?|seminars?|symposium|panel discussion|training (?:session|programme|program|camp)")]],
   ["statistics_ranking", [W("surveys?|surveyed|rank(?:s|ed|ing|ings)|index|safest|least safe|most unsafe|ncrb|statistics|(?:study|report|figures) (?:finds|found|shows|showed|reveals)|per ?cent of women|\\d+ in \\d+ women")]],
   ["media_award", [W("film (?:on|about|based on|wins|screened|screening)|films? (?:on|about)|documentar\\p{L}*|docu-?series|books? (?:on|about)|book (?:launch\\p{L}*|release\\p{L}*)|novel|memoir|short film|exhibition|awards?|awarded|honou?red (?:for|with)|felicitat\\p{L}*|prizes?")]],
   ["business", [W("stalking horse|entrepreneurs?|entrepreneurship|founders?|start-?ups?|funding|investors?|conference|summit|expo|award (?:ceremony|winners?)|ceo|ipo|stock market|startup|women in (?:tech|business|leadership)|leadership|empowerment|hackathon|webinar")]],
   ["sport", [W("champions?|championship|medals?|tournament|olympi\\p{L}*|world cup|grand slam|cricket(?:er)?s?|football(?:er)?s?|soccer|tennis|athletes?|athletics|marathon|wins? (?:gold|silver|bronze|title|the)|league|match(?:es)? (?:report|preview)|t20|odi|ipl|wpl")]],
   ["entertainment", [W("(?:new|upcoming|debut) film|film (?:release|festival|review|premiere|shoot)|movies?|trailer|box office|actress(?:es)?|actors?|celebrit\\p{L}*|bollywood|hollywood|tollywood|netflix|web series|ott|albums?|singers?|premiere|red carpet|divorce[ds]?|dating rumou?rs?|wedding|reality (?:show|tv)|biopic|star kids?|influencer|pel[ií]cula|actriz|estreno|atriz|novela|estreia|actrice|schauspielerin")]],
-  ["accident", [W("road accident|car crash|crash|collision|traffic accident|mishap|overturn\\p{L}*|drown\\p{L}*|fire broke out|blaze|landslide|flood(?:s|ed|ing|waters)?|electrocut\\p{L}*")]],
-  ["incidental", [W("(?:female|woman) (?:witness|driver|passenger injured)|witness(?:es)? (?:said|say)|eyewitness")]],
+  ["accident", [W("road accident|collision|traffic accident|mishap|overturn\\p{L}*|fire broke out|blaze|landslide|flood(?:s|ed|ing|waters)?|electrocut\\p{L}*")]],
+  ["incidental", [W("(?:female|woman) (?:witness|driver|passenger injured)")]],
+];
+
+/**
+ * Words that also turn up in a real incident's headline: "Police condemn attack at bus stop",
+ * "accused arrested, produced in court", "woman shares video on social media", "witnesses said",
+ * "chased by stalker, she drowned". Never enough to drop a headline: one the gate would include
+ * goes to the classifier instead, and one with no women's-safety signal is still left out.
+ */
+const WEAK_TOPICS: Array<[string, RegExp[]]> = [
+  ["politics_policy", [W("bill|scheme|policy|visits|visited|condemn\\p{L}*|condol\\p{L}*")]],
+  ["accident", [W("crash(?:es|ed)?|drown\\p{L}*")]],
+  ["incidental", [W("witness(?:es)? (?:said|say)|eyewitness(?:es)?")]],
 ];
 
 /** "…in 2019 case": a year older than last year means a historical case, not current context. */
@@ -316,19 +332,33 @@ export function eventYearOf(title: string): number | null {
  * The strict, deterministic relevance gate. Include only headlines that are clearly about
  * women's safety; send the ones it can't judge to the classifier; exclude everything else.
  * Never tuned by loosening what counts as relevant.
+ *
+ * Weak words (WEAK_TOPICS, a court named at the arrest stage, a protest, "social media") never
+ * drop a headline on their own: one the gate would include goes to the classifier instead, so a
+ * real incident reported alongside them isn't thrown away. With no women's-safety signal, it's
+ * still left out.
  */
 export function screenHeadline(item: Pick<SafetySourceResult, "title" | "language" | "publisher">, now: Date = new Date()): GateDecision {
+  const weak: string[] = [];
+  const d = gateHeadline(item, now, weak);
+  if (d.decision !== "include" || !weak.length) return d;
+  return { decision: "ambiguous", reason: `${d.reason}, but mentions ${weak.join(", ")}` };
+}
+
+function gateHeadline(item: Pick<SafetySourceResult, "title" | "language" | "publisher">, now: Date, weak: string[]): GateDecision {
   const text = item.title.normalize("NFKC");
   if (!text.trim()) return { decision: "exclude", reason: "empty" };
   const old = oldYear(text, now);
   if (old !== null) return { decision: "exclude", reason: `historical (${old})` };
   for (const [topic, res] of EXCLUDE_TOPICS) if (any(text, res)) return { decision: "exclude", reason: topic };
+  for (const [topic, res] of WEAK_TOPICS) if (any(text, res)) weak.push(topic);
 
   const official = sourceTypeOf(item.publisher) === "official";
   const advisory = any(text, ADVISORY);
   const officialAdvisory = official && advisory;
   if (any(text, COURT) && !officialAdvisory) return { decision: "exclude", reason: "court procedure" };
-  if (firstIndex(text, PROTEST) < firstIndex(text, INCIDENT)) return { decision: "exclude", reason: "protest / reaction, not the incident" };
+  if (any(text, COURT_MENTION) && !officialAdvisory) weak.push("court");
+  if (firstIndex(text, PROTEST) < firstIndex(text, INCIDENT)) weak.push("protest / reaction");
 
   // A woman named only as the accused ("Woman arrested for stalking ex-boyfriend") is not a victim word.
   const accusedWoman = text.search(ACCUSED_WOMAN) >= 0;
@@ -341,6 +371,7 @@ export function screenHeadline(item: Pick<SafetySourceResult, "title" | "languag
   if (any(text, LURE) && any(text, ABROAD) && (target || advisory)) return { decision: "include", category: "trafficking", reason: "trafficking lure pattern" };
   if (any(text, SPIKING)) return { decision: "include", category: "spiking_nightlife", reason: "drink/needle spiking" };
   if (any(text, ONLINE)) return { decision: "exclude", reason: "online, not a place she moves through" };
+  if (any(text, SOCIAL_MEDIA)) weak.push("social media");
   if (accusedWoman && !target) return { decision: "exclude", reason: "the woman named is the accused" };
   if (any(text, SEXUAL) || (target && any(text, SEXUAL_WITH_TARGET))) {
     // A woman/girl victim, a public-transport setting, or a police/official warning; never on the crime word alone.

@@ -39,7 +39,31 @@ export interface HelpLookup {
   failed: boolean;
 }
 
-/** Safety updates as Mira may state them: counts, categories, publishers and ages — never headlines or a verdict. */
+/** One report as Mira may quote it: the publisher's own headline, with who published it and when. */
+export interface SafetyUpdateItem {
+  /** Verbatim, as published (the publisher's words, never reworded). */
+  headline: string;
+  /** MIRA's English translation of a non-English headline, when there is one. */
+  headline_translation?: string;
+  publisher: string;
+  /** Days since MIRA's news index first saw it (not necessarily the publisher's own date). */
+  age_days: number;
+  /** The UTC day the index first saw it, YYYY-MM-DD. */
+  first_seen: string;
+  category: string;
+  /** The legal status the headline states ("Arrest reported, not a conviction"). */
+  reporting: string;
+  sources: number;
+  official: boolean;
+}
+
+/** Most reports Mira gets per check; the full list is in the app. */
+export const SAFETY_UPDATE_ITEMS = 5;
+
+/**
+ * Safety updates as Mira may state them: counts, categories, and the latest reports with their
+ * headline as published, publisher and age — reported context, never a verdict.
+ */
 export type SafetyUpdatesResult =
   | { status: "off" }
   | { status: "no_place"; reason: string }
@@ -53,7 +77,7 @@ export type SafetyUpdatesResult =
       /** Some sources couldn't be checked: an empty list then proves even less. */
       partial: boolean;
       categories: Array<{ category: string; updates: number }>;
-      latest: Array<{ category: string; publisher: string; age_days: number; reporting: string; sources: number; official: boolean }>;
+      latest: SafetyUpdateItem[];
     };
 
 /** Pure: the tool result for one Safety updates check. A failed or unavailable check is "couldn't check", never "none". */
@@ -69,10 +93,13 @@ export function safetyUpdatesSummary(e: SafetyEvidence, area: string | null, now
     count: e.data.updates.length,
     partial: e.state === "partial",
     categories: [...counts].map(([category, updates]) => ({ category, updates })),
-    latest: e.data.updates.slice(0, 3).map((u) => ({
-      category: CATEGORY_LABEL[u.category],
+    latest: e.data.updates.slice(0, SAFETY_UPDATE_ITEMS).map((u) => ({
+      headline: u.title,
+      ...(u.translatedTitle ? { headline_translation: u.translatedTitle } : {}),
       publisher: u.publisher,
       age_days: Math.max(0, Math.floor((now.getTime() - new Date(u.publishedAt).getTime()) / 86_400_000)),
+      first_seen: u.publishedAt.slice(0, 10),
+      category: CATEGORY_LABEL[u.category],
       reporting: REPORTING_NOTE[u.reporting],
       sources: u.sourceCount,
       official: u.sourceType === "official",

@@ -421,18 +421,22 @@ describe("audit: relevance gate", () => {
   const gate = (title: string, publisher = "news.example.com") => screenHeadline({ title, language: "English", publisher }, EVAL_NOW);
 
   it.each([
-    "Protest over rape case turns violent",
     "Stalker jailed after following woman for months",
     "Missing dog found; she was hungry",
     "Priest arrested for sexual abuse of boys",
     "Man arrested for molesting minor boy",
     "Film on acid attack survivor wins award",
-    "Women protest against harassment in Delhi university",
-    "Rape accused MLA granted bail",
     "Woman journalist harassed online by trolls",
   ])("excludes a headline the audit found wrongly included: %s", (title) => {
     expect(gate(title).decision).toBe("exclude");
   });
+
+  it.each(["Protest over rape case turns violent", "Women protest against harassment in Delhi university", "Rape accused MLA granted bail"])(
+    "never includes on keywords a headline the audit found wrongly included; the classifier decides: %s",
+    (title) => {
+      expect(gate(title).decision).toBe("ambiguous");
+    },
+  );
 
   it.each(["Police warn of drink spiking at Soho bars", "Cab driver arrested for molesting passenger", "Man held for harassing women on metro"])("still includes: %s", (title) => {
     expect(gate(title).decision).toBe("include");
@@ -465,9 +469,44 @@ describe("audit: relevance gate", () => {
     expect(gate("Man caught filming women in mall trial room").reason).not.toBe("court procedure"); // "trial room" is a changing room
   });
 
-  it("a protest is excluded when it leads; an incident that prompts one is not", () => {
-    expect(gate("Protest over rape case turns violent").reason).toMatch(/protest/);
+  it("a protest that leads sends the headline to the classifier; an incident that prompts one is included", () => {
+    expect(gate("Protests after woman raped in cab")).toMatchObject({ decision: "ambiguous", reason: expect.stringMatching(/protest/) });
     expect(gate("Femicide in São Paulo suburb prompts protest").decision).toBe("include");
+  });
+
+  it.each([
+    ["Woman shares video of harassment on metro on social media", /social media/],
+    ["Accused arrested for stalking woman, produced in court", /court/],
+    ["Man who molested woman on bus arrested, produced in court", /court/],
+    ["HC grants bail to man accused of stalking woman", /court/],
+    ["Police condemn attack on woman at bus stop", /woman/],
+    ["Woman drowns after being chased by stalker", /accident/],
+    ["Woman abducted, car crash during police chase", /accident/],
+    ["Woman groped on train, witnesses said", /incidental/],
+  ])("a real incident is never dropped on a weak word; the classifier decides: %s", (title, reason) => {
+    expect(gate(title)).toMatchObject({ decision: "ambiguous", reason: expect.stringMatching(reason) });
+  });
+
+  it.each(["Woman shares video of harassment on metro", "Police warn women after man exposes himself at bus stop"])("still includes without a weak word: %s", (title) => {
+    expect(gate(title).decision).toBe("include");
+  });
+
+  it.each([
+    ["Minister visits new school building", "not about women's safety"],
+    ["Bail hearing in fraud case", "court procedure"],
+    ["Three injured in bus crash on highway", "not about women's safety"],
+    ["Fisherman drowns off coast, witnesses said", "not about women's safety"],
+    ["Influencer trends on social media", "entertainment"],
+    ["Woman killed in road accident", "accident"],
+  ])("a weak word without a women's-safety signal is still left out: %s", (title, reason) => {
+    expect(gate(title)).toEqual({ decision: "exclude", reason });
+  });
+
+  it("with no classifier, an incident sent to it makes the result partial, never 'no updates found'", async () => {
+    const { evidence, stats } = await runPipeline(deps({ providers: [stubProvider([result("Accused arrested for stalking woman, produced in court")])] }), DELHI, 7);
+    expect(stats).toMatchObject({ ambiguous: 1, unassessed: 1, excluded: 0 });
+    expect(evidence.state).toBe("partial");
+    expect(partialLine(evidence.sources, true)).toContain(PARTIAL_EMPTY_LINE);
   });
 
   it("sexual violence needs a woman/girl word, a transport setting or a police warning; otherwise the classifier decides", () => {
