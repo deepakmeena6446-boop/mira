@@ -151,7 +151,7 @@ type Row = {
 
 async function toView(sql: postgres.Sql, r: Row, now: Date): Promise<TripView> {
   const [contacts, [loc]] = await Promise.all([
-    sql<{ id: string; name: string; notified: boolean; via_email: boolean; phone_enc: string | null; share_token_enc: string | null; link_delivery: AlertState; alert_delivery: AlertState; check_delivery: AlertState }[]>`
+    sql<{ id: string; name: string; notified: boolean; via_email: boolean; phone_enc: string | null; share_token_enc: string | null; link_delivery: AlertState; alert_delivery: AlertState | "sending"; check_delivery: AlertState }[]>`
       SELECT c.id, c.name, tc.notified_at IS NOT NULL AS notified, (c.accepted_at IS NOT NULL AND c.encrypted_email IS NOT NULL) AS via_email, c.phone_enc, tc.share_token_enc, tc.link_delivery, tc.alert_delivery, tc.check_delivery
       FROM trip_contacts tc JOIN contacts c ON c.id = tc.contact_id WHERE tc.journey_id = ${r.id} AND tc.revoked_at IS NULL ORDER BY c.name`,
     sql<{ lat: number; lon: number; at: Date }[]>`SELECT lat, lon, at FROM trip_locations WHERE journey_id = ${r.id} ORDER BY at DESC LIMIT 1`,
@@ -173,7 +173,7 @@ async function toView(sql: postgres.Sql, r: Row, now: Date): Promise<TripView> {
       notified: c.notified,
       viaEmail: c.via_email,
       linkDelivery: c.link_delivery === "claimed" ? "unconfirmed" : c.link_delivery,
-      alertDelivery: displayAlertState(c.alert_delivery, r.alert_claimed_at ? new Date(r.alert_claimed_at) : null, now),
+      alertDelivery: displayAlertState(c.alert_delivery === "sending" ? "claimed" : c.alert_delivery, r.alert_claimed_at ? new Date(r.alert_claimed_at) : null, now),
       checkDelivery: c.check_delivery === "claimed" ? "unconfirmed" : c.check_delivery,
       whatsapp:
         open && c.phone_enc && c.share_token_enc

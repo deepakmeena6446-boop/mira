@@ -47,7 +47,8 @@ export function ReportScreen({ preset, from = null, emailAlerts = false }: { pre
       <SafetyAccess emailAlerts={emailAlerts} compact className="min-w-0" />
     </header>
   );
-  const loc = useLocation(true);
+  // Never asks for location by itself (audit P0-2): a position she already chose is used; otherwise she taps for one or picks the place.
+  const loc = useLocation(false);
   // A spot long-pressed on the map, handed over in memory (never via the URL).
   const [spot, setSpot] = useState(() => takePendingReportSpot());
   const [choosing, setChoosing] = useState(false); // location off: pick the place by search instead
@@ -71,11 +72,11 @@ export function ReportScreen({ preset, from = null, emailAlerts = false }: { pre
     if (!category || busy) return;
     setBusy(true);
     setError(null);
-    // A picked spot is used as is; "here" is refreshed if the last fix is old.
-    const where = spot ?? (await freshLocation()).point;
+    // A picked spot is used as is; "here" (only once she chose it) is refreshed if the last fix is old.
+    const where = spot ?? (loc.point ? (await freshLocation()).point : null);
     if (!where) {
       setBusy(false);
-      return setError("Turn on location, or choose where it happened.");
+      return setError("Choose where it happened, or tap “Use where I am”.");
     }
     const now = new Date();
     const r = await api("/api/reports", {
@@ -149,16 +150,23 @@ export function ReportScreen({ preset, from = null, emailAlerts = false }: { pre
             <section className="m-card mt-6 p-4">
               <p className="flex items-center gap-2 font-semibold">
                 <Icon name="pin" className="size-5 text-accent" />
-                {spot ? (spot.name ? `Near ${spot.name.replace(/^Near /, "")}` : "The spot you picked on the map") : loc.point ? "Around where you are now" : loc.status === "asking" ? "Finding you…" : "Location is off"}
+                {spot ? (spot.name ? `Near ${spot.name.replace(/^Near /, "")}` : "The spot you picked on the map") : loc.point ? "Around where you are now" : loc.status === "asking" ? "Finding you…" : loc.status === "denied" ? "Location is off for Mira" : "Where did it happen?"}
               </p>
               {spot ? (
                 <button type="button" onClick={() => setSpot(null)} className="mt-1 min-h-11 text-sm font-semibold text-accent-strong">
                   Use where I am instead
                 </button>
               ) : !loc.point && loc.status !== "asking" ? (
-                <button type="button" onClick={() => setChoosing(true)} className="mt-2 min-h-11 rounded-full bg-accent-soft px-4 text-sm font-semibold text-accent-strong">
-                  Choose where it happened
-                </button>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => setChoosing(true)} className="min-h-11 rounded-full bg-accent-soft px-4 text-sm font-semibold text-accent-strong">
+                    Choose where it happened
+                  </button>
+                  {loc.status !== "denied" ? (
+                    <button type="button" onClick={() => void loc.request()} className="min-h-11 rounded-full px-4 text-sm font-semibold text-accent-strong ring-1 ring-line-strong">
+                      Use where I am
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
               <p className="mt-1 text-sm text-ink-muted">Only a rough area (about 1 km) is kept — never the exact spot.</p>
               <div className="mt-4 flex flex-wrap gap-2">

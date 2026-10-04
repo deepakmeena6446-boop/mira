@@ -27,6 +27,14 @@ describe("computeReleases", () => {
     expect(computeReleases(actors(1).map((a) => rep(a)), T, new Map()).releases).toHaveLength(0);
     expect(computeReleases(actors(4).map((a) => rep(a)), T, new Map()).releases).toHaveLength(0);
   });
+  it("five 'people' from one network publish nothing; from three networks they do (audit P14-001)", () => {
+    const sameNet = actors(5, "b").map((a) => rep(a, { networkHash: "net-1" }));
+    expect(computeReleases(sameNet, T, new Map())).toMatchObject({ releases: [], skipped: [{ reason: "not_enough_networks" }] });
+    const twoNets = actors(5, "c").map((a, i) => rep(a, { networkHash: i < 4 ? "net-1" : "net-2" }));
+    expect(computeReleases(twoNets, T, new Map()).releases).toHaveLength(0);
+    const threeNets = actors(5, "d").map((a, i) => rep(a, { networkHash: `net-${i % 3}` }));
+    expect(computeReleases(threeNets, T, new Map()).releases).toHaveLength(1);
+  });
   it("publishes one coarse release at five independent contributors", () => {
     const { releases } = computeReleases(actors(5).map((a) => rep(a)), T, new Map());
     expect(releases).toHaveLength(1);

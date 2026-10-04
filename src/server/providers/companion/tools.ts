@@ -6,7 +6,7 @@ import { HELP_CLASSES, SOURCE_NAME, hoursLine, isNight, rankHelpPoints } from "@
 import type { CountryContext } from "@/domain/country-context";
 import { CATEGORY_LABEL, DEFAULT_WINDOW, REPORTING_NOTE } from "@/domain/safety-updates";
 import { openState, parseOpeningHours } from "@/domain/opening-hours";
-import { countryContext } from "@/server/locale";
+import { countryContext, findCountry } from "@/server/locale";
 import { emailConfigured, getEnv } from "@/server/config/env";
 import { areaFromReverse, safetyProviders, safetyUpdatesFor, type SafetyEvidence } from "@/server/safety-intel";
 import type postgres from "postgres";
@@ -15,6 +15,8 @@ import { listPlaces } from "@/server/account/places";
 import { phoneTargets, shareTargets } from "@/server/account/contacts";
 import { currentTrip } from "@/server/trips";
 import type { User } from "@/server/session/user";
+import type { MovementIntent } from "@/domain/plan-contract";
+import { checkPlanForMira, type PlanCheck } from "@/server/plan/mira-check";
 import type { MiraContext, MiraHelpPoint, MiraTripMode } from "./types";
 import { localClock, type MiraClock } from "./clock";
 import { coverageLine } from "./coverage";
@@ -87,7 +89,11 @@ export interface MiraNow extends MiraClock {
   country: CountryContext;
 }
 
-export function miraTools(sql: postgres.Sql, user: User, ctx: MiraContext) {
+/**
+ * `user` is null for a guest: Mira still answers, with no saved places, Circle or journeys to look at.
+ * `plan` is the plan she has open in Plan (from this tab), if any — check_plan reads it, nothing stores it.
+ */
+export function miraTools(sql: postgres.Sql, user: User | null, ctx: MiraContext, plan: MovementIntent | null = null) {
   // Once per message: the reply may consult it several times (greeting, time, nudges).
   let context: Promise<MiraNow> | null = null;
   const getContext = () => {
@@ -114,7 +120,15 @@ export function miraTools(sql: postgres.Sql, user: User, ctx: MiraContext) {
     /** Can MIRA email her Circle at all? Off means a shared journey reaches nobody unless she sends the link herself. */
     emailOn: () => emailConfigured(),
     safetyUpdatesOn: () => safetyProviders().length > 0,
-    listSavedPlaces: () => listPlaces(sql, user.id),
+    listSavedPlaces: async () => (user ? listPlaces(sql, user.id) : []),
+    signedIn: () => Boolean(user),
+    /** A named country's reviewed profile ("emergency number in Japan"): every number with its service, never where she is. */
+    emergencyFor: (name: string): CountryContext | null => { const c = findCountry(name.trim()); return c ? countryContext(c.iso2) : null; },
+    openPlan: () => plan,
+    /** Her open plan, if any: a one-line summary for the context block (names only). */
+    planSummary: () => plan ? `${plan.activity}: ${plan.origin.kind === "device" ? "from where she is" : `from ${plan.origin.query}`}${plan.loop ? " (a loop)" : plan.destination ? ` to ${plan.destination.query}` : ""}, ${plan.departure.local.replace("T", " ")} ${plan.departure.timeZone}` : null,
+    /** The same route and daylight evidence the Plan screen shows; null when no plan is open. */
+    checkPlan: async (): Promise<PlanCheck | null> => (plan ? checkPlanForMira(sql, plan) : null),
     /**
      * Ordinary places around her, or around `around` (a running trip's destination or a saved
      * place). `openNow` is "open" only when listed hours say so at her local time; distances
@@ -149,10 +163,10 @@ export function miraTools(sql: postgres.Sql, user: User, ctx: MiraContext) {
       const email = emailConfigured();
       if (mode !== "walk") {
         // Ride / transit: MIRA doesn't estimate those here; Home plans it and asks her for the ETA.
-        const [contacts, phones] = await Promise.all([shareTargets(sql, user.id), phoneTargets(sql, user.id)]);
+        const [contacts, phones] = user ? await Promise.all([shareTargets(sql, user.id), phoneTargets(sql, user.id)]) : [[], []];
         return { destination: dest, minutes: null, contacts: contacts.map((c) => c.name), whatsapp: phones.map((c) => c.name), context: [], mode, email, helpLookupFailed: false };
       }
-      const [contacts, phones, route] = await Promise.all([shareTargets(sql, user.id), phoneTargets(sql, user.id), ctx.location ? getGeo().walk(ctx.location, dest) : Promise.resolve(null)]);
+      const [contacts, phones, route] = await Promise.all([user ? shareTargets(sql, user.id) : [], user ? phoneTargets(sql, user.id) : [], ctx.location ? getGeo().walk(ctx.location, dest) : Promise.resolve(null)]);
       // After dark, lighting along the way is worth knowing (only for real street routes).
       const { hour } = await getContext();
       const night = hour >= 18 || hour < 6;
@@ -166,7 +180,7 @@ export function miraTools(sql: postgres.Sql, user: User, ctx: MiraContext) {
       const helpLookupFailed = Boolean(street) && (!help || help.state === "failed");
       return { destination: dest, minutes: route?.minutes ?? null, contacts: contacts.map((c) => c.name), whatsapp: phones.map((c) => c.name), context, mode, email, helpLookupFailed };
     },
-    tripStatus: () => currentTrip(sql, user.id, new Date()),
+    tripStatus: async () => (user ? currentTrip(sql, user.id, new Date()) : null),
     /**
      * Safety updates (news reports) for the city she's in, or her running trip's destination —
      * the same entry point as POST /api/safety-updates. Read-only; only the city name leaves.
@@ -175,7 +189,7 @@ export function miraTools(sql: postgres.Sql, user: User, ctx: MiraContext) {
       if (!safetyProviders().length) return { status: "off" };
       let point: GeoPoint | null = ctx.location;
       if (where === "destination") {
-        const t = await currentTrip(sql, user.id, new Date());
+        const t = user ? await currentTrip(sql, user.id, new Date()) : null;
         if (!t || (t.state !== "active" && t.state !== "missed")) return { status: "no_place", reason: "No journey is running, so MIRA has no destination to check." };
         point = t.destination;
       } else if (!point) return { status: "no_place", reason: "Her location is off, so MIRA doesn't know which city to check." };
@@ -191,6 +205,7 @@ export function miraTools(sql: postgres.Sql, user: User, ctx: MiraContext) {
     },
     /** Everyone in her Circle she can reach on a journey: accepted email contacts and WhatsApp contacts. */
     async trustedContacts() {
+      if (!user) return [];
       const [byEmail, byPhone] = await Promise.all([shareTargets(sql, user.id), phoneTargets(sql, user.id)]);
       return [...new Set([...byEmail, ...byPhone].map((c) => c.name))];
     },

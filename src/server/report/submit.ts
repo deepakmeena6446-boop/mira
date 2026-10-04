@@ -57,7 +57,7 @@ export async function prepareReport(sql: postgres.Sql, input: ReportInput): Prom
   return { input, narrative, cell };
 }
 
-export async function submitReport(sql: postgres.Sql, actorHash: string, prepared: PreparedReport, clock: Clock, userId: string | null = null): Promise<SubmitResult> {
+export async function submitReport(sql: postgres.Sql, actorHash: string, prepared: PreparedReport, clock: Clock, userId: string | null = null, networkHash: string | null = null): Promise<SubmitResult> {
   const { input, narrative, cell } = prepared;
   const now = clock.now();
   const spans = narrative ? detectPii(narrative) : [];
@@ -77,11 +77,11 @@ export async function submitReport(sql: postgres.Sql, actorHash: string, prepare
 
   const rows = await sql<{ id: string; status: string }[]>`
     INSERT INTO reports_private (actor_hash, idempotency_key, involvement, category, coarse_cell_id, recency_bucket, time_band,
-                                 encrypted_text, text_fingerprint, redaction_flags, hold_reasons, ai_consent, status, created_at, expires_at, user_id)
+                                 encrypted_text, text_fingerprint, redaction_flags, hold_reasons, ai_consent, status, created_at, expires_at, user_id, network_hash)
     VALUES (${actorHash}, ${input.idempotencyKey}, ${input.involvement}, ${input.category}, ${cell}, ${input.recency}, ${input.timeBand},
             ${narrative ? encryptText(narrative, "report_text") : null},
             ${narrative ? hmacHex("report-fingerprint", narrative.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()) : null},
-            ${sql.json(flags)}, ${holdReasons}, ${input.aiConsent}, ${status}, ${created}, ${expires}, ${userId})
+            ${sql.json(flags)}, ${holdReasons}, ${input.aiConsent}, ${status}, ${created}, ${expires}, ${userId}, ${networkHash})
     ON CONFLICT (actor_hash, idempotency_key) DO NOTHING
     RETURNING id, status`;
   if (rows.length === 0) {

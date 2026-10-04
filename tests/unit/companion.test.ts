@@ -264,12 +264,12 @@ function mockClient(steps: Array<{ text?: string; tools?: Array<{ name: string; 
 }
 
 describe("Mira on Claude (mocked client)", () => {
-  it("defaults to Sonnet 5 with low effort, and sends the context block without coordinates", async () => {
-    expect(DEFAULT_MIRA_MODEL).toBe("claude-sonnet-5");
+  it("defaults to Sonnet 5.5 with low effort, and sends the context block without coordinates", async () => {
+    expect(DEFAULT_MIRA_MODEL).toBe("claude-sonnet-5-5");
     const { client, calls } = mockClient([{ text: "Hi Amara!" }]);
     const r = await collect(claudeMira({ client, message: "hi", history: [], tools: tools(), firstName: "Amara" }));
     expect(r.text).toBe("Hi Amara!");
-    expect(calls[0]).toMatchObject({ model: "claude-sonnet-5", output_config: { effort: "low" } });
+    expect(calls[0]).toMatchObject({ model: "claude-sonnet-5-5", output_config: { effort: "low" } });
     const system = JSON.stringify(calls[0].system);
     expect(system).toMatch(/United Kingdom \(GB\)/);
     expect(system).toMatch(/Reviewed call options: 999/);

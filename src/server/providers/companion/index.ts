@@ -1,6 +1,7 @@
 import "server-only";
 import type postgres from "postgres";
 import type { User } from "@/server/session/user";
+import type { MovementIntent } from "@/domain/plan-contract";
 import { getEnv } from "@/server/config/env";
 import { providerModes } from "@/server/providers/modes";
 import { placeholderMira } from "./placeholder";
@@ -27,15 +28,15 @@ const log = (event: string, extra: Record<string, unknown> = {}) => console.warn
  * without a reply: if Claude fails, times out or the day's token budget is spent, the
  * placeholder answers instead. Only text, card and done events leave this function.
  */
-export async function* respond(sql: postgres.Sql, user: User, message: string, history: MiraTurn[], ctx: MiraContext, modelAllowed = true): AsyncGenerator<MiraEvent> {
+export async function* respond(sql: postgres.Sql, user: User | null, message: string, history: MiraTurn[], ctx: MiraContext, modelAllowed = true, plan: MovementIntent | null = null): AsyncGenerator<MiraEvent> {
   // A capabilities question needs a factual product answer, not a model-generated safety verdict.
   if (CAPABILITIES_QUESTION.test(message)) {
     yield { type: "text", delta: CAPABILITIES_REPLY };
     yield { type: "done" };
     return;
   }
-  const firstName = user.name.split(" ")[0];
-  const tools = miraTools(sql, user, ctx);
+  const firstName = user ? user.name.split(" ")[0] : "";
+  const tools = miraTools(sql, user, ctx, plan);
   const fallback = () => placeholderMira(message, history, tools, firstName);
   const env = getEnv();
   const apiKey = env.ANTHROPIC_API_KEY;

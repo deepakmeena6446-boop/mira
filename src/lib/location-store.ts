@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { haversineMeters } from "@/domain/pilot";
-import { invalidateCountryForLocation, clearCountry } from "@/lib/locale-store";
+import { invalidateCountryForLocation, clearCountry, forgetLastKnownCountry } from "@/lib/locale-store";
 
 /**
  * The user's current position, held in JS memory only (never persisted, never put in
@@ -23,7 +23,11 @@ export function locationUsable(loc: LocState, options: { at?: number; maxAgeMs?:
   const age = (options.at ?? Date.now()) - loc.at;
   return loc.status === "ok" && Boolean(loc.point) && Number.isFinite(loc.point?.lat) && Math.abs(loc.point!.lat) <= 90 && Number.isFinite(loc.point?.lon) && Math.abs(loc.point!.lon) <= 180 && age >= -10_000 && age < (options.maxAgeMs ?? LOCATION_FRESH_MS) && Number.isFinite(loc.point?.accuracy) && loc.point!.accuracy >= 0 && loc.point!.accuracy <= (options.maxAccuracyM ?? LOCATION_MAX_ACCURACY_M);
 }
-export function usableLocationPoint(loc: LocState, at = Date.now()): LocState["point"] { return locationUsable(loc, { at }) ? loc.point : null; }
+/**
+ * `at` is a render clock (useClock ticks every 30 s), which can only lag real time. A fix taken since its last
+ * tick would look future-dated and be refused for up to 30 s — so never judge it against an earlier time than now.
+ */
+export function usableLocationPoint(loc: LocState, at = Date.now()): LocState["point"] { return locationUsable(loc, { at: Math.max(at, Date.now()) }) ? loc.point : null; }
 
 let locationGeneration = 0;
 let state: LocState = { status: "idle", point: null, at: 0, area: null };
@@ -39,6 +43,7 @@ export function clearLocation() {
   set({ status: "idle", point: null, at: 0, area: null });
   pendingDest = null;
   clearCountry();
+  forgetLastKnownCountry(); // sign-out/delete: the next person on this phone starts from nothing
 }
 
 export function requestLocation(): Promise<LocState> {
@@ -72,14 +77,32 @@ export function requestLocation(): Promise<LocState> {
   });
 }
 
-/** A declined first-open location choice is respected on later visits. */
+/**
+ * Her location choice, asked once on first open (owner decision 2026-10-04): "on" means every later open
+ * fetches location by itself; "off" means Mira never asks again until she turns it on in You. Null: not asked yet.
+ */
+export type LocationChoice = "on" | "off" | null;
+const LOCATION_CHOICE_KEY = "mira.location.skip";
+const choiceListeners = new Set<() => void>();
+export function locationChoice(): LocationChoice {
+  try { const v = localStorage.getItem(LOCATION_CHOICE_KEY); return v === "0" ? "on" : v === "1" ? "off" : null; } catch { return null; }
+}
 export function rememberLocationChoice(useLocation: boolean) {
-  try { localStorage.setItem("mira.location.skip", useLocation ? "0" : "1"); } catch { /* memory-only location still works */ }
+  try { localStorage.setItem(LOCATION_CHOICE_KEY, useLocation ? "0" : "1"); } catch { /* memory-only location still works */ }
+  choiceListeners.forEach((l) => l());
 }
 export function shouldAutoLocate(): boolean {
-  // Only an explicit location choice authorises reacquisition on a local-context screen.
-  // Merely completing onboarding must not opt in; choosing location needs no onboarding flag.
-  try { return localStorage.getItem("mira.location.skip") === "0"; } catch { return false; }
+  return locationChoice() === "on";
+}
+/** "unknown" during server render and hydration, so the first-open card never flashes. */
+export function useLocationChoice(): LocationChoice | "unknown" {
+  return useSyncExternalStore((l) => { choiceListeners.add(l); return () => { choiceListeners.delete(l); }; }, locationChoice, () => "unknown");
+}
+/** Ask (or re-ask) for location as her choice: a refusal in the browser prompt is remembered as "off", never nagged. */
+export async function chooseLocation(): Promise<LocState> {
+  const result = await requestLocation();
+  rememberLocationChoice(result.status !== "denied");
+  return result;
 }
 
 /** A fix older than this is refreshed before it's used for anything that matters. */

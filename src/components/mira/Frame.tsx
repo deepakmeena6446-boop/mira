@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 import { MiraPulse, type PulseState } from "@/components/app/MiraPulse";
 import { SafetyAccess } from "@/components/app/SafetyAccess";
-import { useOverlay } from "@/lib/use-overlay";
+import { useOverlay, useScrimClose } from "@/lib/use-overlay";
 
 /**
  * Root screen header: a title on the left, the Support pair (I feel unsafe · Emergency) on the right.
@@ -83,9 +83,10 @@ export function StateNote({ tone = "quiet", title, children, action, className, 
  */
 export function Sheet({ open, onClose, title, children, labelledBy = "m-sheet-title", footer }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; labelledBy?: string; footer?: React.ReactNode }) {
   useOverlay(open, onClose);
+  const scrimClose = useScrimClose(open, onClose);
   if (!open || typeof document === "undefined") return null;
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-labelledby={labelledBy} className="fixed inset-0 z-[55] flex items-end justify-center bg-scrim animate-fade sm:items-center" onClick={onClose}>
+    <div role="dialog" aria-modal="true" aria-labelledby={labelledBy} className="fixed inset-0 z-[55] flex items-end justify-center bg-scrim animate-fade sm:items-center" onClick={scrimClose}>
       <div onClick={(e) => e.stopPropagation()} className="flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-[var(--radius-sheet)] bg-surface shadow-[var(--shadow-sheet)] animate-rise sm:rounded-[var(--radius-sheet)]">
         <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-4">
           <h2 id={labelledBy} className="m-title">{title}</h2>

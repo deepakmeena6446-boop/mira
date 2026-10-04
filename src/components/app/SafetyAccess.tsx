@@ -72,7 +72,21 @@ export function SafetyAccess({ emailAlerts, className = "", compact = false }: {
     requestKey.current ??= crypto.randomUUID();
     if (sentStart.current?.key !== requestKey.current) sentStart.current = { key: requestKey.current, at: Date.now(), body: { from: { lat: fix.point.lat, lon: fix.point.lon }, share: recipientIds.length > 0, recipientIds, etaMinutes: 30, idempotencyKey: requestKey.current } };
     const r = await api<{ trip: TripView }>("/api/trips", { body: sentStart.current.body });
-    setBusy(false); if (r.ok || r.code === "trip_active") leaveSharing(true); else setMessage(r.message);
+    if (!r.ok && r.code === "trip_active") {
+      // A journey is already running: the people she just chose follow THAT journey, said plainly — never a silent swap.
+      const current = await api<{ trip: TripView | null }>("/api/trips/current");
+      const running = current.ok ? current.data.trip : null;
+      if (running && recipientIds.length) {
+        const shared = await api<{ trip: TripView }>(`/api/trips/${running.id}/share`, { body: { recipientIds } });
+        setBusy(false);
+        if (shared.ok) leaveSharing(true); else setMessage(`You already have a journey running, and adding them to it failed: ${shared.message}`);
+        return;
+      }
+      setBusy(false);
+      if (running) leaveSharing(true); else setMessage(r.message);
+      return;
+    }
+    setBusy(false); if (r.ok) leaveSharing(true); else setMessage(r.message);
   };
   return <>
     <div className={className}><HelpCluster compact={compact} onUnsafe={() => setOpen(true)} /></div>

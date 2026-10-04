@@ -17,7 +17,7 @@ import { HELP_ICON } from "@/components/app/kinds";
 import { api } from "@/lib/api-client";
 import { handOffAsk } from "@/lib/ask-handoff";
 import { setPlanDraft } from "@/lib/plan-store";
-import { clearPendingDestination, peekPendingDestination, rememberLocationChoice, setPendingDestination, shouldAutoLocate, usableLocationPoint, useClock, useLocation } from "@/lib/location-store";
+import { clearPendingDestination, peekPendingDestination, chooseLocation, setPendingDestination, shouldAutoLocate, usableLocationPoint, useClock, useLocation } from "@/lib/location-store";
 import { useCountry } from "@/lib/locale-store";
 import { blindSpotsClaim, daylightClaim, helpClaim, hoursWords, lightingClaim, notesClaim, updatesClaim, walkTimeClaim, type Claim, type CommunityNote, type WayOption } from "@/lib/brief";
 import { HELP_CLASSES, helpWeightsFor, hoursState, isNight, rankHelpPoints, type HelpPoint } from "@/domain/help-points";
@@ -165,7 +165,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
 
         {!focus ? (
           <div className="mt-5">
-            <LiveNowCard now={clock} point={null} area={null} stats={[]} line={null} footer={null} locating={loc.status === "asking"} locationState={loc.status} onLocate={() => { rememberLocationChoice(true); void loc.request(); }} />
+            <LiveNowCard now={clock} point={null} area={null} stats={[]} line={null} footer={null} locating={loc.status === "asking"} locationState={loc.status} onLocate={() => { void chooseLocation(); }} />
             <div className="mt-3"><HelpNextCard from="around" check={null} impactLine={null} signedIn={signedIn} country={country.iso ?? null} /></div>
           </div>
         ) : (

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearLocation, currentLocation, freshLocation, locationUsable, rememberLocationChoice, requestLocation, shouldAutoLocate, watchWhileVisible, type LocState } from "@/lib/location-store";
-import { clearCountry, currentCountry, invalidateCountryForLocation, setCountry } from "@/lib/locale-store";
+import { clearCountry, countryConfirmedAt, currentCountry, invalidateCountryForLocation, setCountry } from "@/lib/locale-store";
 import { UNKNOWN_COUNTRY, type CountryContext } from "@/domain/country-context";
 const london = { lat: 51.47, lon: -0.45 };
 const profile: CountryContext = { ...UNKNOWN_COUNTRY, iso: "GB", countryName: "United Kingdom", timezone: "Europe/London", emergency: { ...UNKNOWN_COUNTRY.emergency, status: "VERIFIED", primary: { number: "999", label: "Emergency", scope: "all" } } };
@@ -42,14 +42,15 @@ describe("current location and emergency jurisdiction", () => {
     setCountry(profile); expect(currentCountry().emergency.primary).toBeNull();
     setCountry(profile, { point: london, checkedAt: Date.now() }); expect(currentCountry().iso).toBe("GB");
     invalidateCountryForLocation({ lat: 35.68, lon: 139.76 }); expect(currentCountry().iso).toBeNull();
-    setCountry(profile, { point: london, checkedAt: Date.now() }); vi.advanceTimersByTime(120_000); expect(currentCountry().emergency.primary).toBeNull();
+    // Past the fresh window the remembered country keeps the number on screen, labelled with when it was confirmed (audit P0-1).
+    setCountry(profile, { point: london, checkedAt: Date.now() }); vi.advanceTimersByTime(120_000); expect(currentCountry().emergency.primary?.number).toBe("999"); expect(countryConfirmedAt()).not.toBeNull();
   });
-  it("does not reuse the earlier point or country after permission denial", async () => {
+  it("does not reuse the earlier point after permission denial; the remembered country (not a position) stays labelled", async () => {
     let denied = false;
     vi.stubGlobal("navigator", { geolocation: { getCurrentPosition: (ok: (pos: unknown) => void, error: (err: unknown) => void) => denied ? error({ code: 1, PERMISSION_DENIED: 1 }) : ok({ coords: { latitude: london.lat, longitude: london.lon, accuracy: 10 }, timestamp: Date.now() }) } });
     expect((await requestLocation()).point).not.toBeNull();
     setCountry(profile, { point: london, checkedAt: Date.now() }); denied = true;
-    const next = await requestLocation(); expect(next.status).toBe("denied"); expect(next.point).toBeNull(); expect(currentCountry().iso).toBeNull();
+    const next = await requestLocation(); expect(next.status).toBe("denied"); expect(next.point).toBeNull(); expect(currentCountry().iso).toBe("GB"); expect(countryConfirmedAt()).not.toBeNull();
   });
   it("ignores a location response which arrives after personal state was cleared", async () => {
     let answer: (pos: unknown) => void = () => {};

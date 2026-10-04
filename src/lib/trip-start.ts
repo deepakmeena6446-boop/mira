@@ -1,3 +1,5 @@
+import { api } from "@/lib/api-client";
+
 /**
  * Extra fields for POST /api/trips, read from THIS phone at the moment she starts: its IANA
  * time zone (so her contacts' emails and the live link show her local time, labelled) and the
@@ -21,4 +23,14 @@ export function suggestionQuery(mode?: string, now: Date = new Date()): string {
   const q = new URLSearchParams({ hour: String(now.getHours()) });
   if (mode) q.set("mode", mode);
   return `?${q.toString()}`;
+}
+
+/**
+ * A start refused with `trip_active`: another journey is already open. Say so plainly and never open
+ * that other journey in place of this one — it may go somewhere else and be shared with different people.
+ */
+export async function activeTripMessage(): Promise<string> {
+  const current = await api<{ trip: { destination: { name: string }; autoArrival: boolean } | null }>("/api/trips/current");
+  const where = current.ok && current.data.trip?.autoArrival && current.data.trip.destination.name ? ` to ${current.data.trip.destination.name}` : "";
+  return `You already have a journey running${where}. Nothing new started, and nobody was told about this one. Open it to tap “I’m here” or end it, then start again.`;
 }

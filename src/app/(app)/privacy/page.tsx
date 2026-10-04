@@ -36,7 +36,7 @@ export default function PrivacyPage() {
 
         <ul className="mt-6 space-y-3">
           <Item icon="pin" title="Your location">
-            <p>Used to show where you are and what&apos;s around. It isn&apos;t stored unless you&apos;re on a trip you started.</p>
+            <p>Used to show where you are, what&apos;s around, and the right emergency number. Mira asks once; if you allow it, it&apos;s checked each time you open Mira and kept current while Mira is on screen. Turn it off any time in You → App. Your position isn&apos;t stored unless you&apos;re on a trip you started.</p>
             <p>During a trip, only your last few positions are kept, and they&apos;re deleted the moment the trip ends. There&apos;s no location history.</p>
             {providerModes().maps === "google" ? (
               <p>
@@ -135,10 +135,15 @@ export default function PrivacyPage() {
               check, a correction, a lighting answer, a message to Mira) and the day. No time, no place, no text. It&apos;s never sent to Mira, and it&apos;s cleared
               after 60 days, when you tap &ldquo;Reset Mira suggestions&rdquo; in You, when you sign out and when you delete your account.
             </p>
+            <p>
+              It also keeps the last country Mira confirmed from your phone&apos;s position — the country only, never where you were — so Emergency can
+              still show its number when the screen opens before location is on, when you&apos;re offline, or when a lookup fails. It&apos;s cleared when
+              you sign out and when you delete your account.
+            </p>
           </Item>
           <Item icon="sparkle" title="Chatting with Mira">
             <p>
-              Signed-in nearby, reporting and general product chat is saved to your account for 30 days so Mira can follow the conversation. Movement planning follows the temporary-plan handling above. Mira&apos;s replies are saved without area names, walking times or
+              Signed-in nearby, reporting and general product chat is saved to your account for 30 days so Mira can follow the conversation. Questions about a plan you have open in Plan follow the temporary-plan handling above and aren&apos;t saved. Mira&apos;s replies are saved without area names, walking times or
               nearby places. <strong className="text-ink">Your own messages are saved exactly as you typed them</strong>, so don&apos;t type addresses you&apos;d rather not
               keep. Clear it any time in You.
             </p>
@@ -150,7 +155,7 @@ export default function PrivacyPage() {
             <p>For basic product measurement, Mira counts only the UTC day and a fixed outcome type when a plan gives a ready or partial answer or you confirm a journey action. No account, IP, question, route, coordinate or contact is in that counter. The counts are deleted after 30 days.</p>
           </Item>
           <Item icon="report" title="Reports">
-            <p>Only a rough area (about 1 km), roughly when, and the kind of thing are kept — never your exact spot. Notes are encrypted and read only by a moderator.</p>
+            <p>Only a rough area (about 1 km), roughly when, and the kind of thing are kept — never your exact spot. Notes are encrypted and read only by a moderator. To stop one person posing as many, each report also keeps a fingerprint of your network that changes every week — never your address.</p>
             <p>
               Reports are submitted privately. They may be reviewed before they can contribute to Mira&apos;s information, and public notes are currently switched
               off: nothing from reports is shown to anyone during this beta. When switched on, a fixed-wording note appears on a route that passes through the area only when at least five different people have reported something similar nearby, and disappears after five weeks. Reports are deleted within 30 days. How reports are reviewed is in Mira&apos;s moderation policy (MODERATION_POLICY.md in the project).

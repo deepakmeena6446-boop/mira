@@ -17,6 +17,11 @@ import { CATEGORY_POLARITY, TAG_PHRASE, type Polarity } from "./report/taxonomy"
 import type { TimeBand } from "./time-bands";
 
 export const MIN_CONTRIBUTORS = 5;
+/**
+ * …from at least this many networks (audit P14-001: one person, five browsers, one connection). Not five: many
+ * people share a mobile carrier's address, so different people often look like one network.
+ */
+export const MIN_NETWORKS = 3;
 export const MIN_NEW_CONTRIBUTORS = 5;
 export const ELIGIBLE_SUBMISSION_DAYS = 21;
 export const RELEASE_TTL_DAYS = 35;
@@ -40,6 +45,8 @@ const BAND_PHRASE: Record<TimeBand, string> = { day: "the day", evening: "the ev
 export interface EligibleReport {
   reportId: string;
   actorHash: string;
+  /** Keyed, week-salted hash of the report's network prefix; null for reports from before it was recorded. */
+  networkHash?: string | null;
   duplicateGroup: string | null;
   cellId: string;
   timeBand: string;
@@ -61,7 +68,7 @@ export interface KeyedRelease {
   reportIds: string[]; // private
 }
 
-export type SkipReason = "below_threshold" | "not_enough_new_contributors" | "burst_hold" | "no_template";
+export type SkipReason = "below_threshold" | "not_enough_networks" | "not_enough_new_contributors" | "burst_hold" | "no_template";
 
 export function releaseKey(cellId: string, band: string, category: string): string {
   return `${cellId}|${band}|${category}`;
@@ -131,6 +138,11 @@ export function computeReleases(reports: EligibleReport[], releaseAt: Date, prev
     const contributions = independentContributions(list);
     if (contributions.length < MIN_CONTRIBUTORS) {
       skipped.push({ key, reason: "below_threshold" });
+      continue;
+    }
+    // A report with no recorded network (older) counts as its own network: it never blocks, it just can't help an attacker.
+    if (new Set(contributions.map((c) => c.networkHash ?? `actor:${c.actorHash}`)).size < MIN_NETWORKS) {
+      skipped.push({ key, reason: "not_enough_networks" });
       continue;
     }
     const prior = previous.get(key);

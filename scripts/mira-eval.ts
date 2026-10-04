@@ -273,7 +273,7 @@ async function main() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set (.env.local).");
   const i = process.argv.indexOf("--models");
-  const models = i > 0 ? process.argv[i + 1].split(",") : ["claude-sonnet-5", "claude-opus-5", "claude-haiku-4-5-20251001"];
+  const models = i > 0 ? process.argv[i + 1].split(",") : ["claude-sonnet-5-5", "claude-opus-5-5", "claude-sonnet-5"];
   const api = new Anthropic({ apiKey, timeout: 60_000, maxRetries: 2 });
   const results: Result[] = [];
   for (const model of models) {

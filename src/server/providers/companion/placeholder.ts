@@ -1,4 +1,6 @@
 import "server-only";
+import { answerPlanQuestion } from "@/domain/plan-ask";
+import { shouldSeedPlan } from "@/domain/ask-routing";
 import type { MiraCard, MiraEvent, MiraTurn } from "./types";
 import type { MiraTools } from "./tools";
 import { daypartFor } from "@/domain/daypart";
@@ -19,7 +21,7 @@ const RX = {
   judgement: JUDGEMENT,
   uneasy: /\b(uneasy|nervous|anxious|weird|uncomfortable|creepy|not ok|not okay|ajeeb|ghabra|dar)\b/i,
   staffed: /\b(staffed|help point|somewhere with people|where people are|somewhere open|police station|hospital)\b/i,
-  sosInfo: /\b(emergency number|police number|ambulance number|what do i dial|which number|helpline)\b/i,
+  sosInfo: /\b(emergency (?:number|no\.?)|police number|ambulance number|what (?:number )?do i (?:dial|call)|which number|number (?:to|do i) (?:dial|call)|helpline)\b/i,
   safetyNews: /\b(safety updates?|safety news|recent (?:safety |crime )?(?:news|incidents?|reports?|updates?)|what'?s been happening|news (?:about|in|for) (?:this|the|my) (?:city|area))\b/i,
   share: /\b(share (?:this|my|the) (?:trip|journey|walk|location|link)|send (?:my |the )?(?:live )?link|tell my people|share (?:it |this )?with my (?:people|circle|family|friends|mum|mom)|trip share kar)\b/i,
   home: /\b(home|ghar|hostel|pg|room|going back|wapas)\b/i,
@@ -107,6 +109,9 @@ async function* speak(text: string): AsyncGenerator<MiraEvent> {
 export async function* placeholderMira(message: string, history: MiraTurn[], tools: MiraTools, firstName: string): AsyncGenerator<MiraEvent> {
   const m = message.trim();
   const hinglish = RX.hinglish.test(m);
+  // A guest has no name: greetings read "Good evening 🌆", never "Good evening, 🌆".
+  const name = firstName ? `, ${firstName}` : "";
+  const sp = firstName ? ` ${firstName}` : "";
   const cards: MiraCard[] = [];
   let reply: string;
 
@@ -146,8 +151,16 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     reply = `I don't have enough verified information to make that judgement. What I can do: ${help.points.length ? "show Help Points near you and their hours, " : ""}${num}and share your journey with someone you trust.`;
     if (help.points.length) cards.push({ type: "help_points", title: "Help Points near you", points: help.points });
   } else if (RX.sosInfo.test(m)) {
-    reply = emergencyFacts(ctx0.country);
-    cards.push({ type: "sos", contacts: await tools.trustedContacts() });
+    // A country she names ("in Japan") gets that country's reviewed profile — every service (audit P05-004) — and
+    // is said to be for there; otherwise where she is, with the Emergency card.
+    const named = /\b(?:in|for)\s+([\p{L}\p{M} .'-]{2,80})\s*[?.!]*$/iu.exec(m)?.[1]?.trim();
+    const there = named ? tools.emergencyFor?.(named) ?? null : null;
+    if (named && there) reply = `${emergencyFacts(there)} That's for ${there.countryName}, not where you are now.`;
+    else if (named) reply = `I don't have a reviewed profile for ${named}. Check an official local source; your phone's own emergency call works anywhere.`;
+    else {
+      reply = emergencyFacts(ctx0.country);
+      cards.push({ type: "sos", contacts: await tools.trustedContacts() });
+    }
   } else if (RX.safetyNews.test(m)) {
     reply = tools.safetyUpdatesOn()
       ? "Recent Safety updates for your city are on Today: news reports with their publisher and date. They're reported context, not a verdict on any area, and no updates doesn't mean nothing happened."
@@ -165,8 +178,8 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     else
       reply = uneasy
         ? hinglish
-          ? `Main yahin hoon, ${firstName}. ${help.length ? "Paas mein kuch Help Points hain." : ""} Chaho toh main tumhari trip share kar doon.`
-          : `I'm right here, ${firstName}. ${help.length ? "These are the nearest Help Points — places where help is usually available." : failed ? "I couldn't check Help Points just now." : ""} Want me to set up your journey so you can share it with someone you trust?`
+          ? `Main yahin hoon${name}. ${help.length ? "Paas mein kuch Help Points hain." : ""} Chaho toh main tumhari trip share kar doon.`
+          : `I'm right here${name}. ${help.length ? "These are the nearest Help Points — places where help is usually available." : failed ? "I couldn't check Help Points just now." : ""} Want me to set up your journey so you can share it with someone you trust?`
         : help.length
           ? "Here are the nearest Help Points. Hours are as the source lists them."
           : failed
@@ -221,14 +234,14 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     const ctx = ctx0;
     const where = ctx.area ? (ctx.area.toLowerCase().startsWith("near") ? ctx.area.charAt(0).toLowerCase() + ctx.area.slice(1) : "in " + ctx.area) : null;
     const open = {
-      dawn: `Morning, ${firstName}! ☀️ Early start?`,
-      day: `${ctx.hour < 12 ? "Good morning" : "Good afternoon"}, ${firstName}!`,
-      evening: `Good evening, ${firstName} 🌆`,
-      night: `Hey ${firstName} 🌙 It's late.`,
+      dawn: `Morning${name}! ☀️ Early start?`,
+      day: `${ctx.hour < 12 ? "Good morning" : "Good afternoon"}${name}!`,
+      evening: `Good evening${name} 🌆`,
+      night: `Hey${sp} 🌙 It's late.`,
     }[part];
     const ask = running ? `You're on your way to ${running.destination.name}.` : part === "night" ? (home ? `Want me to share your walk to ${home.label}?` : "Heading somewhere? I can share your journey live.") : "Where are you headed?";
     reply = hinglish
-      ? `Hi ${firstName}! ${ctx.area ? priv(`Tum ${ctx.area.replace(/^Near /, "")} ke paas ho. `) : ""}${part === "night" ? "Kaafi late ho gaya hai — ghar tak ki walk share kar doon?" : "Kahan ja rahi ho?"}`
+      ? `Hi${sp}! ${ctx.area ? priv(`Tum ${ctx.area.replace(/^Near /, "")} ke paas ho. `) : ""}${part === "night" ? "Kaafi late ho gaya hai — ghar tak ki walk share kar doon?" : "Kahan ja rahi ho?"}`
       : `${open} ${where ? priv(`Looks like you're ${where}. `) : ""}${ask}`;
     if (ctx.late && offerHome) cards.push(tripCard(await tools.proposeTrip({ name: offerHome.label, lat: offerHome.lat, lon: offerHome.lon })));
     if (running) cards.push(statusCard(running));
@@ -236,8 +249,14 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
     reply = hinglish ? "Koi baat nahi! Main yahin hoon." : part === "night" ? "Anytime 🌙 I'm around if you head out again." : "Anytime. I'm here whenever you're heading out.";
   } else if (RX.who.test(m)) {
     reply = `I'm Mira, your travel companion. I can share your journey live with people you trust, find Help Points and what's open around you, and help you report something privately. I'm not an emergency service — for that, ${emergencySentence(ctx0.country)}.`;
+  } else if (tools.openPlan?.() || shouldSeedPlan(m)) {
+    // No model: the same deterministic plan answer the Plan screen's evidence supports.
+    const plan = tools.openPlan?.() ?? null;
+    const checked = plan && tools.checkPlan ? await tools.checkPlan() : null;
+    reply = answerPlanQuestion(m, plan, checked?.evidence ?? null).text;
+    if (checked) cards.push(checked.card);
   } else {
-    reply = `I can't answer that one yet. Right now I'm best at sharing your journey, finding Help Points and what's open nearby, and private reports — try "take me home" or "find Help Points nearby".`;
+    reply = `I can't answer that one yet. Right now I'm best at sharing your journey, finding Help Points and what's open nearby, and private reports — try "take me home" or "find Help Points nearby". If you're not okay right now, use “I feel unsafe” or Emergency at the top of the screen.`;
     if (part === "night" && offerHome) {
       reply += ` It's late, so here's your walk to ${offerHome.label} if you want it.`;
       cards.push(tripCard(await tools.proposeTrip({ name: offerHome.label, lat: offerHome.lat, lon: offerHome.lon })));

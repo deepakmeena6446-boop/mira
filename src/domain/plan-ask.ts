@@ -2,6 +2,7 @@ import type { MovementIntent } from "./plan-contract";
 import { resolvedDestination, resolvedOrigin, type PlanDraft } from "./plan-state";
 import { deterministicIntentHints, applyIntentHints, type MovementIntentHints } from "./plan-intent";
 import { laterDaylight, type PlanOptionsResult } from "./plan-options";
+import { shouldSeedPlan } from "./ask-routing";
 
 export type PlanAskAnswer = { text: string; next: "edit_plan" | "review_options"; evidence: PlanOptionsResult | null };
 
@@ -37,6 +38,11 @@ export function answerPlanQuestion(message: string, plan: MovementIntent | null,
     }
     const arrival = /land|airport|station|flight|hotel|arriv/i.test(message);
     const outing = /date|event|concert|venue|return/i.test(message);
+    // Not a movement plan at all ("can you alert my sister?", "I'm fine", "how do you use my data?"): never answer
+    // with a route question. Say plainly where help is, and that Mira can't contact anyone for her.
+    if (!arrival && !outing && !shouldSeedPlan(message) && !details.destination && !explicitTimeHint(message)) {
+      return { text: "I'm not sure that's a way I can check for you. If you're not okay right now, use “I feel unsafe” or Emergency at the top of the screen — Mira can't call or alert anyone for you. To plan a way somewhere, tell me where you're starting and where you're going.", next: "edit_plan", evidence: null };
+    }
     const first = arrival
       ? "For a late arrival, I can keep the destination's local time and compare available mapped travel facts. I cannot assume a train, taxi or hotel desk is operating. Which airport or station are you arriving at?"
       : outing

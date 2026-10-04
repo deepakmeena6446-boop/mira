@@ -3,12 +3,12 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { useOverlay } from "@/lib/use-overlay";
+import { useOverlay, useScrimClose } from "@/lib/use-overlay";
 import { useClock } from "@/lib/location-store";
 import { HELP_CLASSES, SOURCE_NAME, helpWeightsFor, hoursLine, hoursShort, isNight, rankHelpPoints, type HelpClass, type HelpPoint, type RankedHelpPoint } from "@/domain/help-points";
 import { localTimeInZone } from "@/domain/opening-hours";
 import { useCountry } from "@/lib/locale-store";
-import { EmergencyPill } from "@/components/app/EmergencyPill";
+import { EmergencyPill, LastConfirmedNote } from "@/components/app/EmergencyPill";
 import { emergencyStatusNote, otherEmergencyNumbers } from "@/domain/country-context";
 import { Icon } from "@/components/ui/Icon";
 import { HELP_ICON } from "./kinds";
@@ -90,6 +90,7 @@ export function UnsafeSheet({
   change?: UnsafeChangeAction | null;
 }) {
   useOverlay(open, onClose);
+  const scrimClose = useScrimClose(open, onClose);
   const now = useClock();
   const locale = useCountry();
   const placeClock = localTimeInZone(now ?? new Date(), locale.timezone);
@@ -122,7 +123,7 @@ export function UnsafeSheet({
   };
   // Portal: screens are position:fixed (their own stacking context), and this must sit above the tab bar.
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-labelledby="unsafe-h" className="fixed inset-0 z-50 flex items-end justify-center bg-scrim animate-fade sm:items-center" onClick={onClose}>
+    <div role="dialog" aria-modal="true" aria-labelledby="unsafe-h" className="fixed inset-0 z-50 flex items-end justify-center bg-scrim animate-fade sm:items-center" onClick={scrimClose}>
       <div
         onClick={(e) => e.stopPropagation()}
         className="max-h-[92dvh] min-w-0 w-full max-w-[min(28rem,100vw)] overflow-x-hidden overflow-y-auto overscroll-contain rounded-t-[var(--radius-lg)] bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-float)] sm:rounded-[var(--radius-lg)]"
@@ -218,6 +219,7 @@ export function UnsafeSheet({
           <CallSomeone />
           <EmergencyPill variant="block" className="min-w-0 [white-space:normal] [&>span]:min-w-0 [&>span]:break-words" />
         </div>
+        <LastConfirmedNote className="mt-2" />
 
         {/* Partly verified, region-dependent or unverified: say so beside the call options. */}
         {emergencyStatusNote(locale) ? <p className="mt-2 text-xs text-ink-muted">{emergencyStatusNote(locale)}</p> : null}
@@ -350,8 +352,8 @@ function TellMyPeople({ tell }: { tell: UnsafeTellAction }) {
             <ul className="mt-2 grid gap-2">
               {state.whatsapp.map((w) => (
                 <li key={w.url}>
-                  <a href={w.url} target="_blank" rel="noopener noreferrer" onClick={() => setOpened((xs) => [...xs, w.name])} className="flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-surface px-4 font-semibold text-ink">
-                    <Icon name="send" className="size-4" /> {opened.includes(w.name) ? `Opened WhatsApp for ${w.name} ✓` : `Send to ${w.name} on WhatsApp`}
+                  <a href={w.url} target="_blank" rel="noopener noreferrer" onClick={() => setOpened((xs) => [...xs, w.url])} className="flex min-h-12 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-surface px-4 font-semibold text-ink">
+                    <Icon name="send" className="size-4" /> {opened.includes(w.url) ? `Opened WhatsApp for ${w.name} ✓` : `Send to ${w.name} on WhatsApp`}
                   </a>
                 </li>
               ))}

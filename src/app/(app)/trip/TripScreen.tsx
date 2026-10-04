@@ -8,6 +8,7 @@ import { EmergencyPill } from "@/components/app/EmergencyPill";
 import { HelpCluster } from "@/components/app/HelpCluster";
 import { useChromeTop } from "@/lib/use-chrome-top";
 import { journeyNextAction } from "@/lib/trip-actions";
+import { publishTrip } from "@/lib/current-trip-store";
 import { haptic } from "@/lib/haptics";
 import { UnsafeSheet } from "@/components/app/UnsafeSheet";
 import { AfterArrival } from "@/components/app/AfterArrival";
@@ -131,16 +132,37 @@ export function TripScreen({
     };
   }, [open]);
 
+  // Closed somewhere else (I'm here or End on another device, the account deleted, signed out): never keep showing a
+  // live journey and its alert promise for a trip that no longer runs (audit P18-001 / P15-001).
+  const stillOpen = useRef(true);
+  useEffect(() => { stillOpen.current = trip.state === "active" || trip.state === "missed"; }, [trip.state]);
+  // Kept in a ref so `refresh` stays stable: callbacks and effects below depend on it.
+  const leave = useRef<(signedOut: boolean) => void>(() => {});
+  useEffect(() => {
+    leave.current = (signedOut) => {
+      toast(signedOut ? "You're signed out here, so this journey isn't running on this device any more." : "This journey was closed on another device. Nothing is being shared, and nobody will be alerted.", "info");
+      router.replace("/trips");
+    };
+  }, [router, toast]);
   const refresh = useCallback(async () => {
     const r = await api<{ trip: TripView | null; safetyNet?: SafetyNet }>("/api/trips/current");
-    if (r.ok && r.data.trip) setTrip(r.data.trip);
+    if (r.ok && r.data.trip) { setTrip(r.data.trip); publishTrip(r.data.trip); }
     if (r.ok && r.data.safetyNet) setNet(r.data.safetyNet);
+    if (stillOpen.current && ((r.ok && !r.data.trip) || (!r.ok && r.status === 401))) {
+      stillOpen.current = false;
+      publishTrip(null);
+      leave.current(!r.ok);
+    }
   }, []);
 
   useEffect(() => {
     const p = setInterval(refresh, 20_000);
-    return () => clearInterval(p);
+    const onVisible = () => { if (document.visibilityState === "visible") void refresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(p); document.removeEventListener("visibilitychange", onVisible); };
   }, [refresh]);
+  // Every change she makes here (arrive, end, extend, share) reaches the journey bar and Home at once.
+  useEffect(() => { publishTrip(trip); }, [trip]);
 
   useEffect(() => {
     if (!sharingOpen || contactsState !== "idle") return;
@@ -155,8 +177,9 @@ export function TripScreen({
 
   const sharedOk = trip.sharedWith.filter((c) => c.notified);
   const onWhatsApp = trip.sharedWith.filter((c) => c.whatsapp);
-  // Which WhatsApp chats she opened on this device (a convenience, per journey): "opened", never "sent".
-  const openedKey = `mira.wa.${trip.id}`;
+  // Which WhatsApp chats she opened on this device (a convenience, per journey): "opened", never "sent". By contact id:
+  // two contacts can share a name, and one tap must never tick both (audit P07-001).
+  const openedKey = `mira.wa.v2.${trip.id}`;
   const [openedSaved, setOpened] = useState<string[]>(() => {
     try {
       return typeof window === "undefined" ? [] : (JSON.parse(sessionStorage.getItem(openedKey) ?? "[]") as string[]);
@@ -166,9 +189,9 @@ export function TripScreen({
   });
   // Shown only once the device clock exists (null while server-rendering and hydrating), so both renders agree.
   const opened = clock ? openedSaved : [];
-  const markOpened = (name: string) =>
+  const markOpened = (id: string) =>
     setOpened((xs) => {
-      const next = xs.includes(name) ? xs : [...xs, name];
+      const next = xs.includes(id) ? xs : [...xs, id];
       try {
         sessionStorage.setItem(openedKey, JSON.stringify(next));
       } catch {
@@ -446,6 +469,11 @@ export function TripScreen({
               ? `Glad you're at ${trip.destination.name}. ${sharedOk.length ? `${names(sharedOk.map((c) => c.name))} can see you arrived.` : "Your live link now just says you arrived."}`
               : "Live sharing is off."}
           </p>
+          {trip.alert === "sent" ? (
+            <p className="mt-2 max-w-sm text-sm text-ink-muted animate-rise">
+              {(() => { const told = trip.sharedWith.filter((c) => c.alertDelivery === "sent").map((c) => c.name); return `${told.length ? names(told) : "The people Mira emailed"} ${told.length === 1 ? "was" : "were"} told you missed your check-in. Mira is emailing them now that this journey is over — call them if you can.`; })()}
+            </p>
+          ) : null}
           {/* The one question after a journey (or nothing): a Mira Check that helps the next person. */}
           <div className="mt-6 w-full max-w-sm text-left">
             <AfterArrival trip={trip} route={route} hour={clock ? clock.getHours() : null} onDone={() => clearTripRoutes()} />
@@ -478,19 +506,24 @@ export function TripScreen({
   const missed = trip.state === "missed";
   const emailFailed = trip.sharedWith.filter((c) => c.viaEmail && !c.notified);
   const attention = netDown || gps !== "ok" || uploadFailing || missed || emailFailed.length > 0;
-  const next = journeyNextAction({ missed, whatsapp: onWhatsApp.map((c) => c.name), opened, following: sharedOk.length, canShare: Boolean(trip.shareUrl) });
+  const next = journeyNextAction({ missed, whatsapp: onWhatsApp.map((c) => c.id), opened, following: sharedOk.length, canShare: Boolean(trip.shareUrl) });
   // Honest alert behaviour: only claim an automatic email when email works, someone accepted and got the link, and the worker is up.
   const alertsOn = emailAlerts && trip.sharedWith.some((contact) => contact.viaEmail) && !netDown;
   const emailRecipients = trip.sharedWith.filter((contact) => contact.viaEmail);
   const acceptedAlerts = emailRecipients.filter((contact) => contact.alertDelivery === "sent");
   const uncertainAlerts = emailRecipients.filter((contact) => contact.alertDelivery === "unconfirmed" || contact.alertDelivery === "failed");
+  // After the miss, receipts come only from each person's own delivery record — never from who is on the trip now.
+  const notAlerted = trip.sharedWith.filter((contact) => contact.alertDelivery === "none" || contact.alertDelivery === "not_attempted");
+  const notAlertedLine = notAlerted.length ? ` ${names(notAlerted.map((contact) => contact.name))} ${notAlerted.length === 1 ? "hasn't" : "haven't"} been alerted — call or message them directly.` : "";
   const noun = journeyNoun(trip.autoArrival ? trip.mode : "other");
   const aheadCount = ranked.filter((p) => p.ahead).length;
   const mapPins = ranked.slice(0, 6).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, icon: HELP_ICON[p.cls] ?? "pin", strong: HELP_CLASSES[p.cls].emergency }));
   const directions = (p: { lat: number; lon: number }) => `https://www.google.com/maps/dir/?api=1&destination=${p.lat.toFixed(5)},${p.lon.toFixed(5)}&travelmode=walking`;
   // Who can see her, in one line (receipts only).
   const whoLine = sharedOk.length ? `The email provider accepted a journey link for ${names(sharedOk.map((c) => c.name))}. Receipt and viewing are unknown.` : onWhatsApp.length ? `${names(onWhatsApp.map((c) => c.name))} ${onWhatsApp.length === 1 ? "gets" : "get"} your link when you send it on WhatsApp.` : "Only people you send your live link to can follow.";
-  const alertLine = alertsOn
+  const alertLine = missed
+    ? `Your check-in time has passed. Mira sends one missed-check-in alert per journey and won't alert anyone added now.${notAlertedLine}`
+    : alertsOn
     ? `If you haven't ${trip.autoArrival ? "arrived" : "checked in"} ${Math.round(MISS_GRACE_MS / 60_000)} min after ${trip.autoArrival ? "your ETA" : "your sharing time ends"}, Mira attempts an email to ${names(emailRecipients.map((contact) => contact.name))}. Sending can fail; receipt is unknown.`
     : !emailAlerts
       ? `Nobody is alerted automatically if you don't ${trip.autoArrival ? "arrive" : "check in"} — Mira can't send email alerts yet.`
@@ -531,11 +564,11 @@ export function TripScreen({
               <p className="font-semibold">Are you okay? Tap &ldquo;I&apos;m here&rdquo; if you&apos;ve arrived.</p>
               <p className="mt-1 text-sm text-ink-muted">
                 {trip.alert === "sent"
-                  ? `The email provider accepted the missed-check-in message for ${names(acceptedAlerts.length ? acceptedAlerts.map((contact) => contact.name) : emailRecipients.map((contact) => contact.name))}. Receipt is unknown.`
+                  ? `${acceptedAlerts.length ? `The email provider accepted the missed-check-in message for ${names(acceptedAlerts.map((contact) => contact.name))}.` : "The email provider accepted the missed-check-in message for someone who is no longer on this journey."} Receipt is unknown.${notAlertedLine}`
                   : trip.alert === "claimed"
-                    ? "I'm letting your contacts know now…"
+                    ? `I'm letting your contacts know now…${notAlertedLine}`
                     : trip.alert === "failed" || trip.alert === "unconfirmed"
-                      ? `${acceptedAlerts.length ? `The provider accepted email for ${names(acceptedAlerts.map((contact) => contact.name))}. ` : ""}${uncertainAlerts.length ? `Email was rejected or unconfirmed for ${names(uncertainAlerts.map((contact) => contact.name))}. ` : "The email attempt could not be confirmed. "}Call or message them directly.`
+                      ? `${acceptedAlerts.length ? `The provider accepted email for ${names(acceptedAlerts.map((contact) => contact.name))}. ` : ""}${uncertainAlerts.length ? `Email was rejected or unconfirmed for ${names(uncertainAlerts.map((contact) => contact.name))}. ` : "The email attempt could not be confirmed. "}Call or message them directly.${notAlertedLine}`
                       : onWhatsApp.length
                         ? "Nobody was notified automatically — Mira can't send WhatsApp for you. Use “Send to …” below, or call someone."
                         : "Nobody was notified — either no contact on this trip has accepted your invite, or email isn't available right now."}{" "}
@@ -557,11 +590,11 @@ export function TripScreen({
             {onWhatsApp.length ? (
               <ul className="grid gap-2">
                 {onWhatsApp.map((c) => {
-                  const isNext = next.kind === "whatsapp" && next.name === c.name;
+                  const isNext = next.kind === "whatsapp" && next.id === c.id;
                   return (
-                    <li key={c.name}>
-                      <a href={c.whatsapp!} target="_blank" rel="noopener noreferrer" onClick={() => markOpened(c.name)} data-variant={isNext ? "primary" : "secondary"} className={cx("flex min-h-13 items-center justify-center gap-2 rounded-2xl px-4 font-semibold", isNext ? "bg-accent text-accent-ink" : opened.includes(c.name) ? "bg-accent-soft text-ink" : "bg-surface text-ink ring-1 ring-line-strong")}>
-                        <Icon name={opened.includes(c.name) ? "check" : "send"} className="size-4" /> {opened.includes(c.name) ? `Opened WhatsApp for ${c.name} ✓` : `Send to ${c.name}`}
+                    <li key={c.id}>
+                      <a href={c.whatsapp!} target="_blank" rel="noopener noreferrer" onClick={() => markOpened(c.id)} data-variant={isNext ? "primary" : "secondary"} className={cx("flex min-h-13 items-center justify-center gap-2 rounded-2xl px-4 font-semibold", isNext ? "bg-accent text-accent-ink" : opened.includes(c.id) ? "bg-accent-soft text-ink" : "bg-surface text-ink ring-1 ring-line-strong")}>
+                        <Icon name={opened.includes(c.id) ? "check" : "send"} className="size-4" /> {opened.includes(c.id) ? `Opened WhatsApp for ${c.name} ✓` : `Send to ${c.name}`}
                       </a>
                     </li>
                   );

@@ -52,6 +52,7 @@ Approving a report does **not** publish it; it only lets it count toward a commu
 Publishing notes is **switched off** during the beta (see *Review*). When it is switched on, notes are prepared once a week, and a note appears only when all of these hold:
 
 - At least **five independent people** have approved reports in the same area, the same time band and the same category. Different categories are never combined to reach five.
+- Those people reported from at least **three different networks**, so one person with several browsers or accounts on one connection can't make a note. Mira keeps only a weekly-changing keyed fingerprint of each report's coarse network, never the address. Many people share a mobile carrier's address, so this never merges different people; it only adds the requirement.
 - Each person counts once. Duplicates (the same person or browser reporting the same thing, or identical text) count as one.
 - Reports were sent in the **21 days** before the note is prepared, about something that happened within roughly the week before the report was sent, with a known time band.
 - A tag is mentioned only if at least five of those people share it, and at most two tags are mentioned.

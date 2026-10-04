@@ -1,5 +1,7 @@
 import { TabBar } from "@/components/app/TabBar";
 import { SignInNotice } from "@/components/app/SignInNotice";
+import { LocationOnOpen } from "@/components/app/LocationOnOpen";
+import { EarlyTaps } from "@/components/app/EarlyTaps";
 import { JourneyDock, type DockTrip } from "@/components/mira/JourneyDock";
 import { getSql } from "@/server/db/client";
 import { getUser } from "@/server/session/user";
@@ -31,6 +33,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <JourneyDock trip={trip} />
       <TabBar />
       <SignInNotice />
+      <LocationOnOpen />
+      <EarlyTaps />
     </>
   );
 }

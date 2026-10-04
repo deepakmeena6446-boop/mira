@@ -3,8 +3,8 @@
 // outlive sign-out or be shown to the next person on a shared phone. API responses and
 // live trip data are never cached either (private and time-sensitive).
 // v2 replaces v1, which cached personal pages; activation deletes the old cache.
-const CACHE = "mira-shell-v5";
-const SHELL = ["/offline.html", "/daypart.js", "/icon.svg", "/manifest.webmanifest"];
+const CACHE = "mira-shell-v6";
+const SHELL = ["/offline.html", "/offline.js", "/daypart.js", "/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

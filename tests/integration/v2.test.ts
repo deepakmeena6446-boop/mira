@@ -181,7 +181,12 @@ describe("MIRA 2.0 accounts, trips, Mira (placeholders)", () => {
     await miraDELETE(jsonRequest("/api/mira", {}, { method: "DELETE" }));
     expect((await (await miraGET()).json()).messages).toEqual([]);
     switchJar(newJar());
-    expect((await miraPOST(jsonRequest("/api/mira", { message: "hi", context: { localTime: new Date().toISOString(), tzOffsetMin: 0, location: null } }))).status).toBe(401);
+    // Guests can talk to Mira too (owner decision 2026-10-04): a streamed reply, and nothing is saved.
+    const before = (await getSql()`SELECT count(*)::int AS n FROM mira_messages`)[0].n;
+    const guest = await miraPOST(jsonRequest("/api/mira", { message: "hi", context: { localTime: new Date().toISOString(), tzOffsetMin: 0, location: null } }));
+    expect(guest.status).toBe(200);
+    expect((await guest.text()).trim().split("\n").map((l) => JSON.parse(l)).at(-1)).toEqual({ type: "done" });
+    expect((await getSql()`SELECT count(*)::int AS n FROM mira_messages`)[0].n).toBe(before);
   });
 
   it("works worldwide: honest approximate routes and geohash reports anywhere", async () => {

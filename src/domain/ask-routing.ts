@@ -5,7 +5,14 @@ export function immediateSupportIntent(message: string): "urgent" | "unease" | n
   if (/\b(?:sos)\b/i.test(message)) return "urgent";
   if (DANGER.test(message)) return "urgent";
   if (/\b(?:feel(?:ing)?\s+(?:unsafe|uneasy|uncomfortable)|(?:i(?:'m| am)?\s+)?uneasy|not\s+(?:feeling\s+)?comfortable|something feels wrong|need\s+(?:support|options)\s+(?:now|right now))\b/i.test(message)) return "unease";
+  // Something happened to her: support options (Emergency, Help Points, telling someone, reporting) — never a route question.
+  if (/\b(?:harass\w*|molest\w*|grop(?:e|ed|ing)|eve[\s-]?teas\w*|flash(?:ed|ing)\s+(?:at\s+)?me|touched\s+me|staring\s+at\s+me|stalk(?:ed|ing)\s+me|creep(?:y)?\s+(?:guy|man|men)|(?:pareshan|chhed)\s*kar)\w*/i.test(message)) return "unease";
   return null;
+}
+
+/** "I'm home", "reached", "ghar pahunch gayi": she may think telling Mira ends her journey. Only "I'm here" does. */
+export function arrivalIntent(message: string): boolean {
+  return /^\s*(?:i'?m|i am|im)\s+(?:home|here|back)\b|\b(?:reached|arrived|got home|made it|safely home|home safe(?:ly)?)\b|\bpa?hu?n?ch\s*(?:gay[ai]|gai|gya|gyi|gaya|gayi)\b|\bghar\s+(?:aa|a)\s*(?:gay[ai]|gyi|gya)\b|पहुँच|पहुंच|घर आ ग/i.test(message);
 }
 
 export type AskToolIntent = "emergency_info" | "nearby" | "report" | "product";
@@ -28,7 +35,11 @@ export function askUsesPlan(message: string, _hasPlan: boolean, signedIn: boolea
   return true;
 }
 
-/** Generic product or urgent questions never seed a movement draft. */
+/** Generic product or urgent questions never seed a movement draft. Hinglish and Hindi movement count too (audit P11-001). */
 export function shouldSeedPlan(message: string): boolean {
-  return !immediateSupportIntent(message) && !askToolIntent(message) && /\b(?:plan\w*|go|going|walk\w*|run\w*|loop|travel\w*|trip|route|commut\w*|home|arriv\w*|land\w*|airport|station|hotel|return\w*|venue|event|date|dinner|appointment|meeting|from .+ to )\b/i.test(message);
+  return !immediateSupportIntent(message) && !askToolIntent(message) && !arrivalIntent(message) && (
+    /\b(?:plan\w*|go|going|walk\w*|run\w*|loop|travel\w*|trip|route|commut\w*|home|arriv\w*|land\w*|airport|station|hotel|return\w*|venue|event|date|dinner|appointment|meeting|from .+ to )\b/i.test(message)
+    || /\b(?:ghar|jaana|jana|jaungi|jaunga|jaa rahi|ja rahi|ja raha|chalna|wapas|metro se|pahunchna|nikalna|nikal rahi)\b/i.test(message)
+    || /घर|जाना|जाऊँगी|जा रही|मेट्रो|वापस|पहुँचना|निकल/.test(message)
+  );
 }

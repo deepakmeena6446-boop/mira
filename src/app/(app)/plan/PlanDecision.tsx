@@ -21,7 +21,7 @@ import { blindSpotsClaim, daylightClaim, helpClaim, lightingClaim, notesClaim, u
 import { decisionTake } from "@/lib/decision-take";
 import { HELP_CLASSES, hoursState, type HelpPoint } from "@/domain/help-points";
 import { localTimeInZone } from "@/domain/opening-hours";
-import { daylightAt, instantForLocal, laterDaylight, localTimeForInstant, type PlanOptionsResult } from "@/domain/plan-options";
+import { clockChangeAt, daylightAt, instantForLocal, laterDaylight, localTimeForInstant, type PlanOptionsResult } from "@/domain/plan-options";
 import { activatePlanLeg, intentFromDraft, newPlanDraft, returnLegFromMain, type PlanDraft, type PlanLegDraft } from "@/domain/plan-state";
 import { emergencyActions, statusWords, type CountryContext } from "@/domain/country-context";
 import type { EvidenceState } from "@/domain/evidence-state";
@@ -159,7 +159,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   // Around the place that matters: the destination (or the start of a loop).
   const focus = loop ? origin : dest;
   const focusKey = complete && focus ? `${focus.lat.toFixed(3)},${focus.lon.toFixed(3)}` : "";
-  type Around = { key: string; notes: CommunityNote[] | null; updates: { evidence: EvidenceState<SafetyUpdatesData> } | "failed" | null; country: CountryContext | null };
+  type Around = { key: string; notes: CommunityNote[] | null; updates: { evidence: EvidenceState<SafetyUpdatesData> } | "failed" | null; country: CountryContext | null; zone?: string | null };
   const [around, setAroundState] = useState<Around | null>(null);
   const setAround = (key: string, patch: Partial<Omit<Around, "key">>) => setAroundState((a) => ({ ...(a?.key === key ? a : { key, notes: null, updates: null, country: null }), ...patch }));
   useEffect(() => {
@@ -169,17 +169,22 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
     void api<{ notes: CommunityNote[] }>("/api/community/nearby", { body: at }).then((r) => { if (live) setAround(focusKey, { notes: r.ok ? r.data.notes : [] }); });
     void api<{ evidence: EvidenceState<SafetyUpdatesData> }>("/api/safety-updates", { body: { ...at, window: 7 } }).then((r) => { if (live) setAround(focusKey, { updates: r.ok ? r.data : "failed" }); });
     void api<{ country: CountryContext }>("/api/geo/reverse", { body: { ...at, ...(osmOnly ? { source: "osm" } : {}) } }).then((r) => { if (live && r.ok) setAround(focusKey, { country: r.data.country }); });
+    void api<{ timeZone: string | null }>("/api/geo/zone", { body: at }).then((r) => { if (live) setAround(focusKey, { zone: r.ok ? r.data.timeZone : null }); });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusKey]);
   const aroundNow = around?.key === focusKey ? around : null;
 
-  // Travelling: times default to the destination's zone once it's known (said plainly, changeable).
-  const countryZone = aroundNow?.country?.timezone ?? null;
+  // Times are the place's, not the phone's (audit P05-001: a 10 PM walk in Lisbon was briefed on India time as daylight).
+  // Once the place's zone is known it becomes the plan's — said plainly in When, and changeable there. A zone she
+  // picked herself is never replaced.
+  const countryZone = aroundNow?.zone ?? aroundNow?.country?.timezone ?? null;
   useEffect(() => {
-    if (situation !== "travel" || !draft || !countryZone || !validZone(countryZone) || sameClock(draft.timeZone || deviceZone(), countryZone) || (draft.timeZone && draft.timeZone !== deviceZone())) return;
+    if (!draft || !countryZone || !validZone(countryZone) || sameClock(draft.timeZone || deviceZone(), countryZone) || (draft.timeZone && draft.timeZone !== deviceZone())) return;
     setPlanDraft({ ...draft, timeZone: countryZone });
-  }, [situation, countryZone, draft]);
+  }, [countryZone, draft]);
+  // Zone not known, but the place is far east or west of the phone's clock: say so rather than plan on the phone's time.
+  const zoneUnsure = Boolean(focus && aroundNow && aroundNow.zone === null && !countryZone && Math.abs(focus.lon / 15 - -new Date().getTimezoneOffset() / 60) > 2.5);
 
   // ── Derived brief ─────────────────────────────────────────────────────────────────────────
   const loopReady = loopPlan?.key === loopKey && loopPlan.data?.state === "ready" ? loopPlan.data : null;
@@ -373,7 +378,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
           ) : (
             <QuestionRow label={situation === "travel" ? "Staying at" : "To"} icon="pin" value={destLabel && !unresolvedDest ? destLabel : null} placeholder={situation === "travel" ? "Hotel, home, address…" : "Search a place"} hint={unresolvedDest ? `Which “${draft.destination.query}” did you mean? Tap to choose.` : null} state={unresolvedDest ? "needs" : "idle"} onClick={() => setSheet("destination")} />
           )}
-          <QuestionRow label={situation === "travel" ? "Landing / arriving" : draft.timeKind === "arrive_by" ? "Arrive by" : "When"} icon="clock" value={instant ? whenWords(draft.departureLocal, zone) : null} placeholder="Choose a time" hint={draft.timeHint && !instant ? `You said ${draft.timeHint} — choose the day` : !sameClock(zone, deviceZone()) ? `${zone.replace(/_/g, " ")} time` : null} state={draft.timeHint && !instant ? "needs" : "idle"} onClick={() => setSheet("when")} />
+          <QuestionRow label={situation === "travel" ? "Landing / arriving" : draft.timeKind === "arrive_by" ? "Arrive by" : "When"} icon="clock" value={instant ? whenWords(draft.departureLocal, zone) : null} placeholder="Choose a time" hint={draft.timeHint && !instant ? `You said ${draft.timeHint} — choose the day` : !instant && clockChangeAt(draft.departureLocal, zone) === "repeated" ? "Clocks go back then, so that time happens twice. Choose a time a little before or after." : !instant && clockChangeAt(draft.departureLocal, zone) === "skipped" ? "Clocks go forward then, so that time doesn't exist. Choose a time a little later." : zoneUnsure ? `Times are in your phone’s zone (${zone.replace(/_/g, " ")}). This place may be in a different one — set it here.` : !sameClock(zone, deviceZone()) ? `${zone.replace(/_/g, " ")} time` : null} state={draft.timeHint && !instant ? "needs" : "idle"} onClick={() => setSheet("when")} />
           {!loop ? (
             <div className="px-4 py-3">
               <p className="m-label">How</p>
