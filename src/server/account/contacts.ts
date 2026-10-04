@@ -8,6 +8,7 @@ import { emailSenderAddress, getEnv } from "@/server/config/env";
 import { emailContact, notifyInApp } from "@/server/providers/notify";
 import { findCountry } from "@/server/locale";
 import { normalizePhone, phoneHint } from "@/domain/phone";
+import { consume, dailyKey, type Limit } from "@/server/ratelimit";
 
 export { MAX_CONTACTS } from "@/domain/limits";
 import { MAX_CONTACTS } from "@/domain/limits";
@@ -29,6 +30,64 @@ export const contactSchema = z
 
 /** Invite links are single-use and expire after a week. */
 export const INVITE_TTL_MS = 7 * 86_400_000;
+
+/**
+ * Invites one address can receive per day, from everyone together (audit P20-001: per-sender caps let two
+ * accounts email one victim 10 times). Counted under a daily-rotated key of the address's keyed hash.
+ */
+export const INVITE_RECIPIENT_LIMIT: Limit = { bucket: "contacts:invite:to:d", max: 3, windowMs: 86_400_000 };
+
+const emailHash = (email: string) => hmacHex("contact-email", email.trim().toLowerCase());
+
+/**
+ * The "Stop MIRA emails" link in invite and trip emails. The token is the address sealed for this purpose
+ * only, so it reveals nothing and can't be forged, and works for as long as the key does (an opt-out mustn't expire).
+ */
+export function stopEmailsUrl(email: string): string {
+  return new URL(`/invite/stop/${encryptText(email.trim().toLowerCase(), "email_stop")}`, getEnv().APP_BASE_URL).toString();
+}
+
+/** The address a stop link was made for, or null for anything that isn't one of ours. */
+export function stopTokenEmail(token: string): string | null {
+  if (!/^v1\.[A-Za-z0-9_-]{40,600}$/.test(token)) return null;
+  try {
+    return decryptText(token, "email_stop");
+  } catch {
+    return null;
+  }
+}
+
+export async function emailsStopped(sql: postgres.Sql | postgres.TransactionSql, email: string): Promise<boolean> {
+  const [row] = await sql`SELECT 1 FROM email_suppressions WHERE email_hash = ${emailHash(email)}`;
+  return Boolean(row);
+}
+
+/**
+ * The person at this address asked MIRA to stop emailing them (P20-001/P20-002). From now on the address can't be
+ * invited or emailed: every Circle entry with it loses the address (one reachable only by email leaves that Circle),
+ * open invite links stop working, and each owner is told in the app — her missed-check-in alert can't reach them now.
+ */
+export async function stopContactEmails(sql: postgres.Sql, email: string): Promise<void> {
+  const h = emailHash(email);
+  const owners = await sql.begin(async (tx) => {
+    await tx`INSERT INTO email_suppressions (email_hash) VALUES (${h}) ON CONFLICT (email_hash) DO NOTHING`;
+    const kept = await tx<{ user_id: string; name: string }[]>`
+      UPDATE contacts SET encrypted_email = NULL, email_hash = NULL, invite_token_hash = NULL, invited_at = NULL, accepted_at = NULL
+      WHERE email_hash = ${h} AND phone_enc IS NOT NULL RETURNING user_id, name`;
+    const removed = await tx<{ user_id: string; name: string }[]>`DELETE FROM contacts WHERE email_hash = ${h} RETURNING user_id, name`;
+    return [...kept.map((r) => ({ ...r, kept: true })), ...removed.map((r) => ({ ...r, kept: false }))];
+  });
+  for (const o of owners) {
+    await notifyInApp(sql, o.user_id, {
+      kind: "contact_stopped_email",
+      title: `${o.name} asked MIRA to stop emailing them`,
+      body: o.kept
+        ? `MIRA won't email ${o.name} invites, trip links or missed check-in alerts any more. They stay in your Circle on WhatsApp, so you can still send them your link yourself.`
+        : `MIRA won't email ${o.name} invites, trip links or missed check-in alerts any more, so they're no longer in your Circle. You can still message them yourself.`,
+      href: "/circle",
+    });
+  }
+}
 
 export interface Contact {
   id: string;
@@ -74,6 +133,15 @@ export async function addContact(sql: postgres.Sql, userId: string, userName: st
   const calling = input.country ? (findCountry(input.country)?.callingCode.replace("-", "") ?? null) : null;
   const phone = input.phone ? normalizePhone(input.phone, calling) : null;
   if (input.phone && !phone) throw new ApiError(400, "invalid_phone", "That doesn't look like a phone number. Add it with its country code, like +91 98765 43210.", { fields: ["phone"] });
+  if (email) {
+    // Audit P20-001: an address that said stop is never invited again, and no address gets more than a few invites a day
+    // whoever sends them (deleting and re-adding a contact counts again). The wording doesn't confirm that someone opted out.
+    if (await emailsStopped(sql, email)) throw new ApiError(409, "email_stopped", "MIRA can't send invites to this email address. Add their WhatsApp number instead.", { fields: ["email"] });
+    const now = new Date();
+    if (!(await consume(sql, dailyKey("recipient", emailHash(email), now), INVITE_RECIPIENT_LIMIT, now))) {
+      throw new ApiError(429, "recipient_invite_limit", "This address has had enough MIRA invites for today. Try again tomorrow, or add their WhatsApp number instead.", { fields: ["email"] });
+    }
+  }
   const token = email ? randomToken(32) : null;
   let row: Row;
   try {
@@ -102,7 +170,8 @@ export async function addContact(sql: postgres.Sql, userId: string, userName: st
     // Fixed subject: user-chosen names stay in the body only.
     "You've been invited to be a trusted contact on MIRA",
     [
-      `Hi ${input.name},`,
+      // Never the name she saved them under: that's free text she chose, and this goes to an address that hasn't agreed to anything (P20-001).
+      "Hello,",
       "",
       `${userName} would like you to be one of their trusted contacts on MIRA.`,
       "When they share a journey, MIRA emails you a link to follow along live until they arrive — and emails you if they don't check in.",
@@ -113,6 +182,9 @@ export async function addContact(sql: postgres.Sql, userId: string, userName: st
       ...(sender ? [`So those emails never land in spam, add ${sender} to your contacts.`, ""] : []),
       "You'll only ever see their location while they're actively sharing a journey with you. You can say no by ignoring this email.",
       "This link works once and expires in 7 days.",
+      "",
+      "Don't know them, or don't want emails from MIRA? Stop all MIRA emails to this address:",
+      stopEmailsUrl(email),
     ].join("\n"),
   );
   if (sent.ok) {
