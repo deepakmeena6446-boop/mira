@@ -19,11 +19,43 @@ import type { DaylightState } from "@/domain/daylight";
  * too small to matter). Never rank ways overall, and never use a verdict word.
  */
 export function compareWays(ways: WayOption[], selected: number): string | null {
-  // TODO(human): decide when a lighting / Help Point difference between ways is worth saying, and how.
-  void ways;
-  void selected;
-  return null;
+  const mine = ways[selected];
+  const myLit = mappedLighting(mine);
+  if (myLit === null) return null;
+  // Against the fastest way; when this is the fastest, against the way that differs most.
+  const others = selected === 0 ? ways.map((w, i) => ({ w, i })).filter(({ i }) => i !== 0) : [{ w: ways[0], i: 0 }];
+  let best: { w: WayOption; lit: number } | null = null;
+  for (const { w } of others) {
+    const lit = mappedLighting(w);
+    if (lit === null || Math.abs(lit - myLit) < LIGHTING_GAP) continue;
+    if (!best || Math.abs(lit - myLit) > Math.abs(best.lit - myLit)) best = { w, lit };
+  }
+  if (!best) return null;
+  const name = selected !== 0 ? "the fastest way" : ways.length === 2 ? "the other way" : "another way";
+  const short = selected !== 0 ? "fastest" : ways.length === 2 ? "the other way" : "that way";
+  const dm = Math.round(mine.route.minutes) - Math.round(best.w.route.minutes);
+  const time = dm === 0 ? "It takes about the same time" : `It takes ${Math.abs(dm)} min ${dm > 0 ? "longer" : "less"}`;
+  const a = mine.helpPoints.length;
+  const b = best.w.helpPoints.length;
+  const help = Math.abs(a - b) >= HELP_GAP ? ` and passes ${a} Help Point${a === 1 ? "" : "s"} (${short}: ${b})` : "";
+  return `This way has lighting mapped along about ${about(myLit)}% of it; ${name}, about ${about(best.lit)}%. ${time}${help}.`;
 }
+
+/** Owner decisions (2026-10-04): gaps under 20 points are noise in old map data; 2+ Help Points is a real difference. */
+const LIGHTING_GAP = 20;
+const HELP_GAP = 2;
+const MAX_UNKNOWN = 50;
+
+/** Share of a way with lighting mapped (lit + streetlights), or null when the evidence is too thin to compare. */
+function mappedLighting(w: WayOption | undefined): number | null {
+  if (!w || w.route.approximate || !w.lighting) return null;
+  const s = w.lighting.summary;
+  if (s.lit + s.poles + s.dark === 0 || s.unknown > MAX_UNKNOWN) return null;
+  return s.lit + s.poles;
+}
+
+/** Map shares are years old: "about 70%", never "72%". */
+const about = (pct: number) => Math.round(pct / 5) * 5;
 
 const listedOpen = (p: HelpPoint, at: LocalTime | null) => {
   const h = hoursState(p, at ?? undefined);
