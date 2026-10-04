@@ -9,12 +9,15 @@ import { clock12, localTime, openState, openedAt, type LocalTime, type OpenState
  * Everything here is deterministic, so it is instant, predictable and works without a model:
  * the "I feel unsafe" sheet depends on it. An LLM never ranks or filters Help Points.
  *
- * Classes stay conservative. Clinics, doctors and labs (often shut at night), ATMs, banks,
- * cafés, ordinary shops and bus stops are not Help Points. Convenience stores are a class only
- * where a country turns them on (24-hour stores are common in e.g. Japan or Thailand).
+ * Classes come from the map's own type for a place; names only drop what the data plainly says is
+ * something else (a lab, a dentist, a doctor's own clinic, a PG). Over-filtering costs her the
+ * big staffed places (a government hospital named "Dr. …", a Taj or Marriott with no "hotel" in
+ * its name), so the name rules stay narrow. ATMs, banks, cafés, ordinary shops and bus stops are
+ * not Help Points. Convenience stores are a class only where a country turns them on (24-hour
+ * stores are common in e.g. Japan or Thailand).
  */
 
-export type HelpClass = "hospital" | "police" | "transit" | "airport" | "hotel" | "pharmacy" | "fuel" | "convenience";
+export type HelpClass = "hospital" | "police" | "transit" | "bus" | "airport" | "hotel" | "pharmacy" | "fuel" | "convenience";
 
 interface ClassInfo {
   label: string;
@@ -36,6 +39,8 @@ export const HELP_CLASSES: Record<HelpClass, ClassInfo> = {
   hospital: { label: "Hospital", emoji: "🏥", weight: 1, emergency: true, hoursMatter: false, staffing: "Hospitals with an emergency department are usually open day and night" },
   police: { label: "Police station", emoji: "👮", weight: 1, emergency: true, hoursMatter: false, staffing: "Police stations are often open day and night" },
   transit: { label: "Metro / train station", emoji: "🚇", weight: 1, emergency: false, hoursMatter: true, staffing: "Stations usually have staff while trains are running" },
+  // Bus stations and terminals (an ISBT runs day and night), never stops: see the name rule below.
+  bus: { label: "Bus station", emoji: "🚌", weight: 0.9, emergency: false, hoursMatter: true, staffing: "Bus stations usually have staff while buses are running" },
   airport: { label: "Airport", emoji: "✈️", weight: 1, emergency: false, hoursMatter: true, staffing: "Airports usually have staff and help desks while flights operate" },
   hotel: { label: "Hotel reception", emoji: "🏨", weight: 0.9, emergency: false, hoursMatter: false, staffing: "Hotel receptions are often open late" },
   pharmacy: { label: "Pharmacy", emoji: "💊", weight: 0.9, emergency: false, hoursMatter: true, staffing: "Pharmacies have people at the counter while open" },
@@ -108,6 +113,8 @@ export function helpClassFromOsm(tags: Record<string, string | undefined>): Help
   if (tags.amenity === "fuel") return "fuel";
   if (tags.tourism === "hotel") return "hotel";
   if (tags.railway === "station" || tags.railway === "subway_entrance") return "transit";
+  // amenity=bus_station is a station or terminal; stops are highway=bus_stop / public_transport=platform.
+  if (tags.amenity === "bus_station") return "bus";
   // Airports with scheduled service (an IATA code, or tagged international): not airstrips or helipads.
   if (tags.aeroway === "aerodrome" && (tags.iata || tags.aerodrome === "international" || tags["aerodrome:type"] === "international")) return "airport";
   if (tags.shop === "convenience") return "convenience";
@@ -115,8 +122,10 @@ export function helpClassFromOsm(tags: Record<string, string | undefined>): Help
 }
 
 /**
- * Google place types (Places API (New), Table A) we ask for, and what they mean. Bus stations
- * and generic `transit_station`s are left out: the type can't tell a staffed hub from a stop.
+ * Google place types (Places API (New), Table A) we ask for, and what they mean. `bus_station`
+ * is its own type (stops are `bus_stop`); generic `transit_station`s are left out, since that
+ * type can't tell a staffed hub from a stop. `lodging` and `resort_hotel` are where Google files
+ * many big hotels (a Taj or Leela) whose names never say "hotel".
  */
 export const GOOGLE_HELP_TYPES: Record<string, HelpClass> = {
   hospital: "hospital",
@@ -124,9 +133,12 @@ export const GOOGLE_HELP_TYPES: Record<string, HelpClass> = {
   subway_station: "transit",
   train_station: "transit",
   light_rail_station: "transit",
+  bus_station: "bus",
   airport: "airport",
   international_airport: "airport",
   hotel: "hotel",
+  resort_hotel: "hotel",
+  lodging: "hotel",
   pharmacy: "pharmacy",
   drugstore: "pharmacy",
   gas_station: "fuel",
@@ -142,22 +154,34 @@ export function helpClassFromGoogle(primaryType: string | undefined): HelpClass 
 }
 
 /**
- * Conservative name checks for the two noisiest classes (deterministic, source-independent).
- * In map data "hotel" also covers PGs, room rentals and co-living; "hospital" also covers
- * labs, dispensaries, clinics, suppliers and health offices. None of those is a place to walk to for help.
+ * Name checks, applied after the map type has given the class (deterministic, source-independent).
+ * They only drop what a name plainly says: in map data "hotel" also covers PGs, hostels and room
+ * rentals; "hospital" also covers labs, dentists, suppliers, health offices and a doctor's own
+ * clinic. Anything else the map types as a hospital or hotel is kept: a Community Health Centre,
+ * a polyclinic or "Dr. Ram Manohar Lohia Hospital" is where a night-time emergency goes in India,
+ * and the Taj, Oberoi or ITC Maurya have a 24-hour front desk though their names never say "hotel".
  */
+/** A name that says hospital is one, whatever else it says ("Dr. … Hospital", "… Hospital & Diagnostic Centre"). */
+const HOSPITAL_NAME = /\b(hospitals?|h[oô]pital|infirmary)\b/i;
+/** Suppliers and offices are never places of care, even when "hospital" is in the name. */
+const NOT_CARE = /\b(pharmaceutical\w*|council|equipment|supplies|suppliers?|devices|furniture)\b/i;
 const NOT_A_HOSPITAL =
-  /\b(lab|labs|laborator\w*|diagnostic\w*|dental|dentist|clinic\w*|dispensary|council|pathology|scan|imaging|ayurved\w*|homeopath\w*|pharmaceutical\w*|braces|orthodont\w*|aesthetic\w*|cosmetic\w*|diet|physiotherap\w*|ivf|fertility|medical (?:equipment|supplies|devices))\b/i;
-/** A named doctor or a GP practice isn't a hospital ("Dr Khan", "Dr. Mehta's", "… Surgery", "… Medical Centre"). */
-const DOCTORS_PRACTICE = /^\s*dr\.?\s|\b(surgery|medical cent(?:re|er)|health cent(?:re|er)|gp|polyclinic)\b/i;
+  /\b(lab|labs|pathlabs?|laborator\w*|diagnostic\w*|dental|dentist|dispensary|pathology|scan|imaging|ayurved\w*|homeopath\w*|braces|orthodont\w*|aesthetic\w*|cosmetic\w*|diet|physiotherap\w*|ivf|fertility)\b/i;
+/** A named doctor's own clinic ("Dr. Mehta's Clinic", "D.Najat clinice") or a GP surgery: a practice, shut at night. */
+const DOCTORS_PRACTICE = /^\s*(?:dr\b\.?|d\.)\s*\S.*\bclinic\w*|\b(gp|surgery)\b/i;
 const NOT_A_PHARMACY = /\b(homeopath\w*|ayurved\w*|herbal\w*|wholesale\w*|distributor\w*|pharmaceutical\w*)\b/i;
-const HOTEL_NAME = /\b(hotel|hotels|inn|resort)\b/i;
+const HOTEL_NAME = /\b(hotels?|inn|resort)\b/i;
 const NOT_A_HOTEL = /\b(pg|paying guest|hostel|co-?living|oyo life)\b/i;
+/** Room rentals and homestays: no front desk, unless the place calls itself a hotel ("Hotel Royal Rooms"). */
+const RENTAL = /\b(rooms?|homestays?|home stay|guest ?house|apartments?|flats?|service apartments?)\b/i;
+/** A stop is not a station, whatever the map type says. */
+const BUS_STOP = /\b(stop|halt)\b/i;
 
 export function plausibleHelpPoint(cls: HelpClass, name: string): boolean {
-  if (cls === "hospital") return !NOT_A_HOSPITAL.test(name) && !DOCTORS_PRACTICE.test(name);
+  if (cls === "hospital") return !NOT_CARE.test(name) && (HOSPITAL_NAME.test(name) || (!NOT_A_HOSPITAL.test(name) && !DOCTORS_PRACTICE.test(name)));
   if (cls === "pharmacy") return !NOT_A_PHARMACY.test(name);
-  if (cls === "hotel") return HOTEL_NAME.test(name) && !NOT_A_HOTEL.test(name);
+  if (cls === "hotel") return !NOT_A_HOTEL.test(name) && (HOTEL_NAME.test(name) || !RENTAL.test(name));
+  if (cls === "bus") return !BUS_STOP.test(name);
   return true;
 }
 

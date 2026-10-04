@@ -60,7 +60,9 @@ export function placeholderGeo(sql: postgres.Sql): GeoProvider {
       try { rows = await sql<HelpRow[]>`
         SELECT id, name, tags->>'mira:kind' AS kind, place_type, tags, ST_Y(point) AS lat, ST_X(point) AS lon
         FROM places
-        WHERE place_type = ANY(${["health", "police", "metro", "rail", "pharmacy", "accommodation"]})
+        WHERE (place_type = ANY(${["health", "police", "metro", "rail", "pharmacy", "accommodation"]})
+          -- Bus stations only: the "bus" type also holds every stop, which would crowd the LIMIT.
+          OR (place_type = 'bus' AND tags->>'amenity' = 'bus_station'))
           AND ST_DWithin(point::geography,
                 (SELECT ST_Collect(ST_SetSRID(ST_MakePoint(x, y), 4326)) FROM unnest(${points.map((p) => p.lon)}::float8[], ${points.map((p) => p.lat)}::float8[]) AS t(x, y))::geography,
                 ${radiusM})

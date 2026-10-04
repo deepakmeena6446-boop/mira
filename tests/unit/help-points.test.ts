@@ -51,17 +51,20 @@ describe("Help Point classes", () => {
     expect(helpClassFromGoogle(undefined)).toBeNull();
   });
 
-  it("airports and (country-weighted) convenience stores; never bus stops, bus stations, ATMs or cafés", () => {
+  it("airports, bus stations and (country-weighted) convenience stores; never bus stops, ATMs or cafés", () => {
     expect(helpClassFromGoogle("airport")).toBe("airport");
     expect(helpClassFromGoogle("international_airport")).toBe("airport");
     expect(helpClassFromGoogle("convenience_store")).toBe("convenience");
-    for (const t of ["bus_stop", "bus_station", "transit_station", "atm", "bank", "cafe", "doctor"]) expect(helpClassFromGoogle(t), t).toBeNull();
+    expect(helpClassFromGoogle("bus_station")).toBe("bus");
+    for (const t of ["bus_stop", "transit_station", "atm", "bank", "cafe", "doctor"]) expect(helpClassFromGoogle(t), t).toBeNull();
     expect(helpClassFromOsm({ aeroway: "aerodrome", iata: "LHR" })).toBe("airport");
     expect(helpClassFromOsm({ aeroway: "aerodrome", aerodrome: "international" })).toBe("airport");
     expect(helpClassFromOsm({ aeroway: "aerodrome" })).toBeNull(); // airstrips, flying clubs
     expect(helpClassFromOsm({ aeroway: "helipad" })).toBeNull();
     expect(helpClassFromOsm({ shop: "convenience" })).toBe("convenience");
-    expect(helpClassFromOsm({ amenity: "bus_station" })).toBeNull();
+    expect(helpClassFromOsm({ amenity: "bus_station" })).toBe("bus");
+    expect(helpClassFromOsm({ highway: "bus_stop" })).toBeNull();
+    expect(helpClassFromOsm({ public_transport: "platform", bus: "yes" })).toBeNull();
     expect(helpClassFromOsm({ shop: "chemist" })).toBeNull();
     // Convenience stores are off unless her country turns them on.
     expect(HELP_CLASSES.convenience.weight).toBe(0);
@@ -81,6 +84,40 @@ describe("Help Point classes", () => {
     }
     expect(plausibleHelpPoint("hospital", "Rashid Hospital")).toBe(true);
     expect(plausibleHelpPoint("police", "Police Station Maurice Nagar")).toBe(true);
+  });
+
+  it("keeps the big staffed places that over-broad name rules used to drop", () => {
+    // A name that says hospital is one, "Dr." or "diagnostic" notwithstanding; government health centres and polyclinics stay.
+    for (const n of [
+      "Dr. Ram Manohar Lohia Hospital",
+      "Dr Baba Saheb Ambedkar Hospital",
+      "Sir Ganga Ram Hospital",
+      "Max Super Speciality Hospital & Diagnostic Centre",
+      "Community Health Centre Narela",
+      "CHC Bhagwanpur",
+      "Primary Health Centre Sohna",
+      "Lok Nayak Medical Centre",
+      "Delhi Govt Polyclinic",
+      "Cleveland Clinic Abu Dhabi",
+      "All India Institute of Medical Sciences",
+    ]) {
+      expect(plausibleHelpPoint("hospital", n), n).toBe(true);
+    }
+    // Still out where the name really says so: labs, a doctor's own clinic, a GP surgery, suppliers.
+    for (const n of ["Dr Lal PathLabs", "Dr. Mehta's Clinic", "Dr Khan Skin Clinic", "Riverside GP Surgery", "Apollo Hospital Equipment Suppliers"]) {
+      expect(plausibleHelpPoint("hospital", n), n).toBe(false);
+    }
+    // The map type says hotel: kept, whatever the name.
+    for (const n of ["Taj Palace, New Delhi", "The Oberoi, New Delhi", "The Leela Palace", "ITC Maurya", "JW Marriott New Delhi Aerocity", "Hyatt Regency Delhi", "Novotel New Delhi Aerocity", "Hotel Royal Rooms"]) {
+      expect(plausibleHelpPoint("hotel", n), n).toBe(true);
+    }
+    for (const n of ["Sunrise Paying Guest", "Comfort Homestay", "Star Service Apartments"]) expect(plausibleHelpPoint("hotel", n), n).toBe(false);
+    // Bus terminals are Help Points; stops are not.
+    for (const n of ["Kashmere Gate ISBT", "Anand Vihar ISBT", "Sarai Kale Khan Bus Terminal", "Majestic Bus Station"]) expect(plausibleHelpPoint("bus", n), n).toBe(true);
+    for (const n of ["AIIMS Bus Stop", "Nehru Place Halt"]) expect(plausibleHelpPoint("bus", n), n).toBe(false);
+    expect(helpClassFromGoogle("lodging")).toBe("hotel");
+    expect(helpClassFromGoogle("resort_hotel")).toBe("hotel");
+    expect(HELP_CLASSES.bus.label).toBe("Bus station");
   });
 
   it("counts a place as open 24h only when the source says exactly that", () => {

@@ -63,6 +63,7 @@ export function UnsafeSheet({
   exclude,
   onTrip,
   staleLocation = false,
+  locating = false,
   change,
 }: {
   open: boolean;
@@ -87,6 +88,8 @@ export function UnsafeSheet({
   exclude?: readonly HelpClass[];
   onTrip?: boolean;
   staleLocation?: boolean;
+  /** A one-time fix was asked for on opening and hasn't come back yet (not "location is off"). */
+  locating?: boolean;
   /** Review only: a separate confirmation is required to change any active journey. */
   change?: UnsafeChangeAction | null;
 }) {
@@ -122,6 +125,12 @@ export function UnsafeSheet({
     const s = hoursShort(p.hoursNow, p.mayBeClosed);
     return s ? ` · ${s}` : "";
   };
+  // Lead with the help, not a disclaimer (owner: guardrails mustn't bury the point of the sheet).
+  // "Nearest" only when it is: at night the ranking can put a likely-open place before a closer one.
+  const nearest = first && ranked.every((p) => p.minutes >= first.minutes);
+  const lead = first
+    ? `${nearest ? "Nearest place with people" : "A place with people nearby"}: ${first.name}, about ${first.minutes} min walk${first.ahead ? ", ahead on your way" : ""}${first.mayBeClosed ? " (may be closed now)" : ""}.`
+    : "Here's what you can do right now.";
   // Portal: screens are position:fixed (their own stacking context), and this must sit above the tab bar.
   return createPortal(
     <div role="dialog" aria-modal="true" aria-labelledby="unsafe-h" className="fixed inset-0 z-50 flex items-end justify-center bg-scrim animate-fade sm:items-center" onClick={scrimClose}>
@@ -146,7 +155,7 @@ export function UnsafeSheet({
 
         {/* A calm lead: the nearest place with people, in one line (deterministic; no AI, no wait). */}
         <p className="mt-3 text-[1.0625rem] font-medium leading-snug">
-          {first ? `${first.name} may be an option. The walking route has not been checked.` : "Here's what you can do right now."}
+          {lead}
         </p>
 
         {/* 1. Go to a Help Point: the best one for right now, and two more */}
@@ -160,7 +169,7 @@ export function UnsafeSheet({
                 <span className="block font-semibold text-accent-strong">Go to a Help Point</span>
                 <span className="block truncate font-semibold">{first.name}</span>
                 <span className="block text-sm text-ink-muted">
-                  {HELP_CLASSES[first.cls].label} · roughly {first.minutes} min by distance, route unverified{aheadNote(first)} · {hoursLine(first)}
+                  {HELP_CLASSES[first.cls].label} · about {first.minutes} min walk{aheadNote(first)} · {hoursLine(first)}
                 </span>
               </span>
               <span className="shrink-0 text-sm font-semibold text-accent-strong">{goLabel}</span>
@@ -168,7 +177,7 @@ export function UnsafeSheet({
           ) : (
             <p className="rounded-[var(--radius-card)] bg-sunken p-4 text-sm text-ink-muted">
               {!me
-                ? staleLocation ? "Your last position is too old to rank nearby places. Refresh location; calling and Emergency still work." : "Turn on location to see Help Points near you."
+                ? locating ? "Finding where you are…" : staleLocation ?"Your last position is too old to rank nearby places. Refresh location; calling and Emergency still work." : "Turn on location to see Help Points near you."
                 : helpLoading
                   ? "Finding Help Points near you…"
                   : helpFailed
@@ -189,7 +198,7 @@ export function UnsafeSheet({
                       <span className="font-semibold">{p.name}</span>
                       <span className="text-ink-muted">
                         {" "}
-                        · {HELP_CLASSES[p.cls].label} · roughly {p.minutes} min, route unverified{aheadNote(p)}{shortHours(p)}
+                        · {HELP_CLASSES[p.cls].label} · about {p.minutes} min walk{aheadNote(p)}{shortHours(p)}
                       </span>
                     </span>
                   </button>
@@ -267,7 +276,8 @@ export function UnsafeSheet({
         </div>
 
         <p className="mt-3 text-xs leading-relaxed text-ink-subtle">
-          {ranked.length ? `Help Points are types of places where help may be available, from ${sources.join(" and ")}. Mira can't confirm who's there right now. ` : ""}
+          {/* One honest line about Help Points; the source stays named (map data attribution). */}
+          {ranked.length ? `Walking times are estimates; Mira can't see who's there right now. Places from ${sources.join(" and ")}. ` : ""}
           Emergency opens your phone&apos;s dialler: Mira doesn&apos;t call or alert anyone for you.
           {onTrip ? " Your live location keeps updating only while the trip screen is open." : ""}
         </p>

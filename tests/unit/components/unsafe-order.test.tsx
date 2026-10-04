@@ -44,4 +44,31 @@ describe("I feel unsafe — the action order is frozen", () => {
       at = i;
     }
   });
+
+  it("leads with the nearest place with people, without per-row caveats, and keeps one honest footer line", () => {
+    render(
+      <UnsafeSheet
+        open
+        onClose={() => {}}
+        me={{ lat: 28.6951, lon: 77.2143 }}
+        area={null}
+        helpPoints={[point("a", "hospital", 0.004), point("b", "transit", 0.006), point("c", "police", 0.008)]}
+        helpLoading={false}
+        onGoHelpPoint={() => {}}
+        goLabel="Walk there"
+        share={null}
+        exclude={[]}
+      />,
+    );
+    const sheet = screen.getByRole("dialog", { name: "Right now" });
+    expect(sheet).toHaveTextContent(/Nearest place with people: Place a, about \d+ min walk\./);
+    expect(sheet).not.toHaveTextContent(/route unverified|may be an option|has not been checked/i);
+    expect(sheet).toHaveTextContent("Walking times are estimates; Mira can't see who's there right now.");
+    expect(sheet).not.toHaveTextContent(/\b(safe place|you are safe|safest)\b/i);
+  });
+
+  it("says it's finding her position while a one-time fix is on its way, not 'turn on location'", () => {
+    render(<UnsafeSheet open onClose={() => {}} me={null} area={null} helpPoints={[]} helpLoading locating onGoHelpPoint={() => {}} goLabel="Directions" share={null} />);
+    expect(screen.getByRole("dialog", { name: "Right now" })).toHaveTextContent("Finding where you are…");
+  });
 });
