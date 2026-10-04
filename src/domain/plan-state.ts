@@ -40,6 +40,8 @@ export const planDraftSchema = z.object({
   loop: z.boolean(),
   departureLocal: z.string().max(16),
   timeZone: z.string().max(64),
+  /** The zone came from the place, not from her: a new place may replace it (re-audit RA5). */
+  timeZoneAuto: z.boolean().optional(),
   mode: z.enum(TRAVEL_MODES),
   constraints: z.string().max(500),
   timeKind: planTimeKindSchema.optional(),
