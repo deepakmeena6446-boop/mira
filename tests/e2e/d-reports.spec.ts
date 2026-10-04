@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { GEO, SAME_ORIGIN, adminPage, apiReport, db, newUser, nextIstMonday, runAggregation } from "./helpers";
+import { GEO, SAME_ORIGIN, adminPage, apiReport, db, newUser, nextIstMonday, runAggregation, testClientIp } from "./helpers";
 
 const HERE = { lat: GEO.latitude, lon: GEO.longitude };
 
@@ -16,9 +16,8 @@ test.describe("Reports — private until reviewed, public only as thresholded no
     const me = await newUser(browser, "Nisha");
     await me.page.goto("/report");
     await me.page.getByRole("button", { name: /Dark or broken street/ }).click();
-    // Location is never taken on opening Report (R2): it's an explicit tap.
-    await expect(me.page.getByText("Where did it happen?")).toBeVisible();
-    await me.page.getByRole("button", { name: "Use where I am" }).click();
+    // She turned location on once (newUser, Home → Use my location), so Report starts from where she is. Report itself
+    // never asks (R2, audit P0-2); with location off it shows "Where did it happen?" and a "Use where I am" tap (f-mobile-extras).
     await expect(me.page.getByText("Around where you are now")).toBeVisible();
     await me.page.getByRole("button", { name: "Send privately" }).click();
     await expect(me.page.getByText(/Thank you/)).toBeVisible();
@@ -28,8 +27,9 @@ test.describe("Reports — private until reviewed, public only as thresholded no
 
     // 2. Five late-hours reports from separate browsers (independent actors) plus one unrelated report.
     //    (The UI report above is "just now", so it falls in the current time band, not "late".)
+    // Each from its own network: one connection can't make a note on its own (audit P14-001).
     for (let i = 0; i < 5; i++) {
-      const ctx = await browser.newContext();
+      const ctx = await browser.newContext({ extraHTTPHeaders: { "x-forwarded-for": testClientIp() } });
       const res = await apiReport(ctx.request, { involvement: "witnessed", category: "environment", location: HERE, recency: "yesterday", timeBand: "late", narrative: `Dark stretch ${i}` });
       expect(res.status()).toBe(201);
       await ctx.close();
@@ -60,7 +60,10 @@ test.describe("Reports — private until reviewed, public only as thresholded no
     expect(before.notes).toEqual([]); // approval alone publishes nothing
 
     // 4. TEST-ONLY: spread submission days (reports can't be backdated via the app), then the weekly release.
-    await db`UPDATE reports_private SET created_at = created_at - (s.rn * interval '1 day'), expires_at = expires_at - (s.rn * interval '1 day')
+    //    Spread over this ISO week (UTC), not across weeks: network hashes are salted weekly, so only same-week ones can
+    //    be told apart (re-audit RA5). Several hours apart, so it isn't a burst.
+    await db`UPDATE reports_private SET created_at = (date_trunc('week', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') + (s.rn * interval '3 hours'),
+             expires_at = (date_trunc('week', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') + (s.rn * interval '3 hours') + (expires_at - created_at)
              FROM (SELECT id AS rid, row_number() OVER (ORDER BY id) AS rn FROM reports_private) s WHERE id = s.rid`;
     const out = runAggregation(nextIstMonday());
     expect(JSON.parse(out.trim().split("\n").pop()!), out).toMatchObject({ ran: true, releasesCreated: 1 });
@@ -83,7 +86,7 @@ test.describe("Reports — private until reviewed, public only as thresholded no
     const { ctx, page } = await newUser(browser, "Esha");
     await page.goto("/report");
     await page.getByRole("button", { name: /Being followed/ }).click();
-    await page.getByRole("button", { name: "Use where I am" }).click();
+    await expect(page.getByText("Around where you are now")).toBeVisible(); // location chosen on in newUser
     await page.getByRole("button", { name: "It happened to me" }).click();
     await page.getByLabel(/Anything to add/).fill("Auto DL1RT4567 followed me, driver said his name is Rakesh, call 9876543210");
     await expect(page.getByText(/This looks like it includes a/)).toBeVisible();
@@ -117,7 +120,7 @@ test.describe("Reports — private until reviewed, public only as thresholded no
     const before = (await db`SELECT count(*)::int AS n FROM reports_private`)[0].n;
     await page.goto("/report");
     await page.getByRole("button", { name: /Transport problem/ }).click();
-    await page.getByRole("button", { name: "Use where I am" }).click();
+    await expect(page.getByText("Around where you are now")).toBeVisible(); // location chosen on in newUser
     await page.getByLabel(/Anything to add/).fill(evil);
     await page.getByRole("button", { name: "Send privately" }).dblclick();
     await expect(page.getByText(/Thank you/)).toBeVisible();
