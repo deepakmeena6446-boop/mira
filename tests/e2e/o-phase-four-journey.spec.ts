@@ -42,7 +42,8 @@ test("active journey resumes with truthful position age and immediate support", 
   await owner.page.getByRole("button", { name: "I feel unsafe" }).click();
   const sheet = owner.page.getByRole("dialog", { name: "Right now" });
   await expect(sheet.getByLabel("Immediate Emergency action").getByRole("link", { name: /Emergency call/ })).toBeVisible();
-  await expect(sheet).toContainText("route unverified");
+  await expect(sheet).toContainText(/place with people nearby|Nearest place with people/);
+  await expect(sheet).toContainText("Walking times are estimates");
   await sheet.getByRole("button", { name: /Go to a Help Point/ }).click();
   let routeRequests = 0;
   await owner.page.route("**/api/plan/options", async (route) => {

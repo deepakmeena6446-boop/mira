@@ -5,12 +5,13 @@ import { PlanJourneyControls } from "@/components/app/PlanJourneyControls";
 import { LocalCheckInScreen } from "@/app/(app)/trip/local/LocalCheckInScreen";
 import { newPlanDraft, intentFromDraft, parsePlanSession } from "@/domain/plan-state";
 import { clearPlanDraft, currentPlanDraft, setPlanDraft } from "@/lib/plan-store";
+import { rememberLocationChoice } from "@/lib/location-store";
 import { endLocalCheckIn, startLocalJourney, startLocalCheckIn, updateLocalJourney, markLocalProgress, readLocalCheckIn, readLocalJourney } from "@/lib/local-check-in-store";
 
-const mocks = vi.hoisted(() => ({ api: vi.fn(), location: vi.fn(), push: vi.fn(), refresh: vi.fn(), unsafe: vi.fn() }));
+const mocks = vi.hoisted(() => ({ api: vi.fn(), location: vi.fn(), fresh: vi.fn(), push: vi.fn(), refresh: vi.fn(), unsafe: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }) }));
 vi.mock("@/lib/api-client", () => ({ api: mocks.api }));
-vi.mock("@/lib/location-store", async (original) => ({ ...await original<typeof import("@/lib/location-store")>(), requestLocation: mocks.location }));
+vi.mock("@/lib/location-store", async (original) => ({ ...await original<typeof import("@/lib/location-store")>(), requestLocation: mocks.location, freshLocation: mocks.fresh }));
 vi.mock("@/components/app/RoutePreview", () => ({ RoutePreview: () => <div>Chosen route</div> }));
 vi.mock("@/components/app/EmergencyPill", () => ({ EmergencyPill: () => <a href="tel:112">Emergency options</a> }));
 vi.mock("@/components/app/UnsafeSheet", () => ({ UnsafeSheet: (props: { open: boolean; change: { label: string; onReview: () => void } | null }) => { mocks.unsafe(props); return props.open && props.change ? <div role="dialog"><button onClick={props.change.onReview}>{props.change.label}</button></div> : null; } }));
@@ -27,7 +28,7 @@ const confirm = () => fireEvent.click(screen.getByRole("button", { name: "Confir
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now);
-  mocks.api.mockReset(); mocks.location.mockReset(); mocks.push.mockReset(); mocks.refresh.mockReset(); mocks.unsafe.mockReset();
+  mocks.api.mockReset(); mocks.location.mockReset(); mocks.fresh.mockReset(); mocks.push.mockReset(); mocks.refresh.mockReset(); mocks.unsafe.mockReset();
   endLocalCheckIn(); clearPlanDraft(); sessionStorage.clear();
   setPlanDraft({ ...newPlanDraft(now, "UTC"), activity: "Fictional event arrival", origin: { kind: "named", ...place("Fictional home", 28.69) }, destination: place("Fictional event", 28.70), mode: "ride", departureLocal: "2026-10-03T18:00", timeZone: "UTC" });
   mocks.location.mockImplementation(async () => fix());
@@ -36,6 +37,26 @@ beforeEach(() => {
 afterEach(() => { cleanup(); endLocalCheckIn(); clearPlanDraft(); sessionStorage.clear(); vi.useRealTimers(); });
 
 describe("chosen journey explicit consent and stable retry", () => {
+  it("'I feel unsafe' on a private journey shows Help Points from one fresh fix when location is on, and drops it on close", async () => {
+    const plan = intentFromDraft(currentPlanDraft()!)!;
+    startLocalJourney(plan, null, 60);
+    rememberLocationChoice(true);
+    const hospital = { id: "osm:node/1", name: "Dr. Ram Manohar Lohia Hospital", cls: "hospital", lat: 28.692, lon: 77.21, open24h: true, hours: null, source: "osm" };
+    mocks.fresh.mockImplementation(async () => fix());
+    mocks.api.mockImplementation(async (path: string) => path === "/api/geo/help" ? { ok: true, data: { helpPoints: [hospital], evidence: { state: "ready", data: [hospital], sources: [] } } } : path === "/api/me" ? { ok: true, data: { user: null } } : { ok: false, message: "unexpected" });
+    try {
+      render(<LocalCheckInScreen />); await act(async () => {});
+      expect(mocks.fresh).not.toHaveBeenCalled(); // no GPS until she opens the sheet
+      fireEvent.click(screen.getByRole("button", { name: "I need options" }));
+      await act(async () => {});
+      expect(mocks.fresh).toHaveBeenCalledOnce();
+      expect(mocks.api).toHaveBeenCalledWith("/api/geo/help", expect.objectContaining({ body: expect.objectContaining({ lat: 28.69, lon: 77.21 }) }));
+      expect(mocks.unsafe).toHaveBeenLastCalledWith(expect.objectContaining({ open: true, me: { lat: 28.69, lon: 77.21 }, helpPoints: [hospital], helpLoading: false, helpFailed: false }));
+      act(() => mocks.unsafe.mock.lastCall![0].onClose());
+      expect(mocks.unsafe).toHaveBeenLastCalledWith(expect.objectContaining({ open: false, me: null, helpPoints: [] }));
+      expect(posts()).toHaveLength(0);
+    } finally { localStorage.clear(); }
+  });
   it("the active private screen reflects the update receipt and offers immediate same-workspace review from support", async () => {
     const plan = intentFromDraft(currentPlanDraft()!)!;
     const entry = startLocalJourney(plan, null, 60)!;

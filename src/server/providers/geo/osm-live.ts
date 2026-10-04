@@ -117,7 +117,7 @@ export async function overpassHelp(points: GeoPoint[], radiusM: number, opts?: {
   await overpassSlot();
   const around = `(around:${r},${pts.map((c) => `${c.lat},${c.lon}`).join(",")})`;
   const query = `[out:json][timeout:8];(
-    nwr${around}[amenity~"^(hospital|police|pharmacy|fuel)$"];
+    nwr${around}[amenity~"^(hospital|police|pharmacy|fuel|bus_station)$"];
     nwr${around}[healthcare~"^(hospital|pharmacy)$"];
     nwr${around}[tourism=hotel];
     nwr${around}[railway~"^(station|subway_entrance)$"];

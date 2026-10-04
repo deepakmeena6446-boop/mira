@@ -47,6 +47,7 @@ export const HELP_ICON: Record<string, string> = {
   hospital: "hospital",
   police: "police",
   transit: "transit",
+  bus: "bus",
   airport: "airport",
   hotel: "hotel",
   pharmacy: "pharmacy",

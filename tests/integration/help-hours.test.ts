@@ -119,9 +119,9 @@ describe("Help Points from Google, hours only for the shortlist", () => {
       expect(c.fields).toBe(HELP_NEARBY_FIELDS);
       expect(c.fields).not.toMatch(/OpeningHours|openNow/i);
       expect(c.body?.includedPrimaryTypes).not.toContain("convenience_store");
-      expect(c.body?.includedPrimaryTypes).not.toContain("bus_station");
+      expect(c.body?.includedPrimaryTypes).not.toContain("bus_stop");
     }
-    expect(nearbyCalls().flatMap((c) => c.body?.includedPrimaryTypes ?? [])).toEqual(expect.arrayContaining(["airport", "international_airport", "hospital", "police", "pharmacy", "gas_station"]));
+    expect(nearbyCalls().flatMap((c) => c.body?.includedPrimaryTypes ?? [])).toEqual(expect.arrayContaining(["airport", "international_airport", "hospital", "police", "pharmacy", "gas_station", "bus_station", "lodging"]));
     // Hours: at most five Place Details calls, hours fields only, never with coordinates in the URL.
     expect(detailCalls().length).toBeGreaterThan(0);
     expect(detailCalls().length).toBeLessThanOrEqual(MAX_HOURS_LOOKUPS);
