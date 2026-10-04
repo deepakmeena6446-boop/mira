@@ -41,7 +41,13 @@ export function localTimeForInstant(instant: Date, timeZone: string): string {
 export const GRAPH_MAX_AGE_MS = 365 * 24 * 60 * 60_000;
 
 /** A local wall time can be absent or repeated at a DST transition. Never guess which instant it means. */
-export function instantForLocal(local: string, timeZone: string): Date | null {
+/**
+ * The instant for a local wall time in a zone. Where clocks go back, a wall time happens twice: if one of them is within
+ * three hours of `near` (her real "now" — a plan for now or soon) that's the one she means (audit P05-003: "Now" in the
+ * repeated hour couldn't be planned). Further out, or where clocks go forward and the time doesn't exist, Mira won't
+ * guess: null, and `clockChangeAt` says why.
+ */
+export function instantForLocal(local: string, timeZone: string, near: Date = new Date()): Date | null {
   const target = local.replace("T", " ");
   const nominal = Date.parse(`${local}:00Z`);
   if (!Number.isFinite(nominal)) return null;
@@ -53,7 +59,22 @@ export function instantForLocal(local: string, timeZone: string): Date | null {
     const instant = new Date(nominal - offset * 60_000);
     if (format.format(instant) === target) matches.push(instant);
   }
-  return matches.length === 1 ? matches[0] : null;
+  if (matches.length === 1) return matches[0];
+  const close = matches.filter((m) => Math.abs(m.getTime() - near.getTime()) <= 3 * 3600_000);
+  if (close.length) return close.reduce((a, b) => (Math.abs(a.getTime() - near.getTime()) <= Math.abs(b.getTime() - near.getTime()) ? a : b));
+  return null;
+}
+
+/** Why a wall time has no single instant: "repeated" (clocks go back: it happens twice) or "skipped" (clocks go forward). */
+export function clockChangeAt(local: string, timeZone: string): "repeated" | "skipped" | null {
+  const nominal = Date.parse(`${local}:00Z`);
+  if (!Number.isFinite(nominal)) return null;
+  let format: Intl.DateTimeFormat;
+  try { format = new Intl.DateTimeFormat("sv-SE", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }); }
+  catch { return null; }
+  let n = 0;
+  for (let offset = -14 * 60; offset <= 14 * 60; offset += 15) if (format.format(new Date(nominal - offset * 60_000)) === local.replace("T", " ")) n++;
+  return n === 0 ? "skipped" : n > 1 ? "repeated" : null;
 }
 
 /** NOAA's fractional-year solar-position approximation; horizon uncertainty is reported as unknown. */

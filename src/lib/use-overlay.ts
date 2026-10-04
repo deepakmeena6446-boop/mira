@@ -80,3 +80,16 @@ export function useOverlay(open: boolean, onClose: () => void) {
     };
   }, [open]);
 }
+
+/**
+ * A tap on the scrim closes a sheet — but not the second tap of a double-tap that just opened it, which lands on the
+ * scrim before she sees the sheet (audit P08-004: "I feel unsafe" opened and closed again). Only taps on the scrim itself.
+ */
+export function useScrimClose(open: boolean, onClose: () => void, guardMs = 600) {
+  const openedAt = useRef(0);
+  useEffect(() => { if (open) openedAt.current = Date.now(); }, [open]);
+  return (event: { target: EventTarget; currentTarget: EventTarget }) => {
+    if (event.target !== event.currentTarget || Date.now() - openedAt.current < guardMs) return;
+    onClose();
+  };
+}

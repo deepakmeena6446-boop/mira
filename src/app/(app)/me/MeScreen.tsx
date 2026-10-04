@@ -16,6 +16,9 @@ import { api } from "@/lib/api-client";
 import { freshLocation } from "@/lib/location-store";
 import { useCountry } from "@/lib/locale-store";
 import { clearDevicePersonalState } from "@/lib/clear-device-personal-state";
+import { LocationSetting } from "@/components/app/LocationOnOpen";
+import { LastConfirmedNote } from "@/components/app/EmergencyPill";
+import { ChooseCountry } from "@/components/app/ChooseCountry";
 import { emergencyActions } from "@/domain/country-context";
 import { MAX_SAVED_PLACES } from "@/domain/limits";
 import { HELP_CLASSES, type HelpClass } from "@/domain/help-points";
@@ -81,9 +84,13 @@ export function MeScreen({ user, places: initialPlaces, contacts, modes, emailAl
         <>
           {actions.map((a) => <GroupRow key={a.number} icon="phone" tone="warm" title={`${a.number} · ${a.label}`} detail={a.qualification ?? null} href={`tel:${a.number}`} ariaLabel={`Call ${a.label}, ${a.number}`} />)}
           {country.helplines.map((h) => <GroupRow key={h.number} icon="phone" tone="ink" title={`${h.number} · ${h.name}`} detail={h.hours} href={`tel:${h.number}`} ariaLabel={`Call ${h.name}, ${h.number}`} />)}
+          <LastConfirmedNote className="px-4 py-2" />
         </>
       ) : (
-        <GroupRow icon="phone" tone="ink" title="Numbers show once your location is on" detail="Your phone’s own emergency call always works — it doesn’t need Mira." />
+        <>
+          <GroupRow icon="phone" tone="ink" title="Numbers show once your location is on" detail="Your phone’s own emergency call always works — it doesn’t need Mira." />
+          <div className="px-4 pb-4"><ChooseCountry /></div>
+        </>
       )}
     </Group>
   );
@@ -99,7 +106,7 @@ export function MeScreen({ user, places: initialPlaces, contacts, modes, emailAl
             <button type="button" onClick={() => setSignIn(true)} className="mira-primary mt-5 w-full">Get started</button>
           </section>
           {emergency}
-          <Group id="app" label="App" className="mt-7"><AppearancePicker /><InstallCard variant="row" /></Group>
+          <Group id="app" label="App" className="mt-7"><LocationSetting /><AppearancePicker /><InstallCard variant="row" /></Group>
           <Group id="privacy" label="Privacy" className="mt-7"><GroupRow icon="shield" title="How Mira handles your data" href="/privacy" /></Group>
         </div>
         <SignInSheet open={signIn} onClose={() => setSignIn(false)} />
@@ -195,7 +202,7 @@ export function MeScreen({ user, places: initialPlaces, contacts, modes, emailAl
         <div className="mt-7 space-y-7">
           <AccountSection durable={user.durable} google={user.google} emailHint={user.emailHint} emailAvailable={emailAlerts} googleAvailable={modes.auth === "google"} saved={saved} />
           <PushSection available={modes.push === "web_push"} />
-          <Group id="app" label="App"><AppearancePicker /><LanguagePicker /><InstallCard variant="row" /></Group>
+          <Group id="app" label="App"><LocationSetting /><AppearancePicker /><LanguagePicker /><InstallCard variant="row" /></Group>
           <Group id="privacy" label="Privacy and your data">
             <GroupRow icon="shield" title="How Mira handles your data" href="/privacy" />
             <GroupRow icon="arrow" title="Download my data" detail="Everything Mira keeps for you, as one file" onClick={() => { const a = document.createElement("a"); a.href = "/api/me/export"; a.download = ""; a.click(); }} end={<span />} />

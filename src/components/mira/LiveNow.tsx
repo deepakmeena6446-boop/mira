@@ -170,10 +170,10 @@ export function LiveNowCard({ now, point, area, stats, line, onLocate, locating,
     <SkyCard state={state} label="Right now, around you" eyebrow="Mira, around you">
       <p className="mt-3 text-[1.45rem] font-semibold leading-tight tracking-[-0.02em]">See what’s open, lit and noticed around you — right now.</p>
       <p className="mt-2 text-sm" style={{ color: sky.muted }}>
-        {locationState === "denied" ? "Location is off for Mira. Allow it in your browser’s site settings — or check any place by name." : locationState === "unavailable" ? "Couldn’t find you just now. Try again outdoors, or check a place by name." : "Your location is used on this phone for this view only. Mira never keeps a history of where you’ve been."}
+        {locationState === "denied" ? "Location is off for Mira. Allow it in your browser’s site settings — or check any place by name." : locationState === "unavailable" ? "Couldn’t find you just now. Try again outdoors, or check a place by name." : "Your location stays on this phone while Mira is open. Mira never keeps a history of where you’ve been."}
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" onClick={onLocate} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-[#14213d]"><Icon name="locate" className="size-4" />{locating ? "Finding you…" : "Use my location"}</button>
+        <button type="button" data-early-tap="locate" onClick={onLocate} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-[#14213d]"><Icon name="locate" className="size-4" />{locating ? "Finding you…" : "Use my location"}</button>
         <Link href="/around?check=1" className="inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold" style={{ background: sky.chip }}><Icon name="search" className="size-4" />Check a place</Link>
       </div>
     </SkyCard>

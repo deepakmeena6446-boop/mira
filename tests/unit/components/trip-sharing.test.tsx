@@ -7,7 +7,7 @@ import { UNKNOWN_COUNTRY } from "@/domain/country-context";
 import { newPlanDraft, newPlanLeg, type PlanDraft } from "@/domain/plan-state";
 
 const mocks = vi.hoisted(() => ({ api: vi.fn(), setLocation: vi.fn(), setCountry: vi.fn(), toast: vi.fn(), now: Date.now(), fix: null as PositionCallback | null, plan: null as PlanDraft | null, setPlan: vi.fn(), push: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, replace: mocks.push, refresh: vi.fn() }) }));
 vi.mock("@/lib/api-client", () => ({ api: mocks.api }));
 vi.mock("@/lib/location-store", () => ({ setLocation: mocks.setLocation, requestLocation: vi.fn(), useClock: () => new Date(mocks.now) }));
 vi.mock("@/lib/locale-store", () => ({ setCountry: mocks.setCountry, useCountry: () => ({ iso: "IN", timezone: "Asia/Kolkata" }) }));
@@ -44,6 +44,28 @@ beforeEach(() => {
 afterEach(() => { cleanup(); sessionStorage.clear(); vi.restoreAllMocks(); });
 
 describe("active journey consent and fresh position controls", () => {
+  it("a journey closed on another device stops showing as live, says so, and leaves (audit P18-001 / P15-001)", async () => {
+    show(); await act(async () => {});
+    const original = mocks.api.getMockImplementation()!;
+    mocks.api.mockImplementation(async (path: string, options?: unknown) => path === "/api/trips/current" ? { ok: true, status: 200, data: { trip: null } } : original(path, options));
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    await act(async () => { document.dispatchEvent(new Event("visibilitychange")); });
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/trips"));
+    expect(mocks.toast).toHaveBeenCalledWith(expect.stringMatching(/closed on another device.*nobody will be alerted/), "info");
+  });
+
+  it("after a miss, receipts name only who was actually alerted; people added later are said not to be (audit P0-4)", async () => {
+    const person = (id: string, name: string, alertDelivery: TripView["alert"]) => ({ id, name, notified: true, viaEmail: true, whatsapp: null, linkDelivery: "sent" as const, alertDelivery, checkDelivery: "none" as const });
+    // The alerted contact was removed after the miss; Chitra was added afterwards and never alerted.
+    trip = { ...trip, state: "missed", alert: "sent", etaAt: new Date(mocks.now - 15 * 60_000).toISOString(), sharedWith: [person(noor, "Fictional Chitra", "none")] };
+    show(); await act(async () => {});
+    const box = screen.getByRole("alert");
+    expect(box).toHaveTextContent("accepted the missed-check-in message for someone who is no longer on this journey");
+    expect(box).toHaveTextContent("Fictional Chitra hasn't been alerted — call or message them directly.");
+    expect(box).not.toHaveTextContent(/message for Fictional Chitra/);
+    expect(document.body).not.toHaveTextContent(/Mira attempts an email to Fictional Chitra/);
+  });
+
   it("an arrived event reviews the return without starting or sharing, preserving the old event and explicit choices", async () => {
     const place = (query: string, lat: number) => ({ query, resolution: { source: "search" as const, name: query, point: { lat, lon: 77.21 } } });
     mocks.plan = { ...newPlanDraft(new Date(mocks.now), "Asia/Kolkata"), activity: "Fictional event", origin: { kind: "named", ...place("Fictional home", 28.69) }, destination: place("Fictional event", 28.70), departureLocal: "2026-10-03T18:00", recipientIds: [noor], journeyMode: "location", legs: [{ ...newPlanLeg(), label: "Return after event", origin: place("Fictional event", 28.70), destination: place("Fictional home", 28.69), departureLocal: "2026-10-03T23:30", timeZone: "Asia/Kolkata" }] };

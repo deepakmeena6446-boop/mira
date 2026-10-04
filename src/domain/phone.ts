@@ -32,13 +32,41 @@ export function normalizePhone(raw: string, callingCode: string | null): string 
     international = true;
     digits = digits.slice(2);
   }
-  if (international) return E164.test(`+${digits}`) ? `+${digits}` : null;
+  const cc = callingCode?.replace(/\D/g, "") ?? null;
+  if (international) return checked(withoutTrunkOrRepeat(digits, cc));
   // A local number needs her country's code; without it, a guess could reach someone else.
-  if (!callingCode) return null;
+  if (!cc) return null;
+  // "919876543210" typed without "+": her own country code already leads a full number.
+  const length = NATIONAL_LENGTH[cc];
+  if (length && digits.startsWith(cc) && digits.length === cc.length + length) return checked(digits);
   // The national trunk 0 (098765…, 020 7946…) is dropped once the country code is added. WhatsApp numbers are
   // mobiles, so countries that keep a 0 after the code (Italian landlines) don't arise in practice.
-  const e164 = `${callingCode.replace(/[^\d+]/g, "")}${digits.replace(/^0/, "")}`;
-  return E164.test(e164) ? e164 : null;
+  return checked(`${cc}${digits.replace(/^0/, "")}`);
+}
+
+/**
+ * National number length (after the country code) where it is fixed, for the codes people here use most.
+ * A number of another length in these countries is refused, not guessed (audit P07-002 / P07-007).
+ */
+const NATIONAL_LENGTH: Record<string, number> = { "91": 10, "1": 10, "44": 10, "81": 10, "254": 9, "351": 9, "971": 9, "880": 10, "92": 10, "977": 10, "94": 9 };
+function countryCodeOf(digits: string): string | null {
+  for (const n of [1, 2, 3]) if (NATIONAL_LENGTH[digits.slice(0, n)]) return digits.slice(0, n);
+  return null;
+}
+/** "+91 098765 43210" → +919876543210 (a trunk 0 after the code); "+91 91 98765 43210" → the code typed twice. */
+function withoutTrunkOrRepeat(digits: string, home: string | null): string {
+  const cc = countryCodeOf(digits) ?? (home && digits.startsWith(home) ? home : null);
+  if (!cc || cc === "39") return digits; // Italy keeps its 0 after the code
+  let national = digits.slice(cc.length);
+  const length = NATIONAL_LENGTH[cc];
+  if (national.startsWith("0") && (!length || national.length === length + 1)) national = national.slice(1);
+  if (length && national.length === length + cc.length && national.startsWith(cc)) national = national.slice(cc.length);
+  return `${cc}${national}`;
+}
+function checked(digits: string): string | null {
+  const cc = countryCodeOf(digits);
+  if (cc && digits.length - cc.length !== NATIONAL_LENGTH[cc]) return null;
+  return E164.test(`+${digits}`) ? `+${digits}` : null;
 }
 
 /** "+91 •••• ••3210": enough for her to recognise the number, not enough to read it off a screen. */

@@ -19,6 +19,8 @@ const HEARTBEAT_MS = 30_000;
 /** Consecutive heartbeat failures (~5 min) after which the process exits for its supervisor to restart it. */
 const MAX_HEARTBEAT_FAILURES = 10;
 const TICK_MS = 15_000;
+/** How long a stop waits for a running job (platforms usually send SIGKILL ~30 s after SIGTERM). */
+const SHUTDOWN_DRAIN_MS = 20_000;
 const VERSION = process.env.npm_package_version ?? "0.1.0";
 
 async function main() {
@@ -83,6 +85,11 @@ async function main() {
     clearInterval(beat);
     clearInterval(loop);
     workerLog("worker.stopping", { signal });
+    // Let an in-flight pass finish its sends (a deploy's SIGTERM mid-send used to lose a missed-check-in alert).
+    // Bounded under typical SIGKILL grace; anything still claimed is resumed by the next worker's pass.
+    const drainUntil = Date.now() + SHUTDOWN_DRAIN_MS;
+    while (running.size && Date.now() < drainUntil) await new Promise((r) => setTimeout(r, 200));
+    if (running.size) workerLog("worker.stop_undrained", { jobs: [...running].join(",") });
     await sql`DELETE FROM worker_heartbeats WHERE worker_id = ${workerId}`.catch(() => {});
     await Promise.all([sql.end({ timeout: 5 }), ormClient.end({ timeout: 5 })]);
     process.exit(0);

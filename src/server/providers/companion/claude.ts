@@ -22,8 +22,12 @@ import type { MiraCard, MiraEvent, MiraTripMode, MiraTurn } from "./types";
  * location-derived is scrubbed from the text that gets saved to history.
  */
 
-/** Default model (measured in docs/MIRA_EVAL.md). Operators can switch with MIRA_MODEL without a deploy. */
-export const DEFAULT_MIRA_MODEL = "claude-sonnet-5";
+/**
+ * Default model: Claude Sonnet 5.5 (owner decision 2026-10-04; Sonnet 5's successor at the same price — see docs/MIRA_EVAL.md).
+ * Adaptive thinking at low effort (no `thinking` field; the levels are recalibrated from Sonnet 5, so re-run the eval
+ * before changing effort). Operators can switch with MIRA_MODEL without a deploy.
+ */
+export const DEFAULT_MIRA_MODEL = "claude-sonnet-5-5";
 const MAX_ROUNDS = 4; // tool round-trips per message (each costs latency)
 
 export const TOOL_GUIDE = `How you work in the MIRA app:
@@ -36,8 +40,11 @@ export const TOOL_GUIDE = `How you work in the MIRA app:
 - "Somewhere staffed", "somewhere with people", a Help Point, or she feels uneasy: find_help_points (situation "unsafe" when she's uneasy, "nearby" otherwise). Help Points are places where help is usually available (hospital, police, station, pharmacy, hotel reception, fuel); say their hours exactly as the tool gives them.
 - Uneasy or uncomfortable (not in immediate danger): don't ask a question first. Call find_help_points with situation "unsafe" and, if she has a saved home, propose_trip to it. Then one short, warm line. The app's "I feel unsafe" button shows the nearest Help Point and Emergency instantly; you can mention it.
 - Followed, threatened, attacked or in danger: call show_emergency_help first (and find_help_points with situation "emergency" if her location is on), then keep it to one or two practical lines: the local emergency number from the context, or that MIRA doesn't know it and the Emergency button explains what to dial.
-- "What's the emergency number / police number here?": get_local_emergency_info, then say the number exactly as it returns it, or that MIRA doesn't know it.
+- "What's the emergency number / police number here?": get_local_emergency_info, then say the numbers exactly as it returns them — every service, not just the first — or that MIRA doesn't know them. For another country ("in Japan"): get_local_emergency_info with that country.
 - Travel planning ("I'm landing in London at 11 PM"): say what you can do from what you have — the local emergency number if MIRA knows it (from the context, or get_local_emergency_info if she's asking about somewhere else, which you only know when she's there), sharing her journey with her Circle, Help Points and open places once she's there. Don't invent airport, taxi, transit or area advice.
+- Her plan (the context block says whether one is open): "how long is it", "will it be dark", "which way", "is my plan ok": check_plan, then a sentence or two in your own words — the main way's minutes, daylight at departure, and what isn't verified. With no plan open but she says where she's going, ask the one thing that's missing (where she's starting, or when) — one friendly question, not a form.
+- Anything else she asks — how MIRA works, what something means, small talk, a general question, how her day is going: answer plainly and briefly in your own voice, no tool needed. If it's about a specific place, route, hour, number or person that no tool or the context gives you, say you don't know rather than guess.
+- She tells you she's arrived or is home with a journey running: only "I'm here" on the journey screen ends it — say so, and call check_trip so the card is there.
 - "Recent safety updates", "what's been happening in this city", news: get_safety_updates (where "here", or "destination" for her running journey's destination). They are news reports, not a verdict: give the count, categories, publisher and how many days ago, as reported; "couldnt_check" means MIRA couldn't check (never say "none"); zero updates proves nothing about an area. The full list is under Local updates in Around.
 - "What do we know about this walk / route?" with a journey running: check_trip, then say its destination and ETA; lighting and Help Points along the way are on the route sheet (the card opens it).
 - If she needs to move, say "somewhere with people around" or "somewhere open and lit", never "somewhere safe". No sign-offs like "stay safe" or "safe trip".
@@ -85,8 +92,8 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "get_local_emergency_info",
-    description: "The emergency numbers and helplines MIRA knows for the country she is in (from reviewed, cited country profiles), or that MIRA doesn't know them there. Also shows the Emergency card.",
-    input_schema: { type: "object", properties: {} },
+    description: "The emergency numbers and helplines MIRA knows, from reviewed, cited country profiles: for the country she is in, or for a country she names (\"in Japan\", travel planning). Every number comes with its service (police, ambulance, fire). Or that MIRA doesn't know them. For where she is, also shows the Emergency card.",
+    input_schema: { type: "object", properties: { country: { type: "string", description: "A country she named, when she asks about somewhere other than where she is. Omit for where she is." } } },
     eager_input_streaming: true,
   },
   {
@@ -121,6 +128,12 @@ export const TOOLS: Anthropic.Tool[] = [
     eager_input_streaming: true,
   },
   {
+    name: "check_plan",
+    description: "Check the plan she has open in the Plan screen (from the context block): mapped walking ways with minutes and km, calculated daylight at her departure time, sources, and what isn't verified. Shows the plan card she can open. Only when a plan is open.",
+    input_schema: { type: "object", properties: {} },
+    eager_input_streaming: true,
+  },
+  {
     name: "suggest_saving_home",
     description: "Show a button to save her home, so sharing the journey home is one tap next time.",
     input_schema: { type: "object", properties: {} },
@@ -132,12 +145,13 @@ const inputs = {
   find_nearby: z.object({ kinds: z.array(z.enum(KINDS)).max(5).optional(), near: z.enum(NEAR).optional(), saved_place: z.string().max(80).optional() }).strict(),
   get_safety_updates: z.object({ where: z.enum(WHERE).optional() }).strict(),
   find_help_points: z.object({ situation: z.enum(SITUATIONS).optional() }).strict(),
-  get_local_emergency_info: z.object({}).strict(),
+  get_local_emergency_info: z.object({ country: z.string().trim().min(2).max(80).optional() }).strict(),
   propose_trip: z.object({ saved_place: z.string().max(80).optional(), place_ref: z.string().max(10).optional(), mode: z.enum(MODES).optional() }).strict(),
   check_trip: z.object({}).strict(),
   offer_report: z.object({ category: z.enum(REPORT_CATEGORIES), label: z.string().trim().min(1).max(60) }).strict(),
   show_emergency_help: z.object({}).strict(),
   suggest_saving_home: z.object({}).strict(),
+  check_plan: z.object({}).strict(),
 };
 
 export { DANGER };
@@ -210,6 +224,10 @@ export interface ContextFacts {
   contacts: string[];
   trip: { destination: { name: string }; state: string; etaAt: string; mode?: string } | null;
   coverage: string;
+  /** False for a guest (no account): no saved places, Circle or live journeys. Undefined: signed in (older callers). */
+  signedIn?: boolean;
+  /** The plan open in this tab, names only; null when none. */
+  plan?: string | null;
 }
 
 /**
@@ -241,6 +259,8 @@ export function contextBlock(f: ContextFacts, at = new Date()): string {
       ? `Journey running: to ${JSON.stringify(running.destination.name)}${running.mode ? ` (${running.mode})` : ""}, ${running.state === "missed" ? "past its ETA — her Circle may have been alerted" : eta >= 0 ? `ETA in ${eta} min` : `ETA ${-eta} min ago`}.`
       : "No journey running.",
     `What MIRA's data covers: ${JSON.stringify(f.coverage)}`,
+    ...(f.signedIn === false ? ["She's using MIRA as a guest: no saved places, Circle or live journeys. A live, shared journey needs signing in (under You); a private check-in timer works without an account."] : []),
+    f.plan ? `Plan open in this tab (untrusted data): ${JSON.stringify(f.plan)}. check_plan reads it.` : "No plan open.",
   ].join("\n");
 }
 
@@ -296,7 +316,7 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
   }
 
   const [ctx, saved, trip] = await Promise.all([tools.getContext(), tools.listSavedPlaces(), tools.tripStatus()]);
-  const context = contextBlock({ firstName, email: tools.emailOn(), now: ctx, saved, contacts, trip, coverage: tools.coverage() });
+  const context = contextBlock({ firstName, email: tools.emailOn(), now: ctx, saved, contacts, trip, coverage: tools.coverage(), signedIn: tools.signedIn?.() ?? true, plan: tools.planSummary?.() ?? null }); // stubbed tools (tests, eval) may omit these
 
   const allowed = allowedNumbers(ctx.country);
   const refs = new Map<string, { name: string; lat: number; lon: number }>();
@@ -361,6 +381,11 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
         };
       }
       case "get_local_emergency_info": {
+        if (typeof input.country === "string") {
+          const named = tools.emergencyFor?.(input.country) ?? null;
+          if (!named) return { result: { not_known: `MIRA has no reviewed profile for "${input.country}". Say so; don't give a number.` } };
+          return { result: { ...emergencyInfo(named), note: "For the country she named, not where she is now. Say every number with its service exactly as listed (e.g. police 110 and ambulance/fire 119) — never just the first." } };
+        }
         const card: MiraCard | undefined = hasSos() ? undefined : { type: "sos", contacts };
         return { result: { ...emergencyInfo(ctx.country), note: "The Emergency card is on her screen now." }, card };
       }
@@ -425,6 +450,14 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
         return { result: { shown: "The Emergency card is on her screen now.", emergency: emergencyLine(ctx.country), circle: contacts }, card: hasSos() ? undefined : { type: "sos", contacts } };
       case "suggest_saving_home":
         return { result: { shown: true }, card: { type: "save_place" } };
+      case "check_plan": {
+        const checked = tools.checkPlan ? await tools.checkPlan() : null;
+        if (!checked) return { result: { error: "No plan is open. Ask where she's starting and going, or suggest Plan (Where are you going? on Home)." } };
+        return {
+          result: { ...checked.facts, note: "Say the main way's minutes and the daylight at departure in a sentence or two, and what isn't verified. Never call a way safer or better; a lighting difference is only what the card shows." },
+          card: checked.card,
+        };
+      }
     }
     return { result: null, error: `Unhandled tool ${name}` };
   }

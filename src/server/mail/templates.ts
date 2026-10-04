@@ -1,5 +1,6 @@
 import { formatPlaceDateTime, formatPlaceTime } from "@/lib/time";
 import { modeWords } from "@/domain/travel-prefs";
+import { EXPIRE_AFTER_ETA_MS } from "@/domain/journey";
 
 /**
  * Minimised contact emails (architecture §6): ETA and a public place name only if the
@@ -84,7 +85,7 @@ export function tripMissedEmail(args: { ownerName: string; destination: string; 
       "Hello,",
       "",
       `${args.ownerName} was expected at ${args.destination} ${about(args.minutesLate)} ago${theirTime(args.etaAt, args.tz)} and hasn't confirmed they arrived.`,
-      ...(args.liveUrl ? ["Their last shared location is here while the trip is still open:", args.liveUrl] : []),
+      ...(args.liveUrl ? [`Their last shared location is here until ${Math.round(EXPIRE_AFTER_ETA_MS / 60_000)} minutes after their expected time (after that the page only says they didn't check in):`, args.liveUrl] : []),
       "",
       "They may simply have forgotten to tap \"I'm here\". You might want to call or message them directly.",
       "MIRA is not an emergency service and hasn't contacted anyone else. If you believe they're in danger, call your local emergency number.",
@@ -95,13 +96,16 @@ export function tripMissedEmail(args: { ownerName: string; destination: string; 
 }
 
 /** Follow-up to a missed-arrival email: the person has checked in. No location, no link. */
-export function tripArrivedEmail(args: { ownerName: string; destination: string }) {
+export function tripArrivedEmail(args: { ownerName: string; destination: string; ended?: boolean }) {
+  // `ended`: she closed the trip herself instead of tapping "I'm here" — she acted in the app, but MIRA can't say where she is.
   return {
-    subject: `${args.ownerName} has checked in on MIRA`,
+    subject: args.ended ? `${args.ownerName} ended their trip on MIRA` : `${args.ownerName} has checked in on MIRA`,
     text: [
       "Hello,",
       "",
-      `Good news: ${args.ownerName} has now checked in at ${args.destination}.`,
+      args.ended
+        ? `${args.ownerName} has ended their trip to ${args.destination} in the app, after missing the check-in we emailed you about. MIRA can't tell you where they are now; if you're still worried, call or message them.`
+        : `Good news: ${args.ownerName} has now checked in at ${args.destination}.`,
       "Their trip is closed and live sharing has stopped.",
       "",
       "You don't need to do anything. This is the last email about this trip.",

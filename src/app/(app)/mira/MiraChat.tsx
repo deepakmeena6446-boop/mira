@@ -22,11 +22,12 @@ import type { MiraCard } from "@/server/providers/companion/types";
 import { circleSharingLine } from "@/domain/companion-output";
 import { clockIn } from "@/domain/daylight";
 import { useDaypart } from "@/lib/daypart-store";
-import { hasPlanWork, intentFromDraft, intentFromLeg, newPlanDraft } from "@/domain/plan-state";
+import { hasPlanWork, intentFromDraft, newPlanDraft } from "@/domain/plan-state";
 import { clearPlanDraft, setPlanDraft, usePlanDraft, usePlanHydrated } from "@/lib/plan-store";
 import { planTitle, whenWords } from "@/domain/plan-name";
 import { draftFromAsk } from "@/domain/plan-ask";
-import { askUsesPlan, shouldSeedPlan, immediateSupportIntent } from "@/domain/ask-routing";
+import { arrivalIntent, shouldSeedPlan, immediateSupportIntent } from "@/domain/ask-routing";
+import { activeTripMessage } from "@/lib/trip-start";
 
 interface Msg {
   id: string;
@@ -200,7 +201,7 @@ function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; o
 function GuestNote({ onSignIn }: { onSignIn: () => void }) {
   return (
     <p className="text-[0.8125rem] text-ink-muted">
-      As a guest, Mira answers plan questions from checked evidence. <button type="button" onClick={onSignIn} className="font-semibold text-accent-strong underline">Sign in</button> for nearby places, saved chat and live journeys.
+      As a guest, nothing you send Mira is saved. <button type="button" onClick={onSignIn} className="font-semibold text-accent-strong underline">Sign in</button> for your saved places, your Circle and live journeys.
     </p>
   );
 }
@@ -240,9 +241,24 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
     const message = text.trim();
     if (!message || sending) return;
     if (immediateSupportIntent(message)) { window.dispatchEvent(new Event("mira:need-options")); return; }
-    const planFlow = askUsesPlan(message, planActive, Boolean(user));
+    // "I'm home" during a live journey: telling Mira doesn't end it. Say so before she puts the phone away,
+    // or her contacts get a missed-check-in alert while she's safe.
+    if (user && arrivalIntent(message)) {
+      const current = await api<{ trip: { destination: { name: string }; etaAt: string; state: string } | null }>("/api/trips/current");
+      const trip = current.ok ? current.data.trip : null;
+      if (trip && (trip.state === "active" || trip.state === "missed")) {
+        setInput("");
+        setMsgs((m) => [
+          ...m,
+          { id: `u${Date.now()}`, role: "user", text: message, cards: [] },
+          { id: `a${Date.now()}`, role: "assistant", text: "Glad you're there. Telling me doesn't end your journey — only “I'm here” does. Until you tap it, Mira treats you as still on the way, and anyone following could be told you missed your check-in.", cards: [{ type: "trip_status", destination: trip.destination.name, etaAt: trip.etaAt, state: trip.state }] },
+        ]);
+        return;
+      }
+    }
     setSending(true);
-    if (planFlow && !planActive && shouldSeedPlan(message)) {
+    // Every message goes to Mira (one door); a movement sentence also starts a plan draft she can finish in Plan.
+    if (!planActive && shouldSeedPlan(message)) {
       const timeZone = deviceTimeZone() ?? "UTC";
       const draft = draftFromAsk(message, newPlanDraft(new Date(), timeZone));
       if (user && /^\s*(?:take me home|go home|going home|walk home)\s*[?.!]*\s*$/i.test(message)) {
@@ -259,10 +275,12 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
     setMsgs((m) => [...m, mine, reply]);
     const now = new Date();
     try {
-      const res = await fetch(planFlow ? "/api/mira/plan" : "/api/mira", {
+      // Guests have no saved chat: this tab's last few turns give Mira the thread of the conversation.
+      const guestHistory = user ? undefined : msgs.filter((x) => !x.failed && x.text.trim()).slice(-8).map((x) => ({ role: x.role, text: x.text.slice(0, 2000) }));
+      const res = await fetch("/api/mira", {
         method: "POST",
         headers: { "content-type": "application/json", "x-mira-request": "1" },
-        body: planFlow ? JSON.stringify({ message, plan, legs: planDraft?.legs?.map(intentFromLeg) ?? [], countryIsos: [planDraft?.destinationCountryIso ?? null, ...(planDraft?.legs?.map((leg) => leg.destinationCountryIso) ?? [])] }) : JSON.stringify({ message, context: { localTime: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), tz: deviceTimeZone(), location: planHydrated && loc.point ? { lat: loc.point.lat, lon: loc.point.lon } : null, area: planHydrated ? loc.area : null } }),
+        body: JSON.stringify({ message, plan, ...(guestHistory ? { history: guestHistory } : {}), context: { localTime: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), tz: deviceTimeZone(), location: planHydrated && loc.point ? { lat: loc.point.lat, lon: loc.point.lon } : null, area: planHydrated ? loc.area : null } }),
       });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => null);
@@ -318,11 +336,12 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
     const l = await freshLocation();
     if (!l.point) return toast("Turn on location so I can start your trip.", "error");
     const r = await api("/api/trips", { body: { from: { lat: l.point.lat, lon: l.point.lon }, to: dest, share: false } });
-    if (r.ok) recordUsage("journey");
-    if (r.ok || r.code === "trip_active") {
+    if (r.ok) {
+      recordUsage("journey");
       router.push("/trip");
       router.refresh();
-    } else toast(r.message, "error");
+    } else if (r.code === "trip_active") toast(await activeTripMessage(), "error"); // never swap in the other journey
+    else toast(r.message, "error");
   };
   // Conversation → decision: hand the place to Plan, from where she is (only if location is already on).
   const comparePlace = (d: { name: string; lat: number; lon: number }) => {
@@ -433,7 +452,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
               <Icon name="send" className="size-5" />
             </button>
           </form>
-          <p className="mt-1.5 px-2 text-[0.7rem] leading-snug text-ink-subtle">Questions may be read by the configured AI provider. Plan questions aren’t saved; other chats are kept for 30 days. <Link href="/privacy" className="underline">Data details</Link></p>
+          <p className="mt-1.5 px-2 text-[0.7rem] leading-snug text-ink-subtle">Messages may be read by the configured AI provider. {user ? "Questions about an open plan aren’t saved; other chats are kept for 30 days." : "As a guest, nothing here is saved."} <Link href="/privacy" className="underline">Data details</Link></p>
         </div>
       </div>
       <SignInSheet open={signIn} onClose={() => setSignIn(false)} reason="Sign in to talk to Mira" />

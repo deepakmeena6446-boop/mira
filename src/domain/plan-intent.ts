@@ -16,6 +16,21 @@ function normalizeTime(value: string): string {
   const clock = /^(\d{1,2})(?::([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)$/i.exec(value);
   return clock ? `${Number(clock[1])}:${clock[2] ?? "00"} ${clock[3].replaceAll(".", "").toUpperCase()}` : value.toLowerCase();
 }
+/**
+ * "raat 11 baje", "subah 6 baje", "shaam ko 7 baje", "११ बजे" (audit P11-001): Hinglish and Hindi clock times. The
+ * part of day settles AM/PM; without one it stays unspecified, exactly like a bare English "at 11".
+ */
+function hinglishTime(clause: string): string | null {
+  const m = /(?:(raat|rat|shaam|sham|subah|subha|savere|dopahar|दोपहर|रात|शाम|सुबह)\s*(?:ko|को)?\s*)?([0-9०-९]{1,2})(?:[:.]([0-5][0-9]))?\s*(?:baje|bje|बजे)/i.exec(clause);
+  if (!m) return null;
+  const hour = Number(m[2].replace(/[०-९]/g, (d) => String("०१२३४५६७८९".indexOf(d))));
+  if (hour < 1 || hour > 12) return null;
+  const minute = m[3] ?? "00";
+  const part = (m[1] ?? "").toLowerCase();
+  const pm = /^(?:shaam|sham|dopahar|दोपहर|शाम)$/.test(part) || (/^(?:raat|rat|रात)$/.test(part) && hour >= 6 && hour !== 12);
+  const am = /^(?:subah|subha|savere|सुबह)$/.test(part) || (/^(?:raat|rat|रात)$/.test(part) && (hour < 6 || hour === 12));
+  return pm ? `${hour}:${minute} PM` : am ? `${hour}:${minute} AM` : `${hour} (AM/PM unspecified)`;
+}
 function firstTimeHint(clause: string): string | null {
   const explicit = [...clause.matchAll(TIME)][0];
   // A bare clock number is useful wording, but its AM/PM remains unresolved.
@@ -24,7 +39,7 @@ function firstTimeHint(clause: string): string | null {
   const bareIndex = bare ? bare.index + bare[0].lastIndexOf(bare[1]) : Infinity;
   return bare && (!explicit || bareIndex < (explicit.index ?? Infinity))
     ? `${Number(bare[1])} (AM/PM unspecified)`
-    : explicit ? normalizeTime(explicit[0]) : null;
+    : explicit ? normalizeTime(explicit[0]) : hinglishTime(clause);
 }
 function isClockName(name: string): boolean {
   return /^(?:\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?|midnight|noon|dawn|sunrise|sunset)$/i.test(name.trim());

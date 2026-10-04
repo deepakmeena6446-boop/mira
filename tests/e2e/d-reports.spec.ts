@@ -16,6 +16,9 @@ test.describe("Reports — private until reviewed, public only as thresholded no
     const me = await newUser(browser, "Nisha");
     await me.page.goto("/report");
     await me.page.getByRole("button", { name: /Dark or broken street/ }).click();
+    // Location is never taken on opening Report (R2): it's an explicit tap.
+    await expect(me.page.getByText("Where did it happen?")).toBeVisible();
+    await me.page.getByRole("button", { name: "Use where I am" }).click();
     await expect(me.page.getByText("Around where you are now")).toBeVisible();
     await me.page.getByRole("button", { name: "Send privately" }).click();
     await expect(me.page.getByText(/Thank you/)).toBeVisible();
@@ -80,6 +83,7 @@ test.describe("Reports — private until reviewed, public only as thresholded no
     const { ctx, page } = await newUser(browser, "Esha");
     await page.goto("/report");
     await page.getByRole("button", { name: /Being followed/ }).click();
+    await page.getByRole("button", { name: "Use where I am" }).click();
     await page.getByRole("button", { name: "It happened to me" }).click();
     await page.getByLabel(/Anything to add/).fill("Auto DL1RT4567 followed me, driver said his name is Rakesh, call 9876543210");
     await expect(page.getByText(/This looks like it includes a/)).toBeVisible();
@@ -113,6 +117,7 @@ test.describe("Reports — private until reviewed, public only as thresholded no
     const before = (await db`SELECT count(*)::int AS n FROM reports_private`)[0].n;
     await page.goto("/report");
     await page.getByRole("button", { name: /Transport problem/ }).click();
+    await page.getByRole("button", { name: "Use where I am" }).click();
     await page.getByLabel(/Anything to add/).fill(evil);
     await page.getByRole("button", { name: "Send privately" }).dblclick();
     await expect(page.getByText(/Thank you/)).toBeVisible();

@@ -17,6 +17,7 @@ import { POST as demoPOST } from "@/app/api/auth/demo/route";
 import { POST as signoutPOST } from "@/app/api/auth/signout/route";
 import { POST as emailPOST } from "@/app/api/auth/email/route";
 import { POST as confirmPOST } from "@/app/api/auth/email/confirm/route";
+import { POST as previewPOST } from "@/app/api/auth/email/preview/route";
 import { GET as meGET, PATCH as mePATCH } from "@/app/api/me/route";
 import { POST as contactsPOST } from "@/app/api/me/contacts/route";
 import { POST as acceptPOST } from "@/app/api/invites/accept/route";
@@ -100,6 +101,37 @@ describe("P1: durable accounts, journeys, check-on-me, push, Location Context", 
     // A link works once.
     const again = await useSignInLink(email, phone);
     expect(again.status).toBe(410);
+  });
+
+  it("a sign-in link for another account never silently switches a signed-in browser (login CSRF, audit L01-001)", async () => {
+    const email = unique("xena");
+    const xena = await signIn("Xena");
+    expect((await emailPOST(jsonRequest("/api/auth/email", { email }))).status).toBe(200);
+    expect((await useSignInLink(email, xena)).status).toBe(200); // Xena's account now has this email
+    // Someone else (anyone holding Xena's inbox — or Xena herself) requests a link and gets it opened in Yuri's browser.
+    switchJar(newJar());
+    expect((await emailPOST(jsonRequest("/api/auth/email", { email }))).status).toBe(200);
+    const yuri = await signIn("Yuri");
+    const [m] = await mailsTo(email);
+    yuri.set("mira_signin", /\/auth\/link\/([A-Za-z0-9_-]+)/.exec(await mailText(m.ID))![1]);
+    switchJar(yuri);
+    const preview = await (await previewPOST(jsonRequest("/api/auth/email/preview", {}))).json();
+    expect(preview).toMatchObject({ valid: true, switching: true, accountName: "Xena", signedInAs: "Yuri" });
+    expect(preview.emailHint).toMatch(/•/);
+    const silent = await confirmPOST(jsonRequest("/api/auth/email/confirm", {}));
+    expect(silent.status).toBe(409);
+    expect((await (await meGET()).json()).user.name).toBe("Yuri"); // still Yuri
+    const chosen = await confirmPOST(jsonRequest("/api/auth/email/confirm", { switchAccount: true }));
+    expect(chosen.status).toBe(200);
+    expect((await (await meGET()).json()).user.name).toBe("Xena");
+  });
+
+  it("an unknown or garbage link says it expired, not '18+' (audit P19-001)", async () => {
+    const jar = newJar();
+    jar.set("mira_signin", "x".repeat(40));
+    switchJar(jar);
+    expect(await (await previewPOST(jsonRequest("/api/auth/email/preview", {}))).json()).toMatchObject({ valid: false });
+    expect((await confirmPOST(jsonRequest("/api/auth/email/confirm", {}))).status).toBe(410);
   });
 
   it("an 'add this email' link completes only for the account that asked — never files someone's address under a stranger's account", async () => {

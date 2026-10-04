@@ -44,14 +44,15 @@ export async function runWeeklyAggregation(sql: postgres.Sql, clock: Clock): Pro
     const [done] = await tx`SELECT 1 FROM aggregate_runs WHERE release_week = ${week}`;
     if (done) return { ran: false, releaseWeek: week, keysEvaluated: 0, releasesCreated: 0, heldForBurst: 0 };
 
-    const rows = await tx<{ report_id: string; actor_hash: string; duplicate_group: string | null; cell_id: string; time_band: string; category: Category; recency_bucket: string; tags: string[]; created_at: Date }[]>`
-      SELECT s.report_id, r.actor_hash, s.duplicate_group, s.cell_id, s.time_band, s.category, s.recency_bucket, s.tags, r.created_at
+    const rows = await tx<{ report_id: string; actor_hash: string; network_hash: string | null; duplicate_group: string | null; cell_id: string; time_band: string; category: Category; recency_bucket: string; tags: string[]; created_at: Date }[]>`
+      SELECT s.report_id, r.actor_hash, r.network_hash, s.duplicate_group, s.cell_id, s.time_band, s.category, s.recency_bucket, s.tags, r.created_at
       FROM report_structured s JOIN reports_private r ON r.id = s.report_id
       WHERE r.status = 'approved' AND s.withdrawn_at IS NULL
         AND r.created_at > ${new Date(now.getTime() - ELIGIBLE_SUBMISSION_DAYS * 86_400_000)} AND r.created_at <= ${now}`;
     const reports: EligibleReport[] = rows.map((r) => ({
       reportId: r.report_id,
       actorHash: r.actor_hash,
+      networkHash: r.network_hash,
       duplicateGroup: r.duplicate_group,
       cellId: r.cell_id,
       timeBand: r.time_band,

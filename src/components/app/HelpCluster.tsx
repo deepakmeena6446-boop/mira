@@ -14,7 +14,7 @@ export function HelpCluster({ onUnsafe, compact = false }: { onUnsafe: () => voi
     // Root-screen header form (docs/phase1-ux/01 §2): same two anchors, quieter chrome, same place on every root.
     return (
       <div className="mira-helpcluster flex min-w-0 flex-wrap justify-end gap-1.5">
-        <button type="button" onClick={onUnsafe} className="min-h-11 max-w-full rounded-full bg-surface px-3.5 text-[0.8125rem] font-semibold text-accent-strong ring-1 ring-line-strong">
+        <button type="button" data-early-tap="unsafe" onClick={onUnsafe} className="min-h-11 max-w-full rounded-full bg-surface px-3.5 text-[0.8125rem] font-semibold text-accent-strong ring-1 ring-line-strong">
           {t("support.unsafe")}
         </button>
         <EmergencyPill variant="quiet" className="min-w-0 max-w-full justify-center break-words" />
@@ -23,7 +23,7 @@ export function HelpCluster({ onUnsafe, compact = false }: { onUnsafe: () => voi
   }
   return (
     <div className="mira-helpcluster flex min-w-0 flex-wrap justify-end gap-2">
-      <button type="button" onClick={onUnsafe} className="min-h-12 max-w-full rounded-full border border-line-strong bg-surface px-4 text-sm font-semibold text-accent-strong shadow-[var(--shadow-float)]">
+      <button type="button" data-early-tap="unsafe" onClick={onUnsafe} className="min-h-12 max-w-full rounded-full border border-line-strong bg-surface px-4 text-sm font-semibold text-accent-strong shadow-[var(--shadow-float)]">
         {t("support.unsafe")}
       </button>
       <EmergencyPill className="min-w-0 max-w-full justify-center break-words" />

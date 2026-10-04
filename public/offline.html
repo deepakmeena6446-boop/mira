@@ -13,6 +13,8 @@
   h1 { font-size: 1.6rem; margin: 0 0 .5rem; }
   p { color: var(--muted); margin: .5rem 0; }
   .card { background: var(--card); border-radius: 1.5rem; padding: 1rem 1.25rem; margin-top: 1.5rem; text-align: left; }
+  .call-box { margin-top: .75rem; }
+  .call-box a.call { display: flex; margin-top: .5rem; background: var(--ink); }
   a.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 1.5rem; margin-top: 1.5rem; border-radius: 999px; background: var(--accent); color: #fff; font-weight: 700; text-decoration: none; }
 </style>
 </head>
@@ -23,9 +25,11 @@
   <p>MIRA needs a connection to show the map and share trips.</p>
   <div class="card">
     <p><strong>On a trip?</strong> Live updates are unavailable. If you explicitly shared a journey, recipients may see an older position while its link remains valid. Delivery and check-in alerts are not guaranteed; contact someone directly if needed.</p>
-    <p><strong>In danger?</strong> MIRA cannot determine your current country on this offline page. Use your phone’s emergency call screen or dial a local emergency number you know. Calls require an available phone service; MIRA does not call or dispatch help.</p>
+    <p><strong>In danger?</strong> Calls need phone service, not internet. MIRA opens your phone's dialler; it does not call or dispatch help.</p>
+    <div id="call" class="call-box"></div>
   </div>
   <a class="btn" href="/">Try again</a>
 </main>
+<script src="/offline.js"></script>
 </body>
 </html>

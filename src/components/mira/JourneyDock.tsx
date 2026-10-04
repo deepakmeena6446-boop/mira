@@ -7,8 +7,9 @@ import { cx } from "@/components/ui/cx";
 import { MiraPulse } from "@/components/app/MiraPulse";
 import { useClock } from "@/lib/location-store";
 import { useLocalJourneyActive } from "@/lib/local-check-in-store";
+import { useCurrentTrip, type DockTrip } from "@/lib/current-trip-store";
 
-export type DockTrip = { state: "active" | "missed"; destination: string | null; etaAt: string; following: string[] };
+export type { DockTrip };
 
 /** Screens that already own the journey (or a sticky action bar) don't get the dock. */
 const HIDDEN = ["/trip", "/trips", "/plan", "/mira"];
@@ -17,8 +18,9 @@ const HIDDEN = ["/trip", "/trips", "/plan", "/mira"];
  * The open journey, one tap away from every root (docs/phase1-ux/01 §2). It says only what's true:
  * where to, time left, and who can follow — or that nobody can.
  */
-export function JourneyDock({ trip }: { trip: DockTrip | null }) {
+export function JourneyDock({ trip: initial }: { trip: DockTrip | null }) {
   const path = usePathname() ?? "/";
+  const trip = useCurrentTrip(initial);
   const clock = useClock();
   const manual = useLocalJourneyActive();
   if (HIDDEN.some((h) => path === h || path.startsWith(`${h}/`))) return null;

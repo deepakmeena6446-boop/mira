@@ -5,7 +5,7 @@ const base = { missed: false, whatsapp: [] as string[], opened: [] as string[], 
 
 describe("journeyNextAction — one filled button on the journey screen", () => {
   it("sends the link to the first WhatsApp contact not yet opened", () => {
-    expect(journeyNextAction({ ...base, whatsapp: ["Priya", "Mum"], opened: ["Priya"] })).toEqual({ kind: "whatsapp", name: "Mum" });
+    expect(journeyNextAction({ ...base, whatsapp: ["Priya", "Mum"], opened: ["Priya"] })).toEqual({ kind: "whatsapp", id: "Mum" });
   });
   it("with nobody following and no WhatsApp contacts, sending the live link comes first", () => {
     expect(journeyNextAction(base)).toEqual({ kind: "share" });

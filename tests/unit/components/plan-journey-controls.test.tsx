@@ -155,6 +155,21 @@ describe("chosen journey explicit consent and stable retry", () => {
     expect(mocks.location).not.toHaveBeenCalled();
   });
 
+  it("a journey already running is said plainly and never swapped in for this one (audit P0-3)", async () => {
+    mocks.api.mockImplementation(async (path: string) =>
+      path === "/api/me/contacts" ? { ok: true, data: { contacts } }
+      : path === "/api/trips" ? { ok: false, status: 409, code: "trip_active", message: "You already have a trip running.", network: false }
+      : path === "/api/trips/current" ? { ok: true, data: { trip: { destination: { name: "Fictional gym" }, autoArrival: true } } }
+      : { ok: true, data: {} });
+    show(true); await screen.findByRole("radio", { name: "Use foreground location" });
+    fireEvent.click(screen.getByRole("radio", { name: "Use foreground location" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: /Fictional Noor/ }));
+    prepare(); confirm();
+    expect(await screen.findByText(/You already have a journey running to Fictional gym\. Nothing new started, and nobody was told about this one/)).toBeInTheDocument();
+    expect(mocks.push).not.toHaveBeenCalledWith("/trip");
+    expect(screen.getByRole("link", { name: "Open my current journey" })).toHaveAttribute("href", "/trip");
+  });
+
   it("denied assisted location posts nothing and offers a separately confirmed private manual fallback", async () => {
     mocks.location.mockResolvedValue({ status: "denied", point: null, at: Date.now(), area: null });
     show(true); await screen.findByRole("radio", { name: "Use foreground location" });

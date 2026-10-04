@@ -74,6 +74,21 @@ export function SharedTripView({ token, initial, tiles }: { token: string; initi
     return () => clearInterval(t);
   }, [token, open]);
 
+  // "expired" is only ever reached from "missed": she never checked in. Never present that as an ordinary end.
+  if (!open && !gone && trip.state === "expired") {
+    return (
+      <main className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 text-center">
+        <span aria-hidden className="grid size-14 place-items-center rounded-full bg-warm-soft text-warm"><Icon name="info" className="size-7" /></span>
+        <h1 className="mt-5 text-2xl font-semibold">{trip.name} didn&apos;t check in</h1>
+        <p className="mt-2 max-w-sm text-ink-muted">
+          {trip.name} missed their check-in and hasn&apos;t tapped &ldquo;I&apos;m here&rdquo; since. Live sharing has now stopped, so this page can&apos;t show where they are.
+        </p>
+        <p className="mt-3 max-w-sm font-semibold">Call or message {trip.name} directly. If you think they&apos;re in danger, call your local emergency number.</p>
+        <p className="mt-3 max-w-sm text-sm text-ink-muted">Mira isn&apos;t an emergency service and can&apos;t contact anyone for you.</p>
+      </main>
+    );
+  }
+
   if (!open) {
     return (
       <main className="bg-companion flex min-h-dvh flex-col items-center justify-center px-6 text-center">

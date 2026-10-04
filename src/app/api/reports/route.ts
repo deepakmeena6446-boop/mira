@@ -5,6 +5,7 @@ import { ensureActor } from "@/server/session/actor";
 import { getUser } from "@/server/session/user";
 import { hmacHex } from "@/server/crypto";
 import { clientIp, dailyKey, enforce } from "@/server/ratelimit";
+import { reportNetworkHash } from "@/server/report/network";
 import { systemClock } from "@/server/clock";
 import { prepareReport, reportInputSchema, submitReport } from "@/server/report/submit";
 import { REPORT_LIMITS_ACTOR, REPORT_LIMITS_GLOBAL, REPORT_LIMITS_IP } from "@/server/report/limits";
@@ -28,7 +29,7 @@ export const POST = handle(async (req: Request) => {
   const user = await getUser(sql);
   const actorHash = user ? hmacHex("user-actor", user.id) : (await ensureActor()).actorHash;
   await enforce(sql, [dailyKey("actor", actorHash, now)], REPORT_LIMITS_ACTOR, now);
-  const result = await submitReport(sql, actorHash, prepared, systemClock, user?.id ?? null);
+  const result = await submitReport(sql, actorHash, prepared, systemClock, user?.id ?? null, reportNetworkHash(clientIp(req), now));
   console.log(JSON.stringify({ t: now.toISOString(), src: "web", event: result.replay ? "report.replayed" : "report.received", report: result.id, held: result.held }));
   return json({ received: true }, result.replay ? 200 : 201);
 });

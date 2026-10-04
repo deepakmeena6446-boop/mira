@@ -11,6 +11,7 @@ import { haversineMeters } from "@/domain/pilot";
 import { readLocalCheckIn, startLocalJourney, updateLocalJourney, useLocalJourneyActive } from "@/lib/local-check-in-store";
 import type { LocalCheckIn } from "@/domain/local-check-in";
 import { keepTripRoute } from "@/lib/trip-route";
+import { activeTripMessage } from "@/lib/trip-start";
 import { currentPlanDraft, setPlanDraft, usePlanDraft } from "@/lib/plan-store";
 import type { Contact } from "@/server/account/contacts";
 import type { TripView } from "@/server/trips";
@@ -32,6 +33,7 @@ export function PlanJourneyControls({ plan, option, signedIn, emailAlerts }: { p
   const [confirm, setConfirm] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [otherTrip, setOtherTrip] = useState(false);
   const [manualPlaceConfirmation, setManualPlaceConfirmation] = useState<string | null>(null);
   const [continuedOriginConfirmation, setContinuedOriginConfirmation] = useState<string | null>(null);
   const reviewedTimer = useRef<LocalCheckIn | null>(null);
@@ -63,7 +65,7 @@ export function PlanJourneyControls({ plan, option, signedIn, emailAlerts }: { p
     }
     if (!from || (!plan.loop && !target)) return setMessage("Choose resolved place results before starting a location-assisted journey. The private manual path remains available.");
     if (!signedIn) return setMessage("Choose manual mode without an account, or sign in under You for location sharing.");
-    setBusy(true); setMessage(null);
+    setBusy(true); setMessage(null); setOtherTrip(false);
     if (requestKey.current && sentStart.current?.key === requestKey.current && Date.now() - sentStart.current.at > 30_000) { const receipt = await api<{ trip: TripView | null }>("/api/trips/current"); setBusy(false); if (receipt.ok && receipt.data.trip) { router.push("/trip"); return; } if (!receipt.ok) return setMessage("The previous start is unconfirmed. Reconnect to check it before starting again."); requestKey.current = null; setConfirm(null); return setMessage("The previous start expired without an active journey. Review and confirm a fresh start."); }
     const fix = await requestLocation();
     if (!locationUsable(fix, { maxAgeMs: 30_000 }) || !fix.point || haversineMeters(from, fix.point) > Math.max(150, fix.point.accuracy * 2)) { setBusy(false); return setMessage("A fresh, accurate position near your chosen origin is needed. Retry or use the private manual journey."); }
@@ -75,7 +77,7 @@ export function PlanJourneyControls({ plan, option, signedIn, emailAlerts }: { p
     const result = await api<{ trip: TripView }>("/api/trips", { body: sentStart.current.body });
     setBusy(false);
     if (result.ok) { if (option?.geometry.length) keepTripRoute(result.data.trip.id, option.geometry); router.push("/trip"); router.refresh(); }
-    else if (result.code === "trip_active") router.push("/trip");
+    else if (result.code === "trip_active") { requestKey.current = null; setConfirm(null); setOtherTrip(true); setMessage(await activeTripMessage()); }
     else setMessage(result.message);
   };
   return <section className="space-y-4 rounded-3xl border border-line bg-surface p-5" aria-label={activeManual ? "Update private journey" : "Start chosen plan"}>
@@ -90,5 +92,6 @@ export function PlanJourneyControls({ plan, option, signedIn, emailAlerts }: { p
     {assisted ? <><RecipientPicker contacts={contacts} selectedIds={recipientIds} onChange={(ids) => { setRecipientIds(ids); setConfirm(null); requestKey.current = null; }} /><p className="text-xs text-ink-muted">{emailAlerts ? "Selected email contacts receive delivery attempts. WhatsApp requires you to send." : "Automatic email is unavailable. Send links yourself where supported."}</p></> : null}
     {confirm === key ? <div className="rounded-2xl bg-accent-soft p-4"><p className="text-sm">{activeManual ? `Update the same private journey to ${option?.label ?? "this reviewed manual plan"}, with check-in ${eta} minutes from confirmation? Manual progress resets; the original start stays unchanged.` : `Start ${option?.label ?? "this manual plan"} now?`} {assisted ? `Foreground location will be used. ${recipientIds.length ? `Selected recipients: ${contacts.filter((c) => recipientIds.includes(c.id)).map((c) => c.name).join(", ")}.` : "Nobody is notified."}` : "Only you can see this tab journey. It cannot alert anyone or detect arrival."}</p><div className="mt-3 flex gap-3"><button type="button" disabled={busy} onClick={() => void start()} className="mira-primary">{busy ? "Checking location…" : activeManual ? "Confirm journey update" : "Confirm start"}</button><button type="button" disabled={busy} onClick={() => { setConfirm(null); requestKey.current = null; reviewedTimer.current = null; }} className="min-h-12 px-3">Cancel</button></div></div> : <button type="button" onClick={() => { setMessage(null); requestKey.current = null; reviewedTimer.current = readLocalCheckIn(); setConfirm(key); }} className="mira-primary w-full">{activeManual ? "Review journey update" : option ? "Start chosen journey" : "Start manual journey"}</button>}
     {message ? <p role="status" className="text-sm text-error">{message}</p> : null}
+    {otherTrip ? <Link href="/trip" className="inline-flex min-h-12 items-center text-sm font-semibold text-accent-strong">Open my current journey</Link> : null}
   </section>;
 }

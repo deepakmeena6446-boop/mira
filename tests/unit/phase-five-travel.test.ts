@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { instantForLocal } from "@/domain/plan-options";
+import { clockChangeAt, instantForLocal } from "@/domain/plan-options";
 import { activatePlanLeg, intentFromLeg, newPlanDraft, newPlanLeg, parsePlanSession, planDraftSchema, serializePlanSession } from "@/domain/plan-state";
 
 const now = new Date("2026-10-02T00:00:00Z");
@@ -56,5 +56,18 @@ describe("Phase 5 remote travel contracts", () => {
     expect(selected.legs?.[0]).toMatchObject({ label: base.activity, origin: { query: base.origin.query, resolution: null }, departureLocal: "" });
     expect(intentFromLeg(selected.legs![0])).toBeNull();
     expect(() => planDraftSchema.parse(selected)).not.toThrow();
+  });
+
+  it("plans 'now' in the repeated hour when clocks go back, and says why other times there aren't guessed (audit P05-003)", () => {
+    // Lisbon, 25 Oct 2026: 01:00–01:59 happens twice (WEST then WET). At 01:30 WET (the second one), "now" is that one.
+    const secondOne = new Date("2026-10-25T01:30:00Z");
+    expect(instantForLocal("2026-10-25T01:30", "Europe/Lisbon", secondOne)?.toISOString()).toBe("2026-10-25T01:30:00.000Z");
+    const firstOne = new Date("2026-10-25T00:30:00Z");
+    expect(instantForLocal("2026-10-25T01:30", "Europe/Lisbon", firstOne)?.toISOString()).toBe("2026-10-25T00:30:00.000Z");
+    // Days ahead, Mira won't pick one of the two.
+    expect(instantForLocal("2026-10-25T01:30", "Europe/Lisbon", new Date("2026-10-20T12:00:00Z"))).toBeNull();
+    expect(clockChangeAt("2026-10-25T01:30", "Europe/Lisbon")).toBe("repeated");
+    expect(clockChangeAt("2027-03-14T02:30", "America/New_York")).toBe("skipped");
+    expect(clockChangeAt("2026-10-03T21:00", "Asia/Kolkata")).toBeNull();
   });
 });

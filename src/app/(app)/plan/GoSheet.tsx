@@ -8,7 +8,7 @@ import { Sheet, StateNote } from "@/components/mira/Frame";
 import { api } from "@/lib/api-client";
 import { freshLocation, locationUsable } from "@/lib/location-store";
 import { keepTripRoute } from "@/lib/trip-route";
-import { tripStartExtras } from "@/lib/trip-start";
+import { activeTripMessage, tripStartExtras } from "@/lib/trip-start";
 import { recordUsage } from "@/lib/usage-signal";
 import { haptic } from "@/lib/haptics";
 import { startLocalJourney } from "@/lib/local-check-in-store";
@@ -44,7 +44,9 @@ export function GoSheet({ open, onClose, target, signedIn, emailAlerts, onSignIn
   const [eta, setEta] = useState<number>(30);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [otherTrip, setOtherTrip] = useState(false);
   const key = useRef<string | null>(null);
+  const sentBody = useRef<Record<string, unknown> | null>(null);
   const farConfirmed = useRef(false);
 
   useEffect(() => {
@@ -68,19 +70,26 @@ export function GoSheet({ open, onClose, target, signedIn, emailAlerts, onSignIn
     if (busy) return;
     setBusy(true);
     setMessage(null);
-    const fix = await freshLocation();
-    if (!locationUsable(fix) || !fix.point) { setBusy(false); return setMessage(fix.status === "denied" ? "Location is off for Mira. A live journey needs your position while the screen is open." : "A fresh, accurate position isn’t available yet. Step outside or wait a moment, then try again."); }
-    const from = { lat: fix.point.lat, lon: fix.point.lon };
-    // A named start elsewhere is never replaced silently: say so once, then follow from here if she confirms.
-    if (target.start && haversineMeters(from, target.start) > 300 && !farConfirmed.current) {
-      farConfirmed.current = true;
-      setBusy(false);
-      return setMessage(`You’re about ${(haversineMeters(from, target.start) / 1000).toFixed(1)} km from this plan’s start. A live journey follows you from where you are now. Tap Start again to go from here.`);
+    setOtherTrip(false);
+    setUnconfirmed(false);
+    // Checking an unconfirmed start resends exactly what was sent: the server matches the key AND the request.
+    let body = sentBody.current;
+    if (!body) {
+      const fix = await freshLocation();
+      if (!locationUsable(fix) || !fix.point) { setBusy(false); return setMessage(fix.status === "denied" ? "Location is off for Mira. A live journey needs your position while the screen is open." : "A fresh, accurate position isn’t available yet. Step outside or wait a moment, then try again."); }
+      const from = { lat: fix.point.lat, lon: fix.point.lon };
+      // A named start elsewhere is never replaced silently: say so once, then follow from here if she confirms.
+      if (target.start && haversineMeters(from, target.start) > 300 && !farConfirmed.current) {
+        farConfirmed.current = true;
+        setBusy(false);
+        return setMessage(`You’re about ${(haversineMeters(from, target.start) / 1000).toFixed(1)} km from this plan’s start. A live journey follows you from where you are now. Tap Start again to go from here.`);
+      }
+      key.current ??= crypto.randomUUID();
+      body = target.to && !target.loop
+        ? { from, to: { lat: target.to.lat, lon: target.to.lon, name: target.to.name.slice(0, 80) }, share: picked.length > 0, recipientIds: picked, idempotencyKey: key.current, ...(target.mode === "walk" ? (!target.fastest && target.minutes ? { routeMinutes: Math.max(1, Math.min(240, Math.round(target.minutes))) } : {}) : { mode: target.mode, etaMinutes: eta }), ...tripStartExtras(target.to.savedPlaceId) }
+        : { from, share: picked.length > 0, recipientIds: picked, idempotencyKey: key.current, mode: "other", etaMinutes: eta, ...tripStartExtras() };
+      sentBody.current = body;
     }
-    key.current ??= crypto.randomUUID();
-    const body = target.to && !target.loop
-      ? { from, to: { lat: target.to.lat, lon: target.to.lon, name: target.to.name.slice(0, 80) }, share: picked.length > 0, recipientIds: picked, idempotencyKey: key.current, ...(target.mode === "walk" ? (!target.fastest && target.minutes ? { routeMinutes: Math.max(1, Math.min(240, Math.round(target.minutes))) } : {}) : { mode: target.mode, etaMinutes: eta }), ...tripStartExtras(target.to.savedPlaceId) }
-      : { from, share: picked.length > 0, recipientIds: picked, idempotencyKey: key.current, mode: "other", etaMinutes: eta, ...tripStartExtras() };
     const r = await api<{ trip: TripView }>("/api/trips", { body });
     setBusy(false);
     if (r.ok) {
@@ -90,12 +99,34 @@ export function GoSheet({ open, onClose, target, signedIn, emailAlerts, onSignIn
       router.push("/trip");
       router.refresh();
     } else if (r.code === "trip_active") {
-      router.push("/trip");
+      // Never open the other journey in place of this one: it may be unshared or going elsewhere.
+      key.current = null;
+      sentBody.current = null;
+      setOtherTrip(true);
+      setMessage(await activeTripMessage());
+    } else if (r.network) {
+      // The start may have reached Mira and only the reply was lost (audit P09-001). Keep the same key: sending it
+      // again can only confirm that one journey, never start a second — and re-check by itself once she's back online.
+      setUnconfirmed(true);
+      setMessage("Your connection dropped, so Mira can't confirm your journey started. It may have. Tap Start again to check — it won't start a second one.");
     } else {
       key.current = null;
+      sentBody.current = null;
       setMessage(r.message);
     }
   };
+  const [unconfirmed, setUnconfirmed] = useState(false);
+  // New choices are a new request (a fresh key); if the earlier start did go through, the server says one is running.
+  const targetKey = JSON.stringify([target.to, target.mode, target.loop, target.minutes]);
+  useEffect(() => { key.current = null; sentBody.current = null; }, [picked, eta, targetKey]);
+  const startRef = useRef(start);
+  useEffect(() => { startRef.current = start; });
+  useEffect(() => {
+    if (!unconfirmed) return;
+    const recheck = () => { setUnconfirmed(false); void startRef.current(); };
+    window.addEventListener("online", recheck);
+    return () => window.removeEventListener("online", recheck);
+  }, [unconfirmed]);
 
   const startPrivate = () => {
     if (!target.intent) return setMessage("Complete the places and time first.");
@@ -166,6 +197,7 @@ export function GoSheet({ open, onClose, target, signedIn, emailAlerts, onSignIn
           <p><strong className="text-ink">While you go:</strong> your position updates while the journey screen is open. Phones may pause it when locked. Tap “I’m here” when you arrive.</p>
         </section>
         {message ? <StateNote tone="attention" role="alert">{message}</StateNote> : null}
+        {otherTrip ? <button type="button" onClick={() => router.push("/trip")} className="min-h-12 w-full rounded-2xl font-semibold text-accent-strong ring-1 ring-line-strong">Open my current journey</button> : null}
       </div>
     </Sheet>
   );

@@ -73,6 +73,20 @@ export async function consumeSignInLink(sql: postgres.Sql, token: string, curren
   });
 }
 
+/**
+ * What a sign-in link would do, without using it (audit L01-001 / P19-001): which account it opens (shown masked,
+ * so she can tell it isn't hers), and whether it would switch this browser away from someone already signed in.
+ */
+export async function previewSignInLink(sql: postgres.Sql, token: string, currentUserId: string | null): Promise<{ emailHint: string | null; accountName: string | null; switching: boolean; adding: boolean } | null> {
+  if (!/^[A-Za-z0-9_-]{20,128}$/.test(token)) return null;
+  const [link] = await sql<{ email_hash: string; email_enc: string; user_id: string | null }[]>`
+    SELECT email_hash, email_enc, user_id FROM auth_links WHERE token_hash = ${hashToken("invite", `signin:${token}`)} AND used_at IS NULL AND expires_at > now()`;
+  if (!link) return null;
+  const [owner] = await sql<{ id: string; name: string }[]>`SELECT id, name FROM users WHERE email_hash = ${link.email_hash}`;
+  const target = owner?.id ?? link.user_id;
+  return { emailHint: emailHint(link.email_enc), accountName: owner ? owner.name.split(" ")[0] : null, switching: Boolean(currentUserId && target && target !== currentUserId), adding: !owner };
+}
+
 export async function purgeAuthLinks(sql: postgres.Sql, now: Date): Promise<number> {
   return (await sql`DELETE FROM auth_links WHERE expires_at < ${new Date(now.getTime() - 86_400_000)}`).count;
 }

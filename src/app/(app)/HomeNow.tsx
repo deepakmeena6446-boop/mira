@@ -15,8 +15,9 @@ import { LiveNowCard, type LiveStat } from "@/components/mira/LiveNow";
 import { HelpNextCard } from "@/components/mira/HelpNext";
 import { api } from "@/lib/api-client";
 import { handOffAsk } from "@/lib/ask-handoff";
-import { greetingFor, rememberLocationChoice, shouldAutoLocate, useClock, useLocation, usableLocationPoint } from "@/lib/location-store";
+import { greetingFor, chooseLocation, shouldAutoLocate, useClock, useLocation, usableLocationPoint } from "@/lib/location-store";
 import { useCountry } from "@/lib/locale-store";
+import { useCurrentTrip } from "@/lib/current-trip-store";
 import { setPlanDraft } from "@/lib/plan-store";
 import { suggestionQuery } from "@/lib/trip-start";
 import { usageMode, type UsageMode } from "@/lib/usage-signal";
@@ -42,7 +43,10 @@ type Contrib = { checks: Array<{ id: string; question: string; placeName: string
  * now (live, sourced), where you're going, and the one-tap way to help the next person here. Mira's
  * other suggestions come last and only when real.
  */
-export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { user: { name: string; avatarUrl: string | null } | null; places: SavedPlace[]; savedPlan: SavedPlan | null; emailAlerts: boolean; journeyTo: string | null }) {
+export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serverJourneyTo }: { user: { name: string; avatarUrl: string | null } | null; places: SavedPlace[]; savedPlan: SavedPlan | null; emailAlerts: boolean; journeyTo: string | null }) {
+  // The server's answer can be stale after client navigation: the shared store keeps it current.
+  const live = useCurrentTrip(serverJourneyTo === null ? null : { state: "active", destination: serverJourneyTo || null, etaAt: "", following: [] });
+  const journeyTo = live ? (live.destination ?? "") : null;
   const router = useRouter();
   const loc = useLocation(false);
   const clock = useClock();
@@ -60,6 +64,12 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
   const idle = loc.status === "idle";
   const request = loc.request;
   useEffect(() => { if (idle && shouldAutoLocate()) void request(); }, [idle, request]);
+  useEffect(() => {
+    // Text typed before the app was ready (slow phones) is kept, not wiped by hydration (audit P09-004).
+    const early = (window as { __miraEarly?: { text: Record<string, string> } }).__miraEarly?.text.ask;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time pickup of pre-hydration input
+    if (early) setAsk(early);
+  }, []);
   useEffect(() => {
     // Device storage exists only after mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -182,7 +192,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
 
         {/* 1. Mira knows: what's true around you, right now. */}
         <div className="mt-5">
-          <LiveNowCard now={clock} point={point ? { lat: point.lat, lon: point.lon } : null} area={point ? loc.area : null} stats={stats} line={line} locating={loc.status === "asking"} locationState={loc.status} onLocate={() => { rememberLocationChoice(true); void loc.request(); }} />
+          <LiveNowCard now={clock} point={point ? { lat: point.lat, lon: point.lon } : null} area={point ? loc.area : null} stats={stats} line={line} locating={loc.status === "asking"} locationState={loc.status} onLocate={() => { void chooseLocation(); }} />
         </div>
 
         {/* 2. Everyone makes it better: what's known here grows from what people add — one tap, right here. */}
@@ -196,7 +206,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo }: { u
           <form onSubmit={(e) => { e.preventDefault(); submitAsk(ask); }} className="m-card mt-2.5 flex items-center gap-2 rounded-[1.5rem] p-1.5 pl-4 focus-within:ring-2 focus-within:ring-accent">
             <span aria-hidden><Icon name="sparkle" className="size-5 text-accent" /></span>
             <label htmlFor="home-ask" className="sr-only">Tell Mira what you’re about to do</label>
-            <input id="home-ask" value={ask} onChange={(e) => setAsk(e.target.value)} maxLength={1000} placeholder="Tell Mira — “a run at 5 AM”, “home at 11”…" autoComplete="off" className="min-h-12 min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-ink-subtle" />
+            <input id="home-ask" data-early-text="ask" value={ask} onChange={(e) => setAsk(e.target.value)} maxLength={1000} placeholder="Tell Mira — “a run at 5 AM”, “home at 11”…" autoComplete="off" className="min-h-12 min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-ink-subtle" />
             <button type="submit" aria-label="Ask Mira" disabled={!ask.trim()} className={cx("grid size-11 shrink-0 place-items-center rounded-full transition-colors", ask.trim() ? "bg-accent text-accent-ink" : "bg-sunken text-ink-subtle")}>
               <Icon name="arrow" className="size-5" />
             </button>

@@ -46,4 +46,14 @@ describe("WhatsApp links", () => {
   it("show a number as a hint, never the whole number", () => {
     expect(phoneHint("+919876543210")).toBe("+91 •••• ••3210");
   });
+
+  it("keeps the audit's Indian formats from becoming wrong numbers (P07-002)", () => {
+    expect(normalizePhone("+91 098765 43210", "+91")).toBe("+919876543210"); // trunk 0 after the code
+    expect(normalizePhone("+91 9198765 43210", "+91")).toBe("+919876543210"); // code typed twice
+    expect(normalizePhone("919876543210", "+91")).toBe("+919876543210"); // code typed without "+"
+    expect(normalizePhone("98765 43210", "+91")).toBe("+919876543210");
+    expect(normalizePhone("+91 98765 4321", "+91")).toBeNull(); // 9 digits: not an Indian mobile
+    expect(normalizePhone("+44 (0)20 7946 0958", "+91")).toBe("+442079460958");
+    expect(normalizePhone("+39 06 1234 5678", "+91")).toBe("+390612345678"); // Italy keeps its 0
+  });
 });
