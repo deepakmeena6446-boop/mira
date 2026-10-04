@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  // The dev badge sits on top of the tab bar's Home tab; compile/runtime errors still surface.
+  devIndicators: false,
   // postgres.js and nodemailer are server-only runtime dependencies.
   serverExternalPackages: ["postgres", "nodemailer"],
   logging: {
