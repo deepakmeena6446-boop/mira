@@ -141,7 +141,8 @@ describe("Mira (scripted engine)", () => {
     expect(MIRA_PERSONA).toMatch(/Never claim to be human/);
     expect(MIRA_PERSONA).toMatch(/local emergency number from the context/);
     expect(MIRA_PERSONA).toMatch(/Never start a trip or send anything without the person tapping to confirm/);
-    expect(MIRA_PERSONA).toMatch(/I don't have enough verified information to make that judgement/);
+    expect(MIRA_PERSONA).toMatch(/Never label a place, area, route, city, transport option or person as safe, unsafe or dangerous/);
+    expect(MIRA_PERSONA).toMatch(/Never refuse the underlying request/);
   });
 
   it("knows the time of day: tells the time, and leans towards the walk home at night", async () => {
@@ -325,15 +326,31 @@ describe("Mira on Claude (mocked client)", () => {
     expect(r.cards.filter((c) => c.type === "sos")).toHaveLength(1);
   });
 
-  it("rejects a model safety verdict before any unsafe text reaches the user", async () => {
+  it("leaves safety wording to Claude: a Hinglish answer that says it can't judge safety reaches her whole", async () => {
+    // A word filter rejected this kind of answer outright and showed a canned line instead (owner report 2026-10-04).
+    const answer = "Main kisi route ko safe nahi bol sakti, par 2 baje ke run ke liye mapped raste, unki lighting aur us waqt khuli jagah dekh sakti hoon. Aap kahan se start karogi?";
+    const { client, calls } = mockClient([{ text: answer }]);
+    const r = await collect(claudeMira({ client, message: "Bro mujhe 2am running ke liye jana h suggest safe routes", history: [], tools: tools(), firstName: "A" }));
+    expect(r.text).toBe(answer);
+    expect(calls).toHaveLength(1); // no rewrite, no second call
+  });
+  it("an invented action is rewritten by Claude, keeping the help", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const { client } = mockClient([{ text: "That area is safe." }]);
-    const r = await collect(claudeMira({ client, message: "is Soho safe?", history: [], tools: tools(), firstName: "A" }));
-    expect(r.text).not.toContain("That area is safe");
-    expect(r.text).toBe("I don't have enough verified information to make that judgement. The cards here show what MIRA can check.");
+    const { client, calls } = mockClient([{ text: "I've alerted Priya. Head somewhere open and lit." }, { text: "Tap Share on the trip card to send Priya your link. Head somewhere open and lit." }]);
+    const r = await collect(claudeMira({ client, message: "tell priya i'm walking", history: [], tools: tools(), firstName: "A" }));
+    expect(r.text).toBe("Tap Share on the trip card to send Priya your link. Head somewhere open and lit.");
+    expect(String((calls[1].messages as Array<{ content: string }>)[0].content)).toMatch(/hasn't happened/);
     const line = warn.mock.calls.map((c) => String(c[0])).find((l) => l.includes("mira.output_rejected"));
-    expect(JSON.parse(line!)).toMatchObject({ event: "mira.output_rejected", reason: "safety_verdict" });
-    expect(line).not.toMatch(/That area|Soho/);
+    expect(JSON.parse(line!)).toMatchObject({ reason: "invented_action", recovered: true });
+    expect(line).not.toMatch(/Priya/);
+    warn.mockRestore();
+  });
+  it("an unverified emergency number that survives the rewrite falls back to the fixed line", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { client } = mockClient([{ text: "Call 555 0199 for the police." }, { text: "Call 555 0199 for the police." }]);
+    const r = await collect(claudeMira({ client, message: "police number?", history: [], tools: tools(), firstName: "A" }));
+    expect(r.text).not.toMatch(/555/);
+    expect(r.text).toBe("I can't verify that from MIRA's information. Please use the cards shown here for actions and checked details.");
     warn.mockRestore();
   });
 });

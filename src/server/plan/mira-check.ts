@@ -6,6 +6,8 @@ import { resolvedDestination, resolvedOrigin } from "@/domain/plan-state";
 import { haversineMeters } from "@/domain/pilot";
 import type { PlanOptionsResult } from "@/domain/plan-options";
 import { planOptionsFor } from "./options";
+import { walkWaysWithContext } from "./ways";
+import { getGeo } from "@/server/providers/geo";
 import { localWhen } from "@/domain/plan-ask";
 import type { MiraCard } from "@/server/providers/companion/types";
 
@@ -36,6 +38,9 @@ export async function checkPlanForMira(sql: postgres.Sql, plan: MovementIntent, 
     evidence = await planOptionsFor(sql, from, to, plan.departure, now, plan).catch(() => null);
     if (evidence) for (const e of [evidence.daylight, evidence.service]) planEvidenceSchema.parse(e);
   }
+  // Walks between two chosen places: each way's mapped lighting and Help Points, from the same engine as the Plan screen,
+  // so Mira can say which way she'd take and why (owner, 2026-10-04: "safe routes nahi bata sakti to use kya h").
+  const ways = from && to && !tooFar && !plan.loop && plan.mode === "walk" ? await walkWaysWithContext(sql, getGeo(), from, to).catch(() => null) : null;
   const notChecked = !from ? "she hasn't chosen the starting place from the search results yet"
     : !to ? "she hasn't chosen the destination from the search results yet"
     : tooFar ? "the places are further apart than MIRA's local walking comparison covers (25 km)"
@@ -52,6 +57,18 @@ export async function checkPlanForMira(sql: postgres.Sql, plan: MovementIntent, 
     ...(notChecked ? { why_not_checked: notChecked } : {}),
     daylight_at_departure: daylight,
     ways: (evidence?.options ?? []).slice(0, 3).map((o) => ({ label: o.label, minutes: Math.round(o.minutes), km: Number((o.meters / 1000).toFixed(1)) })),
+    ...(ways ? { ways_compared: ways.routes.map((r, i) => {
+      const l = ways.lighting[i];
+      const h = ways.help[i];
+      const sum = "data" in l ? l.data.summary : null;
+      return {
+        way: i === 0 ? "fastest" : `option ${i + 1}`,
+        minutes: Math.round(r.minutes),
+        km: Number((r.meters / 1000).toFixed(1)),
+        lighting: r.approximate ? "not checked (no street route)" : sum ? `${sum.lit + sum.poles}% mapped as lit or with street lamps, ${sum.dark}% mapped as unlit, ${sum.unknown}% not known` : "couldn't check",
+        help_points_on_way: !("data" in h) ? "couldn't check" : h.data.slice(0, 4).map((p) => `${p.name} (${p.cls.replace(/_/g, " ")}${p.open24h ? ", listed open 24h" : p.hours ? `, listed hours ${p.hours}` : ", hours not known"})`),
+      };
+    }) } : {}),
     ...(evidence && evidence.state !== "ready" ? { detail: evidence.detail } : {}),
     ...(evidence?.timeAlternatives?.[0] ? { later_daylight: `${localWhen(evidence.timeAlternatives[0].local)} (${evidence.timeAlternatives[0].timeZone}), ${evidence.timeAlternatives[0].minutesLater} min later` } : {}),
     // No `scope`: for a route it is both points as coordinates, and Mira repeats what she is given (audit L02-002).

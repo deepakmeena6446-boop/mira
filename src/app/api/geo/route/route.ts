@@ -5,8 +5,7 @@ import { clientIp, dailyKey, enforce } from "@/server/ratelimit";
 import { point } from "@/server/http/geo-input";
 import { getGeo, type GeoPoint, type GeoProvider } from "@/server/providers/geo";
 import { cellsAlongRoute, notesForCells } from "@/server/notes";
-import { lightingEvidenceForRoutes } from "@/server/lighting";
-import { helpPointsEvidenceForRoutes, withoutCorroboratedGone } from "@/server/help-points";
+import { walkWaysWithContext } from "@/server/plan/ways";
 import { dedupeHelpPoints, type HelpPoint } from "@/domain/help-points";
 import { evidenceState, type EvidenceState } from "@/domain/evidence-state";
 import { TRAVEL_MODES } from "@/domain/travel-mode";
@@ -16,8 +15,6 @@ import { ApiError } from "@/server/http/errors";
 const MAX_WALK_M = 25_000; // ~5 h on foot; trips are capped at 4 h anyway
 /** Ride / transit: a journey MIRA follows lasts at most ~4 h, so nothing further than a long drive. */
 const MAX_RIDE_M = 400_000;
-/** An alternative much longer than the fastest way isn't a real option for a walk. */
-const ALT_MAX_STRETCH = 1.5;
 /** Help Points "where you arrive": within a short walk of the destination. */
 const ARRIVAL_RADIUS_M = 500;
 const ARRIVAL_MAX = 5;
@@ -72,16 +69,8 @@ export const POST = handle(async (req: Request) => {
 
   // Walking routes only: refuse anything longer than a (long) walk before doing any work.
   if (haversineMeters(from, to) > MAX_WALK_M) throw new ApiError(400, "too_far", "That's too far to walk. Pick a closer place.");
-  const all = await geo.walkRoutes(from, to);
-  const routes = all.filter((r, i) => i === 0 || (!r.approximate && r.minutes <= all[0].minutes * ALT_MAX_STRETCH)).slice(0, 3);
-  // Only real street routes get lighting and Help Points: a straight-line estimate doesn't follow any street.
-  const streets = routes.map((r) => (r.approximate ? [] : r.geometry));
-  const [notes, lighting, helpPoints] = await Promise.all([notesForCells(sql, cellsAlongRoute(routes[0].geometry)), lightingEvidenceForRoutes(sql, streets), helpPointsEvidenceForRoutes(geo, streets)]);
-  const filteredHelp = await Promise.all(helpPoints.map(async (e) => {
-    if (!("data" in e)) return e;
-    const data = await withoutCorroboratedGone(sql, e.data);
-    return { ...e, data, state: e.state === "ready" && !data.length ? "empty" as const : e.state };
-  }));
+  const { routes, lighting, help: filteredHelp } = await walkWaysWithContext(sql, geo, from, to);
+  const notes = await notesForCells(sql, cellsAlongRoute(routes[0].geometry));
   return json({
     route: routes[0],
     lighting: "data" in lighting[0] ? lighting[0].data : null,

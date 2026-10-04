@@ -86,7 +86,19 @@ const VERDICT_PATTERNS: RegExp[] = [
   rx(String.raw`안전(?:하|한|해|합|했)|위험(?:하|한|해|합|했)`),
 ];
 
+// Hinglish (romanised Hindi with English verdict words): "koi route safe nahi bol sakti", "safe hai ya nahi ye main nahi
+// bata sakti", "safe feel karo". Without these, a refusal written in Hinglish was itself rejected as a verdict.
+const HINGLISH_VERDICT = String.raw`(?:safe|unsafe|safer|surakshit|asurakshit|khatarnaa?k|risky|dangerous)`;
+const HINGLISH_ALLOWED = [
+  rx(String.raw`${B}${HINGLISH_VERDICT}(?:\s+(?:ya|or|aur)\s+(?:${HINGLISH_VERDICT}|nahi|nahin|nhi))?\s+(?:hai|hain|he|h)?\s*(?:ya|or)\s+(?:nahi|nahin|nhi)${E}`),
+  rx(String.raw`${B}${HINGLISH_VERDICT}(?:\s+(?:ya|or)\s+${HINGLISH_VERDICT})?\s+(?:hai\s+)?(?:ye\s+|yeh\s+|main\s+|mai\s+|mein\s+)*(?:nahi|nahin|nhi|na)\s+(?:bol|keh|kah|bata|bta|maan|judge|decide|tay|guarantee|promise)\p{L}*`),
+  rx(String.raw`${B}(?:un)?safe\s+(?:feel|mehsoos|mahsoos)\s*(?:(?:na|nahi|nahin)\s+)?(?:kar|ho|hu|hoon|nahi)\p{L}*`),
+  // "main safe routes judge nahi kar sakti", "kaunsa area safe hai ye decide nahi kar sakti"
+  rx(String.raw`${B}${HINGLISH_VERDICT}(?:\s+[\p{L}']+){0,3}?\s+(?:judge|decide|tay|guarantee|confirm|verify)\s+(?:nahi|nahin|nhi|na)\s+(?:kar|ho)\p{L}*`),
+];
+
 const OTHER_ALLOWED = [
+  ...HINGLISH_ALLOWED,
   rx(String.raw`${B}bien sûr${E}|${B}(?:suis|es|sommes|êtes)\s+(?:pas\s+|vraiment\s+|tout à fait\s+)?sûre?s?${E}`), // "of course", "I'm sure"
   rx(String.raw`${B}(?:bin|bist|sind|seid)\s+(?:mir|dir|uns|euch)?\s*(?:nicht\s+|ganz\s+|sehr\s+)*sicher${E}`), // "ich bin mir sicher"
   rx(String.raw`${B}(?:estoy|estás|está|estamos|no estoy|estou|está|sono|sei|siamo)\s+(?:muy\s+|del todo\s+|tan\s+)?segur[oa]s?${E}|${B}(?:sono|sei|siamo)\s+(?:del tutto\s+)?sicur[oaie]${E}`), // "I'm (not) sure"
@@ -168,11 +180,17 @@ export function allowedNumbers(ctx: CountryContext): string[] {
   return [...emergencyActions(ctx).map((n) => n.number), ...ctx.helplines.map((h) => h.number)];
 }
 
-export function companionOutputIssue(text: string, allowedEmergencyNumbers: readonly string[]): CompanionOutputIssue | null {
+/**
+ * `checkVerdicts: false` (Mira's chat): safety wording is left to the model's own understanding of her language — a word
+ * filter can't tell "main koi route safe nahi bol sakti" from a verdict, and rejecting a whole helpful answer for it
+ * ruined replies (owner, 2026-10-04). Verdict words are still logged (mira.verdict_word). Invented actions, promises and
+ * unverified emergency numbers are still caught: those can hurt someone.
+ */
+export function companionOutputIssue(text: string, allowedEmergencyNumbers: readonly string[], { checkVerdicts = true }: { checkVerdicts?: boolean } = {}): CompanionOutputIssue | null {
   const norm = normaliseForCheck(text);
   const folded = foldConfusables(norm);
   const views = folded === norm ? [norm] : [norm, folded];
-  if (views.some(hasVerdict)) return "safety_verdict";
+  if (checkVerdicts && views.some(hasVerdict)) return "safety_verdict";
   const hit = (ps: RegExp[]) => views.some((v) => ps.some((p) => ((p.lastIndex = 0), p.test(v))));
   if (hit(ACTION_PATTERNS)) return "invented_action";
   if (hit(PROMISE_PATTERNS)) return "unsupported_promise";

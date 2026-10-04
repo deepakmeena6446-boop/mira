@@ -48,10 +48,11 @@ export const TOOL_GUIDE = `How you work in the MIRA app:
 - "Recent safety updates", "what's been happening in this city", news: get_safety_updates (where "here", or "destination" for her running journey's destination). They are news reports, not a verdict: give the count, categories, publisher and how many days ago, as reported; "couldnt_check" means MIRA couldn't check (never say "none"); zero updates proves nothing about an area. The full list is under Local updates in Around.
 - "What do we know about this walk / route?" with a journey running: check_trip, then say its destination and ETA; lighting and Help Points along the way are on the route sheet (the card opens it).
 - If she needs to move, say "somewhere with people around" or "somewhere open and lit", never "somewhere safe". No sign-offs like "stay safe" or "safe trip".
-- Questions MIRA has no verified data for — is an area, street, city, route, taxi or transport safe or dangerous, crime, "should I avoid…": start with "I don't have enough verified information to make that judgement." (in her language), then offer factual context from tools: Help Points near her and their hours (find_help_points), lighting mapped along a route if she proposes one (propose_trip after dark gives it), the local emergency number, sharing her journey. Never label anything safe, unsafe or dangerous; never estimate risk; never cite crime or statistics.
+- Questions MIRA has no verified data for — is an area, street, city, route, taxi or transport safe or dangerous, crime, "should I avoid…": say in one short clause, in her language, that you can't judge that, then offer factual context from tools: Help Points near her and their hours (find_help_points), lighting mapped along a route if she proposes one (propose_trip after dark gives it), the local emergency number, sharing her journey. Never label anything safe, unsafe or dangerous; never estimate risk; never cite crime or statistics.
 - propose_trip may return "known_about_the_way" (lighting, Help Points on the route). These are the only facts you have about the way; mention at most one or two that matter, with the source and what isn't known.
 - Something happened to her, or she wants to report something: offer_report (category "other" when it's unclear), so she can report it privately (only ever shared as combined, anonymous notes).
 - No saved home and she wants to go home: suggest_saving_home.
+- She asks for routes or a way to go (even "safe routes", any time of day or night): never say you can't suggest routes. MIRA compares mapped ways for a walk or run — their minutes, the lighting mapped along each, daylight at that time, Help Points and places open then — and you recommend the one you'd take, with those reasons. She can share the journey too. If a plan is open, check_plan; otherwise ask the one thing you need (where she starts, and where she's going unless it's a loop back) or propose_trip to a saved place. Late at night, also mention places that are open then and sharing her run with her Circle.
 - Never output coordinates, and don't guess addresses, hours, numbers or facts the tools and context didn't give you.`;
 
 const REPORT_CATEGORIES = [...CATEGORIES] as unknown as [string, ...string[]];
@@ -280,6 +281,17 @@ function emergencyInfo(c: CountryContext) {
   };
 }
 
+/** One rewrite of a rejected reply: same language, same help, without the problem. The draft is model text (untrusted). */
+export function rewriteRequest(issue: CompanionOutputIssue, draft: string): string {
+  const what = {
+    safety_verdict: "It calls a place, route, area, time or option safe, safer, unsafe, dangerous or risky (in some language, Hinglish included). Never use those words about anything, not even to deny them; if you need to, say once that you can't judge that.",
+    invented_action: "It says MIRA did something (sent, shared, alerted, started, saved) that hasn't happened. Say instead what she can tap to do it.",
+    unsupported_promise: "It promises an outcome, or that someone will be told. Drop the promise.",
+    unsupported_emergency_number: "It gives an emergency number that isn't in MIRA's reviewed information. Drop that number and point to the Emergency button instead.",
+  }[issue];
+  return `Rewrite this reply from Mira so it follows Mira's rules. ${what} Keep everything else that helps — the facts, the offer, the question to her — in the same language and voice, just as short. Reply with the rewritten text only.\n\n<draft>\n${draft.slice(0, 4000)}\n</draft>`;
+}
+
 /**
  * What she sees instead of a rejected model reply, built only from the Country Context. In a
  * danger turn it always carries the emergency sentence, so rejecting text never loses the number.
@@ -454,7 +466,7 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
         const checked = tools.checkPlan ? await tools.checkPlan() : null;
         if (!checked) return { result: { error: "No plan is open. Ask where she's starting and going, or suggest Plan (Where are you going? on Home)." } };
         return {
-          result: { ...checked.facts, note: "Say the main way's minutes and the daylight at departure in a sentence or two, and what isn't verified. Never call a way safer or better; a lighting difference is only what the card shows." },
+          result: { ...checked.facts, note: "If ways_compared is there, recommend one: say which way you'd take and the checked reasons (more of it mapped as lit, Help Points or places listed open on it, shorter), then the daylight at departure and what isn't known (map tags don't say whether lamps work tonight; how busy a street is isn't known). Recommend, never guarantee: don't call any way safe or safer. Otherwise say the main way's minutes and the daylight in a sentence or two." },
           card: checked.card,
         };
       }
@@ -479,11 +491,26 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
       if (ev.type === "content_block_delta" && ev.delta.type === "text_delta" && ev.delta.text) roundText += ev.delta.text;
     }
     // The round alone, then the whole reply so far (a claim can straddle rounds; earlier rounds already passed).
-    const issue = roundText ? (companionOutputIssue(roundText, allowed) ?? companionOutputIssue(spoken + roundText, allowed)) : null;
+    const NO_VERDICT_FILTER = { checkVerdicts: false };
+    const issue = roundText ? (companionOutputIssue(roundText, allowed, NO_VERDICT_FILTER) ?? companionOutputIssue(spoken + roundText, allowed, NO_VERDICT_FILTER)) : null;
     if (issue) {
-      console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "mira.output_rejected", reason: issue }));
       const danger = hasSos() || DANGER.test(opts.message);
-      roundText = replacementLine(issue, ctx.country, danger);
+      // Outside danger, ask for one rewrite that keeps the help and drops the problem: throwing the whole answer away for
+      // a single word left her with a canned line and nothing useful (owner report 2026-10-04, a Hinglish "safe routes" ask).
+      let fixed: string | null = null;
+      if (!danger) {
+        try {
+          const r = await api.messages.stream({ model, max_tokens: 1024, ...effort, system: [{ type: "text", text: MIRA_PERSONA }], messages: [{ role: "user", content: rewriteRequest(issue, roundText) }] }).finalMessage();
+          const text = r.content.map((c) => (c.type === "text" ? c.text : "")).join("").trim();
+          const u = r.usage;
+          yield { type: "usage", inputTokens: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + Math.ceil((u.cache_read_input_tokens ?? 0) / 10), outputTokens: u.output_tokens ?? 0 };
+          if (text && !companionOutputIssue(text, allowed, NO_VERDICT_FILTER) && !companionOutputIssue(spoken + text, allowed, NO_VERDICT_FILTER)) fixed = text;
+        } catch {
+          fixed = null;
+        }
+      }
+      console.warn(JSON.stringify({ t: new Date().toISOString(), src: "web", event: "mira.output_rejected", reason: issue, recovered: Boolean(fixed) }));
+      roundText = fixed ?? replacementLine(issue, ctx.country, danger);
       if (danger && !hasSos()) {
         const card: MiraCard = { type: "sos", contacts };
         cards.push(card);
