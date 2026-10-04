@@ -36,6 +36,10 @@ const KIND_TYPES: Record<string, string[]> = {
   shop: ["convenience_store", "supermarket", "grocery_store", "shopping_mall"],
   toilets: ["public_bathroom"],
   finance: ["atm", "bank"],
+  // Travel needs (UX sweep 2026-10-04): somewhere to stay tonight, fuel, a taxi rank.
+  accommodation: ["hotel", "lodging"],
+  fuel: ["gas_station"],
+  taxi: ["taxi_stand"],
 };
 const ALL_KINDS = Object.keys(KIND_TYPES);
 

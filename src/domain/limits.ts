@@ -5,3 +5,5 @@ export const MAX_CONTACTS = 5;
 export const MIRA_DAILY_MAX = 60;
 /** Model replies per network per day for guests (no account); past it, the scripted Mira answers. */
 export const MIRA_GUEST_DAILY_MAX = 25;
+/** Guest model replies per network per day, all browsers together: bounds cost when device ids are rotated. */
+export const MIRA_GUEST_NETWORK_DAILY_MAX = 400;

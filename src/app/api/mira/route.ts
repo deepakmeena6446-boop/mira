@@ -8,7 +8,7 @@ import { movementIntentSchema } from "@/domain/plan-contract";
 import { getEnv } from "@/server/config/env";
 import { respond, type MiraCard, type MiraTurn } from "@/server/providers/companion";
 import type { MiraEvent } from "@/server/providers/companion/types";
-import { MIRA_DAILY_MAX, MIRA_GUEST_DAILY_MAX } from "@/domain/limits";
+import { MIRA_DAILY_MAX, MIRA_GUEST_DAILY_MAX, MIRA_GUEST_NETWORK_DAILY_MAX } from "@/domain/limits";
 import { shouldSeedPlan } from "@/domain/ask-routing";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +34,8 @@ const body = z
     plan: movementIntentSchema.nullable().optional(),
     /** A guest's last few turns from this tab (guests have no saved chat). Ignored when signed in. */
     history: z.array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().max(2000) }).strict()).max(8).optional(),
+    /** A guest's random per-browser id, so guests behind one network (mobile carriers, campus Wi-Fi) don't share one allowance. */
+    device: z.uuid().optional(),
   })
   .strict();
 
@@ -76,15 +78,19 @@ export const POST = handle(async (req: Request) => {
   const sql = getSql();
   const user = await getUser(sql);
   const now = new Date();
-  const actor = user ? dailyKey("actor", user.id, now) : dailyKey("ip", clientIp(req), now);
+  const { message, context, plan = null, history: guestHistory = [], device } = await readJson(req, body, 32_768);
+  const ip = clientIp(req);
+  // Guests are counted per browser within their network: hundreds of people share one address on mobile carriers
+  // (CGNAT) and campus Wi-Fi, and one shared allowance left all but the first few with the scripted fallback.
+  const actor = user ? dailyKey("actor", user.id, now) : dailyKey("guest", `${ip}|${device ?? "none"}`, now);
   // Burst limits (abuse protection) reject outright.
   await enforce(sql, [actor], [{ bucket: "mira:m", max: 20, windowMs: 60_000 }], now);
-  await enforce(sql, [dailyKey("ip", clientIp(req), now)], [{ bucket: "mira:ip:m", max: 300, windowMs: 60_000 }], now);
-  // The per-person daily cap and the shared ceiling bound model cost, not access: past either,
+  await enforce(sql, [dailyKey("ip", ip, now)], [{ bucket: "mira:ip:m", max: 300, windowMs: 60_000 }], now);
+  // The per-person daily cap and the shared ceilings bound model cost, not access: past any of them,
   // the scripted engine answers (no model call), so a danger message still gets the Emergency card.
-  const withinDaily = await consume(sql, actor, { bucket: user ? "mira:d" : "mira:guest:d", max: user ? MIRA_DAILY_MAX : MIRA_GUEST_DAILY_MAX, windowMs: 86_400_000 }, now);
+  const withinDaily = (await consume(sql, actor, { bucket: user ? "mira:d" : "mira:guest:d", max: user ? MIRA_DAILY_MAX : MIRA_GUEST_DAILY_MAX, windowMs: 86_400_000 }, now))
+    && (user ? true : await consume(sql, dailyKey("ip", ip, now), { bucket: "mira:guest:ip:d", max: MIRA_GUEST_NETWORK_DAILY_MAX, windowMs: 86_400_000 }, now));
   const modelAllowed = withinDaily && (await consume(sql, dailyKey("global", "mira", now), { bucket: "mira:global:d", max: Number(getEnv().MIRA_GLOBAL_DAILY_MAX ?? MIRA_GLOBAL_DAILY_DEFAULT), windowMs: 86_400_000 }, now));
-  const { message, context, plan = null, history: guestHistory = [] } = await readJson(req, body, 32_768);
   // Turns about a plan open in Plan follow the temporary-plan handling (never saved); other turns are saved scrubbed of location.
   const keep = Boolean(user) && !plan;
   const recent = user

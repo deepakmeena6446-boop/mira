@@ -86,8 +86,9 @@ test("Ask uses the selected plan and an ephemeral sourced response", async ({ pa
 
 test("guest danger message shows Emergency before any plan answer", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("mira.welcomed", "1"));
-  let processingPosts = 0;
-  page.on("request", (request) => { if (request.method() === "POST" && new URL(request.url()).pathname.startsWith("/api/mira")) processingPosts++; });
+  let release: () => void = () => {};
+  const held = new Promise<void>((r) => { release = r; });
+  await page.route("**/api/mira", async (route) => { if (route.request().method() === "POST") await held; await route.continue(); });
   await page.goto("/mira");
   await page.getByLabel("Message Mira").fill("Someone is following me");
   await page.getByRole("button", { name: "Send" }).click();
@@ -96,8 +97,11 @@ test("guest danger message shows Emergency before any plan answer", async ({ pag
   await expect(support.getByLabel("Immediate Emergency action").getByRole("button", { name: "Emergency options" })).toBeVisible();
   await expect(support.getByRole("button", { name: "Call someone", exact: true })).toBeVisible();
   await expect(support).toContainText("Turn on location to see Help Points near you.");
-  expect(processingPosts).toBe(0);
+  // The sheet came up while Mira's reply was still held; no plan is started from a danger message.
   expect(await page.evaluate(() => sessionStorage.getItem("mira.plan.v1"))).toBeNull();
+  release();
+  await support.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByRole("log", { name: "Conversation with Mira" })).toContainText(/Emergency/);
 });
 
 test("active plan keeps informational tools separate from movement Ask", async ({ browser }) => {

@@ -31,6 +31,18 @@ import { activeTripMessage, tripStartExtras } from "@/lib/trip-start";
 import { haptic } from "@/lib/haptics";
 import { refreshCurrentTrip } from "@/lib/current-trip-store";
 
+/** A random id for this browser, so guests sharing one network each get their own Mira allowance. Not tracking: never sent signed in. */
+function guestDevice(): string | undefined {
+  try {
+    const KEY = "mira.guest.device";
+    const v = localStorage.getItem(KEY) ?? crypto.randomUUID();
+    localStorage.setItem(KEY, v);
+    return v;
+  } catch {
+    return undefined;
+  }
+}
+
 interface Msg {
   id: string;
   role: "user" | "assistant";
@@ -259,10 +271,13 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   const send = async (text: string) => {
     const message = text.trim();
     if (!message || sending) return;
-    if (immediateSupportIntent(message)) { window.dispatchEvent(new Event("mira:need-options")); return; }
+    // Urgent words open the support sheet at once, before any network — and Mira still answers underneath it, so when
+    // she closes the sheet there's a calm reply in her words, not silence (the message used to be dropped).
+    const urgent = Boolean(immediateSupportIntent(message));
+    if (urgent) window.dispatchEvent(new Event("mira:need-options"));
     // "I'm home" during a live journey: telling Mira doesn't end it. Say so before she puts the phone away,
     // or her contacts get a missed-check-in alert while she's safe.
-    if (user && arrivalIntent(message)) {
+    if (!urgent && user && arrivalIntent(message)) {
       const current = await api<{ trip: { id: string; destination: { name: string }; etaAt: string; state: string } | null }>("/api/trips/current");
       const trip = current.ok ? current.data.trip : null;
       if (trip && (trip.state === "active" || trip.state === "missed")) {
@@ -277,7 +292,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
     }
     setSending(true);
     // Every message goes to Mira (one door); a movement sentence also starts a plan draft she can finish in Plan.
-    if (!planActive && shouldSeedPlan(message)) {
+    if (!urgent && !planActive && shouldSeedPlan(message)) {
       const timeZone = deviceTimeZone() ?? "UTC";
       const draft = draftFromAsk(message, newPlanDraft(new Date(), timeZone));
       if (user && /^\s*(?:take me home|go home|going home|walk home)\s*[?.!]*\s*$/i.test(message)) {
@@ -299,7 +314,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
       const res = await fetch("/api/mira", {
         method: "POST",
         headers: { "content-type": "application/json", "x-mira-request": "1" },
-        body: JSON.stringify({ message, plan, ...(guestHistory ? { history: guestHistory } : {}), context: { localTime: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), tz: deviceTimeZone(), location: planHydrated && loc.point ? { lat: loc.point.lat, lon: loc.point.lon } : null, area: planHydrated ? loc.area : null } }),
+        body: JSON.stringify({ message, plan, ...(guestHistory ? { history: guestHistory, device: guestDevice() } : {}), context: { localTime: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), tz: deviceTimeZone(), location: planHydrated && loc.point ? { lat: loc.point.lat, lon: loc.point.lon } : null, area: planHydrated ? loc.area : null } }),
       });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => null);

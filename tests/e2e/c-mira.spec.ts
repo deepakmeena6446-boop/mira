@@ -37,16 +37,20 @@ test.describe("Mira — the companion (placeholder engine)", () => {
   test("points to Emergency when someone says they're in danger, and never claims to be help itself", async ({ browser }) => {
     const { ctx, page } = await newUser(browser, "Sana");
     await openMira(page);
-    const processing: string[] = [];
-    page.on("request", (request) => { if (request.method() === "POST" && new URL(request.url()).pathname.startsWith("/api/mira")) processing.push(request.url()); });
+    // Hold Mira's reply: the support sheet must not wait for the network.
+    let release: () => void = () => {};
+    const held = new Promise<void>((r) => { release = r; });
+    await page.route("**/api/mira", async (route) => { if (route.request().method() === "POST") await held; await route.continue(); });
     await page.getByPlaceholder("Message Mira…").fill("someone is following me, I'm scared");
     await page.getByRole("button", { name: "Send" }).click();
     const support = page.getByRole("dialog", { name: "Right now", exact: true });
     // The country is known (Delhi fix), so Emergency is the one-tap local number, not a chooser (audit P0-1).
     await expect(support.getByLabel("Immediate Emergency action").getByRole("link", { name: /Emergency call, 112/ })).toBeVisible();
     await expect(support.getByRole("button", { name: "Call someone", exact: true })).toBeVisible();
-    expect(processing).toEqual([]); // Urgent intent opens local support before chat/model processing.
+    release();
     await support.getByRole("button", { name: "Close", exact: true }).click();
+    // …and Mira still answers underneath it, emergency first (the message used to be dropped).
+    await expect(page.getByRole("log")).toContainText("112");
     await page.getByPlaceholder("Message Mira…").fill("who are you");
     await page.getByRole("button", { name: "Send" }).click();
     await expect(page.getByRole("log").getByText(/I'm not an emergency service/)).toBeVisible();
