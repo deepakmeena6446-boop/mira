@@ -28,6 +28,8 @@ import { planTitle, whenWords } from "@/domain/plan-name";
 import { draftFromAsk } from "@/domain/plan-ask";
 import { arrivalIntent, shouldSeedPlan, immediateSupportIntent } from "@/domain/ask-routing";
 import { activeTripMessage } from "@/lib/trip-start";
+import { haptic } from "@/lib/haptics";
+import { refreshCurrentTrip } from "@/lib/current-trip-store";
 
 interface Msg {
   id: string;
@@ -92,6 +94,32 @@ function Fact({ kind, children, label }: { kind: EvidenceKind; children: React.R
       <span className="min-w-0 flex-1">{children}</span>
       <span className="shrink-0 text-[0.7rem] font-semibold text-ink-subtle">{label ?? EVIDENCE_LABEL[kind]}</span>
     </li>
+  );
+}
+
+/** The open journey in the chat: open it, or say "I'm here" right from the card (re-audit RA4: it took one more screen). */
+function TripStatusCard({ card, shell }: { card: Extract<MiraCard, { type: "trip_status" }>; shell: string }) {
+  const toast = useToast();
+  const [state, setState] = useState<"open" | "busy" | "arrived">(card.state === "active" || card.state === "missed" ? "open" : "arrived");
+  const arrive = async () => {
+    setState("busy");
+    const id = card.id ?? (await api<{ trip: { id: string } | null }>("/api/trips/current").then((r) => (r.ok ? r.data.trip?.id : undefined)));
+    const r = id ? await api(`/api/trips/${id}/arrive`, { body: {} }) : null;
+    if (r?.ok) { haptic("arrived"); setState("arrived"); refreshCurrentTrip(); }
+    else { setState("open"); toast(r?.message ?? "This journey has already finished.", "error"); }
+  };
+  return (
+    <div className={cx(shell, "p-4")}>
+      <Link href="/trip" className="flex items-center gap-3">
+        <MiraPulse size={16} state="with-you" />
+        <span className="flex-1">
+          <span className="block font-semibold">{state === "arrived" ? `Arrived at ${card.destination}` : `On the way to ${card.destination}`}</span>
+          <span className="block text-sm text-ink-muted">{state === "arrived" ? "Your journey is closed. Nobody will be alerted." : `ETA ${clockIn(card.etaAt)}`}</span>
+        </span>
+        <Icon name="chevron" className="text-ink-subtle" />
+      </Link>
+      {state !== "arrived" ? <button type="button" onClick={arrive} disabled={state === "busy"} className="mt-3 min-h-11 w-full rounded-full bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-60">I&apos;m here</button> : null}
+    </div>
   );
 }
 
@@ -161,16 +189,7 @@ function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; o
         </div>
       );
     case "trip_status":
-      return (
-        <Link href="/trip" className={cx(shell, "flex items-center gap-3 p-4")}>
-          <MiraPulse size={16} state="with-you" />
-          <span className="flex-1">
-            <span className="block font-semibold">On the way to {card.destination}</span>
-            <span className="block text-sm text-ink-muted">ETA {clockIn(card.etaAt)}</span>
-          </span>
-          <Icon name="chevron" className="text-ink-subtle" />
-        </Link>
-      );
+      return <TripStatusCard card={card} shell={shell} />;
     case "save_place":
       return (
         <Link href="/me#places" className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-full bg-surface px-5 font-semibold text-ink ring-1 ring-line-strong">
@@ -244,14 +263,14 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
     // "I'm home" during a live journey: telling Mira doesn't end it. Say so before she puts the phone away,
     // or her contacts get a missed-check-in alert while she's safe.
     if (user && arrivalIntent(message)) {
-      const current = await api<{ trip: { destination: { name: string }; etaAt: string; state: string } | null }>("/api/trips/current");
+      const current = await api<{ trip: { id: string; destination: { name: string }; etaAt: string; state: string } | null }>("/api/trips/current");
       const trip = current.ok ? current.data.trip : null;
       if (trip && (trip.state === "active" || trip.state === "missed")) {
         setInput("");
         setMsgs((m) => [
           ...m,
           { id: `u${Date.now()}`, role: "user", text: message, cards: [] },
-          { id: `a${Date.now()}`, role: "assistant", text: "Glad you're there. Telling me doesn't end your journey — only “I'm here” does. Until you tap it, Mira treats you as still on the way, and anyone following could be told you missed your check-in.", cards: [{ type: "trip_status", destination: trip.destination.name, etaAt: trip.etaAt, state: trip.state }] },
+          { id: `a${Date.now()}`, role: "assistant", text: "Glad you're there. Telling me doesn't end your journey — only “I'm here” does. Until you tap it, Mira treats you as still on the way, and anyone following could be told you missed your check-in.", cards: [{ type: "trip_status", id: trip.id, destination: trip.destination.name, etaAt: trip.etaAt, state: trip.state }] },
         ]);
         return;
       }
@@ -340,7 +359,13 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
       recordUsage("journey");
       router.push("/trip");
       router.refresh();
-    } else if (r.code === "trip_active") toast(await activeTripMessage(), "error"); // never swap in the other journey
+    } else if (r.code === "trip_active") {
+      // Never swap in the other journey; say so in the chat with that journey's card to open (re-audit RA2: a toast had no way there).
+      const current = await api<{ trip: { id: string; destination: { name: string }; etaAt: string; state: string } | null }>("/api/trips/current");
+      const open = current.ok ? current.data.trip : null;
+      const text = await activeTripMessage();
+      setMsgs((m) => [...m, { id: `a${Date.now()}`, role: "assistant", text, cards: open ? [{ type: "trip_status", id: open.id, destination: open.destination.name, etaAt: open.etaAt, state: open.state }] : [] }]);
+    }
     else toast(r.message, "error");
   };
   // Conversation → decision: hand the place to Plan, from where she is (only if location is already on).

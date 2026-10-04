@@ -25,7 +25,7 @@ export type MiraCard =
   | { type: "help_points"; title: string; points: MiraHelpPoint[] }
   | { type: "report"; category: string; label: string }
   | { type: "sos"; contacts: string[] }
-  | { type: "trip_status"; destination: string; etaAt: string; state: string }
+  | { type: "trip_status"; destination: string; etaAt: string; state: string; id?: string }
   | { type: "save_place" }
   | { type: "plan_brief"; next: "edit_plan" | "review_options"; state: "not_checked" | "ready" | "missing" | "empty" | "stale" | "failed"; checkedAt: string; source: string | null; sourceAt: string | null; scope: string | null; options: Array<{ id: string; label: string; minutes: number; meters: number }>; daylight: import("@/domain/plan-contract").PlanEvidence | null };
 
