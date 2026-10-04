@@ -75,3 +75,12 @@ describe("contact emails use the traveller's zone, labelled", () => {
     expect(inviteEmail({ acceptUrl: "u", etaAt: eta, expiresAt: eta, tz: "Asia/Kolkata" }).text).toContain("1 Jul, 6:35 AM IST");
   });
 });
+
+describe("the missed email states the link window that is actually left (audit L06-002, re-audit RA3 N4)", () => {
+  const send = (minutesLate: number) => JSON.stringify(tripMissedEmail({ ownerName: "Emma", destination: "Home", minutesLate, liveUrl: "https://mira.test/t/x", etaAt: new Date("2026-10-04T20:00:00Z"), tz: "Europe/London" }));
+  it("counts down from 30 min after the ETA, and never below the 15 min kept after a late alert", () => {
+    expect(send(10)).toContain("for about 20 more minutes");
+    expect(send(45)).toContain("for about 15 more minutes");
+    expect(send(45)).not.toMatch(/30 minutes after their expected time/);
+  });
+});

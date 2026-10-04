@@ -1,5 +1,5 @@
 import type postgres from "postgres";
-import { ALERT_UNCONFIRMED_AFTER_MS, EXPIRE_AFTER_ETA_MS, MISS_GRACE_MS, dueTransition, purgeAt, type JourneyState } from "@/domain/journey";
+import { ALERT_UNCONFIRMED_AFTER_MS, EXPIRE_AFTER_ETA_MS, LINK_AFTER_ALERT_MS, MISS_GRACE_MS, dueTransition, purgeAt, type JourneyState } from "@/domain/journey";
 import { displayName } from "@/domain/know-copy";
 import { decryptText } from "@/server/crypto";
 import type { Clock } from "@/server/clock";
@@ -169,8 +169,8 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
   for (const { id } of due) {
     try {
       const pending = await sql.begin(async (tx) => {
-        const [j] = await tx<{ id: string; state: JourneyState; eta_at: Date; contact_state: string; place_id: string | null; dest_name: string | null; user_id: string | null; tz: string | null; alert_state: string }[]>`
-          SELECT id, state, eta_at, contact_state, place_id, dest_name, user_id, tz, alert_state FROM journeys WHERE id = ${id} FOR UPDATE SKIP LOCKED`;
+        const [j] = await tx<{ id: string; state: JourneyState; eta_at: Date; contact_state: string; place_id: string | null; dest_name: string | null; user_id: string | null; tz: string | null; alert_state: string; alert_claimed_at: Date | null }[]>`
+          SELECT id, state, eta_at, contact_state, place_id, dest_name, user_id, tz, alert_state, alert_claimed_at FROM journeys WHERE id = ${id} FOR UPDATE SKIP LOCKED`;
         if (!j) return null; // taken by a user action right now, or gone
 
         if (j.state === "active" && dueTransition({ state: j.state, etaAt: new Date(j.eta_at) }, now) === "miss") {
@@ -229,7 +229,9 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
 
         // Expire only trips that were already missed before this pass, so contacts get
         // at least one pass with a working link after the alert — and never while an alert is still owed.
-        if (j.state === "missed" && j.alert_state !== "claimed" && now.getTime() >= new Date(j.eta_at).getTime() + EXPIRE_AFTER_ETA_MS) {
+        // A late worker used to alert and expire ~30 s apart; the link now lives LINK_AFTER_ALERT_MS past the alert (audit L06-002).
+        const expiresAt = Math.max(new Date(j.eta_at).getTime() + EXPIRE_AFTER_ETA_MS, j.alert_claimed_at ? new Date(j.alert_claimed_at).getTime() + LINK_AFTER_ALERT_MS : 0);
+        if (j.state === "missed" && j.alert_state !== "claimed" && now.getTime() >= expiresAt) {
           await tx`UPDATE journeys SET state = 'expired', closed_at = ${now}, purge_at = ${purgeAt(now)} WHERE id = ${j.id} AND state = 'missed'`;
           await tx`UPDATE contact_invites SET expires_at = LEAST(expires_at, ${now}) WHERE journey_id = ${j.id}`;
           await tx`DELETE FROM trip_locations WHERE journey_id = ${j.id}`;

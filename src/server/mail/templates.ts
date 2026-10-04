@@ -1,6 +1,6 @@
 import { formatPlaceDateTime, formatPlaceTime } from "@/lib/time";
 import { modeWords } from "@/domain/travel-prefs";
-import { EXPIRE_AFTER_ETA_MS } from "@/domain/journey";
+import { EXPIRE_AFTER_ETA_MS, LINK_AFTER_ALERT_MS } from "@/domain/journey";
 
 /**
  * Minimised contact emails (architecture §6): ETA and a public place name only if the
@@ -79,10 +79,9 @@ export function tripSharedEmail(args: { contactName: string; ownerName: string; 
 }
 
 function linkWindow(minutesLate: number): string {
-  const left = Math.round(EXPIRE_AFTER_ETA_MS / 60_000) - Math.max(0, minutesLate);
-  return left >= 5
-    ? `Their last shared location is here for about ${left} more minutes (after that the page only says they didn't check in):`
-    : "This page may already show only that they didn't check in; their live location stops being shared about now:";
+  // The worker keeps the link at least LINK_AFTER_ALERT_MS after the alert, however late it ran.
+  const left = Math.max(Math.round(LINK_AFTER_ALERT_MS / 60_000), Math.round(EXPIRE_AFTER_ETA_MS / 60_000) - Math.max(0, minutesLate));
+  return `Their last shared location is here for about ${left} more minutes (after that the page only says they didn't check in):`;
 }
 
 export function tripMissedEmail(args: { ownerName: string; destination: string; minutesLate: number; liveUrl: string | null; etaAt?: Date; tz?: string | null }) {

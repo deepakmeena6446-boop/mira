@@ -95,6 +95,22 @@ describe("ACCOMPANY journeys (injected clock, real Mailpit)", () => {
     await expect(createJourney(ctx(), "a", { ...input, idempotencyKey: randomUUID() })).rejects.toMatchObject({ code: "journey_already_active" });
   });
 
+  it("a late worker still leaves the link open after the alert (audit L06-002)", async () => {
+    const email = uniqueEmail();
+    const clock = fixedClock(T0);
+    const j = await createJourney(ctx(clock), "a", { idempotencyKey: randomUUID(), destination: { placeId }, etaAt: new Date(T0.getTime() + 30 * MINUTE).toISOString(), contactEmail: email });
+    const invites = await mailpitMessages(email);
+    expect(await acceptInvite(getSql(), inviteTokenFrom(await mailpitText(invites[0].ID)), clock.now())).toBe("accepted");
+    clock.set(new Date(T0.getTime() + 75 * MINUTE)); // ETA + 45: the worker was down past the whole 30-min window
+    expect(await processJourneys(getSql(), clock, getMailer())).toMatchObject({ missed: 1, alertsSent: 1, expired: 0 });
+    clock.advance(1 * MINUTE);
+    expect((await processJourneys(getSql(), clock, getMailer())).expired).toBe(0); // used to expire ~30 s after the alert
+    expect((await currentJourney(getSql(), "a", clock.now()))!.state).toBe("missed");
+    clock.advance(15 * MINUTE);
+    expect((await processJourneys(getSql(), clock, getMailer())).expired).toBe(1);
+    expect(j.id).toBeTruthy();
+  });
+
   it("accepted contact gets exactly one missed-check-in email with no location details", async () => {
     const email = uniqueEmail();
     const clock = fixedClock(T0);

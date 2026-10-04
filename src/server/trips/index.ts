@@ -2,7 +2,7 @@ import "server-only";
 import type postgres from "postgres";
 import { z } from "zod";
 import { placeLabel } from "@/server/http/person-name";
-import { EXPIRE_AFTER_ETA_MS, MAX_JOURNEY_MS, MIN_ETA_MS, displayAlertState, purgeAt, validateNewEta, type AlertState, type JourneyState } from "@/domain/journey";
+import { EXPIRE_AFTER_ETA_MS, LINK_AFTER_ALERT_MS, MAX_JOURNEY_MS, MIN_ETA_MS, displayAlertState, purgeAt, validateNewEta, type AlertState, type JourneyState } from "@/domain/journey";
 import { haversineMeters } from "@/domain/pilot";
 import { decryptText, encryptText, hashToken, hmacHex, randomToken } from "@/server/crypto";
 import { ApiError, conflict, notFound } from "@/server/http/errors";
@@ -162,7 +162,7 @@ async function toView(sql: postgres.Sql, r: Row, now: Date): Promise<TripView> {
     state: r.state,
     destination: { name: r.dest_name, lat: r.dest_lat, lon: r.dest_lon },
     etaAt: new Date(r.eta_at).toISOString(),
-    expiresAt: new Date(new Date(r.eta_at).getTime() + EXPIRE_AFTER_ETA_MS).toISOString(),
+    expiresAt: new Date(Math.max(new Date(r.eta_at).getTime() + EXPIRE_AFTER_ETA_MS, r.alert_claimed_at ? new Date(r.alert_claimed_at).getTime() + LINK_AFTER_ALERT_MS : 0)).toISOString(),
     routeMeters: r.route_meters,
     extended: r.extended,
     alert: displayAlertState(r.alert_state, r.alert_claimed_at ? new Date(r.alert_claimed_at) : null, now),
