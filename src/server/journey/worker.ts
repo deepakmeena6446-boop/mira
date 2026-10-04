@@ -8,6 +8,7 @@ import { getEnv } from "@/server/config/env";
 import { recordHeartbeat } from "@/server/health/worker";
 import { missedAlertEmail, tripArrivedEmail, tripMissedEmail } from "@/server/mail/templates";
 import { errCode } from "@/server/log/err-code";
+import { EMAILED_ON_TRIP } from "./email-recipients";
 
 /** No live point for this long on an active trip → tell the owner once (re-armed when points resume). */
 export const STALE_AFTER_MS = 10 * 60_000;
@@ -53,16 +54,19 @@ export const ALERT_RETRY_AFTER_MS = 60_000;
  * no pass has attempted yet (a retry after a pass died) — anyone already sent, failed or cut off mid-send is left alone.
  */
 async function accountAlertSends(q: postgres.Sql, j: { id: string; user_id: string; dest_name: string | null; eta_at: Date; tz: string | null }, now: Date, onlyClaimed: boolean): Promise<PendingAlert["sends"]> {
-  const contacts = await q<{ contact_id: string; name: string; encrypted_email: string; share_token_enc: string | null }[]>`
-    SELECT c.id AS contact_id, c.name, c.encrypted_email, tc.share_token_enc FROM trip_contacts tc JOIN contacts c ON c.id = tc.contact_id
-    WHERE tc.journey_id = ${j.id} AND c.accepted_at IS NOT NULL AND tc.revoked_at IS NULL ${onlyClaimed ? q`AND tc.alert_delivery = 'claimed'` : q``} ORDER BY c.name`;
+  const contacts = await q<{ contact_id: string; name: string; encrypted_email: string; share_token_enc: string | null; alert_delivery: string }[]>`
+    SELECT c.id AS contact_id, c.name, c.encrypted_email, tc.share_token_enc, tc.alert_delivery FROM trip_contacts tc JOIN contacts c ON c.id = tc.contact_id
+    WHERE tc.journey_id = ${j.id} AND ${q.unsafe(EMAILED_ON_TRIP)} AND tc.revoked_at IS NULL ORDER BY c.name`;
   const owner = ((await q<{ name: string }[]>`SELECT name FROM users WHERE id = ${j.user_id}`)[0]?.name ?? "Your contact").split(" ")[0];
   const minutesLate = Math.max(1, Math.round((now.getTime() - new Date(j.eta_at).getTime()) / 60_000));
-  return contacts.map((c) => ({
+  // Everyone this alert goes to, even on a retry that sends only the rest, so "Besides you…" stays true (L02-005).
+  const alerted = contacts.filter((c) => !onlyClaimed || ["claimed", "sending", "sent", "failed", "unconfirmed"].includes(c.alert_delivery));
+  const others = Math.max(0, alerted.length - 1);
+  return contacts.filter((c) => !onlyClaimed || c.alert_delivery === "claimed").map((c) => ({
     contactId: c.contact_id,
     name: c.name,
     email: decryptText(c.encrypted_email, "contact_email"),
-    message: tripMissedEmail({ ownerName: owner, destination: j.dest_name ?? "their destination", minutesLate, liveUrl: liveUrl(c.share_token_enc), etaAt: new Date(j.eta_at), tz: j.tz }),
+    message: tripMissedEmail({ ownerName: owner, destination: j.dest_name ?? "their destination", minutesLate, liveUrl: liveUrl(c.share_token_enc), etaAt: new Date(j.eta_at), tz: j.tz, others }),
   }));
 }
 
@@ -174,11 +178,12 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
         if (!j) return null; // taken by a user action right now, or gone
 
         if (j.state === "active" && dueTransition({ state: j.state, etaAt: new Date(j.eta_at) }, now) === "miss") {
-          // MIRA 2.0 trips alert every accepted contact on the trip, each with their own live link.
+          // MIRA 2.0 trips alert every contact MIRA emails on this trip (chosen as an email recipient, never one who
+          // accepted an invite mid-trip after she picked them for WhatsApp: P02-007), each with their own live link.
           const contacts = j.user_id
             ? await tx<{ contact_id: string | null; name: string; encrypted_email: string; share_token_enc: string | null }[]>`
                 SELECT c.id AS contact_id, c.name, c.encrypted_email, tc.share_token_enc FROM trip_contacts tc JOIN contacts c ON c.id = tc.contact_id
-                WHERE tc.journey_id = ${j.id} AND c.accepted_at IS NOT NULL AND tc.revoked_at IS NULL ORDER BY c.name`
+                WHERE tc.journey_id = ${j.id} AND ${tx.unsafe(EMAILED_ON_TRIP)} AND tc.revoked_at IS NULL ORDER BY c.name`
             : await tx<{ contact_id: string | null; name: string; encrypted_email: string; share_token_enc: string | null }[]>`
                 SELECT NULL AS contact_id, '' AS name, encrypted_email, NULL AS share_token_enc FROM contact_invites
                 WHERE journey_id = ${j.id} AND accepted_at IS NOT NULL AND revoked_at IS NULL`;
@@ -188,7 +193,7 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
                      alert_state = ${canAlert ? "claimed" : "not_attempted"}, alert_claimed_at = ${canAlert ? now : null}
                    WHERE id = ${j.id} AND state = 'active'`;
           if (j.user_id) await tx`UPDATE trip_contacts tc SET alert_delivery = ${canAlert ? "claimed" : "not_attempted"}
-            FROM contacts c WHERE tc.journey_id = ${j.id} AND tc.contact_id = c.id AND tc.revoked_at IS NULL AND c.accepted_at IS NOT NULL`;
+            FROM contacts c WHERE tc.journey_id = ${j.id} AND tc.contact_id = c.id AND tc.revoked_at IS NULL AND ${tx.unsafe(EMAILED_ON_TRIP)}`;
           result.missed += 1;
           const who = joinNames(contacts.map((c) => c.name));
           if (j.user_id) {
@@ -221,7 +226,7 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
               name: c.name,
               email: decryptText(c.encrypted_email, "contact_email"),
               message: j.user_id
-                ? tripMissedEmail({ ownerName: owner, destination: j.dest_name ?? "their destination", minutesLate, liveUrl: liveUrl(c.share_token_enc), etaAt: new Date(j.eta_at), tz: j.tz })
+                ? tripMissedEmail({ ownerName: owner, destination: j.dest_name ?? "their destination", minutesLate, liveUrl: liveUrl(c.share_token_enc), etaAt: new Date(j.eta_at), tz: j.tz, others: contacts.length - 1 })
                 : missedAlertEmail({ etaAt: new Date(j.eta_at), placeName, tz: j.tz }),
             })),
           } satisfies PendingAlert;
@@ -321,7 +326,7 @@ export async function processJourneys(sql: postgres.Sql, clock: Clock, mailer: M
     for (const j of arrived) {
       try {
         const contacts = await sql<{ encrypted_email: string }[]>`
-          SELECT c.encrypted_email FROM trip_contacts tc JOIN contacts c ON c.id = tc.contact_id WHERE tc.journey_id = ${j.id} AND c.accepted_at IS NOT NULL AND tc.alert_delivery = 'sent'`;
+          SELECT c.encrypted_email FROM trip_contacts tc JOIN contacts c ON c.id = tc.contact_id WHERE tc.journey_id = ${j.id} AND c.encrypted_email IS NOT NULL AND tc.alert_delivery = 'sent'`;
         const mail = tripArrivedEmail({ ownerName: j.owner.split(" ")[0], destination: j.dest_name ?? "their destination", ended: j.state === "ended" });
         for (const c of contacts) await mailer.send({ to: decryptText(c.encrypted_email, "contact_email"), ...mail });
         result.arrivedNotices += 1;

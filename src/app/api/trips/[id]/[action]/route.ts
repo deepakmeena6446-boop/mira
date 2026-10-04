@@ -8,6 +8,7 @@ import { requireUser } from "@/server/session/user";
 import { extendJourney, userAction } from "@/server/journey/service";
 import { changeTrip, tellMyPeopleNow, tripById, tripOwnerHash, shareTrip, revokeTripShare, createTripLink } from "@/server/trips";
 import { MAX_CONTACTS } from "@/domain/limits";
+import { placeLabel } from "@/server/http/person-name";
 import { dailyKey, enforce } from "@/server/ratelimit";
 import { outcomeForTripClose, recordDecisionOutcomeBestEffort } from "@/server/decision-outcomes";
 
@@ -37,7 +38,8 @@ export const POST = handle(async (req: Request, ctx: RouteContext<"/api/trips/[i
     return json({ trip: await createTripLink(sql, user.id, id, systemClock) });
   }
   if (action === "change") {
-    const input = await readJson(req, z.object({ to: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180), name: z.string().trim().min(1).max(80) }).strict(), etaMinutes: z.number().int().min(5).max(235), idempotencyKey: z.guid().optional() }).strict(), 512);
+    // The same place-label defusing as on start (audit P19-002): the new name reaches the follower page and contacts' emails.
+    const input = await readJson(req, z.object({ to: z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180), name: placeLabel(80) }).strict(), etaMinutes: z.number().int().min(5).max(235), idempotencyKey: z.guid().optional() }).strict(), 512);
     const trip = await changeTrip(sql, user.id, id, input, systemClock);
     await recordDecisionOutcomeBestEffort(sql, "journey_changed", systemClock.now());
     console.log(JSON.stringify({ t: systemClock.now().toISOString(), src: "web", event: "trip.changed", trip: id, by: "user" }));

@@ -148,7 +148,8 @@ export function firstNameFrom(given: unknown, name: unknown): string {
   const clean = (v: unknown) => {
     if (typeof v !== "string") return "";
     const first = v.replace(/[\u0000-\u001f\u007f]/g, "").trim().split(/\s+/)[0]?.slice(0, 40) ?? "";
-    return personName(40).safeParse(first).success ? first : "";
+    const parsed = personName(40).safeParse(first);
+    return parsed.success ? parsed.data : ""; // the cleaned name (no bidi/invisible characters, audit P17-001)
   };
   return clean(given) || clean(name) || "Friend";
 }

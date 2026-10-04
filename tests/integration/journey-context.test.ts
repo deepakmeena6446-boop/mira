@@ -134,7 +134,8 @@ describe("journey context: route, Help Points, options, safety net", () => {
     const contact = async (name: string, email: string) =>
       (await getSql()`INSERT INTO contacts (user_id, name, encrypted_email, email_hash, accepted_at) VALUES (${j.user_id}, ${name}, ${encryptText(email, "contact_email")}, ${hmacHex("contact-email", `${name}-${Date.now()}`)}, now()) RETURNING id`)[0].id;
     for (const [name, email] of [["Priya", "priya@example.test"], ["Ravi", "ravi@example.test"]] as const) {
-      await getSql()`INSERT INTO trip_contacts (journey_id, contact_id) VALUES (${trip.id}, ${await contact(name, email)})`;
+      // As a share to an accepted email contact leaves it: the trip emails them (P02-007: fixed per journey, not re-read).
+      await getSql()`INSERT INTO trip_contacts (journey_id, contact_id, link_delivery) VALUES (${trip.id}, ${await contact(name, email)}, 'sent')`;
     }
     await getSql()`UPDATE journeys SET eta_at = now() - interval '20 minutes' WHERE id = ${trip.id}`;
     const mailer = { send: async (m: { to: string }) => (m.to.startsWith("priya") ? { ok: true as const } : { ok: false as const, definite: true }) };

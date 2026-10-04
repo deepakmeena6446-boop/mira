@@ -298,7 +298,7 @@ describe("Journey companion: time zones, habits, Trips", () => {
     expect(res.headers.get("referrer-policy")).toBe("no-referrer");
     const live = await res.json();
     expect(live).toMatchObject({ state: "active", name: "Emma", destination: "Home", mode: "transit", tz: "America/New_York", alertsViewer: true });
-    const allowed = new Set(["state", "name", "destination", "dest", "lat", "lon", "etaAt", "tz", "alertsViewer", "mode", "checkRequested", "location", "at", "ageSeconds"]);
+    const allowed = new Set(["state", "name", "destination", "dest", "destApprox", "lat", "lon", "etaAt", "tz", "alertsViewer", "mode", "checkRequested", "location", "at", "ageSeconds"]);
     for (const k of allKeys(live)) expect(allowed.has(k), k).toBe(true);
     expect(JSON.stringify(live)).not.toMatch(/Stone|@example|token/);
 
