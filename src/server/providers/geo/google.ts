@@ -200,7 +200,7 @@ async function computeWalks(key: string, a: GeoPoint, b: GeoPoint, alternatives:
  */
 const typesFor = (classes: readonly HelpClass[]) => Object.keys(GOOGLE_HELP_TYPES).filter((t) => classes.includes(GOOGLE_HELP_TYPES[t]));
 const HELP_TYPE_GROUPS = {
-  main: typesFor(["hospital", "police", "transit", "airport"]),
+  main: typesFor(["hospital", "police", "transit", "bus", "airport"]),
   late: typesFor(["hotel", "pharmacy", "fuel"]),
   convenience: typesFor(["convenience"]),
 } as const;

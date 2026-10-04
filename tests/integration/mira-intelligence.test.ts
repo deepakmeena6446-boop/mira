@@ -130,7 +130,9 @@ describe("Mira: global context, budget and caps", () => {
       if (here.status !== "checked") throw new Error("unreachable");
       expect(here.count).toBeGreaterThan(0);
       expect(here.latest[0]).toEqual(expect.objectContaining({ publisher: expect.any(String), age_days: expect.any(Number) }));
-      expect(JSON.stringify(here)).not.toMatch(/\[Sample\]|https?:/); // no headlines or links reach the model
+      // Headlines as published reach Mira so she can say what happened (UX sweep 2026-10-04); links never do.
+      expect(here.latest[0]).toEqual(expect.objectContaining({ headline: expect.any(String) }));
+      expect(JSON.stringify(here)).not.toMatch(/https?:/);
       expect(tools.coverage()).toMatch(/Safety updates: recent news reports/);
       expect(await tools.safetyUpdates("destination")).toEqual({ status: "no_place", reason: expect.stringMatching(/No journey is running/) });
       const text = (await streamed("any recent safety updates here?")).filter((e) => e.type === "text").map((e) => e.delta).join("");
