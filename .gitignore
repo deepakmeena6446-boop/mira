@@ -51,3 +51,7 @@ next-env.d.ts
 
 # e2e artifacts
 /tests/e2e/.auth
+
+# Verifier scratch (screenshots, browser state) must never land at the repo root
+/*.png
+/*_state.json

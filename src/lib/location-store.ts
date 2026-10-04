@@ -44,6 +44,9 @@ export function clearLocation() {
   pendingDest = null;
   clearCountry();
   forgetLastKnownCountry(); // sign-out/delete: the next person on this phone starts from nothing
+  // …including her location choice: the next person is asked, not located silently (re-audit RA1, P03-002).
+  try { localStorage.removeItem(LOCATION_CHOICE_KEY); } catch { /* storage blocked: nothing was kept */ }
+  choiceListeners.forEach((l) => l());
 }
 
 export function requestLocation(): Promise<LocState> {

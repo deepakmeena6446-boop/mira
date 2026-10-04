@@ -84,14 +84,16 @@ test.describe("Mobile extras — long-press report, inbox, time of day, installa
     const { installabilityErrors } = await cdp.send("Page.getInstallabilityErrors");
     expect(installabilityErrors).toEqual([]);
     // The offline cache holds no personal pages — only the offline page and static files.
-    await expect.poll(() => page.evaluate(async () => (await caches.keys()).sort())).toEqual(["mira-shell-v5"]);
-    await expect.poll(() => page.evaluate(async () => (await (await caches.open("mira-shell-v6")).keys()).map((r) => new URL(r.url).pathname).sort())).toEqual(["/daypart.js", "/icon.svg", "/manifest.webmanifest", "/offline.html", "/offline.js"]);
+    await expect.poll(() => page.evaluate(async () => (await caches.keys()).sort())).toEqual(["mira-shell-v7"]);
+    await expect.poll(() => page.evaluate(async () => (await (await caches.open("mira-shell-v7")).keys()).map((r) => new URL(r.url).pathname).sort())).toEqual(["/daypart.js", "/icon.svg", "/manifest.webmanifest", "/offline.html", "/offline.js"]);
     // Offline, a navigation gets the offline page (never someone's cached home screen).
     await page.context().setOffline(true);
     await page.goto("/me").catch(() => {});
     await expect(page.getByRole("heading", { name: "You're offline" })).toBeVisible();
     // Offline, the page says how to call: the remembered country's numbers when Mira has one, else the phone's own emergency call (audit P08-005).
     await expect(page.getByText(/emergency call/i).first()).toBeVisible();
+    // …which needs /offline.js from the cache: the script used to fail offline, leaving the call box empty (re-audit RA1).
+    await expect(page.locator("#call > p")).toHaveCount(1);
     await page.context().setOffline(false);
   });
 });
