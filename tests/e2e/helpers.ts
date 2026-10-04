@@ -59,7 +59,10 @@ export function keepGpsFresh(ctx: BrowserContext, start: { latitude: number; lon
   let latest: { latitude: number; longitude: number; accuracy?: number } | null = start;
   const set = ctx.setGeolocation.bind(ctx);
   ctx.setGeolocation = async (g) => { latest = g; return set(g); };
-  const timer = setInterval(() => { if (latest) set(latest).catch(() => {}); }, 30_000);
+  // A ~0.1 m wobble: Chromium doesn't notify an active watchPosition when the same point is re-applied, so the
+  // journey screen's watch would keep the old timestamp (a real phone's watch reports fresh fixes all the time).
+  let wobble = 1;
+  const timer = setInterval(() => { if (latest) { wobble = -wobble; set({ ...latest, latitude: latest.latitude + wobble * 1e-6 }).catch(() => {}); } }, 30_000);
   ctx.on("close", () => clearInterval(timer));
 }
 

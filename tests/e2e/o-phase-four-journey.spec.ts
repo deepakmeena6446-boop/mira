@@ -88,7 +88,8 @@ test("a selected plan requires a separate start confirmation and proximity check
   }, { from, to });
   await owner.page.route("**/api/plan/options", async (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ state: "ready", checkedAt: new Date().toISOString(), source: "OpenStreetMap imported walking graph", sourceAt: new Date().toISOString(), scope: "test route", options: [{ id: "walk-0", label: "Shortest mapped walk", minutes: 15, meters: 1000, geometry: [[from.lon, from.lat], [to.lon, to.lat]], evidence: [{ status: "known", claim: "Mapped walking time estimate", value: 15, scope: { kind: "route", ref: "test route" }, source: { id: "osm-walking-graph", label: "OpenStreetMap", observedAt: new Date().toISOString(), expiresAt: null } }] }], daylight: { status: "unknown", claim: "Daylight", scope: { kind: "area", ref: "test" }, reason: "not_checked", retryable: false }, service: { status: "unknown", claim: "Service", scope: { kind: "route", ref: "test" }, reason: "unsupported", retryable: false }, detail: "One mapped path." }) }));
   await owner.page.goto("/plan?planStep=options");
-  await owner.page.getByRole("radio", { name: "Share my location while Mira is open" }).check();
+  await owner.page.getByRole("radio", { name: "Share my location while Mira is open" }).click();
+  await expect(owner.page.getByRole("radio", { name: "Share my location while Mira is open" })).toBeChecked();
   await expect(owner.page.getByRole("button", { name: "Start chosen journey" })).toBeVisible();
   const before = await (await owner.page.request.get("/api/trips/current")).json();
   expect(before.trip).toBeNull();
@@ -98,7 +99,7 @@ test("a selected plan requires a separate start confirmation and proximity check
   expect(stillBefore.trip).toBeNull();
   await owner.ctx.setGeolocation({ latitude: 28.8, longitude: 77.3 });
   await owner.page.getByRole("button", { name: "Confirm start" }).click();
-  await expect(owner.page.getByText("A fresh, accurate position near your chosen origin is needed.", { exact: false })).toBeVisible();
+  await expect(owner.page.getByText("Mira needs a fresh, accurate location near your start.", { exact: false })).toBeVisible();
   expect((await (await owner.page.request.get("/api/trips/current")).json()).trip).toBeNull();
   await owner.ctx.setGeolocation(GEO);
   // Location is on for her, so a watch is running; static Chromium GPS can then fail a maximumAge:0 request (see above).
@@ -119,13 +120,14 @@ test("S1 loop offers a manual check-in, keeps location optional until confirmed,
   await owner.page.route("**/api/plan/options", async (route) => route.fulfill({ json: { state: "missing", options: [], checkedAt: new Date().toISOString(), source: null, sourceAt: null, scope: "fixture", detail: "No mapped loop in this fixture", daylight: { status: "unknown", reason: "not_checked" }, service: { status: "unknown", reason: "unsupported" } } }));
   await owner.page.goto("/plan?planStep=options");
   await expect(owner.page.getByRole("status").filter({ hasText: "No mapped loop in this fixture" })).toBeVisible();
-  await owner.page.getByRole("radio", { name: "Share my location while Mira is open" }).check();
+  await owner.page.getByRole("radio", { name: "Share my location while Mira is open" }).click();
+  await expect(owner.page.getByRole("radio", { name: "Share my location while Mira is open" })).toBeChecked();
   await expect(owner.page.getByRole("button", { name: "Start manual journey" })).toBeVisible();
   expect((await (await owner.page.request.get("/api/trips/current")).json()).trip).toBeNull();
   await owner.page.getByRole("button", { name: "Start manual journey" }).click();
   await expect(owner.page.getByRole("button", { name: "Confirm start" })).toBeVisible();
   await owner.page.getByRole("button", { name: "Confirm start" }).click();
-  await expect(owner.page.getByText("A fresh, accurate position near your chosen origin is needed.", { exact: false })).toBeVisible();
+  await expect(owner.page.getByText("Mira needs a fresh, accurate location near your start.", { exact: false })).toBeVisible();
   expect((await (await owner.page.request.get("/api/trips/current")).json()).trip).toBeNull();
   await owner.ctx.grantPermissions(["geolocation"]);
   await owner.page.getByRole("button", { name: "Confirm start" }).click();

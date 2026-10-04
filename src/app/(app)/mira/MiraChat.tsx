@@ -259,7 +259,9 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   useEffect(() => {
     if (!user) return;
     void api<{ messages: Msg[] }>("/api/mira").then((r) => {
-      if (r.ok) setMsgs(r.data.messages.map((m) => ({ ...m, id: String(m.id) })));
+      // History that arrives after she already sent something goes before it, never over it (a fast first message
+      // and its reply used to vanish when the history load finished).
+      if (r.ok) setMsgs((now) => [...r.data.messages.map((m) => ({ ...m, id: String(m.id) })), ...now]);
       setLoaded(true);
     });
   }, [user]);
