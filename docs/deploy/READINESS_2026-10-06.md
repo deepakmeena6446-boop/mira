@@ -14,7 +14,7 @@ Approved source remains `a2c853e34c06314238effb1fe442b4e89287fccb` on `origin/ma
 | Unit tests | 873/873 across 87 files passed with localhost access. The sandbox-only first attempt returned EPERM in the database-wait test; no test was weakened |
 | Production build | Next.js 16.3.6 Webpack build and worker/migrator/pilot-import bundles passed |
 | Client secret audit | `npm run audit:bundle` passed: 130 files, 10 patterns |
-| GitHub CI | [Run 37204629715](https://github.com/deepakmeena6446-boop/mira/actions/runs/37204629715) did not start its job: “The job was not started because your account is locked due to a billing issue.” This is not a green CI result |
+| GitHub CI | [Run 37490651058](https://github.com/deepakmeena6446-boop/mira/actions/runs/37490651058) did not start its job: “The job was not started because your account is locked due to a billing issue.” This is not a green CI result |
 | Existing staging | All three services online, one running replica each; no recent failures or staged/applying work reported |
 | Staging HTTP | `/api/health/live` 200; `/api/health/ready` ready; `/` 200 with HSTS/CSP; `/offline.js` 200 |
 | Web settings | Expected build/start/pre-deploy/healthcheck settings; one replica |
@@ -42,9 +42,9 @@ No EnvValidationError appeared in that startup window. A filtered current log qu
 
 ## Blockers and concrete resolution
 
-### 1. Dependency security: new candidate decision required
+### 1. Dependency security: original commit and reviewed candidate
 
-The fresh npm audit reports **11 affected package entries: 7 high, 4 moderate, 0 critical**. These entries include transitive chains and are not 11 distinct exploits. No packages were changed because the owner originally required the exact SHA and no application changes.
+The fresh npm audit reports **11 affected package entries: 7 high, 4 moderate, 0 critical**. These entries include transitive chains and are not 11 distinct exploits. This table records the original a2c853e audit. Its packages were not changed in that clean checkout because the owner originally required the exact SHA and no application changes. The owner subsequently approved preparing a separate dependency candidate, without deployment: [draft PR #2](https://github.com/deepakmeena6446-boop/mira/pull/2), branch codex/deployment-security, dependency commit 7d0ef7d8146a1a0cae3761f3f9580226f2e65be6. It patches sharp/source-map-js and removes unused drizzle-kit; production-only audit is now zero, with the unpatched braces development chain still present. Validation and remaining release holds are recorded in docs/deploy/DEPENDENCY_CANDIDATE_2026-10-06.md on that candidate branch. This does not change the commit currently running in staging.
 
 | Root advisory | Installed dependency | Exposure assessment / next action |
 |---|---|---|
@@ -59,14 +59,14 @@ A dependency change produces a new SHA. Before that candidate can replace a2c853
 
 Sign in as the repository/account owner. Open **GitHub → Settings → Billing and licensing**, identify and resolve the account's billing lock. Review any charge before accepting it; the agent will not change payment settings. If the account is managed by an organisation, its billing owner must resolve the lock.
 
-After GitHub confirms the account is unlocked, rerun the existing original-commit check:
+After GitHub confirms the account is unlocked, rerun the selected candidate check (this run was blocked by the same billing annotation):
 
 ```bash
-gh run rerun 37204629715 --repo deepakmeena6446-boop/mira --failed
-gh run watch 37204629715 --repo deepakmeena6446-boop/mira --exit-status
+gh run rerun 37490651058 --repo deepakmeena6446-boop/mira --failed
+gh run watch 37490651058 --repo deepakmeena6446-boop/mira --exit-status
 ```
 
-Do not execute that rerun while preparation-only/no-cost instructions are still in effect without owner clearance. If a new candidate is approved, verify CI on that new SHA instead. Clearing billing alone is not proof the code checks passed.
+Do not execute that rerun while preparation-only/no-cost instructions are still in effect without owner clearance. Verify CI on the final reviewed candidate SHA, including any later commit; this command refers to the dependency commit run. Clearing billing alone is not proof the code checks passed.
 
 ### 3. Railway restart reliability and backups: owner action
 
