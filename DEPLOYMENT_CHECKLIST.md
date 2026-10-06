@@ -8,7 +8,9 @@ Never paste a secret into chat, a commit, CI logs or this file. Read values from
 
 - [ ] `git status --short` is empty and the commit to ship is recorded (`git rev-parse HEAD`).
 - [ ] On that commit: `npm ci && npm run lint && npm run typecheck && npm test && npm run build` all pass (see BETA_RELEASE_REPORT.md for the last recorded run).
-- [ ] Staging and production deploy the **same** commit.
+- [ ] Staging and production deploy the **same** approved commit. Dependency fixes require a new candidate SHA and fresh checks.
+- [ ] CI actually ran and is green on that SHA; a billing-blocked job is not a code-test failure or a pass.
+- [ ] Review a fresh dependency audit; resolve or explicitly review remaining findings before release. Current evidence: [readiness record](docs/deploy/READINESS_2026-10-06.md).
 
 ## 1. Owner accounts (start these first — DNS and reviews take time)
 
@@ -31,11 +33,11 @@ npx web-push generate-vapid-keys   # VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY
 
 ## 3. Create the production database
 
-- [ ] `railway init --name mira`
+- [ ] Owner approves production creation. Reuse project `29b72709-5ec7-45d8-afa9-a99b43bdfe20`: `railway link --project 29b72709-5ec7-45d8-afa9-a99b43bdfe20 --environment production`, then `railway status --json` confirms Mira / production.
 - [ ] `postgis` service from image `postgis/postgis:17-3.5` with `POSTGRES_USER=mira`, `POSTGRES_DB=mira`, `PGDATA=/var/lib/postgresql/data/pgdata`.
-- [ ] Set `POSTGRES_PASSWORD` **before** its first boot; attach a volume at `/var/lib/postgresql/data`.
+- [ ] Set fresh `POSTGRES_PASSWORD` **before** its first boot; link `postgis` with `railway service link postgis`, verify production with `railway status --json`, then `railway volume add --mount-path /var/lib/postgresql/data`. CLI 4.57.3 has no `volume add --service` flag.
 - [ ] No public TCP proxy on `postgis` (private network only).
-- [ ] On Pro, enable daily volume backups, retention ≤ 30 days. Take and verify a staging backup before migrations; stop for an owner decision if backups are unavailable on the current plan.
+- [ ] Owner approves backup cost and entitlement. Enable Daily (6-day retention), optionally Weekly (27 days); keep Monthly disabled (89 days exceeds the ≤30-day policy). Take and verify a staging backup before migrations and rehearse recovery separately.
 
 ## 4. Create `web` and `worker` with their settings
 
@@ -116,16 +118,16 @@ With Claude configured and budget available, every Mira message uses Claude, inc
 
 ## 8. Domain and HTTPS
 
-- [ ] `railway domain --service web --port 3000`, then `railway domain <your domain> --service web --port 3000`; add the printed CNAME/TXT.
+- [ ] Owner approves custom-domain attachment. Link production and verify `railway status --json`, then `railway domain --service web --port 3000` or `railway domain <your domain> --service web --port 3000`; add the printed CNAME/TXT. CLI 4.57.3 has no `domain --environment` flag.
 - [ ] Every subdomain of an apex domain already serves HTTPS (HSTS `includeSubDomains`).
 
 ## 9. Deploy
 
 ```bash
-railway up --service web --detach -m "MIRA beta <sha>"
-railway up --service worker --detach -m "MIRA beta <sha>"
-railway logs --service web --lines 100       # expect no config.warning you didn't intend
-railway logs --service worker --lines 100    # expect {"event":"worker.started"}
+railway up --service web --environment production --detach -m "MIRA beta <sha>"
+railway up --service worker --environment production --detach -m "MIRA beta <sha>"
+railway logs --service web --environment production --lines 100       # expect no config.warning you didn't intend
+railway logs --service worker --environment production --lines 100    # expect {"event":"worker.started"}
 ```
 
 Pre-deploy runs `node dist/migrate.mjs` (forward-only, additive; `0000` creates the PostGIS, pg_trgm and pgcrypto extensions; a failure stops the deploy with the old version serving). Never run a destructive reset against production.
@@ -148,7 +150,7 @@ curl -sI $BASE/ | grep -iE 'strict-transport|content-security'
 
 ## 12. Optional
 
-- [ ] Pilot OpenStreetMap snapshot (fallback when Google is off/over budget): `railway ssh --service web -- node dist/pilot-import.mjs`.
+- [ ] Pilot OpenStreetMap snapshot (fallback when Google is off/over budget): `railway ssh --service web --environment production -- node dist/pilot-import.mjs`.
 
 ## Rollback
 

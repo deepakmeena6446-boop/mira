@@ -24,7 +24,7 @@ The desired declarative topology is recorded in [`.railway/railway.ts`](../.rail
 - Railway account with an active plan. Volume backups and point-in-time recovery currently require **Pro** (verified in the dashboard on 2026-10-04); approve the plan cost before upgrading. Railway CLI: `brew install railway` (or `npm i -g @railway/cli`), then `railway login`.
 - The required worker `ALWAYS` restart policy needs a paid Railway plan. Free/Trial does not support it and limits `ON_FAILURE` to 10 restarts ([Railway restart policy](https://docs.railway.com/deployments/restart-policy), dashboard verified 2026-10-04). A free staging deployment has this explicit reliability limitation; confirm the active deployment policy rather than trusting an API update response. Do not treat it as meeting the production topology.
 - A domain you control for the final production URL; staging uses a separate domain or subdomain.
-- Resend account with that domain verified (step 6). Start DNS verification first: it can take a while.
+- Optional Resend account with a verified sending subdomain (step 6). Start DNS verification first if enabling email: it can take a while.
 - Google Cloud project: a **server** Maps key, a **browser** Maps key, and an OAuth client.
 - Anthropic API key with a monthly spend limit, plus a Mapillary token.
 
@@ -40,29 +40,46 @@ npx web-push generate-vapid-keys   # VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY (requi
 
 ## 1. Create the project and services
 
-Run from the repository root. Every command below exists in Railway CLI 4.57 (`railway <cmd> --help`). Values are read from stdin so they never land in shell history.
+Run from a clean checkout of the approved release commit. Reuse the existing project; do not run `railway init` for MIRA again. CLI 4.57.3 uses the linked environment for `add`, `volume add`, `domain` and `status`; these commands have no `--environment` option. `volume add` also has no `--service` option. Link and check the exact project/environment before using them:
 
 ```bash
-railway init --name mira                     # creates the project and links this directory
+railway link --project 29b72709-5ec7-45d8-afa9-a99b43bdfe20 --environment production
+railway status --json
+railway environment config --environment production --json | python3 -c '
+import json,sys
+services=json.load(sys.stdin).get("services",{})
+fields=["startCommand","preDeployCommand","healthcheckPath","healthcheckTimeout","restartPolicyType","restartPolicyMaxRetries","numReplicas","multiRegionConfig"]
+print(json.dumps({k:{"buildCommand":v.get("build",{}).get("buildCommand"),"deploy":{f:v.get("deploy",{}).get(f) for f in fields},"variableNames":sorted(v.get("variables",{}))} for k,v in services.items()},indent=2))'
 
-# --- Database: PostGIS image + volume (Railway's stock Postgres has no PostGIS) ---
-railway add --service postgis --image postgis/postgis:17-3.5 \
-  --variables "POSTGRES_USER=mira" --variables "POSTGRES_DB=mira" \
-  --variables "PGDATA=/var/lib/postgresql/data/pgdata"
-openssl rand -hex 32 | railway variable set POSTGRES_PASSWORD --stdin --service postgis
-railway volume add --service postgis --mount-path /var/lib/postgresql/data
+```
+
+The status must name project **Mira** and environment **production**. Stop if it differs. Creating production services, attaching a custom domain, deploying, or incurring new costs needs the owner's approval. The commands below are for the later approved deployment, not for a preparation-only session. Values are read from stdin so they never land in shell history.
+
+```bash
+# --- Database: prepare an EMPTY service before attaching the bootable image ---
+railway add --service postgis
+railway variable set POSTGRES_USER=mira POSTGRES_DB=mira \
+  PGDATA=/var/lib/postgresql/data/pgdata \
+  --service postgis --environment production --skip-deploys
+openssl rand -hex 32 | railway variable set POSTGRES_PASSWORD --stdin --service postgis --environment production --skip-deploys
+railway service link postgis
+railway status --json                      # verify production + postgis before attaching
+railway volume add --mount-path /var/lib/postgresql/data
+# Only after password and volume are set; attaching the image can start the service:
+railway environment edit --environment production -m "MIRA PostGIS source" \
+  --service-config postgis source.image postgis/postgis:17-3.5
 
 # --- App services (empty; code is uploaded with `railway up` in step 4) ---
 railway add --service web
 railway add --service worker
 ```
 
-`PGDATA` points at a sub-directory because a Railway volume's root contains `lost+found`, and `initdb` needs an empty directory. Set `POSTGRES_PASSWORD` **before** the database first boots (it's read only by `initdb`); if the container crash-looped without it, it will start once the variable is set.
+`PGDATA` points at a sub-directory because a Railway volume's root contains `lost+found`, and `initdb` needs an empty directory. Create the service without an image first, then set `POSTGRES_PASSWORD` and attach its volume **before** adding the image. This avoids racing the first boot: `initdb` reads the password only during initialisation. Wait for the database to be online before deploying web; never reset an existing volume to repair a configuration mistake.
 
 Service settings (the same fields `.railway/railway.ts` declares):
 
 ```bash
-railway environment edit -m "MIRA service settings" \
+railway environment edit --environment production -m "MIRA service settings" \
   --service-config web build.buildCommand "npm run build" \
   --service-config web deploy.startCommand "node_modules/.bin/next start" \
   --service-config web deploy.preDeployCommand '["node dist/migrate.mjs"]' \
@@ -73,18 +90,25 @@ railway environment edit -m "MIRA service settings" \
   --service-config worker build.buildCommand "npm run worker:build" \
   --service-config worker deploy.startCommand "node dist/worker.mjs" \
   --service-config worker deploy.restartPolicyType ALWAYS
-railway environment config --json   # verify every field above landed as intended
+railway environment config --environment production --json | python3 -c '
+import json,sys
+services=json.load(sys.stdin).get("services",{})
+fields=["startCommand","preDeployCommand","healthcheckPath","healthcheckTimeout","restartPolicyType","restartPolicyMaxRetries","numReplicas","multiRegionConfig"]
+print(json.dumps({k:{"buildCommand":v.get("build",{}).get("buildCommand"),"deploy":{f:v.get("deploy",{}).get(f) for f in fields},"variableNames":sorted(v.get("variables",{}))} for k,v in services.items()},indent=2))'
+   # verify every field above landed as intended
 ```
 
 If a field didn't take (the CLI doesn't document how `--service-config` parses arrays and numbers), set it in the dashboard: *service → Settings → Build / Deploy*. Pre-deploy command: `node dist/migrate.mjs`.
 
 ### Staging environment
 
-Create a separate `staging` Railway environment with its **own** PostGIS volume, secrets, sending address, OAuth redirect URI and staging domain. `railway environment new staging --json` is available in CLI 4.57.3. Verify the environment and service settings with `railway status --json` and `railway environment config --environment staging --json` before uploading code. Never point staging at the production database or reuse production share-link secrets. Run the same migrations and release checks there first; production uses the same tested Git revision.
+Create a separate `staging` Railway environment with its **own** PostGIS volume, secrets, sending address, OAuth redirect URI and staging domain. `railway environment new staging --json` is available in CLI 4.57.3. Verify the linked environment with `railway status --json` and use the secret-safe configuration command above with `--environment staging` before uploading code. Never print raw configuration or variable JSON; variable inspection must output names only. Never point staging at the production database or reuse production share-link secrets. Run the same migrations and release checks there first; production uses the same tested Git revision.
 
 ## 2. Domain and HTTPS
 
 ```bash
+railway link --project 29b72709-5ec7-45d8-afa9-a99b43bdfe20 --environment production
+railway status --json                      # verify production; domain has no --environment flag
 railway domain --service web --port 3000     # prints https://<name>.up.railway.app
 # later, your own domain (prints the CNAME + TXT records to add at your DNS host):
 railway domain mira.example.org --service web --port 3000
@@ -99,44 +123,44 @@ In production the app sends `Strict-Transport-Security: max-age=31536000; includ
 Set on **web**; the worker gets the subset it needs by reference (`${{web.NAME}}`), so every secret is stored once.
 
 ```bash
-S="--service web --skip-deploys"
-railway variable set NODE_ENV=production PUBLIC_BETA_STRICT=on PUBLIC_AGGREGATE_RELEASES=off PORT=3000 RAILPACK_NODE_VERSION=24 $S
-railway variable set 'DATABASE_URL=postgresql://mira:${{postgis.POSTGRES_PASSWORD}}@${{postgis.RAILWAY_PRIVATE_DOMAIN}}:5432/mira' $S
-printf 'https://<your domain>' | railway variable set APP_BASE_URL --stdin $S
-openssl rand -base64 32 | railway variable set SESSION_SECRET --stdin $S
-openssl rand -base64 32 | railway variable set DATA_ENCRYPTION_KEY --stdin $S
-railway variable set ADMIN_PASSWORD_HASH --stdin $S           # paste the b64:… value, then Ctrl-D
-railway variable set PILOT_MANIFEST_PATH=data/pilot/manifest.json $S
-railway variable set 'MAP_TILE_URL=https://tile.openstreetmap.org/{z}/{x}/{y}.png' $S
-railway variable set MAP_STYLE_URL=https://tiles.openfreemap.org/styles/positron $S
-railway variable set CLIENT_IP_HEADER=x-real-ip TRUSTED_PROXY_HOPS=1 $S
+S=(--service web --environment production --skip-deploys)
+railway variable set NODE_ENV=production PUBLIC_BETA_STRICT=on PUBLIC_AGGREGATE_RELEASES=off PORT=3000 RAILPACK_NODE_VERSION=24 "${S[@]}"
+railway variable set 'DATABASE_URL=postgresql://mira:${{postgis.POSTGRES_PASSWORD}}@${{postgis.RAILWAY_PRIVATE_DOMAIN}}:5432/mira' "${S[@]}"
+printf 'https://<your domain>' | railway variable set APP_BASE_URL --stdin "${S[@]}"
+openssl rand -base64 32 | railway variable set SESSION_SECRET --stdin "${S[@]}"
+openssl rand -base64 32 | railway variable set DATA_ENCRYPTION_KEY --stdin "${S[@]}"
+railway variable set ADMIN_PASSWORD_HASH --stdin "${S[@]}"           # paste the b64:… value, then Ctrl-D
+railway variable set PILOT_MANIFEST_PATH=data/pilot/manifest.json "${S[@]}"
+railway variable set 'MAP_TILE_URL=https://tile.openstreetmap.org/{z}/{x}/{y}.png' "${S[@]}"
+railway variable set MAP_STYLE_URL=https://tiles.openfreemap.org/styles/positron "${S[@]}"
+railway variable set CLIENT_IP_HEADER=x-real-ip TRUSTED_PROXY_HOPS=1 "${S[@]}"
 # Explicit ceilings; confirm the intended limits with the owner before setting them.
-railway variable set GOOGLE_MAX_CALLS_PER_MIN=300 GOOGLE_MAX_CALLS_PER_DAY=10000 MIRA_GLOBAL_DAILY_MAX=1500 $S
+railway variable set GOOGLE_MAX_CALLS_PER_MIN=300 GOOGLE_MAX_CALLS_PER_DAY=10000 MIRA_GLOBAL_DAILY_MAX=1500 "${S[@]}"
 # OpenStreetMap: Overpass is the "mapped as lit" lighting source (required); Photon/Nominatim are fallbacks.
-railway variable set OVERPASS_URL=https://overpass-api.de/api/interpreter PLACE_SEARCH_URL=https://photon.komoot.io REVERSE_GEOCODER_URL=https://nominatim.openstreetmap.org $S
+railway variable set OVERPASS_URL=https://overpass-api.de/api/interpreter PLACE_SEARCH_URL=https://photon.komoot.io REVERSE_GEOCODER_URL=https://nominatim.openstreetmap.org "${S[@]}"
 # Email (Resend; optional; set both variables only when enabling email; see step 6).
-railway variable set RESEND_API_KEY --stdin $S
-railway variable set 'EMAIL_FROM=MIRA <alerts@your-domain>' $S
+railway variable set RESEND_API_KEY --stdin "${S[@]}"
+railway variable set 'EMAIL_FROM=MIRA <alerts@your-domain>' "${S[@]}"
 # Live providers required for this public beta
-railway variable set GOOGLE_MAPS_SERVER_KEY --stdin $S
-railway variable set GOOGLE_MAPS_BROWSER_KEY --stdin $S
-railway variable set GOOGLE_PLACES_HOURS=on $S
-railway variable set MAPILLARY_TOKEN --stdin $S
-railway variable set AUTH_GOOGLE_ID --stdin $S
-railway variable set AUTH_GOOGLE_SECRET --stdin $S
-railway variable set VAPID_PUBLIC_KEY --stdin $S
-railway variable set VAPID_PRIVATE_KEY --stdin $S
-railway variable set VAPID_SUBJECT --stdin $S
-railway variable set ANTHROPIC_API_KEY --stdin $S
+railway variable set GOOGLE_MAPS_SERVER_KEY --stdin "${S[@]}"
+railway variable set GOOGLE_MAPS_BROWSER_KEY --stdin "${S[@]}"
+railway variable set GOOGLE_PLACES_HOURS=on "${S[@]}"
+railway variable set MAPILLARY_TOKEN --stdin "${S[@]}"
+railway variable set AUTH_GOOGLE_ID --stdin "${S[@]}"
+railway variable set AUTH_GOOGLE_SECRET --stdin "${S[@]}"
+railway variable set VAPID_PUBLIC_KEY --stdin "${S[@]}"
+railway variable set VAPID_PRIVATE_KEY --stdin "${S[@]}"
+railway variable set VAPID_SUBJECT --stdin "${S[@]}"
+railway variable set ANTHROPIC_API_KEY --stdin "${S[@]}"
 
-W="--service worker --skip-deploys"
-railway variable set NODE_ENV=production RAILPACK_NODE_VERSION=24 $W
+W=(--service worker --environment production --skip-deploys)
+railway variable set NODE_ENV=production RAILPACK_NODE_VERSION=24 "${W[@]}"
 # The worker also needs the map lookups: its contributions job finds Help Points along finished walks (MIRA Checks).
 for k in DATABASE_URL APP_BASE_URL SESSION_SECRET DATA_ENCRYPTION_KEY ADMIN_PASSWORD_HASH PILOT_MANIFEST_PATH MAP_TILE_URL PUBLIC_AGGREGATE_RELEASES VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT GOOGLE_MAPS_SERVER_KEY GOOGLE_PLACES_HOURS GOOGLE_MAX_CALLS_PER_MIN OVERPASS_URL; do
-  railway variable set "$k=\${{web.$k}}" $W
+  railway variable set "$k=\${{web.$k}}" "${W[@]}"
 done
 # Only when email is configured on web:
-railway variable set 'RESEND_API_KEY=${{web.RESEND_API_KEY}}' 'EMAIL_FROM=${{web.EMAIL_FROM}}' $W
+railway variable set 'RESEND_API_KEY=${{web.RESEND_API_KEY}}' 'EMAIL_FROM=${{web.EMAIL_FROM}}' "${W[@]}"
 ```
 
 | Variable | Service | Required | Notes |
@@ -179,14 +203,16 @@ Set all of these **before the first deploy** (`--skip-deploys` above), because `
 
 ## 4. Deploy
 
+First complete the current [deployment readiness record](deploy/READINESS_2026-10-06.md). Build success alone does not clear CI, security, backup, provider or physical-phone gates.
+
 No GitHub remote is required: `railway up` uploads this directory (respecting `.gitignore`, so `.env*`, `node_modules`, `.next` and `dist` are never uploaded).
 
 ```bash
-railway up --service web --detach -m "MIRA beta"
-railway up --service worker --detach -m "MIRA beta"
-railway deployment list --service web --json     # wait for SUCCESS
-railway logs --service web --lines 100
-railway logs --service worker --lines 100        # expect {"event":"worker.started"}
+railway up --service web --environment production --detach -m "MIRA beta"
+railway up --service worker --environment production --detach -m "MIRA beta"
+railway deployment list --service web --environment production --json     # wait for SUCCESS
+railway logs --service web --environment production --lines 100
+railway logs --service worker --environment production --lines 100        # expect {"event":"worker.started"}
 ```
 
 What happens on `web`: Railpack installs dependencies (devDependencies included), `postinstall`/`prebuild` copy the MapLibre worker into `public/maplibre/`, `npm run build` runs `next build` and bundles `dist/worker.mjs`, `dist/migrate.mjs` and `dist/pilot-import.mjs`. Then the pre-deploy step runs `node dist/migrate.mjs` in a separate container on the private network. It waits up to ~90 s for the database, applies `db/migrations` (0000 runs `CREATE EXTENSION postgis, pg_trgm, pgcrypto`), and **a failure stops the deploy** with the old version still serving. Then Railway waits for `/api/health/live` → 200.
@@ -196,7 +222,7 @@ The runtime image contains the whole repo, including `data/` (locale profiles, r
 **Optional: pilot map data.** It's the OpenStreetMap placeholder for the original pilot area, used when Google is off or over budget. Import it once (it replaces itself idempotently):
 
 ```bash
-railway ssh --service web -- node dist/pilot-import.mjs
+railway ssh --service web --environment production -- node dist/pilot-import.mjs
 ```
 
 ## 5. Verify (smoke test)
@@ -247,7 +273,7 @@ How MIRA uses it (`src/server/mail/resend.ts`): `POST https://api.resend.com/ema
 
 ## 9. Backups, rollback, secrets
 
-- **Backups**: *postgis → Backups*: volume backups and point-in-time recovery require Pro (dashboard verified 2026-10-04). Confirm plan cost with the owner before upgrading. Take and verify a staging backup before migrating; enable daily production backups, retention ≤ 30 days (privacy policy). A local database dump is a different recovery mechanism and requires an explicit owner decision if used instead of the requested volume backup. After any restore, let the worker run a pass **before** serving traffic, so expired journeys and reports are purged again.
+- **Backups**: *postgis → Backups*: volume backups and point-in-time recovery require Pro (dashboard verified 2026-10-04). Confirm plan cost with the owner before upgrading. Take and verify a staging backup before migrating; enable daily production backups, retention ≤ 30 days (privacy policy). Railway currently retains Daily backups for 6 days and Weekly for 27 days; Monthly retains 89 days, so leave Monthly disabled ([backup schedules](https://docs.railway.com/volumes/backups)). Confirm the schedule and actual recovery evidence before release. A local database dump is a different recovery mechanism and requires an explicit owner decision if used instead of the requested volume backup. After any restore, let the worker run a pass **before** serving traffic, so expired journeys and reports are purged again.
 - **Rollback**: dashboard → *web → Deployments → previous → Rollback* (and the same for worker). Migrations are forward-only: rolling code back across a migration is safe only if the old code tolerates the new schema (additive migrations do). There is no down-migration. Restore the volume backup if a migration must be undone.
 - **Rotate** a secret by setting it again (it redeploys). Never rotate `DATA_ENCRYPTION_KEY` in place: existing ciphertext would become unreadable.
 - Keep `web` at **1 replica** for the beta: the Google call budget is per process, and more replicas would also need `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` and a `deploymentId` (see `node_modules/next/dist/docs/01-app/02-guides/self-hosting.md`).

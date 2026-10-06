@@ -4,6 +4,8 @@
 
 **2026-10-03 local vNext update:** Go/Journeys/You, signed-in and guest ephemeral movement Ask, explicit encrypted saved plans, the habit opt-in transition, private guest timer, manual loop check-in and return-leg review are in the local code. [Scenario evidence and limits](mira-vnext/20_ACCEPTANCE_TESTS.md) distinguish implementation from full acceptance. The local development database has migrations `0020–0022`; staging/production have not been migrated. Phase 6 plan-linked community/news claims remain disabled. The user skipped physical-phone checks for the earlier build session, so no phone gate passed. Independent accessibility, privacy/security, live-provider and worker-outage evidence is still missing. External-user recruitment is not a build or launch gate. This verdict is unchanged.
 
+**2026-10-06 deployment preparation:** exact `a2c853e` passes install, lint, typecheck, 873 unit tests, production/worker build and client-bundle secret audit. Existing staging is healthy; production remains empty. CI never started because GitHub reports an account billing lock; the fresh dependency audit has 11 findings, including `sharp` and `source-map-js`. Worker restart reliability, production backup/recovery, restricted provider keys, moderator readiness and physical phones remain open. The [dated readiness record](deploy/READINESS_2026-10-06.md) gives evidence and owner actions. No deployment was performed during this preparation. The verdict remains NOT READY.
+
 ## Release contract
 
 - Keep the web, worker and private PostGIS services together on Railway. Use one tested Git revision for staging and production; do not upload an uncommitted or dirty tree. Set `PUBLIC_BETA_STRICT=on` on web and `PUBLIC_AGGREGATE_RELEASES=off` on web and worker.
