@@ -135,7 +135,7 @@ Pre-deploy runs `node dist/migrate.mjs` (forward-only, additive; `0000` creates 
 ## 10. Health
 
 ```bash
-BASE=https://<your domain>
+BASE='https://<your domain>'
 curl -si $BASE/api/health/live | head -1        # HTTP/2 200
 curl -s  $BASE/api/health/ready                 # {"status":"ready"} within ~1 min (needs a worker pass)
 curl -sI $BASE/ | grep -iE 'strict-transport|content-security'

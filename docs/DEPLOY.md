@@ -228,7 +228,7 @@ railway ssh --service web --environment production -- node dist/pilot-import.mjs
 ## 5. Verify (smoke test)
 
 ```bash
-BASE=https://<your domain>
+BASE='https://<your domain>'
 curl -si $BASE/api/health/live | head -1                       # 200
 curl -s  $BASE/api/health/ready                                 # {"status":"ready"} once the worker has done a pass (≤ 1 min)
 curl -sI $BASE/ | grep -i -E 'strict-transport|content-security'  # HSTS + CSP present
