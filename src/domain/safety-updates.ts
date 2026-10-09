@@ -761,3 +761,22 @@ export function summaryLine(d: SafetyUpdatesData): string {
   const n = d.updates.length;
   return n ? `${n} recent women-safety update${n === 1 ? "" : "s"} from the past ${d.windowDays} days` : EMPTY_LINE;
 }
+
+/**
+ * Whether a local update may enter a companion summary on its own (sprint mira-companion-48h 03 §C). ALL
+ * must hold: permitted source metadata (publisher and source URL); a location that explicitly matches
+ * the selected scope (a city-level story is never "on this route" or "at this place"); present relevance
+ * established by the source itself — not by how recently it was indexed; and a concrete, sourced
+ * implication for this request. A SafetyUpdate has no source-supplied current-action or expiry field and
+ * `summary` is null in the beta, so the last two cannot be established from current data: the result is
+ * always ineligible today, with the first failing reason. Nothing here asks a model to fill the gap.
+ * The labelled source browser (Around → Local updates) still lists these items as published.
+ */
+export type CompanionNewsVerdict = { eligible: false; reason: "source_metadata" | "scope_mismatch" | "no_present_relevance" | "no_sourced_implication" } | { eligible: true };
+export function companionNewsEligibility(u: Pick<SafetyUpdate, "publisher" | "originalUrl" | "locationPrecision" | "summary">, scope: "place" | "route" | "area"): CompanionNewsVerdict {
+  if (!u.publisher.trim() || !/^https?:\/\//.test(u.originalUrl)) return { eligible: false, reason: "source_metadata" };
+  const matches = scope === "area" ? u.locationPrecision === "exact" || u.locationPrecision === "neighbourhood" : u.locationPrecision === "exact";
+  if (!matches) return { eligible: false, reason: "scope_mismatch" };
+  // No field in SafetyUpdate establishes that the matter is current and actionable now (publishedAt is index time).
+  return { eligible: false, reason: "no_present_relevance" };
+}

@@ -285,6 +285,7 @@ function emergencyInfo(c: CountryContext) {
 export function rewriteRequest(issue: CompanionOutputIssue, draft: string): string {
   const what = {
     safety_verdict: "It calls a place, route, area, time or option safe, safer, unsafe, dangerous or risky (in some language, Hinglish included). Never use those words about anything, not even to deny them; if you need to, say once that you can't judge that.",
+    unsupported_assurance: "It asserts something MIRA can't establish: that a place, route or time is safe, fine or dangerous, that one way is the safest, that there are no incidents, that help is available or on its way, or that she is safe. Say what was checked and what isn't known instead.",
     invented_action: "It says MIRA did something (sent, shared, alerted, started, saved) that hasn't happened. Say instead what she can tap to do it.",
     unsupported_promise: "It promises an outcome, or that someone will be told. Drop the promise.",
     unsupported_emergency_number: "It gives an emergency number that isn't in MIRA's reviewed information. Drop that number and point to the Emergency button instead.",
@@ -298,7 +299,7 @@ export function rewriteRequest(issue: CompanionOutputIssue, draft: string): stri
  */
 export function replacementLine(issue: CompanionOutputIssue, country: CountryContext, danger: boolean): string {
   if (danger) return `If you may be in danger, ${emergencySentence(country)}. The Emergency card is on your screen.`;
-  if (issue === "safety_verdict") return "I don't have enough verified information to make that judgement. The cards here show what MIRA can check.";
+  if (issue === "safety_verdict" || issue === "unsupported_assurance") return "I don't have enough verified information to make that judgement. The cards here show what MIRA can check.";
   return "I can't verify that from MIRA's information. Please use the cards shown here for actions and checked details.";
 }
 
