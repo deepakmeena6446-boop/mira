@@ -14,6 +14,7 @@ import { clockIn, daylightOutlook } from "@/domain/daylight";
 import { lightingEvidenceLine, sourceList } from "@/components/app/LightingSummary";
 import { CATEGORY_LABEL, ageLabel, type SafetyUpdatesData } from "@/domain/safety-updates";
 import type { EvidenceKind } from "@/components/mira/Evidence";
+import { briefLimitation, listWords, routeTimeLimitation, selectBrief, type BriefCandidate, type BriefItem } from "@/domain/companion-brief";
 
 export type Claim = { id: string; kind: EvidenceKind; topic: string; claim: string; source?: string; icon?: string };
 
@@ -74,7 +75,7 @@ export function walkTimeClaim(o: WayOption | null, mode: "walk" | "ride" | "tran
   if (!o) return { id: "time", kind: "pending", topic, icon: "clock", claim: "Finding the way…" };
   const arrive = arriveAt ? ` · arrive about ${clockIn(arriveAt, timeZone)}` : "";
   const provider = o.route.provider === "google" ? "Google route" : o.route.provider === "osm" ? "OpenStreetMap route" : o.route.provider === "estimate" ? "Straight-line estimate" : "Mapped route";
-  return { id: "time", kind: "estimate", topic, icon: "clock", claim: `About ${Math.round(o.route.minutes)} min · ${(o.route.meters / 1000).toFixed(1)} km${arrive}`, source: o.route.approximate ? "Straight-line estimate — not a street route" : mode === "walk" ? `${provider} at an average walking pace` : `${provider} · no live traffic` };
+  return { id: "time", kind: "estimate", topic, icon: "clock", claim: `About ${Math.round(o.route.minutes)} min · ${(o.route.meters / 1000).toFixed(1)} km${arrive}`, source: o.route.approximate ? "Straight-line estimate — not a street route" : mode === "walk" ? `${provider} at an average walking pace` : mode === "transit" ? `${provider} · not checked against timetables for your time` : `${provider} · no live traffic` };
 }
 
 /**
@@ -95,9 +96,10 @@ export function updatesClaim(answer: { evidence: EvidenceState<SafetyUpdatesData
   if (answer === "failed" || answer.evidence.state === "failed") return { id: "updates", kind: "failed", topic: "Local updates", icon: "info", claim: "Mira couldn’t check recent local reports just now." };
   if (!("data" in answer.evidence)) return { id: "updates", kind: "none", topic: "Local updates", icon: "info", claim: "Local news isn’t available for this area." };
   const d = answer.evidence.data;
-  if (!d.updates.length) return { id: "updates", kind: "nodata", topic: "Local updates", icon: "info", claim: `No recent women-safety reports found ${where} in the past ${d.windowDays} days.`, source: answer.evidence.state === "partial" ? "Some sources couldn’t be checked" : "Official sources and news, as published" };
+  if (!d.updates.length) return { id: "updates", kind: "nodata", topic: "Local updates", icon: "info", claim: `Mira’s news sources returned nothing indexed for this area in the past ${d.windowDays} days. That isn’t a sign of what happens there.`, source: answer.evidence.state === "partial" ? "Some sources couldn’t be checked" : "Official sources and news, as published" };
   const latest = d.updates[0];
-  return { id: "updates", kind: "checked", topic: "Local updates", icon: "info", claim: `${plural(d.updates.length, "report")} ${where} in the past ${d.windowDays} days · latest: ${CATEGORY_LABEL[latest.category] ?? "report"}, ${ageLabel(latest.publishedAt).toLowerCase()}`, source: `${latest.publisher} and others, as published` };
+  // publishedAt is when the index first saw the story, not when it happened; the area is as the story reports it.
+  return { id: "updates", kind: "checked", topic: "Local updates", icon: "info", claim: `${plural(d.updates.length, "report")} indexed for this area in the past ${d.windowDays} days · latest: ${CATEGORY_LABEL[latest.category] ?? "report"}, first indexed ${ageLabel(latest.publishedAt).toLowerCase()}`, source: `${latest.publisher} and others, as published · location as reported, not checked against this ${where === "near there" ? "place" : "spot"}` };
 }
 
 /**
@@ -124,4 +126,52 @@ export function hoursWords(h: HoursState, { listed = true }: { listed?: boolean 
     case "listed": return "hours unclear";
     default: return "hours not known";
   }
+}
+
+/**
+ * The short answer for a brief (sprint 03 §B): the screen's claims ranked into at most three items, plus
+ * one limitation line. Local news never enters the short answer (03 §C: nothing in the current data
+ * establishes present, route-specific relevance); it stays in the detail. Unknowns stay in the detail
+ * too, except a missing route — the next action depends on it. Pending checks are left out until done.
+ */
+export function planBrief(claims: Claim[], ctx: { mode: "walk" | "ride" | "transit"; loop: boolean; arriveClock?: string | null; departClock?: string | null; constraints?: string; compare?: string | null; notesPending?: boolean }): { items: BriefItem[]; limitation: string | null } {
+  const candidates: BriefCandidate[] = [];
+  const failed: string[] = [];
+  let community: "some" | "none" | "failed" | "pending" = ctx.notesPending ? "pending" : "none";
+  const constraint = (ctx.constraints ?? "").split(",").map((c) => c.trim()).filter(Boolean).slice(0, 3);
+  if (constraint.length) candidates.push({ id: "asked", tier: "asked", kind: "unknown", text: `You asked about ${listWords(constraint.map((c) => `“${c}”`))}. Mira has no source for that here, so this plan doesn’t account for it.`, scopeLabel: "your request" });
+  const dark = claims.some((c) => (c.id === "daylight" || c.id === "daylight-end") && /^(Dark|Twilight)|dark from|twilight from/.test(c.claim));
+  for (const c of claims) {
+    if (c.kind === "pending") { if (c.id === "notes") community = "pending"; continue; }
+    switch (c.id) {
+      case "route":
+      case "time":
+        candidates.push({ id: c.id, tier: "action", kind: c.kind === "failed" ? "failed" : c.kind === "estimate" ? "estimate" : "unknown", text: c.claim, sourceLabel: c.source, scopeLabel: ctx.loop ? "your loop" : "this way", limitation: c.kind === "estimate" ? routeTimeLimitation(ctx.mode, ctx.departClock ?? null) ?? undefined : undefined });
+        break;
+      case "daylight":
+      case "daylight-end":
+        if (c.kind === "checked") candidates.push({ id: c.id, tier: ctx.loop || dark ? "timely" : "secondary", kind: "calculation", text: c.claim, sourceLabel: "Solar calculation, not weather or visibility", scopeLabel: "at that time" });
+        break;
+      case "notes":
+        if (c.kind === "failed") community = "failed";
+        else if (c.kind === "people") { community = "some"; candidates.push({ id: c.id, tier: "timely", kind: "community", text: c.claim, sourceLabel: c.source, scopeLabel: "nearby" }); }
+        break;
+      case "lighting":
+        if (c.kind === "failed") failed.push("street lighting");
+        else if (c.kind === "checked" || c.kind === "people") candidates.push({ id: c.id, tier: dark && ctx.mode === "walk" ? "timely" : "secondary", kind: c.kind === "people" ? "community" : "listed", text: c.claim, sourceLabel: c.source, scopeLabel: "this way", limitation: "Mapped lighting, not whether the lamps work tonight." });
+        break;
+      case "help":
+        if (c.kind === "failed") failed.push("Help Points");
+        else if (c.kind === "checked") candidates.push({ id: c.id, tier: "secondary", kind: "listed", text: c.claim, sourceLabel: c.source, scopeLabel: "nearby", limitation: "A listing isn’t a promise that someone will help; staffing isn’t verified." });
+        break;
+      case "country":
+        candidates.push({ id: c.id, tier: "timely", kind: c.kind === "checked" ? "listed" : "unknown", text: `${c.topic}: ${c.claim}`, sourceLabel: c.source, scopeLabel: "where you arrive" });
+        break;
+      default:
+        break; // local updates and "what Mira can't see" live in the detail
+    }
+  }
+  if (ctx.compare) candidates.push({ id: "compare", tier: "secondary", kind: "estimate", text: ctx.compare, sourceLabel: "Mapped lighting and listed Help Points on each way", scopeLabel: "ways to compare" });
+  const { items } = selectBrief(candidates);
+  return { items, limitation: briefLimitation({ failed, community }) };
 }

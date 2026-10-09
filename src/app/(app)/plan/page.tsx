@@ -4,6 +4,7 @@ import { countryRegistry } from "@/server/locale";
 import { getSql } from "@/server/db/client";
 import { getUser } from "@/server/session/user";
 import { listPlaces } from "@/server/account/places";
+import { getPrefs } from "@/server/account/habits";
 import { tileConfig } from "@/server/providers/geo/tiles";
 import { PlanScreen } from "./PlanScreen";
 import { PlanDecision, type Situation } from "./PlanDecision";
@@ -22,7 +23,8 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
   const sql = getSql();
   const [params, user] = await Promise.all([searchParams, getUser(sql)]);
   if (params.planStep) return <PlanScreen emailAlerts={smtpConfigured()} signedIn={Boolean(user)} countries={countryRegistry().map(({ iso2, name }) => ({ iso: iso2, name }))} />;
-  const [places, tiles] = await Promise.all([user ? listPlaces(sql, user.id) : Promise.resolve([]), tileConfig()]);
+  const [places, tiles, prefs] = await Promise.all([user ? listPlaces(sql, user.id) : Promise.resolve([]), tileConfig(), user ? getPrefs(sql, user.id).catch(() => null) : Promise.resolve(null)]);
   const initialFor = SITUATIONS.includes(params.for as Situation) ? (params.for as Situation) : null;
-  return <PlanDecision signedIn={Boolean(user)} emailAlerts={smtpConfigured()} places={places} tiles={tiles} initialFor={initialFor} />;
+  // Her explicit settings only: a remembered travel mode is a default for a new plan; excluded Help Point kinds stay out.
+  return <PlanDecision signedIn={Boolean(user)} emailAlerts={smtpConfigured()} places={places} tiles={tiles} initialFor={initialFor} preferredMode={prefs?.prefs.mode ?? null} helpExclude={user?.helpExclude ?? []} />;
 }

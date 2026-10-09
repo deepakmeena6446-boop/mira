@@ -45,7 +45,7 @@ function resumable(draft: PlanDraft | null): PlanDraft | null {
  * her before her own job; one row brings back an open journey or a plan. What's around her appears only
  * after she has chosen to let Mira use her location.
  */
-export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serverJourneyTo }: { user: { name: string; avatarUrl: string | null } | null; places: SavedPlace[]; savedPlan: SavedPlan | null; emailAlerts: boolean; journeyTo: string | null }) {
+export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serverJourneyTo, helpExclude = [] }: { user: { name: string; avatarUrl: string | null } | null; places: SavedPlace[]; savedPlan: SavedPlan | null; emailAlerts: boolean; journeyTo: string | null; helpExclude?: string[] }) {
   // The server's answer can be stale after client navigation: the shared store keeps it current.
   const live = useCurrentTrip(serverJourneyTo === null ? null : { state: "active", destination: serverJourneyTo || null, etaAt: "", following: [] });
   const journeyTo = live ? (live.destination ?? "") : null;
@@ -81,7 +81,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
     if (!areaKey || !point) return;
     let live = true;
     void api<{ helpPoints: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> }>("/api/geo/help", { body: { lat: point.lat, lon: point.lon, ...(country.iso ? { country: country.iso } : {}) } }).then((r) => {
-      if (live) setNear({ key: areaKey, points: r.ok ? r.data.helpPoints : [], failed: !r.ok || r.data.evidence.state === "failed" });
+      if (live) setNear({ key: areaKey, points: r.ok ? r.data.helpPoints.filter((p) => !helpExclude.includes(p.cls)) : [], failed: !r.ok || r.data.evidence.state === "failed" });
     });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

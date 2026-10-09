@@ -195,3 +195,13 @@ export function resolvePlanOptions(input: { graph: RouteGraph | null; routes: Pl
   const timeAlternatives = daylight.status === "known" && daylight.value === "dark" && later ? [{ ...later, timeZone, daylight: "daylight" as const, ...(intent?.timeKind === "arrive_by" ? { note: "This is a later departure. It requires changing your requested arrival time." } : {}) }] : [];
   return { ...base, state: "ready", options, daylight, timeAlternatives, constraints: planRequirements(intent?.constraints ?? [], options, input.lighting), detail: intent?.loop ? `${options.length} mapped loop/out-and-back option${options.length === 1 ? "" : "s"} near your requested distance. Time uses the assumed pace; access from the starting place to the graph is not verified.` : options.length > 1 ? "Compare distance and time; neither path is a safety recommendation." : "One mapped walking path is available; no distinct alternate met the route criteria." };
 }
+
+/**
+ * A plan's departure when Mira moves it to the place's own time zone. "Now" stays the same instant
+ * (a departure within five minutes of the present is converted); a time she chose for later keeps its
+ * clock digits, because 10 PM there means 10 PM there (audit P05-001).
+ */
+export function departureForZone(local: string, fromZone: string, toZone: string, now: Date = new Date()): string {
+  const at = instantForLocal(local, fromZone, now);
+  return at && Math.abs(at.getTime() - now.getTime()) <= 5 * 60_000 ? localTimeForInstant(at, toZone) : local;
+}

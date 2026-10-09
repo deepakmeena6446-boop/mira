@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 import { ActionBar, MiraVoice, QuestionRow, StateNote } from "@/components/mira/Frame";
-import { EvidenceChip, EvidenceLedger, type EvidenceItem } from "@/components/mira/Evidence";
+import { BriefSummary, EvidenceChip, EvidenceLedger, type EvidenceItem } from "@/components/mira/Evidence";
 import { Row, RowAction, RowList } from "@/components/mira/Rows";
 import { BriefMap } from "@/components/mira/BriefMap";
-import { SkyCard, skyAt, type LiveStat } from "@/components/mira/LiveNow";
+import { SkyCard, skyAt } from "@/components/mira/LiveNow";
 import { SafetyAccess } from "@/components/app/SafetyAccess";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { TimeZoneChoices } from "@/components/app/TimeZoneChoices";
@@ -17,11 +17,11 @@ import { api } from "@/lib/api-client";
 import { handOffAsk } from "@/lib/ask-handoff";
 import { clearPlanDraft, ensurePlanDraft, setPlanDraft, usePlanDraft, usePlanHydrated } from "@/lib/plan-store";
 import { currentLocation, usableLocationPoint, useClock, useLocation } from "@/lib/location-store";
-import { blindSpotsClaim, daylightClaim, helpClaim, lightingClaim, notesClaim, updatesClaim, walkTimeClaim, type Claim, type CommunityNote, type WayOption } from "@/lib/brief";
-import { decisionTake } from "@/lib/decision-take";
-import { HELP_CLASSES, hoursState, type HelpPoint } from "@/domain/help-points";
+import { blindSpotsClaim, daylightClaim, helpClaim, lightingClaim, notesClaim, planBrief, updatesClaim, walkTimeClaim, type Claim, type CommunityNote, type WayOption } from "@/lib/brief";
+import { compareWays } from "@/lib/decision-take";
+import { HELP_CLASSES, type HelpPoint } from "@/domain/help-points";
 import { localTimeInZone } from "@/domain/opening-hours";
-import { clockChangeAt, daylightAt, instantForLocal, laterDaylight, localTimeForInstant, type PlanOptionsResult } from "@/domain/plan-options";
+import { clockChangeAt, daylightAt, departureForZone, instantForLocal, laterDaylight, localTimeForInstant, type PlanOptionsResult } from "@/domain/plan-options";
 import { activatePlanLeg, intentFromDraft, newPlanDraft, returnLegFromMain, type PlanDraft, type PlanLegDraft } from "@/domain/plan-state";
 import { emergencyActions, statusWords, type CountryContext } from "@/domain/country-context";
 import type { EvidenceState } from "@/domain/evidence-state";
@@ -29,9 +29,10 @@ import type { SafetyUpdatesData } from "@/domain/safety-updates";
 import type { RouteLighting } from "@/domain/lighting";
 import type { SavedPlace } from "@/server/account/places";
 import type { TileConfig } from "@/server/providers/geo/tiles";
-import { PlaceSheet, WhenSheet, whenWords, type PickedPlace } from "./PlanSheets";
+import { PlaceSheet, WhenSheet, queryFor, whenWords, type PickedPlace } from "./PlanSheets";
 import { loopWord, placeName, planTitle } from "@/domain/plan-name";
 import { GoSheet, type GoTarget } from "./GoSheet";
+import { saveEligibility, TAB_PLAN_NOTE } from "@/domain/plan-save";
 import { clockIn } from "@/domain/daylight";
 
 export type Situation = "go" | "run" | "travel";
@@ -58,15 +59,18 @@ function situationOf(draft: PlanDraft): Situation {
   return draft.loop ? "run" : draft.mode !== "walk" && /arriv|land|flight|hotel|stay/i.test(draft.activity) ? "travel" : "go";
 }
 
-/** Situation preset, applied once to an untouched draft (never over her own entries). */
-function preset(input: PlanDraft, s: Situation, here: { lat: number; lon: number } | null): PlanDraft {
+/**
+ * Situation preset, applied once to an untouched draft (never over her own entries). `preferred`: the travel mode
+ * she set in You, used as the default for a new outing — an explicit request or her own choice in this plan wins.
+ */
+function preset(input: PlanDraft, s: Situation, here: { lat: number; lon: number } | null, preferred: Mode | null = null): PlanDraft {
   // A preset applies only to an untouched or new draft, so "now" must be now — not when the blank draft was made.
   const zone = input.timeZone && validZone(input.timeZone) ? input.timeZone : deviceZone();
   const draft = { ...input, timeZone: zone, departureLocal: localTimeForInstant(new Date(), zone), timeKind: "depart_at" as const };
   const origin = here && draft.origin.kind === "named" && !draft.origin.query ? { kind: "device" as const, use: "from_here" as const, point: here } : draft.origin;
   if (s === "run") return { ...draft, touched: true, activity: draft.activity || "Run", loop: true, mode: "walk", loopTarget: draft.loopTarget ?? { kind: "duration", value: 30 }, paceMinutesPerKm: draft.paceMinutesPerKm ?? 6, origin };
   if (s === "travel") return { ...draft, touched: true, activity: draft.activity || "Arrive and get to where I’m staying", loop: false, mode: "ride", loopTarget: undefined };
-  return { ...draft, touched: true, activity: draft.activity || "Go somewhere", loop: false, loopTarget: undefined, origin };
+  return { ...draft, touched: true, activity: draft.activity || "Go somewhere", loop: false, loopTarget: undefined, origin, ...(preferred ? { mode: preferred } : {}) };
 }
 
 /**
@@ -74,7 +78,8 @@ function preset(input: PlanDraft, s: Situation, here: { lat: number; lon: number
  * that time → Go with Mira. Evidence comes from the existing route, help, notes, updates and reverse
  * APIs; nothing is scored and every gap is said.
  */
-export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor }: { signedIn: boolean; emailAlerts: boolean; places: SavedPlace[]; tiles: TileConfig; initialFor: Situation | null }) {
+export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor, preferredMode = null, helpExclude = [] }: { signedIn: boolean; emailAlerts: boolean; places: SavedPlace[]; tiles: TileConfig; initialFor: Situation | null; preferredMode?: Mode | null; helpExclude?: string[] }) {
+  const allowed = (points: HelpPoint[]) => (helpExclude.length ? points.filter((p) => !helpExclude.includes(p.cls)) : points);
   const router = useRouter();
   const draft = usePlanDraft();
   const hydrated = usePlanHydrated();
@@ -89,6 +94,8 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   const [selected, setSelected] = useState(0);
   const [editing, setEditing] = useState(false);
   const [saveState, setSaveState] = useState<{ busy: boolean; text: string | null }>({ busy: false, text: null });
+  // The map is secondary: behind "View map", after the answer.
+  const [showMap, setShowMap] = useState(false);
   const osmOnly = tiles.provider !== "google";
 
   useEffect(ensurePlanDraft, [draft]);
@@ -97,9 +104,9 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
     if (!hydrated || !draft) return;
     const at = here ? { lat: here.lat, lon: here.lon } : null;
     const current = situationOf(draft);
-    if (!draft.touched) setPlanDraft(preset(draft, initialFor ?? "go", at));
+    if (!draft.touched) setPlanDraft(preset(draft, initialFor ?? "go", at, preferredMode));
     // A different situation chosen on Home is a new intention: start it fresh rather than mixing it into the tab's plan.
-    else if (initialFor && current !== initialFor) setPlanDraft(preset(newPlanDraft(new Date(), deviceZone()), initialFor, at));
+    else if (initialFor && current !== initialFor) setPlanDraft(preset(newPlanDraft(new Date(), deviceZone()), initialFor, at, preferredMode));
     // eslint-disable-next-line react-hooks/set-state-in-effect -- derive the situation from a handed-over draft once
     else if (!initialFor) setSituation(current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -191,7 +198,10 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   useEffect(() => {
     // A zone Mira filled in from an earlier place is not her choice: a new place replaces it (re-audit RA5: Lisbon stayed on Kolkata time).
     if (!draft || !countryZone || !validZone(countryZone) || sameClock(draft.timeZone || deviceZone(), countryZone) || (draft.timeZone && draft.timeZone !== deviceZone() && !draft.timeZoneAuto)) return;
-    setPlanDraft({ ...draft, timeZone: countryZone, timeZoneAuto: true });
+    // "Now" stays now: a departure within minutes of the present is the same instant in the place's zone,
+    // not the same clock digits (a phone on UTC planning "now" in Delhi was moved 5½ hours). A time she
+    // chose for later keeps its digits — 10 PM there means 10 PM there (audit P05-001).
+    setPlanDraft({ ...draft, timeZone: countryZone, timeZoneAuto: true, departureLocal: departureForZone(draft.departureLocal, draft.timeZone || deviceZone(), countryZone) });
   }, [countryZone, draft]);
   // Zone not known, but the place is far east or west of the phone's clock: say so rather than plan on the phone's time.
   const zoneUnsure = Boolean(focus && aroundNow && aroundNow.zone === null && !countryZone && Math.abs(focus.lon / 15 - -new Date().getTimezoneOffset() / 60) > 2.5);
@@ -200,7 +210,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   const loopReady = loopPlan?.key === loopKey && loopPlan.data?.state === "ready" ? loopPlan.data : null;
   const wayList: WayOption[] = loop
     ? (loopReady?.options ?? []).map((o) => ({ route: { meters: o.meters, minutes: o.minutes, geometry: o.geometry, approximate: false, provider: "osm" }, lighting: null, helpPoints: [] }))
-    : currentWays?.ways ?? [];
+    : (currentWays?.ways ?? []).map((w) => ({ ...w, helpPoints: allowed(w.helpPoints) }));
   const way = wayList[Math.min(selected, Math.max(0, wayList.length - 1))] ?? null;
   const minutes = loop ? (way?.route.minutes ?? loopMinutes) : way && !currentWays?.noRoute ? way.route.minutes : null;
   const departAt = instant && draft?.timeKind === "arrive_by" && minutes ? new Date(instant.getTime() - minutes * 60_000) : instant;
@@ -208,7 +218,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   const helpAt = departAt ? localTimeInZone(departAt, zone) : null;
   const sun = origin ?? dest;
   const later = draft && origin && departAt && sun && daylightAt(departAt, sun) === "dark" ? laterDaylight(localTimeForInstant(departAt, zone), zone, sun) : null;
-  const helpPointsShown: HelpPoint[] = loop ? (startHelp?.key === loopKey ? startHelp.points.slice(0, 6) : []) : way?.helpPoints ?? [];
+  const helpPointsShown: HelpPoint[] = loop ? (startHelp?.key === loopKey ? allowed(startHelp.points).slice(0, 6) : []) : way?.helpPoints ?? [];
 
   const claims: Claim[] = (() => {
     if (!complete || !draft) return [];
@@ -220,7 +230,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
       const same = departAt && endAt && sun ? daylightAt(departAt, sun) === daylightAt(endAt, sun) : true;
       list.push(daylightClaim(departAt, sun, zone, same ? "for the whole of it" : "when you start"));
       if (!same && endAt) list.push({ ...daylightClaim(endAt, sun, zone, "when you finish"), id: "daylight-end" });
-      list.push(startHelp?.key === loopKey ? helpClaim(startHelp.points, startHelp.evidence, helpAt, "within a short walk of your start", "when you start") : helpClaim([], undefined, null));
+      list.push(startHelp?.key === loopKey ? helpClaim(allowed(startHelp.points), startHelp.evidence, helpAt, "within a short walk of your start", "when you start") : helpClaim([], undefined, null));
     } else {
       if (currentWays?.error) list.push({ id: "time", kind: "failed", topic: mode === "walk" ? "Walk time" : "Travel time", icon: "clock", claim: currentWays.error });
       else if (currentWays?.noRoute) list.push({ id: "time", kind: "none", topic: "Travel time", icon: "clock", claim: "No travel time for this. You’ll set your own check-in time." });
@@ -243,7 +253,8 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
     return list;
   })();
 
-  const take = complete ? decisionTake({ departDaylight: departAt && sun ? daylightAt(departAt, sun) : null, arriveDaylight: (arriveAt ?? (loop && departAt ? new Date(departAt.getTime() + loopMinutes * 60_000) : null)) && sun ? daylightAt(arriveAt ?? new Date(departAt!.getTime() + loopMinutes * 60_000), sun) : null, ways: wayList, selected, helpAt: mode === "walk" || loop ? helpAt : arriveAt ? localTimeInZone(arriveAt, zone) : helpAt, loop, mode, nearStart: loop && startHelp?.key === loopKey ? startHelp.points : undefined }) : [];
+  // The short answer: at most three qualified items and one limitation; the ledger keeps everything.
+  const brief = complete && draft ? planBrief(claims, { mode, loop, constraints: draft.constraints, departClock: departAt ? clockIn(departAt, zone) : null, compare: !loop && wayList.length > 1 ? compareWays(wayList, selected) : null, notesPending: (!loop && mode === "walk" ? currentWays?.notes ?? null : aroundNow?.notes ?? null) === null }) : { items: [], limitation: null };
 
   // ── Actions ───────────────────────────────────────────────────────────────────────────────
   const soon = departAt && clock ? Math.abs(departAt.getTime() - clock.getTime()) <= 30 * 60_000 : false;
@@ -258,8 +269,11 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
     fastest: selected === 0,
     plannedAt: instant ? { kind: draft?.timeKind === "arrive_by" ? "arrive_by" : "depart_at", at: instant.getTime() } : null,
   };
+  // Said before she taps Save: what keeps this plan from her account, and how to fix it (sprint 01 save boundary).
+  const eligibility = draft ? saveEligibility({ ...draft, timeZone: zone }, { signedIn }) : null;
+  const blocked = eligibility && !eligibility.ok && eligibility.code !== "guest" ? eligibility : null;
   const save = async () => {
-    if (!draft) return;
+    if (!draft || blocked) return;
     if (!signedIn) return setSignIn(true);
     setSaveState({ busy: true, text: null });
     const body = { draft: { ...draft, timeZone: zone } };
@@ -268,7 +282,8 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
     const updated = Boolean(r?.ok);
     if (!r || (!r.ok && r.status === 404)) r = await api<{ plan: { id: string } }>("/api/me/plans", { body });
     if (r.ok && r.data.plan.id !== draft.savedId) setPlanDraft({ ...draft, savedId: r.data.plan.id });
-    setSaveState({ busy: false, text: r.ok ? `${updated ? "Updated in" : "Saved to"} Journeys for 30 days. Nothing started and nothing shared.` : r.code === "provider_content" || r.code === "incomplete_plan" ? `${r.message} This plan stays in this tab for 2 hours.` : r.message });
+    // A failure is never a success: offline means nothing reached her account.
+    setSaveState({ busy: false, text: r.ok ? `${updated ? "Updated in" : "Saved to"} Journeys for 30 days. Nothing started and nothing shared.` : r.network ? `You’re offline, so nothing was saved. ${TAB_PLAN_NOTE}` : r.message });
   };
   // ── The way back and other legs (docs/phase2-ux/00 §1) ─────────────────────────────────────
   const setLegs = (legs: PlanLegDraft[]) => { if (draft) setPlanDraft({ ...draft, legs, touched: true, selection: undefined }); };
@@ -283,11 +298,13 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   const pickLegPlace = (p: PickedPlace) => {
     if (!draft || !legSheet || "here" in p) return;
     const legs = [...(draft.legs ?? [])];
-    const to = { query: p.name, resolution: { source: p.source, name: p.name, point: { lat: p.lat, lon: p.lon }, ...(p.placeId ? { placeId: p.placeId } : {}) } };
+    const query = queryFor(p);
+    const to = { query, resolution: { source: p.source, name: p.name, point: { lat: p.lat, lon: p.lon }, ...(p.placeId ? { placeId: p.placeId } : {}) } };
     // A next stop continues from where the previous leg ends; a way back starts where the trip there ends.
+    // Her own words travel with the place; a provider's display name stays in the resolution only.
     const prev = legSheet.kind === "stop" && legs.length ? legs[legs.length - 1].destination : null;
-    const from = prev ?? { query: placeName(draft.destination) ?? draft.destination.query, resolution: draft.destination.resolution };
-    const label = legSheet.kind === "stop" ? `To ${p.name}` : `Return to ${p.name}`;
+    const from = prev ?? { query: draft.destination.query, resolution: draft.destination.resolution };
+    const label = legSheet.kind === "stop" ? `To ${query || "your next stop"}` : `Return to ${query || "where you started"}`;
     legs[legSheet.index] = { ...(legs[legSheet.index] ?? { label: "", departureLocal: "", timeZone: zone, mode: draft.mode, timeKind: "depart_at", constraints: "", destinationCountryIso: null }), label: label.slice(0, 160), origin: from, destination: to };
     setLegs(legs);
     setLegSheet({ index: legSheet.index, kind: "when" });
@@ -308,8 +325,8 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   const pick = (field: "origin" | "destination", p: PickedPlace) => {
     if (!draft) return;
     if ("here" in p) update({ origin: { kind: "device", use: "from_here", point: { lat: p.lat, lon: p.lon } } });
-    else if (field === "origin") update({ origin: { kind: "named", query: p.placeId?.startsWith("g:") && draft.origin.kind === "named" && draft.origin.query ? draft.origin.query : p.name, resolution: { source: p.source, name: p.name, point: { lat: p.lat, lon: p.lon }, ...(p.placeId ? { placeId: p.placeId } : {}) } } });
-    else update({ destination: { query: p.name, resolution: { source: p.source, name: p.name, point: { lat: p.lat, lon: p.lon }, ...(p.placeId ? { placeId: p.placeId } : {}) } } });
+    else if (field === "origin") update({ origin: { kind: "named", query: queryFor(p), resolution: { source: p.source, name: p.name, point: { lat: p.lat, lon: p.lon }, ...(p.placeId ? { placeId: p.placeId } : {}) } } });
+    else update({ destination: { query: queryFor(p), resolution: { source: p.source, name: p.name, point: { lat: p.lat, lon: p.lon }, ...(p.placeId ? { placeId: p.placeId } : {}) } } });
     setSheet(null);
   };
 
@@ -326,20 +343,11 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
   const checking = (!loop && !currentWays) || (loop && loopPlan?.key !== loopKey);
   const verb = loop ? loopName.toLowerCase() : mode === "walk" ? "walk" : mode === "ride" ? "ride" : "by transit";
   const tripTitle = loop ? `${loopMinutes} min ${verb}` : minutes ? `${Math.round(minutes)} min ${verb}${arriveAt ? ` · arrive ${clockIn(arriveAt, zone)}` : ""}` : currentWays?.error ? "Couldn’t check the way" : currentWays?.noRoute ? "No travel time available" : "…";
-  const helpList = loop ? (startHelp?.key === loopKey ? startHelp.points : null) : currentWays ? way?.helpPoints ?? [] : null;
-  const helpLocal = mode === "walk" || loop ? helpAt : arriveAt ? localTimeInZone(arriveAt, zone) : helpAt;
-  const openThen = helpList ? helpList.filter((p) => { const h = hoursState(p, helpLocal ?? undefined); return h.kind === "open_24h" || h.kind === "listed_open" || h.kind === "open_now"; }).length : 0;
-  const litShare = way?.lighting ? (() => { const l = way.lighting.summary; return l.lit + l.poles + l.dark > 0 ? `${l.lit + l.poles}%` : null; })() : null;
-  const planNotes = !loop && mode === "walk" ? currentWays?.notes ?? null : aroundNow?.notes ?? null;
-  // Released notes count only when there are some (publishing is off in this beta; never an always-0 stat).
-  const noteCount = Array.isArray(planNotes) ? planNotes.length : 0;
-  const planStats: LiveStat[] = [
-    // A failed check reads as failed, not "0/0" or a spinner that never ends (audit L06-006).
-    { label: loop ? "Help Points open near your start" : mode === "walk" ? "Help Points open on the way" : "Help Points open where you arrive", value: currentWays?.error ? "—" : helpList ? `${openThen}/${helpList.length}` : "…", state: currentWays?.error ? "failed" : helpList ? "ok" : "loading" },
-    ...(mode === "walk" && !loop ? [{ label: "mapped as lit", value: litShare ?? "—", state: (currentWays ? (litShare ? "ok" : "none") : "loading") as LiveStat["state"] }] : []),
-    ...(noteCount ? [{ label: noteCount === 1 ? "note from people" : "notes from people", value: String(noteCount), state: "ok" as const }] : []),
-  ];
-
+  const fromWords = draft.origin.kind === "device" ? "where you are" : originLabel;
+  const zoneNote = !sameClock(zone, deviceZone()) ? ` (${zone.split("/").pop()?.replace(/_/g, " ")} time)` : "";
+  const acknowledgement = loop
+    ? `You’re planning a ${loopMinutes} min ${loopName.toLowerCase()} from ${fromWords} · ${whenWords(draft.departureLocal, zone)}${zoneNote}.`
+    : `You’re planning ${mode === "walk" ? "a walk" : mode === "ride" ? "a ride" : "a transit trip"} from ${fromWords} to ${destLabel} · ${whenWords(draft.departureLocal, zone)}${zoneNote}.`;
   const lit = (w: WayOption) => { const l = w.lighting?.summary; return l && l.lit + l.poles + l.dark > 0 ? l.lit + l.poles : null; };
 
   return (
@@ -410,9 +418,13 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
           </MiraVoice>
         ) : (
           <>
-            {/* Mira's take, then the options, then the ledger. Conclusion → choice → evidence. */}
-            <section aria-label="Mira’s take" className="mt-5">
-              {/* The plan's own sky: coloured by the sky when she sets off, with the facts for that time. */}
+            {/* A reopened plan whose time has gone: everything below was checked again, for that past time. */}
+            {instant && clock && instant.getTime() < clock.getTime() - 15 * 60_000 ? (
+              <StateNote tone="attention" className="mt-5" title="This plan’s time has passed" action={<button type="button" onClick={() => setSheet("when")} className="min-h-11 text-sm font-semibold text-accent-strong">Choose a new time</button>}>Mira checked it again for {whenWords(draft.departureLocal, zone)}. Choose when you’ll actually go to see it for then.</StateNote>
+            ) : null}
+            {/* The plan at that time, then the short answer, then the options and the full detail. */}
+            <section aria-label="Your plan at that time" className="mt-5">
+              {/* The plan's own sky: coloured by the calculated sky when she sets off. */}
               <SkyCard
                 state={skyAt(departAt, sun)}
                 label="Your plan, at that time"
@@ -421,9 +433,14 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
                 aside={whenWords(draft.departureLocal, zone)}
                 title={tripTitle}
                 strip={departAt && sun ? { from: departAt, point: sun, hours: loop ? 3 : 6, startLabel: "set off" } : null}
-                stats={planStats}
-                line={checking ? null : take.length ? take.join(" ") : "Here’s what I could check."}
               />
+              <BriefSummary className="mt-3" checking={checking} acknowledgement={acknowledgement} items={brief.items} limitation={checking ? null : brief.limitation}>
+                <div className="mt-1 flex flex-wrap gap-x-4 border-t border-line pt-1">
+                  <button type="button" onClick={() => setSheet("when")} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-accent-strong"><Icon name="clock" className="size-4" />Change time</button>
+                  <button type="button" onClick={askAbout} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-accent-strong"><Icon name="sparkle" className="size-4" />Ask Mira about this plan</button>
+                  {origin ? <button type="button" aria-expanded={showMap} onClick={() => setShowMap((v) => !v)} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-accent-strong"><Icon name="pin" className="size-4" />{showMap ? "Hide map" : "View map"}</button> : null}
+                </div>
+              </BriefSummary>
               {later ? (
                 <button type="button" onClick={() => update({ departureLocal: later.local, timeKind: "depart_at" })} className="m-card m-press mt-3 flex w-full items-center gap-3 p-3.5 text-left">
                   <span aria-hidden className="grid size-10 place-items-center rounded-xl bg-dusk-soft text-dusk"><Icon name="sun" className="size-5" /></span>
@@ -433,7 +450,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
               ) : null}
             </section>
 
-            {(way && !way.route.approximate && way.route.geometry.length > 1) || origin ? (
+            {showMap && origin ? (
               <BriefMap className="mt-4 h-52" tiles={tiles} start={origin} end={loop ? null : dest} route={way && way.route.geometry.length > 1 && !way.route.approximate ? way.route.geometry : null} lighting={way?.lighting?.segments ?? null} pins={helpPointsShown.filter((p) => !osmOnly || !p.id.startsWith("g:")).slice(0, 6).map((p) => ({ id: p.id, name: p.name, lat: p.lat, lon: p.lon, icon: HELP_ICON[p.cls] ?? "pin", strong: HELP_CLASSES[p.cls].emergency }))} label={loop ? "Your start and Help Points nearby" : "The chosen way, with lit stretches and Help Points"} />
             ) : null}
 
@@ -458,6 +475,9 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
             <EvidenceLedger className="mt-4" items={claims.map((c): EvidenceItem => ({ ...c, ...(c.kind === "failed" ? { action: { label: "Try again", onClick: () => setRetry((n) => n + 1) } } : {}) }))} title={loop ? "Your start, at that time" : "That way, at that time"} label="What Mira checked" />
 
             {saveState.text ? <StateNote className="mt-3">{saveState.text}</StateNote> : null}
+            {blocked ? (
+              <StateNote className="mt-3" title="Saving to your account" action={blocked.code === "device_origin" ? <button type="button" onClick={() => setSheet("origin")} className="min-h-11 text-sm font-semibold text-accent-strong">Choose starting place</button> : blocked.code === "incomplete_leg" && blocked.legIndex !== undefined ? <button type="button" onClick={() => setLegSheet({ index: blocked.legIndex!, kind: draft.legs?.[blocked.legIndex!]?.destination.resolution ? "when" : "place" })} className="min-h-11 text-sm font-semibold text-accent-strong">Finish it</button> : null}>{blocked.message}</StateNote>
+            ) : null}
 
             {!loop ? (
               <RowList label={!(draft.legs ?? []).length ? "After this" : (draft.legs ?? []).every((l) => /^return\b/i.test(l.label)) ? "The way back" : /^return\b/i.test(draft.activity) ? "The way there" : "Also in this plan"} id="legs-h" className="mt-6">
@@ -488,10 +508,9 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor 
           {soon ? (
             <button type="button" onClick={() => setSheet("go")} className="mira-primary min-h-13 flex-1 text-base"><Icon name="footsteps" className="size-5" />Go with Mira</button>
           ) : (
-            <button type="button" onClick={() => void save()} disabled={saveState.busy} className="mira-primary min-h-13 flex-1 text-base">{saveState.busy ? "Saving…" : signedIn ? "Save this plan" : "Sign in to save"}</button>
+            <button type="button" onClick={() => void save()} disabled={saveState.busy || Boolean(blocked)} className="mira-primary min-h-13 flex-1 text-base">{saveState.busy ? "Saving…" : blocked ? "Can’t save yet" : signedIn ? "Save this plan" : "Sign in to save"}</button>
           )}
-          <button type="button" onClick={askAbout} aria-label="Ask Mira about this plan" className="grid size-13 shrink-0 place-items-center rounded-2xl bg-surface ring-1 ring-line-strong"><Icon name="sparkle" className="size-5 text-accent" /></button>
-          {soon ? <button type="button" onClick={() => void save()} disabled={saveState.busy} aria-label="Save this plan" className="grid size-13 shrink-0 place-items-center rounded-2xl bg-surface ring-1 ring-line-strong"><Icon name="star" className="size-5" /></button> : <button type="button" onClick={() => setSheet("go")} className="min-h-13 shrink-0 rounded-2xl bg-surface px-4 text-sm font-semibold ring-1 ring-line-strong">Go now</button>}
+          {soon ? <button type="button" onClick={() => void save()} disabled={saveState.busy || Boolean(blocked)} aria-label={blocked ? "Can’t save yet" : "Save this plan"} className="grid size-13 shrink-0 place-items-center rounded-2xl bg-surface ring-1 ring-line-strong"><Icon name="star" className="size-5" /></button> : <button type="button" onClick={() => setSheet("go")} className="min-h-13 shrink-0 rounded-2xl bg-surface px-4 text-sm font-semibold ring-1 ring-line-strong">Go now</button>}
         </ActionBar>
       ) : null}
 

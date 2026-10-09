@@ -1,5 +1,6 @@
 import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
+import { BRIEF_KIND_LABEL, type BriefItem, type BriefKind } from "@/domain/companion-brief";
 
 /**
  * Mira's evidence grammar (docs/phase1-ux/01 §1). Every claim in a brief carries exactly one state,
@@ -124,5 +125,36 @@ export function EvidenceChip({ kind, children }: { kind: EvidenceKind; children:
       <EvidenceGlyph kind={kind} />
       <span className="min-w-0 truncate">{children}</span>
     </span>
+  );
+}
+
+const BRIEF_GLYPH: Record<BriefKind, EvidenceKind> = { listed: "checked", community: "people", calculation: "estimate", estimate: "estimate", unknown: "none", failed: "failed" };
+
+/**
+ * The short answer at the top of a brief (sprint 02): what she asked, up to three qualified items, and
+ * one limitation — each qualifier beside its own claim. Everything else stays in "What Mira checked".
+ */
+export function BriefSummary({ acknowledgement, items, limitation, checking, label = "Mira’s take", className, children }: { acknowledgement: React.ReactNode; items: BriefItem[]; limitation: string | null; checking?: boolean; label?: string; className?: string; children?: React.ReactNode }) {
+  return (
+    <section aria-label={label} className={cx("m-card px-4 py-3.5", className)}>
+      <p className="text-[0.95rem] font-semibold leading-snug">{acknowledgement}</p>
+      {checking && !items.length ? <p role="status" className="mt-2 text-sm text-ink-muted">Checking that place at that time…</p> : null}
+      {items.length ? (
+        <ul className="mt-1 divide-y divide-line">
+          {items.map((item) => (
+            <li key={item.id} className="flex gap-2.5 py-2.5">
+              <EvidenceGlyph kind={BRIEF_GLYPH[item.kind]} className="mt-[5px]" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[0.9375rem] leading-snug">{item.text}</p>
+                <p className="mt-0.5 text-xs text-ink-subtle"><span className="font-semibold">{BRIEF_KIND_LABEL[item.kind]}</span>{item.sourceLabel ? ` · ${item.sourceLabel}` : ""}</p>
+                {item.limitation ? <p className="mt-0.5 text-xs text-ink-muted">{item.limitation}</p> : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {limitation ? <p className="mt-1 border-t border-line pt-2.5 text-sm text-ink-muted">{limitation}</p> : null}
+      {children}
+    </section>
   );
 }

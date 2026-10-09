@@ -14,5 +14,5 @@ export default async function AroundPage({ searchParams }: { searchParams: Promi
   const sql = getSql();
   const [params, user] = await Promise.all([searchParams, getUser(sql)]);
   const [places, tiles] = await Promise.all([user ? listPlaces(sql, user.id) : Promise.resolve([]), tileConfig()]);
-  return <AroundNow signedIn={Boolean(user)} emailAlerts={smtpConfigured()} places={places} tiles={tiles} openSearch={params.check === "1"} />;
+  return <AroundNow helpExclude={user?.helpExclude ?? []} canCorrect={Boolean(user?.durable)} signedIn={Boolean(user)} emailAlerts={smtpConfigured()} places={places} tiles={tiles} openSearch={params.check === "1"} />;
 }
