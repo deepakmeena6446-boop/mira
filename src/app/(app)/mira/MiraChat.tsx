@@ -22,7 +22,8 @@ import type { MiraCard } from "@/server/providers/companion/types";
 import { circleSharingLine } from "@/domain/companion-output";
 import { clockIn } from "@/domain/daylight";
 import { useDaypart } from "@/lib/daypart-store";
-import { hasPlanWork, intentFromDraft, newPlanDraft } from "@/domain/plan-state";
+import { hasPlanWork, intentFromDraft, newPlanDraft, UNKNOWN_PROVENANCE } from "@/domain/plan-state";
+import { planToCardPlace } from "@/lib/plan-handoff";
 import { clearPlanDraft, setPlanDraft, usePlanDraft, usePlanHydrated } from "@/lib/plan-store";
 import { planTitle, whenWords } from "@/domain/plan-name";
 import { draftFromAsk } from "@/domain/plan-ask";
@@ -137,8 +138,9 @@ function TripStatusCard({ card, shell }: { card: Extract<MiraCard, { type: "trip
 
 function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; onTrip: StartTrip; onComparePlace: (d: { name: string; lat: number; lon: number; savedPlaceId?: string }) => void; onStartHere: () => void }) {
   const router = useRouter();
-  const show = (d: { name: string; lat: number; lon: number; kind?: string }) => {
-    setPendingDestination(d);
+  // A card place goes to Around with its provider id; one without a recorded source is marked unknown.
+  const show = (d: { name: string; lat: number; lon: number; kind?: string; placeId?: string }) => {
+    setPendingDestination({ ...d, placeId: d.placeId ?? UNKNOWN_PROVENANCE });
     router.push("/around");
   };
   const shell = "m-card mt-2 overflow-hidden";
@@ -163,7 +165,7 @@ function Card({ card, onTrip, onComparePlace, onStartHere }: { card: MiraCard; o
     }
     case "places":
     case "help_points": {
-      const rows = card.type === "places" ? card.places.map((p) => ({ key: `${p.name}-${p.lat}`, name: p.name, sub: p.kind, right: fmtM(p.distanceM), icon: kindIcon(p.kind), go: () => show({ name: p.name, lat: p.lat, lon: p.lon, kind: p.kind }) })) : card.points.map((p) => ({ key: `${p.name}-${p.lat}`, name: p.name, sub: `${p.label} · ${p.hours}`, right: `~${p.minutes} min`, icon: kindIcon(p.label), go: () => show({ name: p.name, lat: p.lat, lon: p.lon, kind: p.label }) }));
+      const rows = card.type === "places" ? card.places.map((p) => ({ key: `${p.name}-${p.lat}`, name: p.name, sub: p.kind, right: fmtM(p.distanceM), icon: kindIcon(p.kind), go: () => show({ name: p.name, lat: p.lat, lon: p.lon, kind: p.kind, placeId: p.placeId }) })) : card.points.map((p) => ({ key: `${p.name}-${p.lat}`, name: p.name, sub: `${p.label} · ${p.hours}`, right: `~${p.minutes} min`, icon: kindIcon(p.label), go: () => show({ name: p.name, lat: p.lat, lon: p.lon, kind: p.label, placeId: p.placeId }) }));
       return (
         <div className={shell}>
           <p className="m-label px-4 pt-3">{card.title}</p>
@@ -419,9 +421,9 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
     else toast(r.message, "error");
   };
   // Conversation → decision: hand the place to Plan, from where she is (only if location is already on).
-  const comparePlace = (d: { name: string; lat: number; lon: number; savedPlaceId?: string }) => {
-    const draft = newPlanDraft(new Date(), deviceTimeZone() ?? "UTC");
-    setPlanDraft({ ...draft, touched: true, activity: `Go to ${d.name}`.slice(0, 160), ...(here ? { origin: { kind: "device", use: "from_here", point: { lat: here.lat, lon: here.lon } } } : {}), destination: { query: d.name.slice(0, 160), resolution: d.savedPlaceId ? { source: "saved_place", placeId: d.savedPlaceId, name: d.name, point: { lat: d.lat, lon: d.lon } } : { source: "selected_point", name: d.name, point: { lat: d.lat, lon: d.lon } } } });
+  // The card's place keeps its provenance: a Google or unknown-source place stays in the tab, never in her account.
+  const comparePlace = (d: { name: string; lat: number; lon: number; savedPlaceId?: string; placeId?: string }) => {
+    planToCardPlace(d, here ? { lat: here.lat, lon: here.lon } : null);
     router.push("/plan?for=go");
   };
 

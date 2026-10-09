@@ -15,13 +15,15 @@ export type MiraHelpPoint = {
   source: string;
   lat: number;
   lon: number;
+  /** Provider id ("g:…" Google, "osm:…"), so the app knows what it may keep. Never shown to the model. */
+  placeId?: string;
 };
 
 /** Streamed events from Mira to the chat UI (NDJSON over /api/mira). */
 export type MiraCard =
   /** `email`: whether MIRA can email the contacts at all (absent on cards saved before it was recorded). */
-  | { type: "trip"; destination: { name: string; lat: number; lon: number; savedPlaceId?: string }; minutes: number | null; contacts: string[]; mode?: MiraTripMode; email?: boolean; whatsapp?: string[] }
-  | { type: "places"; title: string; places: Array<{ name: string; kind: string; distanceM?: number; lat: number; lon: number }> }
+  | { type: "trip"; destination: { name: string; lat: number; lon: number; savedPlaceId?: string; placeId?: string }; minutes: number | null; contacts: string[]; mode?: MiraTripMode; email?: boolean; whatsapp?: string[] }
+  | { type: "places"; title: string; places: Array<{ name: string; kind: string; distanceM?: number; lat: number; lon: number; placeId?: string }> }
   | { type: "help_points"; title: string; points: MiraHelpPoint[] }
   | { type: "report"; category: string; label: string }
   | { type: "sos"; contacts: string[] }

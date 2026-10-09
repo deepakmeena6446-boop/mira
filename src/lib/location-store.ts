@@ -200,8 +200,12 @@ export function greetingFor(d: Date): { hello: string; emoji: string; late: bool
   return { hello: "Good evening", emoji: "🌙", late: true };
 }
 
-/** One-shot destination hand-off (e.g. Mira → Home map), in memory only. */
-let pendingDest: { name: string; lat: number; lon: number; kind?: string } | null = null;
+/**
+ * One-shot destination hand-off (e.g. Mira → Home map), in memory only. `placeId` carries where the place came from
+ * ("g:" Google, "osm:", or "x:unknown" for a provider place without a recorded source) so a plan made from it keeps
+ * the same persistence rules as a search result (sprint mira-companion-48h review, issue 5).
+ */
+let pendingDest: { name: string; lat: number; lon: number; kind?: string; placeId?: string } | null = null;
 export function setPendingDestination(d: typeof pendingDest) {
   pendingDest = d;
 }

@@ -222,7 +222,7 @@ export async function* placeholderMira(message: string, history: MiraTurn[], too
       const where = around ? `near ${around.name}` : "I know of";
       if (found.length) {
         reply = `Here ${found.length === 1 ? "is" : "are"} the closest ${what} ${where}. ${open.length ? `Listed as open now: ${joinNames(open)}. Listed hours can be out of date.` : "Their hours aren't known, so it's worth a quick check."}`;
-        cards.push({ type: "places", title: around ? `Near ${around.name}` : f ? `Nearby ${f[2]}` : "Nearby", places: found });
+        cards.push({ type: "places", title: around ? `Near ${around.name}` : f ? `Nearby ${f[2]}` : "Nearby", places: found.map((p) => ({ name: p.name, kind: p.kind, distanceM: p.distanceM, lat: p.lat, lon: p.lon, placeId: p.id })) });
       } else reply = `I couldn't find ${f?.[2] ?? "anything like that"} ${around ? `near ${around.name} ` : ""}in the map data I have. That doesn't mean there are none.`;
     }
   } else if (RX.trip.test(m)) {

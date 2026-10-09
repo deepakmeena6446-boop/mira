@@ -1,4 +1,4 @@
-import { intentFromDraft, intentFromLeg, type PlanDraft } from "./plan-state";
+import { intentFromDraft, intentFromLeg, isRestrictedPlaceId, type PlanDraft } from "./plan-state";
 
 /**
  * Whether a tab plan can be saved to the account, said before she taps Save (sprint mira-companion-48h
@@ -12,7 +12,8 @@ export type SaveEligibility = { ok: true } | { ok: false; code: SaveBlock; messa
 /** The tab's own lifetime, said wherever saving isn't possible. */
 export const TAB_PLAN_NOTE = "It stays in this tab for 2 hours after your last change.";
 
-export const isProviderPlace = (place: { resolution?: { placeId?: string } | null }) => place.resolution?.placeId?.startsWith("g:") ?? false;
+/** Google results and provider places whose source wasn't recorded stay in the tab (plan-state isRestrictedPlaceId). */
+export const isProviderPlace = (place: { resolution?: { placeId?: string } | null }) => isRestrictedPlaceId(place.resolution?.placeId);
 
 export function saveEligibility(draft: PlanDraft, { signedIn }: { signedIn: boolean }): SaveEligibility {
   if (draft.origin.kind === "device") return { ok: false, code: "device_origin", message: "Choose a named starting place to save this plan." };

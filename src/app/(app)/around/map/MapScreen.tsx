@@ -44,7 +44,7 @@ export function MapScreen({ emailAlerts, places, tiles }: { emailAlerts: boolean
 
   // A place handed over from Around opens selected.
   const [handed] = useState(() => peekPendingDestination());
-  const [focus, setFocus] = useState<Focus | null>(() => (handed ? { name: handed.name, lat: handed.lat, lon: handed.lon, source: "selected_point", kind: "Chosen place" } : null));
+  const [focus, setFocus] = useState<Focus | null>(() => (handed ? { name: handed.name, lat: handed.lat, lon: handed.lon, source: handed.placeId ? "search" : "selected_point", ...(handed.placeId ? { placeId: handed.placeId } : {}), kind: "Chosen place" } : null));
   useEffect(() => { if (handed) clearPendingDestination(handed); }, [handed]);
   const [search, setSearch] = useState(false);
   const [spot, setSpot] = useState<{ lat: number; lon: number; name: string | null } | null>(null);
@@ -92,7 +92,7 @@ export function MapScreen({ emailAlerts, places, tiles }: { emailAlerts: boolean
     <div className="flex h-[calc(100dvh-var(--tabbar-space))] flex-col bg-canvas">
       <h1 className="sr-only">{focus ? `Map around ${focus.name}` : "Map around you"}</h1>
       <div className="relative min-h-[45dvh] flex-1">
-        <WorldMap tiles={tiles} me={here ? { lat: here.lat, lon: here.lon } : null} dest={focus ? { lat: focus.lat, lon: focus.lon } : null} places={pins} follow={!focus} recenter={recenter} onLongPress={(p) => void pressed(p)} onPlaceClick={(p) => { const hp = ranked.find((x) => x.id === p.id); if (hp) setFocus({ name: hp.name, lat: hp.lat, lon: hp.lon, source: "selected_point", kind: HELP_CLASSES[hp.cls].label }); }} padding={{ top: 90, bottom: 60, left: 40, right: 40 }} label={focus ? `Map around ${focus.name}` : "Map around you"} className="absolute inset-0" />
+        <WorldMap tiles={tiles} me={here ? { lat: here.lat, lon: here.lon } : null} dest={focus ? { lat: focus.lat, lon: focus.lon } : null} places={pins} follow={!focus} recenter={recenter} onLongPress={(p) => void pressed(p)} onPlaceClick={(p) => { const hp = ranked.find((x) => x.id === p.id); if (hp) setFocus({ name: hp.name, lat: hp.lat, lon: hp.lon, source: "search", placeId: hp.id, kind: HELP_CLASSES[hp.cls].label }); }} padding={{ top: 90, bottom: 60, left: 40, right: 40 }} label={focus ? `Map around ${focus.name}` : "Map around you"} className="absolute inset-0" />
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="pointer-events-auto mx-auto flex max-w-xl items-center justify-between gap-2">
             <button type="button" onClick={() => (window.history.length > 1 ? router.back() : router.push("/around"))} aria-label="Back" className="grid size-11 shrink-0 place-items-center rounded-full bg-surface shadow-[var(--shadow-float)]"><Icon name="back" className="size-5" /></button>
@@ -127,7 +127,7 @@ export function MapScreen({ emailAlerts, places, tiles }: { emailAlerts: boolean
             <RowList label={focus ? `Help Points near ${focus.name}` : "Help Points near you"} id="map-help-h" className="mt-6">
               {ranked.slice(0, 3).map((p) => {
                 const h = hoursState(p, localNow ?? undefined, 0, clock?.getTime());
-                return <Row key={p.id} icon={HELP_ICON[p.cls] ?? "pin"} tone={HELP_CLASSES[p.cls].emergency ? "warm" : "ink"} eyebrow={`${HELP_CLASSES[p.cls].label} · about ${p.minutes} min`} title={p.name} detail={`${hoursWords(h)} · staffing not verified`} onClick={() => setFocus({ name: p.name, lat: p.lat, lon: p.lon, source: "selected_point", kind: HELP_CLASSES[p.cls].label })} />;
+                return <Row key={p.id} icon={HELP_ICON[p.cls] ?? "pin"} tone={HELP_CLASSES[p.cls].emergency ? "warm" : "ink"} eyebrow={`${HELP_CLASSES[p.cls].label} · about ${p.minutes} min`} title={p.name} detail={`${hoursWords(h)} · staffing not verified`} onClick={() => setFocus({ name: p.name, lat: p.lat, lon: p.lon, source: "search", placeId: p.id, kind: HELP_CLASSES[p.cls].label })} />;
               })}
             </RowList>
           ) : current?.failed ? <StateNote className="mt-6" title="Couldn’t check Help Points">Emergency and calling still work.</StateNote> : null}

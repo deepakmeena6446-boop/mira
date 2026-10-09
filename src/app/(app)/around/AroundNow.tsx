@@ -24,7 +24,7 @@ import { blindSpotsClaim, daylightClaim, helpClaim, hoursWords, lightingClaim, n
 import { HELP_CLASSES, helpWeightsFor, hoursState, isNight, rankHelpPoints, type HelpPoint } from "@/domain/help-points";
 import { localTimeInZone } from "@/domain/opening-hours";
 import { haversineMeters } from "@/domain/pilot";
-import { newPlanDraft } from "@/domain/plan-state";
+import { newPlanDraft, providerPlace } from "@/domain/plan-state";
 import type { EvidenceState } from "@/domain/evidence-state";
 import type { SafetyUpdatesData } from "@/domain/safety-updates";
 import type { SavedPlace } from "@/server/account/places";
@@ -51,7 +51,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch, he
   const here = usableLocationPoint(loc, clock?.getTime());
   // A place handed over from Mira (or the map) opens straight into its brief.
   const [handed] = useState(() => peekPendingDestination());
-  const [place, setPlace] = useState<Place | null>(() => (handed ? { name: handed.name, lat: handed.lat, lon: handed.lon, source: "selected_point", query: handed.name } : null));
+  const [place, setPlace] = useState<Place | null>(() => (handed ? (handed.placeId ? { name: handed.name, lat: handed.lat, lon: handed.lon, source: "search", placeId: handed.placeId, query: providerPlace(handed).query } : { name: handed.name, lat: handed.lat, lon: handed.lon, source: "selected_point", query: handed.name }) : null));
   useEffect(() => { if (handed) clearPendingDestination(handed); }, [handed]);
   const [search, setSearch] = useState(openSearch);
   const [signIn, setSignIn] = useState(false);
@@ -200,7 +200,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch, he
             {/* 3. The map answers "where": you, Help Points, released notes, the walk there. */}
             <div className="mt-6 flex flex-wrap items-center gap-x-5">
             <button type="button" aria-expanded={showMap} onClick={() => setShowMap((v) => !v)} className="inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-semibold text-accent-strong"><Icon name="pin" className="size-4" />{showMap ? "Hide map" : "View map"}</button>
-            <button type="button" onClick={() => { if (place) setPendingDestination({ name: place.name, lat: place.lat, lon: place.lon }); router.push("/around/map"); }} className="inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-semibold text-accent-strong">
+            <button type="button" onClick={() => { if (place) setPendingDestination({ name: place.name, lat: place.lat, lon: place.lon, ...(place.placeId && place.source !== "saved_place" ? { placeId: place.placeId } : {}) }); router.push("/around/map"); }} className="inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-semibold text-accent-strong">
               {place ? "View route & map" : "Open the full map"} <Icon name="arrow" className="size-4" />
             </button>
             </div>

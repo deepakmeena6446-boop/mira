@@ -131,6 +131,28 @@ export function resolvedDestination(intent: MovementIntent): { name: string; lat
   return { name: intent.destination.query, ...intent.destination.resolution.point };
 }
 
+/**
+ * Place provenance (sprint mira-companion-48h review, issue 5). A resolution's placeId names where a place came from:
+ * "g:" is a Google result (display content Mira may show but not keep), "osm:" OpenStreetMap, a bare id a saved place.
+ * "x:unknown" marks a provider-derived place whose source wasn't recorded (e.g. a chat card saved before cards carried
+ * ids): it is treated like Google content. A point she picked on the map has no placeId and stays hers.
+ */
+export const UNKNOWN_PROVENANCE = "x:unknown";
+/** What a plan calls a place whose provider name it may not keep: her words, not the provider's. */
+export const CHOSEN_PLACE = "Place you chose";
+export function isRestrictedPlaceId(id: string | undefined | null): boolean {
+  return Boolean(id && (id.startsWith("g:") || id.startsWith("x:")));
+}
+
+/** A place that came from a provider via a card or hand-off: its id when known, otherwise marked unknown. */
+export function providerPlace(p: { name: string; lat: number; lon: number; placeId?: string; savedPlaceId?: string }): { query: string; activity: string; resolution: PlanPlaceResolution } {
+  if (p.savedPlaceId) return { query: p.name.slice(0, 160), activity: `Go to ${p.name}`.slice(0, 160), resolution: { source: "saved_place", name: p.name, point: { lat: p.lat, lon: p.lon }, placeId: p.savedPlaceId } };
+  const placeId = p.placeId || UNKNOWN_PROVENANCE;
+  // Restricted content is shown from the tab's resolution only; nothing kept as hers repeats its name.
+  const restricted = isRestrictedPlaceId(placeId);
+  return { query: restricted ? CHOSEN_PLACE : p.name.slice(0, 160), activity: restricted ? "Go to a place you chose" : `Go to ${p.name}`.slice(0, 160), resolution: { source: "search", name: p.name, point: { lat: p.lat, lon: p.lon }, placeId } };
+}
+
 /** A session lasts at most two hours without edits; it is not account history. */
 export const PLAN_SESSION_TTL_MS = 2 * 60 * 60_000;
 export function parsePlanSession(raw: string | null, now: number): PlanDraft | null {
@@ -143,13 +165,13 @@ export function parsePlanSession(raw: string | null, now: number): PlanDraft | n
 }
 export function serializePlanSession(draft: PlanDraft, now: number): string {
   const valid = planDraftSchema.parse(draft);
-  // Google Places content (name/coordinates) is display-only. Keep a user's typed
-  // query, but ask them to resolve a Google result again after a page reload.
-  const origin = valid.origin.kind === "named" && valid.origin.resolution?.placeId?.startsWith("g:")
+  // Google Places content (name/coordinates) — and provider content of unknown source — is display-only. Keep a
+  // user's typed query, but ask them to resolve such a result again after a page reload.
+  const origin = valid.origin.kind === "named" && isRestrictedPlaceId(valid.origin.resolution?.placeId)
     ? { ...valid.origin, resolution: null } : valid.origin;
-  const destination = valid.destination.resolution?.placeId?.startsWith("g:")
+  const destination = isRestrictedPlaceId(valid.destination.resolution?.placeId)
     ? { ...valid.destination, resolution: null } : valid.destination;
-  const scrub = (place: PlanLegDraft["origin"]) => place.resolution?.placeId?.startsWith("g:") ? { ...place, resolution: null } : place;
+  const scrub = (place: PlanLegDraft["origin"]) => isRestrictedPlaceId(place.resolution?.placeId) ? { ...place, resolution: null } : place;
   const legs = valid.legs?.map((leg) => ({ ...leg, origin: scrub(leg.origin), destination: scrub(leg.destination) }));
   return JSON.stringify({ savedAt: now, draft: { ...valid, origin, destination, ...(legs ? { legs } : {}) } });
 }

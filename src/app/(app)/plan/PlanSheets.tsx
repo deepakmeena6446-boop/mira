@@ -9,6 +9,7 @@ import { api } from "@/lib/api-client";
 import { freshLocation, locationUsable } from "@/lib/location-store";
 import { localTimeForInstant } from "@/domain/plan-options";
 import type { SavedPlace } from "@/server/account/places";
+import { CHOSEN_PLACE, isRestrictedPlaceId } from "@/domain/plan-state";
 
 /** `typed`: what she typed to find a search result — the only text a plan keeps as her own query. */
 export type PickedPlace = { name: string; lat: number; lon: number; source: "search" | "saved_place" | "selected_point"; placeId?: string; typed?: string } | { here: true; lat: number; lon: number };
@@ -22,7 +23,7 @@ export function queryFor(p: Exclude<PickedPlace, { here: true }>): string {
   const typed = p.typed?.trim().slice(0, 160);
   if (p.source === "saved_place") return p.name.slice(0, 160);
   if (typed) return typed;
-  return p.placeId?.startsWith("g:") ? "" : p.name.slice(0, 160);
+  return isRestrictedPlaceId(p.placeId) ? CHOSEN_PLACE : p.name.slice(0, 160);
 }
 type Hit = { id: string; name: string; kind: string; lat: number; lon: number; distanceM?: number };
 

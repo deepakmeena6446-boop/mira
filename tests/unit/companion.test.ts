@@ -345,6 +345,22 @@ describe("Mira on Claude (mocked client)", () => {
     expect(line).not.toMatch(/Priya/);
     warn.mockRestore();
   });
+  it("cards carry each place's provider id for the app, while the model sees only refs", async () => {
+    const { client, calls } = mockClient([
+      { tools: [{ name: "find_nearby", input: { kinds: ["pharmacy"] } }] },
+      { tools: [{ name: "find_help_points", input: { situation: "nearby" } }] },
+      { tools: [{ name: "propose_trip", input: { place_ref: "p1" } }] },
+      { text: "Here they are." },
+    ]);
+    const r = await collect(claudeMira({ client, message: "pharmacy nearby?", history: [], tools: tools(), firstName: "A" }));
+    const places = r.cards.find((c) => c.type === "places");
+    expect(places && places.type === "places" && places.places[0].placeId).toBe("p");
+    const help = r.cards.find((c) => c.type === "help_points");
+    expect(help && help.type === "help_points" && help.points.every((p) => typeof p.placeId === "string" || p.placeId === undefined)).toBe(true);
+    const trip = r.cards.find((c) => c.type === "trip");
+    expect(trip && trip.type === "trip" && trip.destination.placeId).toBe("p");
+    expect(JSON.stringify(calls.map((c) => c.messages))).not.toMatch(/placeId/);
+  });
   it("a private conversation's earlier turn reaches the model as context for a clarification", async () => {
     const { client, calls } = mockClient([{ text: "Got it — near Science Faculty. When are you going?" }]);
     const history = [{ role: "user" as const, text: "I am going to dinner at Hauz Khas." }, { role: "assistant" as const, text: "Where are you starting from, and when?" }];

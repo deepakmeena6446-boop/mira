@@ -40,7 +40,7 @@ describe("saveEligibility", () => {
 describe("queryFor and the tab session (main and return flows)", () => {
   it("keeps her typed words, never a Google display name", () => {
     expect(queryFor({ name: "Synthetic Google Place — test only", lat: 1, lon: 1, source: "search", placeId: "g:x", typed: "hauz khas" })).toBe("hauz khas");
-    expect(queryFor({ name: "Synthetic Google Place — test only", lat: 1, lon: 1, source: "search", placeId: "g:x" })).toBe("");
+    expect(queryFor({ name: "Synthetic Google Place — test only", lat: 1, lon: 1, source: "search", placeId: "g:x" })).toBe("Place you chose");
     expect(queryFor({ name: "Vishwavidyalaya Metro Gate No. 3", lat: 1, lon: 1, source: "search", placeId: "osm:9" })).toBe("Vishwavidyalaya Metro Gate No. 3");
     expect(queryFor({ name: "Home", lat: 1, lon: 1, source: "saved_place", placeId: "p1", typed: "ho" })).toBe("Home");
   });

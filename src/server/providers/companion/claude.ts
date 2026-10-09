@@ -333,7 +333,7 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
   const context = contextBlock({ firstName, email: tools.emailOn(), now: ctx, saved, contacts, trip, coverage: tools.coverage(), signedIn: tools.signedIn?.() ?? true, plan: tools.planSummary?.() ?? null }); // stubbed tools (tests, eval) may omit these
 
   const allowed = allowedNumbers(ctx.country);
-  const refs = new Map<string, { name: string; lat: number; lon: number }>();
+  const refs = new Map<string, { name: string; lat: number; lon: number; placeId?: string }>();
   let lookedAround = false; // a place list ran: the reply describes what's around her
   const sensitive: string[] = [];
   let spoken = "";
@@ -362,11 +362,11 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
         if (around) sensitive.push(around.name);
         const list = found.map((p) => {
           const ref = `p${refs.size + 1}`;
-          refs.set(ref, { name: p.name, lat: p.lat, lon: p.lon });
+          refs.set(ref, { name: p.name, lat: p.lat, lon: p.lon, placeId: p.id });
           sensitive.push(p.name);
           return { place_ref: ref, name: p.name, kind: p.kind, distance_m: p.distanceM ?? null, listed_hours: p.hours ?? "hours not known", open_now: p.openNow };
         });
-        const card: MiraCard | undefined = found.length ? { type: "places", title: around ? `Near ${around.name}` : "Close by", places: found.map((p) => ({ name: p.name, kind: p.kind, distanceM: p.distanceM, lat: p.lat, lon: p.lon })) } : undefined;
+        const card: MiraCard | undefined = found.length ? { type: "places", title: around ? `Near ${around.name}` : "Close by", places: found.map((p) => ({ name: p.name, kind: p.kind, distanceM: p.distanceM, lat: p.lat, lon: p.lon, placeId: p.id })) } : undefined;
         return {
           result: list.length
             ? { searched_around: around ? `her destination (${around.name}), not where she is` : "where she is", places: list, note: 'Hours are as the map lists them; they can be out of date. Say open only when open_now is "open".' }
@@ -382,7 +382,7 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
         if (failed) return { result: { lookup_failed: "MIRA couldn't check Help Points just now (the map lookup failed). Say you couldn't check — never that there are none. The Emergency button still works." } };
         const list = found.map((p) => {
           const ref = `h${refs.size + 1}`;
-          refs.set(ref, { name: p.name, lat: p.lat, lon: p.lon });
+          refs.set(ref, { name: p.name, lat: p.lat, lon: p.lon, placeId: p.placeId });
           sensitive.push(p.name);
           return { place_ref: ref, name: p.name, class: p.label, walk_minutes_estimate: p.minutes, hours: p.hours, source: p.source };
         });
@@ -419,7 +419,7 @@ export async function* claudeMira(opts: ClaudeMiraOptions): AsyncGenerator<MiraE
       case "propose_trip": {
         const savedPlace = typeof input.saved_place === "string" ? saved.find((p) => p.label.toLowerCase() === (input.saved_place as string).toLowerCase()) : undefined;
         const ref = typeof input.place_ref === "string" ? refs.get(input.place_ref) : undefined;
-        const dest = savedPlace ? { name: savedPlace.label, lat: savedPlace.lat, lon: savedPlace.lon, savedPlaceId: savedPlace.id } : ref ? { name: ref.name, lat: ref.lat, lon: ref.lon } : null;
+        const dest = savedPlace ? { name: savedPlace.label, lat: savedPlace.lat, lon: savedPlace.lon, savedPlaceId: savedPlace.id } : ref ? { name: ref.name, lat: ref.lat, lon: ref.lon, ...(ref.placeId ? { placeId: ref.placeId } : {}) } : null;
         if (!dest) return { result: { error: "Unknown destination. Use a saved place label or a place_ref from find_nearby / find_help_points." } };
         const mode = (input.mode as MiraTripMode | undefined) ?? "walk";
         const { context: known, ...t } = await tools.proposeTrip(dest, mode);
