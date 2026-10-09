@@ -220,5 +220,189 @@ chat must state the observed result. Never pre-write a successful push.
 
 ## Implementation report
 
-Not started. This package is documentation preparation only; no application
-features have been changed. The preparation verification baseline is in 04.
+Classification: **Implemented and locally verified, with listed gaps.** Human,
+physical-device and live-provider checks were not run. The repository's production
+NOT READY verdict is unchanged. Nothing was merged to `main` or deployed.
+
+### Base, branch and commits
+
+- Branch `sprint/mira-companion-48h`. Documentation base `9640f1b`; application base
+  `7ac26b3`. The worktree was clean on arrival and no other work existed to preserve.
+- Commits, in order:
+  1. `594dec3` feat(companion): lead home with outing and local-context actions
+  2. `58c7854` fix(companion): enforce evidence and fallback boundaries
+  3. `ef5fc6c` fix(companion): make saving and private context predictable
+  4. `a2e497e` feat(companion): prioritise sourced context and next actions
+  5. `5b6336c` fix(companion): align support and contribution with actual capabilities
+  6. `0f0308a` test(companion): follow the follower page's corrected invite wording
+     (final code commit)
+- Commits 2 and 3 were each type-checked and unit-tested on their own in a temporary
+  worktree (931 and 937 unit tests passed).
+
+### Delivered, by outcome
+
+- **M1 Home** (`src/app/(app)/HomeNow.tsx`, `src/components/mira/Situations.tsx`): order
+  is purpose, then the ask input ("Ask Mira"), then "Plan an outing" and "Around a
+  place". Run/travel presets follow. One row offers an open journey first, then this
+  tab's plan, then the latest saved plan. Removed from Home: the first-open
+  `LocationAsk`, Help Point ratio stats, the contribution card and the automatic
+  local-update digest. The live card appears only after she has chosen location, and
+  only below her own job. "I'm with you until you check in" is gone; the row names
+  "I'm here" as the real end. "Use my location" inside a flow is now a one-time request
+  (`requestLocation`). Only the You → App setting turns location on at every open, and
+  an existing affirmative setting is kept.
+- **M2 Plan/Around** (`plan/PlanDecision.tsx`, `around/AroundNow.tsx`): the named-place
+  path works for a guest without GPS. Around says "Around <place>, not your current
+  position" and opens place search in place. When Mira learns the place's time zone,
+  "Now" keeps the same instant (`departureForZone`). Before this fix, a phone on UTC
+  planning "now" in Delhi was shifted 5½ hours, which caused the baseline
+  `v-phase1-core` failure at UTC.
+- **M3 short answer** (`src/domain/companion-brief.ts`, `planBrief` in `src/lib/brief.ts`,
+  `BriefSummary` in `src/components/mira/Evidence.tsx`):
+  - Shows an acknowledgement, at most three qualified items and one limitation line.
+    Item order is her constraint, then what the next action needs, then
+    time-sensitive context, then one secondary fact. Unknowns stay in the detail.
+  - Labels daylight as "Calculated · Solar calculation, not weather or visibility".
+    Transit carries "This is a route estimate; I haven't verified services at <time>".
+  - Plan: the map sits behind "View map". The action bar has two actions; "Change
+    time" and "Ask Mira" sit in the answer. "What Mira checked" keeps every claim.
+- **M4 actions**: GoSheet, Trip, sharing and SafetyAccess were not changed. Existing
+  consent and foreground-location wording was checked and kept (Trip: "location updates
+  are paused" while hidden).
+- **M5 continuity**:
+  - `src/domain/plan-save.ts` gives the save-eligibility reason before the tap in both
+    PlanDecision and PlanScreen. The server guard in `saved-plans.ts` uses the same
+    rules and stays authoritative.
+  - `queryFor` keeps what she typed (or her saved-place label) as the plan's query, so
+    a Google display name is never stored as hers. This covers the main, return and
+    stop paths and Around.
+  - A remembered travel mode is the default for a new outing; her own choice wins.
+  - Help Point exclusions now apply on Home, Plan and Around.
+  - A reopened plan whose time has passed asks for a new time.
+- **M6 contribution**: Around shows an optional "Correct this information" action after
+  the context (`src/components/app/PlaceCorrection.tsx`, existing correction endpoint and
+  rules). Contribution moved after the detail. Private reports say "Submitted privately".
+- **M7 failure and privacy**:
+  - `/api/mira` decides on the server whether a turn is stored
+    (`src/server/providers/companion/history.ts`). Turns with a plan, a movement
+    sentence (including the first one, sent with `plan: null`), the device location,
+    or the validated `ephemeral: true` flag are not stored.
+  - Trip cards are never stored.
+  - Home, Plan and Around hand-offs set the flag; MiraChat carries it on follow-ups and
+    shows the mode from `x-mira-history`.
+  - Offline saves say nothing was saved.
+- **C1/T03**: a new always-on `unsupported_assurance` output check. It catches asserted
+  place verdicts, "safest route", "no incidents", help "on its way" and "you're safe
+  with Mira", after the existing allowed refusals and questions. Bare safety words
+  stay allowed in chat, per the owner's decision.
+- **C3**: `companionNewsEligibility` implements 03 §C. Current `SafetyUpdate` data has no
+  source-supplied current action or expiry, so automatic news is **absent** from
+  summaries by design.
+  - The detail says "indexed for this area", "first indexed" and "location as reported".
+  - An empty result no longer reads as an absence of incidents.
+- **C2/C4/C5**: no live provider is configured, so all runs use the existing OSM pilot,
+  community and email paths. Mailpit delivery is simulated.
+
+### Verification (local container, Node 22.22.0)
+
+Environment:
+- Local PostGIS and Mailpit via `docker compose` on fresh volumes.
+- `mira_test` and `mira_e2e` were confirmed as the test targets.
+- `.env.local` was generated once with `npm run env:local` because it was missing. Its
+  output was kept out of Git and out of this report.
+
+| Check | Result |
+| --- | --- |
+| T00 baseline at `9640f1b` | lint 0; typecheck 0; unit 87/87 files, 903/903 (04's two failures did **not** reproduce here); integration 36/36, 200/200; build 0; 8/9 core mobile e2e |
+| `npm run lint` / `npm run typecheck` | exit 0 / exit 0 |
+| `npm run test:unit` | exit 0; 90/90 files, 956/956 tests |
+| `npm run test:integration` | exit 0; 36/36 files, 201/201 tests |
+| `npm run build` / `npm run audit:bundle` | exit 0 / exit 0 (130 files, no secrets) |
+| Playwright mobile (Pixel 7), full suite | 68 passed, 2 failed, 1 skipped; plus 4 local screenshot-only tests |
+| Playwright desktop (1280×900), full suite | 63 passed, 3 failed, 5 skipped; plus 4 local screenshot-only tests |
+| a-share-trip, rerun after the assertion fix | 4/4 passed (mobile and desktop) |
+
+Browser runs used:
+- Chromium 1194 at `/opt/pw-browsers/chromium`, via an untracked
+  `playwright.local.config.ts`, because the pinned headless shell 1243 is not
+  installed here.
+- Fixture mode: the deterministic companion, the sourced pilot import, labelled
+  sample news and Mailpit. This is simulation, not live or device evidence.
+
+Remaining e2e failures:
+- `o-phase-four-journey.spec.ts:113` (S1 loop start after a permission is granted
+  mid-test) fails identically at base `9640f1b` (verified in a separate worktree). It
+  is pre-existing and was not changed.
+- `f-mobile-extras.spec.ts:76` on desktop reports the installability error
+  `in-incognito`. The substituted full Chromium treats test contexts as incognito, so
+  this is environmental. It was not verified against the pinned shell.
+- `a-share-trip.spec.ts:5` asserted the old follower invite wording. It is fixed in
+  `0f0308a` and passed on rerun.
+- `d-reports.spec.ts:14` failed before `.env.local` existed, because the release CLI
+  couldn't validate its env. It passed afterwards.
+
+Screenshots:
+- Home, Plan and Around at 320×568 and 390×844 were captured and inspected (dark
+  theme, which follows the late-night clock).
+- They were taken locally under the session scratchpad and shared in the session
+  handoff. They are not committed.
+
+Acceptance IDs:
+
+| Result | IDs and evidence |
+| --- | --- |
+| **Pass** | A01 (`y-companion-entry`; `q-phase-seven-go` guest, 0 geolocation calls) |
+| | A04, A08 (`y-companion-flows`, `companion-brief.test.ts`) |
+| | A05 (`y-companion-entry`) |
+| | A07 (unit transit caveat; `p-phase-five-travel`) |
+| | A09, A11 (`companion-news-gate.test.ts`) |
+| | A13 (existing `companion.test.ts`) |
+| | A14 (scripted, `companion-output.test.ts`; no live model evaluation) |
+| | A16, A21, A22, A23 (existing suites) |
+| | A24, A25 (`companion-save.test.ts`; `y-companion-flows`) |
+| | A31 (`v2.test.ts`, `audit.test.ts`) |
+| | A32 (`e-privacy`) |
+| | A35 (except the pre-existing S1 failure above) |
+| **Partial** | A03: send-once from Home passes; browser back was not separately exercised. |
+| | A06: unit daylight and missing-loop cases pass; the e2e S1 loop start fails at base. |
+| | A12: existing community tests pass; no new surfacing. |
+| | A15: a headline carrying instructions is withheld by the guard; no new tool-mock test. |
+| | A17: S1 fails at base; the other journey modes pass. |
+| | A19: Mailpit-simulated delivery only. |
+| | A26: mode precedence is tested in e2e; the Help Point exclusion filter has no automated test. |
+| | A27: optional correction and its account requirement are tested; a durable-account submit was not driven in a browser. |
+| | A28: denied-location path tested; no device test. |
+| | A29: zone helper and keyed responses are tested; no slow-response browser test. |
+| | A33: 320/390 overflow and screenshots checked; 200% text relies on the existing `t-urgent-text-zoom`; keyboard-only was not walked. |
+| **Not run** | A02 (no participants) |
+| | A10: blocked by data; no `SafetyUpdate` establishes present action, so the gate is always ineligible. |
+| | A18, A20 (device) |
+| | A30 (offline interception) |
+| | A34 (screen reader) |
+| | Every live-provider check (L) |
+
+### Deviations, deferred scope and limitations
+
+- Google-backed account saving is still unsupported; it is explained before the
+  save. Identifier rehydration is deferred.
+- Places handed over from Mira's cards (trip/places) carry no provider id. Their names
+  can still become a plan's query, as before this sprint.
+- Old chat history is untouched; no bulk deletion was authorised. Signed-in turns sent
+  with location are now never stored, so "nearby" questions no longer appear in
+  history.
+- Automatic news stays out of summaries until the source data can establish present
+  relevance. The labelled source browser is unchanged.
+- Notifications and tracking are unchanged:
+  - Location updates only while the page is visible.
+  - Email alerts only with a configured provider (Mailpit locally).
+  - WhatsApp is a manual send.
+  - No dispatch.
+- Stretch scope was not attempted.
+
+### Git and push
+
+- Pushes went to `refs/heads/sprint/mira-companion-48h` only, without force. The
+  remote SHA was compared with `HEAD` after each push.
+- The commit that adds this report, and the final remote SHA, are given in the
+  session handoff.
+- `main` is untouched, and nothing was deployed.
