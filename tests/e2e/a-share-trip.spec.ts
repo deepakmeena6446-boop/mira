@@ -69,7 +69,7 @@ test.describe("Core loop — onboard, save Home, share a trip live, arrive", () 
     await mum.page.goto(link);
     await expect(mum.page.getByRole("heading", { name: /Priya arrived/ })).toBeVisible();
     // The viewer → user line: quiet, and no tracking parameters.
-    await expect(mum.page.getByText("Want Mira with you on your journeys?")).toBeVisible();
+    await expect(mum.page.getByText("Want Mira for your own journeys?")).toBeVisible();
     await expect(mum.page.getByRole("link", { name: /Try Mira/ })).toHaveAttribute("href", "/");
     const after = await (await mum.page.request.get(`/api/t/${link.split("/t/")[1]}`)).json();
     expect(after.location).toBeUndefined();
