@@ -345,6 +345,15 @@ describe("Mira on Claude (mocked client)", () => {
     expect(line).not.toMatch(/Priya/);
     warn.mockRestore();
   });
+  it("a private conversation's earlier turn reaches the model as context for a clarification", async () => {
+    const { client, calls } = mockClient([{ text: "Got it — near Science Faculty. When are you going?" }]);
+    const history = [{ role: "user" as const, text: "I am going to dinner at Hauz Khas." }, { role: "assistant" as const, text: "Where are you starting from, and when?" }];
+    const r = await collect(claudeMira({ client, message: "I mean near Science Faculty.", history, tools: tools(), firstName: "A" }));
+    expect(r.text).toMatch(/Science Faculty/);
+    const sent = JSON.stringify(calls[0].messages);
+    expect(sent).toMatch(/dinner at Hauz Khas/);
+    expect(sent).toMatch(/I mean near Science Faculty/);
+  });
   it("an unsupported assurance is withheld before display: never streamed, rewritten once, then a useful fixed line", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { client } = mockClient([{ text: "You'll be safe on this route. It's 12 minutes." }, { text: "This street is well-lit and safe." }]);

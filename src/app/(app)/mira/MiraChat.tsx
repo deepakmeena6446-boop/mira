@@ -254,9 +254,28 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   const [loaded, setLoaded] = useState(false);
   const [signIn, setSignIn] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
-  const ephemeral = useRef(false);
-  /** What the server did with the last turn: kept in history, or not (plan, place, movement or location). */
-  const [historyMode, setHistoryMode] = useState<"saved" | "not_saved" | null>(null);
+  /**
+   * A private conversation (signed in): once a turn can't be kept — a plan, a movement, her location, or a question
+   * handed over from an outing or a place — every later turn stays private too, until "New conversation". Its turns
+   * live only in this screen's memory and are sent back as context; the server never stores them (sprint 03 §E).
+   * `privateFrom`: the id of the conversation's first message; `startPrivate`: a handed-over question opens one.
+   */
+  const privateFrom = useRef<string | null>(null);
+  const startPrivate = useRef(false);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const enterPrivate = (fromId: string) => {
+    if (privateFrom.current !== null) return;
+    privateFrom.current = fromId;
+    setIsPrivate(true);
+  };
+  const newConversation = () => {
+    const from = privateFrom.current;
+    privateFrom.current = null;
+    startPrivate.current = false;
+    setIsPrivate(false);
+    // The private turns leave the screen (they were never stored); saved history above them stays.
+    setMsgs((m) => { const i = from ? m.findIndex((x) => x.id === from) : -1; return i >= 0 ? m.slice(0, i) : m; });
+  };
   const [announce, setAnnounce] = useState("");
 
   useEffect(() => {
@@ -311,18 +330,24 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
     setInput("");
     const mine: Msg = { id: `u${Date.now()}`, role: "user", text: message, cards: [] };
     const reply: Msg = { id: `a${Date.now()}`, role: "assistant", text: "", cards: [], streaming: true };
+    const location = planHydrated && loc.point ? { lat: loc.point.lat, lon: loc.point.lon } : null;
+    // Decided before the first request, the same way the server decides, so even the first turn is private.
+    if (user && (startPrivate.current || plan || location || shouldSeedPlan(message))) enterPrivate(mine.id);
+    // The conversation so far, from this screen's memory: a guest's tab, or this private conversation only —
+    // never her stored chats. The server's limits apply (8 turns, 2,000 characters each).
+    const since = privateFrom.current ? msgs.findIndex((x) => x.id === privateFrom.current) : -1;
+    const own = !user ? msgs : privateFrom.current ? (since >= 0 ? msgs.slice(since) : []) : null;
+    const context = own?.filter((x) => !x.failed && x.text.trim()).slice(-8).map((x) => ({ role: x.role, text: x.text.slice(0, 2000) }));
     setMsgs((m) => [...m, mine, reply]);
     const now = new Date();
     try {
-      // Guests have no saved chat: this tab's last few turns give Mira the thread of the conversation.
-      const guestHistory = user ? undefined : msgs.filter((x) => !x.failed && x.text.trim()).slice(-8).map((x) => ({ role: x.role, text: x.text.slice(0, 2000) }));
       const res = await fetch("/api/mira", {
         method: "POST",
         headers: { "content-type": "application/json", "x-mira-request": "1" },
-        body: JSON.stringify({ message, plan, ...(ephemeral.current ? { ephemeral: true } : {}), ...(guestHistory ? { history: guestHistory, device: guestDevice() } : {}), context: { localTime: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), tz: deviceTimeZone(), location: planHydrated && loc.point ? { lat: loc.point.lat, lon: loc.point.lon } : null, area: planHydrated ? loc.area : null } }),
+        body: JSON.stringify({ message, plan, ...(user && privateFrom.current ? { ephemeral: true, history: context } : {}), ...(!user ? { history: context, device: guestDevice() } : {}), context: { localTime: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), tz: deviceTimeZone(), location, area: planHydrated ? loc.area : null } }),
       });
-      const mode = res.headers.get("x-mira-history");
-      if (mode === "saved" || mode === "not_saved") setHistoryMode(mode);
+      // The server can also decide a turn isn't kept (it has the final say): from then on the conversation is private.
+      if (user && res.headers.get("x-mira-history") === "not_saved") enterPrivate(mine.id);
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => null);
         throw new Error(err?.error?.message ?? "Mira couldn't reply just now.");
@@ -367,8 +392,8 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
     if (handed.current || !planHydrated || (user && !loaded)) return;
     handed.current = true;
     const q = takeHandedOff();
-    // A question about an outing or a place keeps this whole conversation out of history, follow-ups included.
-    if (q?.ephemeral) ephemeral.current = true;
+    // A question about an outing or a place starts a private conversation, follow-ups included.
+    if (q?.ephemeral) startPrivate.current = true;
     // Deferred a tick so the screen paints first; the question then streams in like any other.
     if (q) window.setTimeout(() => void send(q.text), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -502,7 +527,13 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
               <Icon name="send" className="size-5" />
             </button>
           </form>
-          <p className="mt-1.5 px-2 text-[0.7rem] leading-snug text-ink-subtle">Messages may be read by the configured AI provider. {!user ? "As a guest, nothing here is saved." : historyMode === "not_saved" ? "This conversation isn’t saved: it’s about a plan, a place or where you are." : "Questions about plans, places or where you are aren’t saved; other chats are kept for 30 days."} <Link href="/privacy" className="underline">Data details</Link></p>
+          {user && isPrivate ? (
+            <div role="status" className="mt-1.5 flex items-center justify-between gap-2 px-2">
+              <p className="text-[0.7rem] leading-snug text-ink-subtle">Private conversation: nothing here is saved. Mira remembers it only while this screen is open.</p>
+              <button type="button" onClick={newConversation} disabled={sending} className="min-h-11 shrink-0 text-xs font-semibold text-accent-strong">New conversation</button>
+            </div>
+          ) : null}
+          <p className="mt-1.5 px-2 text-[0.7rem] leading-snug text-ink-subtle">Messages may be read by the configured AI provider. {!user ? "As a guest, nothing here is saved." : isPrivate ? "Your other chats are kept for 30 days." : "Questions about plans, places or where you are start a private conversation that isn’t saved; other chats are kept for 30 days."} <Link href="/privacy" className="underline">Data details</Link></p>
         </div>
       </div>
       <SignInSheet open={signIn} onClose={() => setSignIn(false)} reason="Sign in to talk to Mira" />

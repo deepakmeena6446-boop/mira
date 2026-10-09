@@ -33,7 +33,10 @@ const body = z
       .strict(),
     /** The plan open in this tab, if any (check_plan reads it; never stored). */
     plan: movementIntentSchema.nullable().optional(),
-    /** A guest's last few turns from this tab (guests have no saved chat). Ignored when signed in. */
+    /**
+     * The last few turns of a conversation that isn't stored: a guest's tab, or a signed-in private conversation
+     * (sent with `ephemeral: true`). Used only as context for this reply; never written anywhere.
+     */
     history: z.array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().max(2000) }).strict()).max(8).optional(),
     /** A guest's random per-browser id, so guests behind one network (mobile carriers, campus Wi-Fi) don't share one allowance. */
     device: z.uuid().optional(),
@@ -74,7 +77,7 @@ export const POST = handle(async (req: Request) => {
   const sql = getSql();
   const user = await getUser(sql);
   const now = new Date();
-  const { message, context, plan = null, history: guestHistory = [], device, ephemeral } = await readJson(req, body, 32_768);
+  const { message, context, plan = null, history: clientHistory, device, ephemeral } = await readJson(req, body, 32_768);
   const ip = clientIp(req);
   // Guests are counted per browser within their network: hundreds of people share one address on mobile carriers
   // (CGNAT) and campus Wi-Fi, and one shared allowance left all but the first few with the scripted fallback.
@@ -88,12 +91,15 @@ export const POST = handle(async (req: Request) => {
     && (user ? true : await consume(sql, dailyKey("ip", ip, now), { bucket: "mira:guest:ip:d", max: MIRA_GUEST_NETWORK_DAILY_MAX, windowMs: 86_400_000 }, now));
   const modelAllowed = withinDaily && (await consume(sql, dailyKey("global", "mira", now), { bucket: "mira:global:d", max: Number(getEnv().MIRA_GLOBAL_DAILY_MAX ?? MIRA_GLOBAL_DAILY_DEFAULT), windowMs: 86_400_000 }, now));
   // Plan, movement, location and place-context turns are never saved; other turns are saved scrubbed of location.
-  const keep = keepTurn({ signedIn: Boolean(user), message, plan, location: context.location, ephemeral });
-  const recent = user
+  // A signed-in client that sends its own turns is in a private conversation: that alone keeps the turn unsaved.
+  const keep = keepTurn({ signedIn: Boolean(user), message, plan, location: context.location, ephemeral: ephemeral || (Boolean(user) && clientHistory !== undefined) });
+  // Context for the reply. A saved conversation reads her own stored turns; a private one reads only the turns the
+  // client kept in memory for it — never stored chats, so unrelated history doesn't mix in (sprint 03 §E).
+  const recent = user && keep
     ? await sql<{ role: "user" | "assistant"; content: Stored }[]>`
         SELECT role, content FROM (SELECT * FROM mira_messages WHERE user_id = ${user.id} ORDER BY id DESC LIMIT 12) m ORDER BY id`
     : [];
-  const history: MiraTurn[] = user ? recent.map((r) => ({ role: r.role, text: r.content.text })) : guestHistory;
+  const history: MiraTurn[] = user && keep ? recent.map((r) => ({ role: r.role, text: r.content.text })) : clientHistory ?? [];
   if (keep) await sql`INSERT INTO mira_messages (user_id, role, content) VALUES (${user!.id}, 'user', ${sql.json({ text: message })})`;
 
   const encoder = new TextEncoder();

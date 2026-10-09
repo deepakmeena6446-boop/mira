@@ -75,7 +75,37 @@ test("after a place's context, correcting it is optional and says what it needs;
   // Asking Mira about the place starts a conversation that isn't kept, and the chat says so.
   await page.getByRole("button", { name: "Ask Mira about it" }).click();
   await expect(page).toHaveURL(/\/mira$/);
-  await expect(page.getByText("This conversation isn’t saved: it’s about a plan, a place or where you are.")).toBeVisible();
+  await expect(page.getByText("Private conversation: nothing here is saved. Mira remembers it only while this screen is open.")).toBeVisible();
   expect((await (await page.request.get("/api/mira")).json()).messages).toEqual([]);
+  await ctx.close();
+});
+
+test("a movement question started in Mira stays private with its clarification, until a new conversation", async ({ browser }) => {
+  const { ctx, page } = await newUser(browser, "Tara");
+  await ctx.clearPermissions(); // no GPS: the turn is private because it's about where she is going
+  await page.goto("/mira");
+  const bodies: Array<Record<string, unknown>> = [];
+  page.on("request", (r) => { if (r.url().endsWith("/api/mira") && r.method() === "POST") bodies.push(r.postDataJSON()); });
+  const box = page.getByRole("textbox", { name: "Message Mira" });
+  await box.fill("I am going to dinner at Hauz Khas.");
+  await box.press("Enter");
+  await expect(page.getByText("Private conversation: nothing here is saved. Mira remembers it only while this screen is open.")).toBeVisible();
+  await expect(box).toBeEnabled();
+  await box.fill("I mean near Science Faculty.");
+  await box.press("Enter");
+  await expect.poll(() => bodies.length).toBe(2);
+  expect(bodies[0]).toMatchObject({ ephemeral: true, history: [] });
+  expect(bodies[1]).toMatchObject({ ephemeral: true });
+  expect((bodies[1].history as Array<{ text: string }>).map((t) => t.text)[0]).toBe("I am going to dinner at Hauz Khas.");
+  await expect(page.locator("[aria-label='Mira is checking']")).toHaveCount(0);
+  expect((await (await page.request.get("/api/mira")).json()).messages).toEqual([]);
+
+  // An explicit boundary ends it: the private turns leave the screen and the next general question is kept.
+  await page.getByRole("button", { name: "New conversation" }).click();
+  await expect(page.getByText("I am going to dinner at Hauz Khas.")).toHaveCount(0);
+  await box.fill("How do I add someone to my Circle?");
+  await box.press("Enter");
+  await expect.poll(async () => ((await (await page.request.get("/api/mira")).json()).messages as unknown[]).length).toBe(2);
+  expect(bodies[2]).not.toHaveProperty("ephemeral");
   await ctx.close();
 });
