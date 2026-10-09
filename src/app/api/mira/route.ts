@@ -10,6 +10,7 @@ import { respond, type MiraCard, type MiraTurn } from "@/server/providers/compan
 import type { MiraEvent } from "@/server/providers/companion/types";
 import { MIRA_DAILY_MAX, MIRA_GUEST_DAILY_MAX, MIRA_GUEST_NETWORK_DAILY_MAX } from "@/domain/limits";
 import { shouldSeedPlan } from "@/domain/ask-routing";
+import { keepTurn, storableCard } from "@/server/providers/companion/history";
 
 export const dynamic = "force-dynamic";
 
@@ -36,20 +37,15 @@ const body = z
     history: z.array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().max(2000) }).strict()).max(8).optional(),
     /** A guest's random per-browser id, so guests behind one network (mobile carriers, campus Wi-Fi) don't share one allowance. */
     device: z.uuid().optional(),
+    /**
+     * The person started from a plan or a place (Home's ask, Plan, Around): this conversation is about where she
+     * is going, so none of it is kept. Carried on follow-ups by the client; the server also decides on its own.
+     */
+    ephemeral: z.literal(true).optional(),
   })
   .strict();
 
 type Stored = { text: string; cards?: MiraCard[] };
-
-/**
- * Cards kept in history carry nothing about where the person was: nearby-place and Help
- * Point lists (coordinates + distances from them) aren't stored, and trip cards drop the walking time.
- */
-function storableCard(card: MiraCard): MiraCard | null {
-  if (card.type === "places" || card.type === "help_points") return null;
-  if (card.type === "trip") return { type: "trip", destination: card.destination, minutes: null, contacts: card.contacts, ...(card.mode ? { mode: card.mode } : {}), ...(card.email !== undefined ? { email: card.email } : {}) };
-  return card;
-}
 
 /** Chat history (last 50 turns). */
 export const GET = handle(async () => {
@@ -78,7 +74,7 @@ export const POST = handle(async (req: Request) => {
   const sql = getSql();
   const user = await getUser(sql);
   const now = new Date();
-  const { message, context, plan = null, history: guestHistory = [], device } = await readJson(req, body, 32_768);
+  const { message, context, plan = null, history: guestHistory = [], device, ephemeral } = await readJson(req, body, 32_768);
   const ip = clientIp(req);
   // Guests are counted per browser within their network: hundreds of people share one address on mobile carriers
   // (CGNAT) and campus Wi-Fi, and one shared allowance left all but the first few with the scripted fallback.
@@ -91,8 +87,8 @@ export const POST = handle(async (req: Request) => {
   const withinDaily = (await consume(sql, actor, { bucket: user ? "mira:d" : "mira:guest:d", max: user ? MIRA_DAILY_MAX : MIRA_GUEST_DAILY_MAX, windowMs: 86_400_000 }, now))
     && (user ? true : await consume(sql, dailyKey("ip", ip, now), { bucket: "mira:guest:ip:d", max: MIRA_GUEST_NETWORK_DAILY_MAX, windowMs: 86_400_000 }, now));
   const modelAllowed = withinDaily && (await consume(sql, dailyKey("global", "mira", now), { bucket: "mira:global:d", max: Number(getEnv().MIRA_GLOBAL_DAILY_MAX ?? MIRA_GLOBAL_DAILY_DEFAULT), windowMs: 86_400_000 }, now));
-  // Turns about a plan open in Plan follow the temporary-plan handling (never saved); other turns are saved scrubbed of location.
-  const keep = Boolean(user) && !plan;
+  // Plan, movement, location and place-context turns are never saved; other turns are saved scrubbed of location.
+  const keep = keepTurn({ signedIn: Boolean(user), message, plan, location: context.location, ephemeral });
   const recent = user
     ? await sql<{ role: "user" | "assistant"; content: Stored }[]>`
         SELECT role, content FROM (SELECT * FROM mira_messages WHERE user_id = ${user.id} ORDER BY id DESC LIMIT 12) m ORDER BY id`
@@ -147,5 +143,6 @@ export const POST = handle(async (req: Request) => {
       if (open) controller.close();
     },
   });
-  return new Response(stream, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store" } });
+  // Tells the chat which history mode this turn used, so the screen says so plainly.
+  return new Response(stream, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store", "x-mira-history": keep ? "saved" : "not_saved" } });
 });

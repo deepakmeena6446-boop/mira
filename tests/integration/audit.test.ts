@@ -153,8 +153,9 @@ describe("audit regressions", () => {
     const { messages } = await (await miraGET()).json();
     const saved = JSON.stringify(messages);
     expect(saved).not.toMatch(/Kamla Nagar|minute walk/); // …but it isn't saved
+    // Trip cards carry the destination's coordinates, so they are never stored (sprint mira-companion-48h 03 §E).
     const tripCard = messages.flatMap((m: { cards: Array<{ type: string; minutes?: number | null }> }) => m.cards).find((c: { type: string }) => c.type === "trip");
-    expect(tripCard.minutes).toBeNull();
+    expect(tripCard).toBeUndefined();
   });
 
   it("one bad trip can't block everyone else's alert, and contacts hear when the person arrives", async () => {

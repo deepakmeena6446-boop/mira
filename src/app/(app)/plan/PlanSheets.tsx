@@ -10,7 +10,20 @@ import { freshLocation, locationUsable } from "@/lib/location-store";
 import { localTimeForInstant } from "@/domain/plan-options";
 import type { SavedPlace } from "@/server/account/places";
 
-export type PickedPlace = { name: string; lat: number; lon: number; source: "search" | "saved_place" | "selected_point"; placeId?: string } | { here: true; lat: number; lon: number };
+/** `typed`: what she typed to find a search result — the only text a plan keeps as her own query. */
+export type PickedPlace = { name: string; lat: number; lon: number; source: "search" | "saved_place" | "selected_point"; placeId?: string; typed?: string } | { here: true; lat: number; lon: number };
+
+/**
+ * The query a plan stores for a picked place: her typed words for a search result, her own label for a saved
+ * place. A Google result's display name is provider content: it lives only in the tab's resolution and is
+ * never copied into a field kept as hers (sprint 01 save boundary, audit of PlanDecision.pick).
+ */
+export function queryFor(p: Exclude<PickedPlace, { here: true }>): string {
+  const typed = p.typed?.trim().slice(0, 160);
+  if (p.source === "saved_place") return p.name.slice(0, 160);
+  if (typed) return typed;
+  return p.placeId?.startsWith("g:") ? "" : p.name.slice(0, 160);
+}
 type Hit = { id: string; name: string; kind: string; lat: number; lon: number; distanceM?: number };
 
 /**
@@ -76,7 +89,7 @@ export function PlaceSheet({ open, onClose, title, onPick, saved, near, allowHer
         )) : null}
         {hits.map((h) => (
           <li key={h.id}>
-            <button type="button" onClick={() => onPick({ name: h.name, lat: h.lat, lon: h.lon, source: "search", placeId: h.id })} className="flex min-h-14 w-full items-center gap-3 py-2 text-left">
+            <button type="button" onClick={() => onPick({ name: h.name, lat: h.lat, lon: h.lon, source: "search", placeId: h.id, typed: q })} className="flex min-h-14 w-full items-center gap-3 py-2 text-left">
               <span aria-hidden className="grid size-9 place-items-center rounded-xl bg-sunken"><Icon name={kindIcon(h.kind)} className="size-[18px] text-ink-muted" /></span>
               <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{h.name}</span><span className="block truncate text-xs text-ink-muted">{h.kind}{h.distanceM !== undefined ? ` · ${h.distanceM < 1000 ? `${Math.round(h.distanceM)} m` : `${(h.distanceM / 1000).toFixed(1)} km`} away` : ""}</span></span>
             </button>

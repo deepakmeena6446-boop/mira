@@ -176,6 +176,13 @@ describe("MIRA 2.0 accounts, trips, Mira (placeholders)", () => {
     expect(events.filter((e) => e.type === "text").map((e) => e.delta).join("")).toMatch(/Home/);
     expect(events.find((e) => e.type === "card")?.card).toMatchObject({ type: "trip", destination: { name: "Home" } });
     expect(events.at(-1)).toEqual({ type: "done" });
+    // A movement turn sent with her location is shown, never kept (sprint mira-companion-48h A31).
+    expect(res.headers.get("x-mira-history")).toBe("not_saved");
+    expect((await (await miraGET()).json()).messages).toEqual([]);
+    // A general question without location is kept, and history can be cleared.
+    const general = await miraPOST(jsonRequest("/api/mira", { message: "What can you help me with?", context: { localTime: new Date().toISOString(), tzOffsetMin: -330, location: null } }));
+    expect(general.headers.get("x-mira-history")).toBe("saved");
+    await general.text();
     const hist = await (await miraGET()).json();
     expect(hist.messages.map((m: { role: string }) => m.role)).toEqual(["user", "assistant"]);
     await miraDELETE(jsonRequest("/api/mira", {}, { method: "DELETE" }));
@@ -187,6 +194,29 @@ describe("MIRA 2.0 accounts, trips, Mira (placeholders)", () => {
     expect(guest.status).toBe(200);
     expect((await guest.text()).trim().split("\n").map((l) => JSON.parse(l)).at(-1)).toEqual({ type: "done" });
     expect((await getSql()`SELECT count(*)::int AS n FROM mira_messages`)[0].n).toBe(before);
+  });
+
+  it("never stores a first movement turn, a place-context conversation or a coordinate-bearing card (A31)", async () => {
+    await signIn("Ishita");
+    const ctx = { localTime: new Date().toISOString(), tzOffsetMin: -330 };
+    const count = async () => ((await (await miraGET()).json()).messages as unknown[]).length;
+    const send = async (body: Record<string, unknown>) => { const r = await miraPOST(jsonRequest("/api/mira", body)); await r.text(); return r.headers.get("x-mira-history"); };
+    // First movement sentence: the client's plan state hasn't caught up yet, so it arrives with plan: null.
+    expect(await send({ message: "I'm walking to Vishwavidyalaya metro at 10 pm", plan: null, context: { ...ctx, location: null } })).toBe("not_saved");
+    // A named-place question started from Around or Home, and its follow-up, carry the ephemeral flag.
+    expect(await send({ message: "What should I know before going to Hauz Khas?", ephemeral: true, context: { ...ctx, location: null } })).toBe("not_saved");
+    expect(await send({ message: "And what about later tonight?", ephemeral: true, context: { ...ctx, location: null } })).toBe("not_saved");
+    // Any turn sent with her position.
+    expect(await send({ message: "What's open nearby?", context: { ...ctx, location: START } })).toBe("not_saved");
+    expect(await count()).toBe(0);
+    // An unrelated question is kept, without coordinates.
+    expect(await send({ message: "How do I add someone to my Circle?", context: { ...ctx, location: null } })).toBe("saved");
+    expect(await count()).toBe(2);
+    const stored = JSON.stringify((await (await miraGET()).json()).messages);
+    expect(stored).not.toMatch(/28\.\d{3}|77\.\d{3}|"lat"|"lon"/);
+    // The flag is validated: only `true` is accepted.
+    const bad = await miraPOST(jsonRequest("/api/mira", { message: "hi", ephemeral: "yes", context: { ...ctx, location: null } }));
+    expect(bad.status).toBe(400);
   });
 
   it("works worldwide: honest approximate routes and geohash reports anywhere", async () => {

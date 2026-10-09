@@ -1,6 +1,7 @@
 import "server-only";
 import type postgres from "postgres";
-import { planDraftSchema, intentFromDraft, intentFromLeg, type PlanDraft } from "@/domain/plan-state";
+import { planDraftSchema, type PlanDraft } from "@/domain/plan-state";
+import { saveEligibility } from "@/domain/plan-save";
 import { decryptText, encryptText } from "@/server/crypto";
 import { badRequest, conflict } from "@/server/http/errors";
 
@@ -19,18 +20,14 @@ function readable(row: Row): SavedPlan {
   };
 }
 
-function hasGoogleContent(place: { resolution?: { placeId?: string } | null }) {
-  return place.resolution?.placeId?.startsWith("g:") ?? false;
-}
-
-/** Save only a complete, explicit named-origin plan. No device point or Google result is archived. */
+/**
+ * Save only a complete, explicit named-origin plan. No device point or Google result is archived. The rules are
+ * the shared saveEligibility (the plan screens show the same message before she taps Save); this is authoritative.
+ */
 function checkedDraft(input: PlanDraft): PlanDraft {
   const draft = planDraftSchema.parse(input);
-  if (draft.origin.kind !== "named" || !intentFromDraft(draft)) throw badRequest("incomplete_plan", "Complete a named-origin plan before saving it. A current GPS point cannot be saved.");
-  if (hasGoogleContent(draft.origin) || hasGoogleContent(draft.destination) || draft.legs?.some((leg) => hasGoogleContent(leg.origin) || hasGoogleContent(leg.destination))) {
-    throw badRequest("provider_content", "Choose a Mira search result before saving this plan.");
-  }
-  if (draft.legs?.some((leg) => !intentFromLeg(leg))) throw badRequest("incomplete_leg", "Complete each added travel leg before saving the plan.");
+  const eligible = saveEligibility(draft, { signedIn: true });
+  if (!eligible.ok) throw badRequest(eligible.code, eligible.message);
   const { savedId: _drop, ...stored } = draft;
   void _drop;
   return stored;

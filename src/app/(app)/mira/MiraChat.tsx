@@ -16,7 +16,7 @@ import { RootHeader } from "@/components/mira/Frame";
 import { SkyCard, skyAt } from "@/components/mira/LiveNow";
 import { EvidenceGlyph, EVIDENCE_LABEL, type EvidenceKind } from "@/components/mira/Evidence";
 import { api } from "@/lib/api-client";
-import { takeHandedOffAsk } from "@/lib/ask-handoff";
+import { takeHandedOff } from "@/lib/ask-handoff";
 import { freshLocation, setPendingDestination, useClock, useLocation, usableLocationPoint } from "@/lib/location-store";
 import type { MiraCard } from "@/server/providers/companion/types";
 import { circleSharingLine } from "@/domain/companion-output";
@@ -254,6 +254,9 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   const [loaded, setLoaded] = useState(false);
   const [signIn, setSignIn] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const ephemeral = useRef(false);
+  /** What the server did with the last turn: kept in history, or not (plan, place, movement or location). */
+  const [historyMode, setHistoryMode] = useState<"saved" | "not_saved" | null>(null);
   const [announce, setAnnounce] = useState("");
 
   useEffect(() => {
@@ -316,8 +319,10 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
       const res = await fetch("/api/mira", {
         method: "POST",
         headers: { "content-type": "application/json", "x-mira-request": "1" },
-        body: JSON.stringify({ message, plan, ...(guestHistory ? { history: guestHistory, device: guestDevice() } : {}), context: { localTime: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), tz: deviceTimeZone(), location: planHydrated && loc.point ? { lat: loc.point.lat, lon: loc.point.lon } : null, area: planHydrated ? loc.area : null } }),
+        body: JSON.stringify({ message, plan, ...(ephemeral.current ? { ephemeral: true } : {}), ...(guestHistory ? { history: guestHistory, device: guestDevice() } : {}), context: { localTime: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), tz: deviceTimeZone(), location: planHydrated && loc.point ? { lat: loc.point.lat, lon: loc.point.lon } : null, area: planHydrated ? loc.area : null } }),
       });
+      const mode = res.headers.get("x-mira-history");
+      if (mode === "saved" || mode === "not_saved") setHistoryMode(mode);
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => null);
         throw new Error(err?.error?.message ?? "Mira couldn't reply just now.");
@@ -361,9 +366,11 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   useEffect(() => {
     if (handed.current || !planHydrated || (user && !loaded)) return;
     handed.current = true;
-    const q = takeHandedOffAsk();
+    const q = takeHandedOff();
+    // A question about an outing or a place keeps this whole conversation out of history, follow-ups included.
+    if (q?.ephemeral) ephemeral.current = true;
     // Deferred a tick so the screen paints first; the question then streams in like any other.
-    if (q) window.setTimeout(() => void send(q), 0);
+    if (q) window.setTimeout(() => void send(q.text), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planHydrated, loaded, user]);
 
@@ -495,7 +502,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
               <Icon name="send" className="size-5" />
             </button>
           </form>
-          <p className="mt-1.5 px-2 text-[0.7rem] leading-snug text-ink-subtle">Messages may be read by the configured AI provider. {user ? "Questions about an open plan aren’t saved; other chats are kept for 30 days." : "As a guest, nothing here is saved."} <Link href="/privacy" className="underline">Data details</Link></p>
+          <p className="mt-1.5 px-2 text-[0.7rem] leading-snug text-ink-subtle">Messages may be read by the configured AI provider. {!user ? "As a guest, nothing here is saved." : historyMode === "not_saved" ? "This conversation isn’t saved: it’s about a plan, a place or where you are." : "Questions about plans, places or where you are aren’t saved; other chats are kept for 30 days."} <Link href="/privacy" className="underline">Data details</Link></p>
         </div>
       </div>
       <SignInSheet open={signIn} onClose={() => setSignIn(false)} reason="Sign in to talk to Mira" />
