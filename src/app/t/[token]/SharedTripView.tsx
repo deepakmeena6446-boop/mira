@@ -99,7 +99,7 @@ Live sharing is off. Mira doesn&apos;t keep a record of the trip.
         </p>
         {/* The viewer → user loop: one quiet card, no referral ids, no tracking parameters. */}
         <div className="mt-8 w-full max-w-sm m-card p-5 text-left">
-          <p className="font-semibold">Want Mira with you on your journeys?</p>
+          <p className="font-semibold">Want Mira for your own journeys?</p>
           <p className="mt-1 text-sm text-ink-muted">See what&apos;s known about the way before you go, share your journey in one tap, and it ends by itself when you arrive. No account needed to follow someone.</p>
           <Link href="/" className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-accent-soft px-4 text-sm font-semibold text-accent-strong">
             Try Mira <Icon name="arrow" className="size-4" />
