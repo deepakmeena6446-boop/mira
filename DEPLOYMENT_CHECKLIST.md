@@ -8,11 +8,13 @@ Never paste a secret into chat, a commit, CI logs or this file. Read values from
 
 - [ ] `git status --short` is empty and the commit to ship is recorded (`git rev-parse HEAD`).
 - [ ] On that commit: `npm ci && npm run lint && npm run typecheck && npm test && npm run build` all pass (see BETA_RELEASE_REPORT.md for the last recorded run).
-- [ ] Staging and production deploy the **same** commit.
+- [ ] Staging and production deploy the **same** approved commit. Dependency fixes require a new candidate SHA and fresh checks.
+- [ ] CI actually ran and is green on that SHA; a billing-blocked job is not a code-test failure or a pass.
+- [ ] Review a fresh dependency audit; resolve or explicitly review remaining findings before release. Current evidence: [readiness record](docs/deploy/READINESS_2026-10-06.md).
 
 ## 1. Owner accounts (start these first — DNS and reviews take time)
 
-- [ ] Railway plan active (the trial has expired on the current account — a paid plan is needed before `railway init`).
+- [ ] Railway plan and billing approved. Volume backups and point-in-time recovery require Pro (dashboard verified 2026-10-04); verify the current plan rather than assuming a trial has expired.
 - [ ] A domain you control, e.g. `mira.example.org` (plus `staging.mira.example.org`).
 - [ ] Optional: Resend account with a verified sending domain (SPF, DKIM, DMARC) — only for invites and the automatic missed-arrival email. WhatsApp contacts need nothing.
 - [ ] Google Cloud: the existing Maps keys get API + referrer restrictions (step 5), a budget alert and per-API quotas; create the sign-in OAuth client (step 6).
@@ -31,11 +33,11 @@ npx web-push generate-vapid-keys   # VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY
 
 ## 3. Create the production database
 
-- [ ] `railway init --name mira`
+- [ ] Owner approves production creation. Reuse project `29b72709-5ec7-45d8-afa9-a99b43bdfe20`: `railway link --project 29b72709-5ec7-45d8-afa9-a99b43bdfe20 --environment production`, then `railway status --json` confirms Mira / production.
 - [ ] `postgis` service from image `postgis/postgis:17-3.5` with `POSTGRES_USER=mira`, `POSTGRES_DB=mira`, `PGDATA=/var/lib/postgresql/data/pgdata`.
-- [ ] Set `POSTGRES_PASSWORD` **before** its first boot; attach a volume at `/var/lib/postgresql/data`.
+- [ ] Set fresh `POSTGRES_PASSWORD` **before** its first boot; link `postgis` with `railway service link postgis`, verify production with `railway status --json`, then `railway volume add --mount-path /var/lib/postgresql/data`. CLI 4.57.3 has no `volume add --service` flag.
 - [ ] No public TCP proxy on `postgis` (private network only).
-- [ ] Enable daily volume backups, retention ≤ 30 days.
+- [ ] Owner approves backup cost and entitlement. Enable Daily (6-day retention), optionally Weekly (27 days); keep Monthly disabled (89 days exceeds the ≤30-day policy). Take and verify a staging backup before migrations and rehearse recovery separately.
 
 ## 4. Create `web` and `worker` with their settings
 
@@ -44,7 +46,7 @@ npx web-push generate-vapid-keys   # VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY
 | `web` | `npm run build` | `node_modules/.bin/next start` | `node dist/migrate.mjs` | `/api/health/live` (timeout 120) | ON_FAILURE ×10 |
 | `worker` | `npm run worker:build` | `node dist/worker.mjs` | — | — | ALWAYS |
 
-Commands: docs/DEPLOY.md §1. Verify with `railway environment config --json`.
+Commands: docs/DEPLOY.md §1. Verify with `railway environment config --json` and the active deployment manifest. Free/Trial does not support ALWAYS and caps ON_FAILURE at 10 restarts; the required worker policy needs a paid plan ([Railway restart policy](https://docs.railway.com/deployments/restart-policy)). Record any owner-approved free staging limitation; it does not satisfy the production topology.
 
 ## 5. Environment variables
 
@@ -69,7 +71,7 @@ Set on **web** (all before the first deploy, with `--skip-deploys`), then refere
 | `PUBLIC_BETA_STRICT` | `on` (web only) |
 | `PUBLIC_AGGREGATE_RELEASES` | `off` (web and worker) |
 | `CLIENT_IP_HEADER` / `TRUSTED_PROXY_HOPS` | `x-real-ip` / `1` |
-| `GOOGLE_MAPS_SERVER_KEY` | Places API (New), Routes API, Geocoding API only |
+| `GOOGLE_MAPS_SERVER_KEY` | Enable and allow Places API (New), Routes API, Geocoding API and Time Zone API |
 | `GOOGLE_MAPS_BROWSER_KEY` | Map Tiles API only; HTTP referrer `https://<your domain>/*` (must match `APP_BASE_URL`) |
 | `GOOGLE_PLACES_HOURS` | `on` |
 | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | both or neither |
@@ -88,7 +90,7 @@ Set on **web** (all before the first deploy, with `--skip-deploys`), then refere
 | `RAILPACK_NODE_VERSION` | — | `24` on web and worker |
 | `GOOGLE_MAX_CALLS_PER_MIN` / `GOOGLE_MAX_CALLS_PER_DAY` | 600 / 20000 per process | over → OpenStreetMap fallback |
 | `MIRA_GLOBAL_DAILY_MAX` / `MIRA_DAILY_TOKEN_MAX` | 5000 msgs / 2M tokens | over → scripted Mira |
-| `MIRA_MODEL` | `claude-sonnet-5` | |
+| `MIRA_MODEL` | `claude-sonnet-5-5` | leave unset for this release |
 | `SAFETY_UPDATES` | `gdelt` | `off` hides the section honestly |
 | `SAFETY_CLASSIFIER_MODEL` | `claude-opus-5` | |
 | `RESEND_API_KEY`, `EMAIL_FROM` | unset | `MIRA <alerts@your-verified-domain>`; adds invites + automatic missed-arrival email |
@@ -96,7 +98,9 @@ Set on **web** (all before the first deploy, with `--skip-deploys`), then refere
 
 **Development only — never in production:** `SMTP_*` (Mailpit), `ALLOW_DEMO_SIGNIN=on`, `SAFETY_UPDATES=fixture`, `MAPBOX_TOKEN` (unused).
 
-**Worker** (by reference `${{web.NAME}}`): `DATABASE_URL APP_BASE_URL SESSION_SECRET DATA_ENCRYPTION_KEY ADMIN_PASSWORD_HASH PILOT_MANIFEST_PATH MAP_TILE_URL RESEND_API_KEY EMAIL_FROM PUBLIC_AGGREGATE_RELEASES VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT GOOGLE_MAPS_SERVER_KEY GOOGLE_PLACES_HOURS OVERPASS_URL`, plus `NODE_ENV=production`. The map keys let the worker prepare MIRA Checks; without them checks are silently dropped.
+With Claude configured and budget available, every Mira message uses Claude, including guest and everyday questions. Guests are capped at 25 replies per network per day; signed-in users at 60/day. Guest traffic also spends the shared budget. Set `MIRA_GLOBAL_DAILY_MAX` explicitly and confirm the Anthropic monthly spend limit. Staging ceilings: Google 300/min and 10000/day per process, Mira 1500/day.
+
+**Worker** (by reference `${{web.NAME}}`): `DATABASE_URL APP_BASE_URL SESSION_SECRET DATA_ENCRYPTION_KEY ADMIN_PASSWORD_HASH PILOT_MANIFEST_PATH MAP_TILE_URL PUBLIC_AGGREGATE_RELEASES VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT GOOGLE_MAPS_SERVER_KEY GOOGLE_PLACES_HOURS GOOGLE_MAX_CALLS_PER_MIN OVERPASS_URL`, plus `NODE_ENV=production` and `RAILPACK_NODE_VERSION=24`. Add `RESEND_API_KEY EMAIL_FROM` by reference only when email is configured on web. The map keys let the worker prepare MIRA Checks; without them checks are silently dropped.
 
 ## 6. Google sign-in
 
@@ -114,16 +118,16 @@ Set on **web** (all before the first deploy, with `--skip-deploys`), then refere
 
 ## 8. Domain and HTTPS
 
-- [ ] `railway domain --service web --port 3000`, then `railway domain <your domain> --service web --port 3000`; add the printed CNAME/TXT.
+- [ ] Owner approves custom-domain attachment. Link production and verify `railway status --json`, then `railway domain --service web --port 3000` or `railway domain <your domain> --service web --port 3000`; add the printed CNAME/TXT. CLI 4.57.3 has no `domain --environment` flag.
 - [ ] Every subdomain of an apex domain already serves HTTPS (HSTS `includeSubDomains`).
 
 ## 9. Deploy
 
 ```bash
-railway up --service web --detach -m "MIRA beta <sha>"
-railway up --service worker --detach -m "MIRA beta <sha>"
-railway logs --service web --lines 100       # expect no config.warning you didn't intend
-railway logs --service worker --lines 100    # expect {"event":"worker.started"}
+railway up --service web --environment production --detach -m "MIRA beta <sha>"
+railway up --service worker --environment production --detach -m "MIRA beta <sha>"
+railway logs --service web --environment production --lines 100       # expect no config.warning you didn't intend
+railway logs --service worker --environment production --lines 100    # expect {"event":"worker.started"}
 ```
 
 Pre-deploy runs `node dist/migrate.mjs` (forward-only, additive; `0000` creates the PostGIS, pg_trgm and pgcrypto extensions; a failure stops the deploy with the old version serving). Never run a destructive reset against production.
@@ -131,13 +135,13 @@ Pre-deploy runs `node dist/migrate.mjs` (forward-only, additive; `0000` creates 
 ## 10. Health
 
 ```bash
-BASE=https://<your domain>
+BASE='https://<your domain>'
 curl -si $BASE/api/health/live | head -1        # HTTP/2 200
 curl -s  $BASE/api/health/ready                 # {"status":"ready"} within ~1 min (needs a worker pass)
 curl -sI $BASE/ | grep -iE 'strict-transport|content-security'
 ```
 
-- [ ] Sign in at `/admin/login`, open `/api/health/ready` in the same browser: `contactEmailProvider: "resend"`, `mira: "claude"`, worker heartbeat < 60 s.
+- [ ] Sign in at `/admin/login`, open `/api/health/ready` in the same browser: `contactEmailProvider: "resend"` if enabled, otherwise `"none"`; `mira: "claude"`, worker heartbeat < 60 s.
 - [ ] Uptime monitor on `/api/health/ready` (1–5 min, phone alert).
 
 ## 11. Smoke test
@@ -146,7 +150,7 @@ curl -sI $BASE/ | grep -iE 'strict-transport|content-security'
 
 ## 12. Optional
 
-- [ ] Pilot OpenStreetMap snapshot (fallback when Google is off/over budget): `railway ssh --service web -- node dist/pilot-import.mjs`.
+- [ ] Pilot OpenStreetMap snapshot (fallback when Google is off/over budget): `railway ssh --service web --environment production -- node dist/pilot-import.mjs`.
 
 ## Rollback
 
