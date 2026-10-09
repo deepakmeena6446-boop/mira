@@ -299,7 +299,8 @@ export function rewriteRequest(issue: CompanionOutputIssue, draft: string): stri
  */
 export function replacementLine(issue: CompanionOutputIssue, country: CountryContext, danger: boolean): string {
   if (danger) return `If you may be in danger, ${emergencySentence(country)}. The Emergency card is on your screen.`;
-  if (issue === "safety_verdict" || issue === "unsupported_assurance") return "I don't have enough verified information to make that judgement. The cards here show what MIRA can check.";
+  // Evidence-bound and deterministic: what Mira can check instead of the judgement it can't make.
+  if (issue === "safety_verdict" || issue === "unsupported_assurance") return "I can't judge whether a place or route is safe, and I can't promise how it will be. What I can show is what's checked: daylight at your time, street lighting as mapped, Help Points with their listed hours, and what isn't known. Plan an outing or open Around a place to see it.";
   return "I can't verify that from MIRA's information. Please use the cards shown here for actions and checked details.";
 }
 

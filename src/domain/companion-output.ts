@@ -41,7 +41,8 @@ const rx = (src: string) => new RegExp(src, "giu");
 
 // ── Safety verdicts ──────────────────────────────────────────────────────────────────────────
 
-const EN_VERDICT = String.raw`(?:safe|safer|safest|safely|unsafe|dangerous|dangerously|risky|sketchy|dodgy)`;
+// "well-lit" is a verdict on a street (map tags say mapped as lit, not whether lamps work tonight).
+const EN_VERDICT = String.raw`(?:safe|safer|safest|safely|unsafe|dangerous|dangerously|risky|sketchy|dodgy|well[- ]lit)`;
 
 /**
  * Constructions that contain a verdict word without asserting a verdict. Removed before the
@@ -104,9 +105,21 @@ const OTHER_ALLOWED = [
   rx(String.raw`${B}(?:estoy|estás|está|estamos|no estoy|estou|está|sono|sei|siamo)\s+(?:muy\s+|del todo\s+|tan\s+)?segur[oa]s?${E}|${B}(?:sono|sei|siamo)\s+(?:del tutto\s+)?sicur[oaie]${E}`), // "I'm (not) sure"
 ];
 
-function hasVerdict(view: string): boolean {
+/**
+ * Wishes and sign-offs that assert nothing about a place ("Stay safe", "safe travels", "I hope you get home
+ * safely"). Allowed in Mira's chat only: the strict check (briefs, eval) still rejects them.
+ */
+const WISH_ALLOWED = [
+  rx(String.raw`${B}(?:stay|keep|be)\s+safe${E}(?!\s+(?:on|in|at|along|through|there|here|with)${E})`),
+  rx(String.raw`${B}safe\s+(?:travels?|trip|journey|run|walk)${E}(?!\s+(?:on|in|at|along|through|there|here)${E})`),
+  rx(String.raw`${B}(?:i\s+)?hope\s+(?:you\s+)?(?:get|got|make it|reach|are|'re|feel)\s+(?:(?:home|back|there)\s+)?(?:safe|safely)${E}`),
+  rx(String.raw`${B}(?:travel|get home|get back|get there|reach home|go home)\s+safe(?:ly)?${E}(?!\s+(?:on|in|at|along|through|via|by)${E})`),
+  rx(String.raw`${B}safe\s+(?:rehna|rehnaa|raho|rahiye|pahuncho|pahunchna)${E}`),
+];
+
+function hasVerdict(view: string, { wishes = false }: { wishes?: boolean } = {}): boolean {
   let t = view;
-  for (const a of [...EN_ALLOWED, ...OTHER_ALLOWED]) t = t.replace(a, " ");
+  for (const a of [...EN_ALLOWED, ...OTHER_ALLOWED, ...(wishes ? WISH_ALLOWED : [])]) t = t.replace(a, " ");
   t = t.replace(EN_QUESTION, (q) => (/\b(?:safer|safest)\b/i.test(q) ? q : " "));
   return VERDICT_PATTERNS.some((p) => {
     p.lastIndex = 0;
@@ -126,6 +139,8 @@ const ASSURANCE_PATTERNS: RegExp[] = [
   rx(String.raw`${B}${PLACE}\s+(?:is|are|'s|looks|look|seems|seem|will be|should be|would be|feels|stays)\s+(?:(?:completely|totally|perfectly|very|quite|pretty|really|generally|usually|definitely|absolutely|fairly|mostly|reasonably)\s+)?(?:safe|fine|secure|dangerous|unsafe|risky)${E}`),
   // Rankings: "the safest route", "a safer way"
   rx(String.raw`${B}(?:safest|safer)\s+(?:[\p{L}-]+\s+)?${PLACE}${E}`),
+  // Absence presented as reassurance: "no safety concerns", "nothing to worry about"
+  rx(String.raw`${B}(?:no|zero|without any|not any|free of)\s+(?:real\s+|major\s+|known\s+|particular\s+|serious\s+)?(?:safety|security)\s+(?:concerns?|issues?|risks?|problems?|threats?)${E}|${B}nothing\s+to\s+worry\s+about${E}|${B}no\s+(?:need|reason)\s+to\s+worry${E}`),
   // Absence presented as reassurance: "no incidents", "zero crime here"
   rx(String.raw`${B}(?:no|zero|never any)\s+(?:recent\s+|reported\s+)?(?:incidents?|crimes?)${E}(?!\s+(?:data|information|info|records?|statistics|stats|sources?|feeds?|maps?))`),
   // Help that Mira can't establish: available, staffed or on its way
@@ -213,18 +228,21 @@ export function allowedNumbers(ctx: CountryContext): string[] {
 }
 
 /**
- * `checkVerdicts: false` (Mira's chat): safety wording is left to the model's own understanding of her language — a word
- * filter can't tell "main koi route safe nahi bol sakti" from a verdict, and rejecting a whole helpful answer for it
- * ruined replies (owner, 2026-10-04). Verdict words are still logged (mira.verdict_word). Asserted assurances (see
- * ASSURANCE_PATTERNS), invented actions, promises and unverified emergency numbers are still caught: those can hurt someone.
+ * `checkVerdicts: false` (Mira's chat): refusals, questions, feelings and wishes in her language reach her whole — a
+ * bare word filter rejected "main koi route safe nahi bol sakti" and ruined replies (owner, 2026-10-04) — but any
+ * other use of a verdict word, and asserted assurances (ASSURANCE_PATTERNS), are withheld as unsupported_assurance
+ * and rewritten or replaced before display. Invented actions, promises and unverified emergency numbers are caught too.
  */
 export function companionOutputIssue(text: string, allowedEmergencyNumbers: readonly string[], { checkVerdicts = true }: { checkVerdicts?: boolean } = {}): CompanionOutputIssue | null {
   const norm = normaliseForCheck(text);
   const folded = foldConfusables(norm);
   const views = folded === norm ? [norm] : [norm, folded];
-  if (checkVerdicts && views.some(hasVerdict)) return "safety_verdict";
-  // Always on, chat included: asserted place verdicts, rankings, "no incidents", help on its way.
-  if (views.some(hasAssurance)) return "unsupported_assurance";
+  if (checkVerdicts && views.some((v) => hasVerdict(v))) return "safety_verdict";
+  // Always on, chat included (sprint mira-companion-48h 03 §D). Default-deny: any verdict word is withheld unless it
+  // sits in a construction that asserts nothing — a refusal, a question, her own feeling, a movement imperative, a
+  // condition or a wish. The shape list (ASSURANCE_PATTERNS) adds claims made without a verdict word. Neither list
+  // is complete protection; consequential facts come from deterministic, sourced cards, not from model prose.
+  if (views.some((v) => hasAssurance(v) || (!checkVerdicts && hasVerdict(v, { wishes: true })))) return "unsupported_assurance";
   const hit = (ps: RegExp[]) => views.some((v) => ps.some((p) => ((p.lastIndex = 0), p.test(v))));
   if (hit(ACTION_PATTERNS)) return "invented_action";
   if (hit(PROMISE_PATTERNS)) return "unsupported_promise";

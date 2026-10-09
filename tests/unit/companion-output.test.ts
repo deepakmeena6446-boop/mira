@@ -235,6 +235,31 @@ describe("consequential assurances (chat, word filter off)", () => {
     "Help Points are listed places; staffing isn't verified.",
   ])("keeps %s", (t) => expect(chat(t)).toBeNull());
 
+  // Review 2026-10-09: probes that passed the shape list. Chat mode is now default-deny for verdict words.
+  it.each([
+    "You'll be safe on this route.",
+    "This street is well-lit and safe.",
+    "The route has no safety concerns.",
+    "It's safe to walk there after 11.",
+    "Walking there at night is perfectly safe.",
+    "That's a safe choice for tonight.",
+    "The lane is well lit, so you're fine.",
+    "Don't worry, there's nothing to worry about on that stretch.",
+    "Raat ko wahan jaana safe hai.",
+    "Yeh raasta bilkul safe rahega.",
+  ])("withholds %s (default-deny)", (t) => expect(chat(t)).toBe("unsupported_assurance"));
+
+  it.each([
+    "Stay safe out there, and message me when you're home.",
+    "Safe travels!",
+    "I hope you get home safely.",
+    "Safe rehna, aur pahunch ke batana.",
+    "I can't tell you whether it's well-lit tonight; 60% of the way is mapped as lit.",
+    "I can't say if it's safe, but the pharmacy is listed open until 10 PM.",
+    "Is the area safe at night? I can't judge that, but I can show what's checked.",
+    "Main safe/unsafe judge nahi kar sakti, par Help Points dikha sakti hoon.",
+  ])("keeps %s (wish, question or refusal)", (t) => expect(chat(t)).toBeNull());
+
   it("still catches an invented dispatch phrased as done", () => {
     expect(chat("I've called the police for you.")).toBe("invented_action");
   });

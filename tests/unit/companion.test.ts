@@ -345,6 +345,25 @@ describe("Mira on Claude (mocked client)", () => {
     expect(line).not.toMatch(/Priya/);
     warn.mockRestore();
   });
+  it("an unsupported assurance is withheld before display: never streamed, rewritten once, then a useful fixed line", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { client } = mockClient([{ text: "You'll be safe on this route. It's 12 minutes." }, { text: "This street is well-lit and safe." }]);
+    const r = await collect(claudeMira({ client, message: "is my route ok tonight?", history: [], tools: tools(), firstName: "A" }));
+    const streamed = r.events.filter((e) => e.type === "text").map((e) => (e as { delta: string }).delta).join("");
+    expect(streamed).not.toMatch(/be safe on this route|well-lit and safe/);
+    expect(streamed).toMatch(/^I can't judge whether a place or route is safe/);
+    expect(streamed).toMatch(/daylight at your time, street lighting as mapped, Help Points with their listed hours/);
+    const line = warn.mock.calls.map((c) => String(c[0])).find((l) => l.includes("mira.output_rejected"));
+    expect(JSON.parse(line!)).toMatchObject({ reason: "unsupported_assurance", recovered: false });
+    warn.mockRestore();
+  });
+  it("an unsupported assurance fixed by the rewrite keeps the useful part", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { client } = mockClient([{ text: "The route has no safety concerns. It's about 12 minutes." }, { text: "I can't judge that, but the mapped walk is about 12 minutes." }]);
+    const r = await collect(claudeMira({ client, message: "is my route ok tonight?", history: [], tools: tools(), firstName: "A" }));
+    expect(r.text).toBe("I can't judge that, but the mapped walk is about 12 minutes.");
+    warn.mockRestore();
+  });
   it("an unverified emergency number that survives the rewrite falls back to the fixed line", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { client } = mockClient([{ text: "Call 555 0199 for the police." }, { text: "Call 555 0199 for the police." }]);
