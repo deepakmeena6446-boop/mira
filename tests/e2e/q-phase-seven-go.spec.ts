@@ -10,20 +10,22 @@ test("guest Home shows Mira live, opens Plan, Mira and Around without requesting
     Object.defineProperty(navigator.geolocation, "getCurrentPosition", { configurable: true, value: () => { state.geoCalls++; } });
   });
   await page.goto("/");
-  // Phase 1 roots (D39) and the live card in its location-not-chosen state.
+  // Phase 1 roots (D39). Purpose and the first action lead; no location question, live counts or contribution ask on Home.
   await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link")).toHaveText(["Home", "Mira", "Around", "Journeys"]);
-  const live = page.getByRole("region", { name: "Right now, around you" });
-  await expect(live).toContainText("See what’s open, lit and noticed around you");
+  await expect(page.getByRole("heading", { level: 1, name: "Step out with confidence." })).toBeVisible();
+  await expect(page.getByText("Tell Mira where you're heading, or explore what matters around a place.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ask Mira" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Around a place" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Right now, around you" })).toHaveCount(0);
+  await expect(page.getByText("Let Mira use your location?")).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Official & news updates" })).toHaveCount(0);
-  // Contributing is one tap from Home, without an account.
-  await expect(page.getByRole("heading", { name: "Add what you see here" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Dark or broken street" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Add what you see here" })).toHaveCount(0);
   await page.getByRole("button", { name: "Emergency options" }).first().focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog", { name: "Emergency call options" })).toContainText("couldn't determine which country you're in");
   await page.getByRole("button", { name: "Close", exact: true }).click();
   // A situation opens the decision flow; the plan is kept across tabs.
-  await page.getByRole("link", { name: "Going somewhere" }).click();
+  await page.getByRole("link", { name: "Plan an outing" }).click();
   await expect(page).toHaveURL(/\/plan\?for=go$/);
   await expect(page.getByRole("heading", { level: 1, name: "Where are you going?" })).toBeVisible();
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Mira" }).click();
@@ -52,9 +54,9 @@ test("signed-in person explicitly saves, opens and deletes a plan without starti
   await page.getByRole("button", { name: "Save plan" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Saved to Journeys for 30 days" })).toBeVisible();
   await page.getByRole("button", { name: "Clear plan" }).click();
-  // Home's "Mira noticed" reopens it in the decision screen, asking which named places were meant.
+  // Home's one "Resume plan" row reopens it in the decision screen, asking which named places were meant.
   await page.goto("/");
-  await page.getByRole("button", { name: /Saved plan.*Visit the museum/ }).click();
+  await page.getByRole("button", { name: /^Resume plan: Visit the museum/ }).click();
   await expect(page).toHaveURL(/\/plan$/);
   await expect(page.getByText("Which “Central Station” did you mean? Tap to choose.")).toBeVisible();
   // Journeys lists the saved plan Home just opened once — as this tab's plan, by its derived name.
@@ -79,7 +81,7 @@ test("a night-out sentence on Home reaches Mira and becomes a plan without guess
     Object.defineProperty(navigator.geolocation, "getCurrentPosition", { configurable: true, value: () => { throw new Error("Planning must not request GPS"); } });
   });
   await page.goto("/");
-  await page.getByRole("textbox", { name: "Tell Mira what you’re about to do" }).fill("Dinner at 9 PM, return around midnight");
+  await page.getByRole("textbox", { name: "Where are you heading or what would you like to know?" }).fill("Dinner at 9 PM, return around midnight");
   await page.getByRole("button", { name: "Ask Mira" }).click();
   await expect(page).toHaveURL(/\/mira$/);
   // The question is handed over in memory (never in the URL) and answered from checked evidence.

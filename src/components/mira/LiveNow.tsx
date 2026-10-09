@@ -147,13 +147,15 @@ export function SkyCard({ state, label, eyebrow, aside, title, titleAs = "div", 
  * "Right now, around you": the moment Mira proves she knows something. Every number here is a
  * checked or released fact with its own screen of evidence one tap away (Around); none is a rating.
  */
-export function LiveNowCard({ now, point, area, stats, line, onLocate, locating, locationState, footer = { label: "See everything around you", href: "/around" }, eyebrow }: {
+export function LiveNowCard({ now, point, area, stats, line, onLocate, onCheckPlace, locating, locationState, footer = { label: "See everything around you", href: "/around" }, eyebrow }: {
   now: Date | null;
   point: { lat: number; lon: number } | null;
   area: string | null;
   stats: LiveStat[];
   line: React.ReactNode | null;
   onLocate: () => void;
+  /** Open place search on this screen instead of linking to Around (Around itself). */
+  onCheckPlace?: () => void;
   locating: boolean;
   locationState: "idle" | "asking" | "ok" | "denied" | "unavailable";
   footer?: { label: string; href?: string; onClick?: () => void } | null;
@@ -170,11 +172,15 @@ export function LiveNowCard({ now, point, area, stats, line, onLocate, locating,
     <SkyCard state={state} label="Right now, around you" eyebrow="Mira, around you">
       <p className="mt-3 text-[1.45rem] font-semibold leading-tight tracking-[-0.02em]">See what’s open, lit and noticed around you — right now.</p>
       <p className="mt-2 text-sm" style={{ color: sky.muted }}>
-        {locationState === "denied" ? "Location is off for Mira. Allow it in your browser’s site settings — or check any place by name." : locationState === "unavailable" ? "Couldn’t find you just now. Try again outdoors, or check a place by name." : "Your location stays on this phone while Mira is open. Mira never keeps a history of where you’ve been."}
+        {locationState === "denied" ? "Location is off for Mira. Allow it in your browser’s site settings — or check any place by name." : locationState === "unavailable" ? "Couldn’t find you just now. Try again outdoors, or check a place by name." : "Mira uses your position only for this check, while it’s open, and keeps no history of where you’ve been. Or check any place by name."}
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" data-early-tap="locate" onClick={onLocate} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-[#14213d]"><Icon name="locate" className="size-4" />{locating ? "Finding you…" : "Use my location"}</button>
-        <Link href="/around?check=1" className="inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold" style={{ background: sky.chip }}><Icon name="search" className="size-4" />Check a place</Link>
+        {onCheckPlace ? (
+          <button type="button" onClick={onCheckPlace} className="inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold" style={{ background: sky.chip }}><Icon name="search" className="size-4" />Check a place</button>
+        ) : (
+          <Link href="/around?check=1" className="inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold" style={{ background: sky.chip }}><Icon name="search" className="size-4" />Check a place</Link>
+        )}
       </div>
     </SkyCard>
   );

@@ -116,8 +116,9 @@ export async function newUser(browser: Browser, name: string): Promise<{ ctx: Br
   await fixtureIndiaReverse(page);
   await page.goto("/");
   await expect(page).toHaveURL(/\/$/);
-  // Phase 1 Home (D39): the live "Right now, around you" card leads, even before location is chosen.
-  await expect(page.getByRole("region", { name: "Right now, around you" })).toBeVisible();
+  // Companion Home (sprint 02): purpose and the first action lead; nothing asks for location on first open.
+  await expect(page.getByRole("heading", { level: 1, name: "Step out with confidence." })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Right now, around you" })).toHaveCount(0);
   await page.goto("/me");
   await page.getByRole("button", { name: "Get started" }).click();
   await page.getByPlaceholder("Your first name").fill(name);
@@ -125,9 +126,12 @@ export async function newUser(browser: Browser, name: string): Promise<{ ctx: Br
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: new RegExp(`, ${name}$`) })).toBeVisible();
-  // Location is chosen once, through the UI, on Home's live card (D12: never silently).
-  await page.getByRole("region", { name: "Right now, around you" }).getByRole("button", { name: "Use my location" }).click();
+  await expect(page.getByText(new RegExp(`, ${name}$`)).first()).toBeVisible();
+  // Location is chosen once, through the UI, with the explicit You → App setting (D12: never silently).
+  await page.goto("/me");
+  await page.getByRole("switch", { name: "Use my location when Mira opens" }).click();
+  await expect(page.getByRole("switch", { name: "Use my location when Mira opens" })).toHaveAttribute("aria-checked", "true");
+  await page.goto("/");
   await expect(page.getByRole("link", { name: /Emergency call, 112/ }).first()).toBeVisible();
   return { ctx, page };
 }

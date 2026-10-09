@@ -17,7 +17,7 @@ import { HELP_ICON } from "@/components/app/kinds";
 import { api } from "@/lib/api-client";
 import { handOffAsk } from "@/lib/ask-handoff";
 import { setPlanDraft } from "@/lib/plan-store";
-import { clearPendingDestination, peekPendingDestination, chooseLocation, setPendingDestination, shouldAutoLocate, usableLocationPoint, useClock, useLocation } from "@/lib/location-store";
+import { clearPendingDestination, peekPendingDestination, setPendingDestination, shouldAutoLocate, usableLocationPoint, useClock, useLocation } from "@/lib/location-store";
 import { useCountry } from "@/lib/locale-store";
 import { blindSpotsClaim, daylightClaim, helpClaim, hoursWords, lightingClaim, notesClaim, updatesClaim, walkTimeClaim, type Claim, type CommunityNote, type WayOption } from "@/lib/brief";
 import { HELP_CLASSES, helpWeightsFor, hoursState, isNight, rankHelpPoints, type HelpPoint } from "@/domain/help-points";
@@ -159,7 +159,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
   return (
     <div className="m-screen bg-companion">
       <div className="m-screen-inner">
-        <RootHeader emailAlerts={emailAlerts} eyebrow={place ? "Around a place" : here && loc.area ? loc.area : "Local intelligence"} title="Around" />
+        <RootHeader emailAlerts={emailAlerts} eyebrow={place ? `Around ${place.name}` : here && loc.area ? `Around you · ${loc.area}` : "Around you, or around a place you choose"} title="Around" />
 
         <button type="button" onClick={() => setSearch(true)} className="m-card m-press mt-5 flex min-h-14 w-full items-center gap-3 px-4 text-left">
           <Icon name="search" className="size-5 text-accent" />
@@ -169,7 +169,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
 
         {!focus ? (
           <div className="mt-5">
-            <LiveNowCard now={clock} point={null} area={null} stats={[]} line={null} footer={null} locating={loc.status === "asking"} locationState={loc.status} onLocate={() => { void chooseLocation(); }} />
+            <LiveNowCard now={clock} point={null} area={null} stats={[]} line={null} footer={null} locating={loc.status === "asking"} locationState={loc.status} onLocate={() => { void loc.request(); }} onCheckPlace={() => setSearch(true)} />
             <div className="mt-3"><HelpNextCard from="around" check={null} impactLine={null} signedIn={signedIn} country={country.iso ?? null} /></div>
           </div>
         ) : (
@@ -177,7 +177,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch }: 
             {/* 1. What's true here, now — the same sky card as Home, for you or for the place you chose. */}
             <div className="mt-5">
               {place ? (
-                <SkyCard state={skyAt(clock, focus)} label={`Around ${place.name}, now`} eyebrow="Around this place, now" aside={clock ? clockIn(clock) : null} titleAs="h2" title={<span className="line-clamp-2">{place.name}</span>} strip={clock ? { from: clock, point: focus } : null} stats={stats} line={line} />
+                <SkyCard state={skyAt(clock, focus)} label={`Around ${place.name}, now`} eyebrow={`Around ${place.name}, not where you are`} aside={clock ? clockIn(clock) : null} titleAs="h2" title={<span className="line-clamp-2">{place.name}</span>} strip={clock ? { from: clock, point: focus } : null} stats={stats} line={line} />
               ) : (
                 <LiveNowCard now={clock} point={focus} area={loc.area} stats={stats} line={line} footer={null} locating={false} locationState={loc.status} onLocate={() => undefined} />
               )}

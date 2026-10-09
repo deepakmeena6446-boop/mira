@@ -12,7 +12,7 @@ import { Row, RowList } from "@/components/mira/Rows";
 import { api } from "@/lib/api-client";
 import { hoursWords } from "@/lib/brief";
 import { planGoingTo } from "@/lib/plan-handoff";
-import { clearPendingDestination, peekPendingDestination, chooseLocation, setPendingReportSpot, shouldAutoLocate, usableLocationPoint, useClock, useLocation } from "@/lib/location-store";
+import { clearPendingDestination, peekPendingDestination, setPendingReportSpot, shouldAutoLocate, usableLocationPoint, useClock, useLocation } from "@/lib/location-store";
 import { useCountry } from "@/lib/locale-store";
 import { HELP_CLASSES, helpWeightsFor, hoursState, isNight, rankHelpPoints, type HelpPoint } from "@/domain/help-points";
 import { localTimeInZone } from "@/domain/opening-hours";
@@ -118,7 +118,7 @@ export function MapScreen({ emailAlerts, places, tiles }: { emailAlerts: boolean
           ) : null}
 
           {!here && !focus ? (
-            <StateNote className="mt-3" title={loc.status === "denied" ? "Location is off for Mira" : "See what’s around you"} action={loc.status === "denied" ? null : <button type="button" onClick={() => { void chooseLocation(); }} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-accent-soft px-4 text-sm font-semibold text-accent-strong"><Icon name="locate" className="size-4" />{loc.status === "asking" ? "Finding you…" : "Use my location"}</button>}>
+            <StateNote className="mt-3" title={loc.status === "denied" ? "Location is off for Mira" : "See what’s around you"} action={loc.status === "denied" ? null : <button type="button" onClick={() => { void loc.request(); }} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-accent-soft px-4 text-sm font-semibold text-accent-strong"><Icon name="locate" className="size-4" />{loc.status === "asking" ? "Finding you…" : "Use my location"}</button>}>
               {loc.status === "denied" ? "Allow it in your browser’s site settings, or check any place by name." : "Your location stays on this phone while Mira is open."}
             </StateNote>
           ) : null}

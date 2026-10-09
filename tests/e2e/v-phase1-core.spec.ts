@@ -13,7 +13,7 @@ test("signed-in person goes from Home's live card to a brief, starts privately, 
   await expectNoVerdictWords(page);
 
   // 2. A situation opens the decision flow; places are chosen explicitly.
-  await page.getByRole("link", { name: "Going somewhere" }).click();
+  await page.getByRole("link", { name: "Plan an outing" }).click();
   await expect(page).toHaveURL(/\/plan\?for=go$/);
   await page.getByRole("region", { name: "Your plan", exact: true }).getByRole("button", { name: /^From/ }).click();
   await page.getByRole("dialog").getByRole("button", { name: /Where I am now/ }).click();

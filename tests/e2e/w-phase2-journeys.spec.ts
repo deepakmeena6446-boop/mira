@@ -19,7 +19,7 @@ test("a guest's Journeys shows nothing running, the four ways to start, and why 
   await page.goto("/trips");
   await expect(page.getByRole("heading", { level: 1, name: "Journeys" })).toBeVisible();
   await expect(page.getByText("No journey right now")).toBeVisible();
-  for (const start of ["Going somewhere", "Run or walk", "Travelling", "Check a place"]) await expect(page.getByRole("link", { name: start })).toBeVisible();
+  for (const start of ["Plan an outing", "Around a place", "Run or walk", "Travelling"]) await expect(page.getByRole("link", { name: start })).toBeVisible();
   await expect(page.getByText("Keep plans and go with Mira")).toBeVisible();
   await expect(page.getByRole("region", { name: "Last 24 hours" })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { chooseLocation } from "@/lib/location-store";
+import { requestLocation } from "@/lib/location-store";
 import type { EarlyTap } from "@/domain/early-taps";
 
 type EarlyWindow = Window & { __miraEarly?: { taps: EarlyTap[]; text: Record<string, string> }; __miraReady?: boolean };
@@ -19,7 +19,8 @@ export function EarlyTaps() {
     // After every screen's effects: the sheet's listener is attached by then.
     const t = window.setTimeout(() => {
       if (taps.includes("unsafe") || taps.includes("emergency")) window.dispatchEvent(new Event("mira:need-options"));
-      if (taps.includes("locate")) void chooseLocation();
+      // "Use my location" in a flow is for now; it never turns on location for every open (that is a setting).
+      if (taps.includes("locate")) void requestLocation();
     }, 0);
     return () => window.clearTimeout(t);
   }, []);

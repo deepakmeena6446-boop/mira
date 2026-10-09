@@ -109,10 +109,13 @@ test.describe("After — one tiny factual contribution", () => {
 });
 
 test.describe("Degraded states are honest", () => {
-  test("with location denied, Home explains it, search still works, and Emergency is still one tap", async ({ browser }) => {
+  test("with location denied, Around explains it, search still works, and Emergency is still one tap", async ({ browser }) => {
     const ctx = await browser.newContext({ permissions: [], extraHTTPHeaders: { "x-forwarded-for": testClientIp() } });
     const page = await ctx.newPage();
+    // Home never asks; the choice is made where it's needed.
     await page.goto("/");
+    await expect(page.getByRole("button", { name: "Use my location" })).toHaveCount(0);
+    await page.goto("/around");
     await expect(page.getByRole("region", { name: "Right now, around you" })).toBeVisible();
     await page.getByRole("region", { name: "Right now, around you" }).getByRole("button", { name: "Use my location" }).click();
     await expect(page.getByRole("region", { name: "Right now, around you" })).toContainText("Location is off for Mira");
@@ -125,7 +128,7 @@ test.describe("Degraded states are honest", () => {
     await page.getByRole("button", { name: "I feel unsafe" }).click();
     await expect(page.getByText("Turn on location to see Help Points near you.")).toBeVisible();
     await page.getByRole("button", { name: "I'm okay now" }).click();
-    await page.getByRole("region", { name: "Right now, around you" }).getByRole("link", { name: "Check a place" }).click();
+    await page.getByRole("region", { name: "Right now, around you" }).getByRole("button", { name: "Check a place" }).click();
     await page.getByRole("dialog").getByRole("textbox").fill("Vishwavidyalaya");
     await expect(page.getByRole("button", { name: /Vishwavidyalaya/ }).first()).toBeVisible();
     await ctx.close();

@@ -9,40 +9,41 @@ import { Avatar } from "@/components/app/Avatar";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { RootHeader } from "@/components/mira/Frame";
 import { Row, RowList } from "@/components/mira/Rows";
-import { SituationChips } from "@/components/mira/Situations";
+import { SITUATIONS } from "@/components/mira/Situations";
 import { greetingKey, useT } from "@/lib/i18n";
-import { LiveNowCard, type LiveStat } from "@/components/mira/LiveNow";
-import { HelpNextCard } from "@/components/mira/HelpNext";
+import { LiveNowCard } from "@/components/mira/LiveNow";
 import { api } from "@/lib/api-client";
 import { handOffAsk } from "@/lib/ask-handoff";
-import { greetingFor, chooseLocation, shouldAutoLocate, useClock, useLocation, usableLocationPoint } from "@/lib/location-store";
+import { shouldAutoLocate, useClock, useLocation, usableLocationPoint } from "@/lib/location-store";
 import { useCountry } from "@/lib/locale-store";
 import { useCurrentTrip } from "@/lib/current-trip-store";
-import { setPlanDraft } from "@/lib/plan-store";
+import { setPlanDraft, usePlanDraft } from "@/lib/plan-store";
 import { suggestionQuery } from "@/lib/trip-start";
-import { usageMode, type UsageMode } from "@/lib/usage-signal";
 import { hoursWords } from "@/lib/brief";
 import { helpWeightsFor, hoursState, isNight, rankHelpPoints, type HelpPoint } from "@/domain/help-points";
 import { localTimeInZone } from "@/domain/opening-hours";
-import { newPlanDraft } from "@/domain/plan-state";
+import { newPlanDraft, type PlanDraft } from "@/domain/plan-state";
 import { planLine, planTitle } from "@/domain/plan-name";
-import { CATEGORY_LABEL, ageLabel, type SafetyUpdatesData } from "@/domain/safety-updates";
 import type { EvidenceState } from "@/domain/evidence-state";
 import type { HabitSuggestion } from "@/domain/habits";
 import type { SavedPlace } from "@/server/account/places";
 import type { SavedPlan } from "@/server/account/saved-plans";
-import { LocationAsk } from "@/components/app/LocationOnOpen";
 
-type Noticed = { id: string; icon: string; tone: "accent" | "dusk" | "people"; eyebrow: string; title: string; detail: string; kind: "checked" | "people" | "estimate"; onOpen: () => void };
-type Near = { key: string; help: { points: HelpPoint[]; failed: boolean } | null; notes: number | null; notesFailed: boolean };
-type Contrib = { checks: Array<{ id: string; question: string; placeName: string; options: Array<{ value: string; label: string }> }>; impact: { line: string | null } };
+type Near = { key: string; points: HelpPoint[]; failed: boolean };
 
-/** Situations, not features: each is something she is about to do. */
+/** A tab plan worth offering back: it names a place (or a named start for a loop), not just an opened form. */
+function resumable(draft: PlanDraft | null): PlanDraft | null {
+  if (!draft?.touched) return null;
+  const to = draft.destination.resolution || draft.destination.query.trim();
+  const loopFrom = draft.loop && draft.origin.kind === "named" && (draft.origin.resolution || draft.origin.query.trim());
+  return to || loopFrom ? draft : null;
+}
 
 /**
- * Home (docs/phase1-ux/01). It shows Mira instead of describing her: what is true around you right
- * now (live, sourced), where you're going, and the one-tap way to help the next person here. Mira's
- * other suggestions come last and only when real.
+ * Home (docs/sprints/mira-companion-48h/02): purpose and the first action come first — ask Mira, plan an
+ * outing, or look around a place. Nothing is counted, asked for (no location question) or requested from
+ * her before her own job; one row brings back an open journey or a plan. What's around her appears only
+ * after she has chosen to let Mira use her location.
  */
 export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serverJourneyTo }: { user: { name: string; avatarUrl: string | null } | null; places: SavedPlace[]; savedPlan: SavedPlan | null; emailAlerts: boolean; journeyTo: string | null }) {
   // The server's answer can be stale after client navigation: the shared store keeps it current.
@@ -51,77 +52,50 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
   const router = useRouter();
   const loc = useLocation(false);
   const clock = useClock();
+  const tabDraft = resumable(usePlanDraft());
   // Home doesn't send her position; when followers' view is old or empty, say how to fix it (audit P01-004).
   const staleSpot = Boolean(live?.following.length) && (live?.sharedAt === null || (live?.sharedAt != null && clock != null && clock.getTime() - new Date(live.sharedAt).getTime() >= 120_000));
   const country = useCountry();
   const point = usableLocationPoint(loc, clock?.getTime());
   const [signIn, setSignIn] = useState(false);
   const [ask, setAsk] = useState("");
-  const [usage, setUsage] = useState<UsageMode>("cold");
   const [habit, setHabit] = useState<HabitSuggestion | null>(null);
-  const [updates, setUpdates] = useState<{ key: string; data: SafetyUpdatesData | null } | null>(null);
-  const [contrib, setContrib] = useState<Contrib | null>(null);
-  const [near, setNearState] = useState<Near | null>(null);
+  const [near, setNear] = useState<Near | null>(null);
 
-  // Location is used only if she chose it before (or taps "Use my location").
+  // Location is used only if she chose it before (Settings, or "Use my location" in a flow). Home never asks.
   const idle = loc.status === "idle";
   const request = loc.request;
   useEffect(() => { if (idle && shouldAutoLocate()) void request(); }, [idle, request]);
-  useEffect(() => {
-    // Device storage exists only after mount.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setUsage(usageMode());
-  }, []);
 
-  // Her own habit and her waiting Mira Check / impact (signed in only).
+  // Her own remembered habit (signed in, and only if she turned habits on).
   useEffect(() => {
     if (!user) return;
     let live = true;
     void api<{ suggestion: HabitSuggestion | null }>(`/api/me/habits/suggestion${suggestionQuery()}`).then((r) => { if (live && r.ok) setHabit(r.data.suggestion); });
-    void api<Contrib>("/api/contribute").then((r) => { if (live && r.ok) setContrib(r.data); });
     return () => { live = false; };
   }, [user]);
 
-  // What's around: Help Points (with listed hours), released notes, and local updates — per ~100 m.
+  // Around her, only once she chose location: the nearest Help Point listed open now (no counts, no digest).
   const areaKey = point ? `${point.lat.toFixed(3)},${point.lon.toFixed(3)}` : "";
   useEffect(() => {
     if (!areaKey || !point) return;
     let live = true;
-    const at = { lat: point.lat, lon: point.lon };
-    const merge = (patch: Partial<Omit<Near, "key">>) => setNearState((n) => ({ ...(n?.key === areaKey ? n : { key: areaKey, help: null, notes: null, notesFailed: false }), ...patch }));
-    void api<{ helpPoints: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> }>("/api/geo/help", { body: { ...at, ...(country.iso ? { country: country.iso } : {}) } }).then((r) => {
-      if (live) merge({ help: { points: r.ok ? r.data.helpPoints : [], failed: !r.ok || r.data.evidence.state === "failed" } });
-    });
-    void api<{ notes: unknown[] }>("/api/community/nearby", { body: at }).then((r) => { if (live) merge({ notes: r.ok ? r.data.notes.length : 0, notesFailed: !r.ok }); });
-    void api<{ evidence: EvidenceState<SafetyUpdatesData> }>("/api/safety-updates", { body: { ...at, window: 7 } }).then((r) => {
-      if (live) setUpdates({ key: areaKey, data: r.ok && "data" in r.data.evidence ? r.data.evidence.data : null });
+    void api<{ helpPoints: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> }>("/api/geo/help", { body: { lat: point.lat, lon: point.lon, ...(country.iso ? { country: country.iso } : {}) } }).then((r) => {
+      if (live) setNear({ key: areaKey, points: r.ok ? r.data.helpPoints : [], failed: !r.ok || r.data.evidence.state === "failed" });
     });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [areaKey]);
   const nearNow = near?.key === areaKey ? near : null;
 
-  // Ranked for right now; "listed open" uses the place's own hours at this minute, never "staffed".
+  // "Listed open" uses the place's own hours at this minute, never "staffed".
   const zone = country.timezone ?? (typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : null);
   const localNow = clock ? localTimeInZone(clock, zone) : null;
-  const ranked = point && nearNow?.help ? rankHelpPoints(nearNow.help.points, point, { situation: "nearby", night: localNow ? isNight(Math.floor(localNow.minute / 60)) : false, weights: helpWeightsFor(country.iso), timeZone: zone, now: localNow ?? undefined, at: clock?.getTime() }) : [];
-  const openNow = ranked.filter((p) => { const h = hoursState(p, localNow ?? undefined, 0, clock?.getTime()); return h.kind === "open_24h" || h.kind === "open_now" || h.kind === "listed_open"; });
-  const nearestOpen = openNow[0] ?? null;
-  const helpTotal = nearNow?.help?.points.length ?? 0;
-  const helpState: LiveStat["state"] = !nearNow?.help ? "loading" : nearNow.help.failed ? "failed" : "ok";
-  const stats: LiveStat[] = [
-    { label: "Help Points open now", value: `${openNow.length}/${helpTotal}`, state: helpState },
-    { label: "to the nearest", value: nearestOpen ? `${nearestOpen.minutes} min` : "—", state: helpState },
-    // Released notes count only when there are some: publishing is off in this beta, so a stat that is
-    // always 0 would advertise something that can't appear.
-    ...(nearNow?.notes ? [{ label: nearNow.notes === 1 ? "note from people" : "notes from people", value: String(nearNow.notes), state: "ok" as const }] : []),
-  ];
-  // Home's one limitation line: staffing (Around says it in its "What Mira can't see").
+  const ranked = point && nearNow ? rankHelpPoints(nearNow.points, point, { situation: "nearby", night: localNow ? isNight(Math.floor(localNow.minute / 60)) : false, weights: helpWeightsFor(country.iso), timeZone: zone, now: localNow ?? undefined, at: clock?.getTime() }) : [];
+  const nearestOpen = ranked.find((p) => { const h = hoursState(p, localNow ?? undefined, 0, clock?.getTime()); return h.kind === "open_24h" || h.kind === "open_now" || h.kind === "listed_open"; }) ?? null;
   const line = nearestOpen ? (
     <><strong className="font-semibold text-[color:var(--sky-ink)]">{nearestOpen.name}</strong> is {hoursWords(hoursState(nearestOpen, localNow ?? undefined, 0, clock?.getTime()))}, about {nearestOpen.minutes} min away. Staffing isn’t verified.</>
-  ) : nearNow?.help && !nearNow.help.failed ? (
-    helpTotal ? <>None of the {helpTotal} Help Points near you is listed open right now. Emergency is always one tap away.</> : <>No Help Points found within a short walk in the sources Mira checked.</>
-  ) : null;
+  ) : nearNow?.failed ? <>Mira couldn’t check Help Points near you just now.</> : nearNow ? <>No Help Point near you is listed open right now in the sources Mira checked.</> : null;
 
   const startPlanTo = (to: { label: string; lat: number; lon: number; id: string }) => {
     const draft = newPlanDraft(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
@@ -129,20 +103,15 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
     router.push("/plan?for=go");
   };
 
-  // At most two, and only when real: her habit, her saved plan, one local update.
-  const noticed = useMemo<Noticed[]>(() => {
-    const list: Noticed[] = [];
-    const usual = habit ? places.find((p) => p.id === habit.placeId) : null;
-    if (habit && usual) list.push({ id: "habit", icon: "route", tone: "accent", kind: "checked", eyebrow: "Your usual", title: `${usual.label} around now`, detail: `${habit.times} of your journeys at this hour · from your own history`, onOpen: () => startPlanTo(usual) });
-    if (savedPlan) list.push({ id: "plan", icon: "clock", tone: "accent", kind: "checked", eyebrow: "Saved plan", title: savedPlan.draft.activity.trim() ? `${savedPlan.draft.activity.trim()} · ${planTitle(savedPlan.draft)}` : planTitle(savedPlan.draft), detail: planLine(savedPlan.draft), onOpen: () => { setPlanDraft({ ...savedPlan.draft, touched: true }); router.push("/plan"); } });
-    const data = updates?.key === areaKey ? updates.data : null;
-    if (data && data.updates.length) {
-      const latest = data.updates[0];
-      list.push({ id: "update", icon: "info", tone: "dusk", kind: "checked", eyebrow: "Local update", title: `${data.updates.length} recent report${data.updates.length === 1 ? "" : "s"} near here`, detail: `Latest: ${CATEGORY_LABEL[latest.category] ?? "Report"} · ${ageLabel(latest.publishedAt)} · ${latest.publisher}`, onOpen: () => router.push("/around#updates") });
-    }
-    return list.slice(0, 2);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [habit, places, savedPlan, updates, areaKey]);
+  // One way back in: an open journey first, else this tab's plan, else her latest saved plan.
+  const resume = useMemo(() => {
+    if (journeyTo !== null) return { id: "journey", icon: "footsteps", eyebrow: "Open journey", title: journeyTo ? `On the way to ${journeyTo}` : "Your journey is open", detail: staleSpot ? "Open it to share where you are now." : "It stays open until you tap “I’m here”.", href: "/trip", aria: "Open journey" };
+    const named = (d: PlanDraft) => (d.activity.trim() ? `${d.activity.trim()} · ${planTitle(d)}` : planTitle(d));
+    if (tabDraft) return { id: "tab", icon: "route", eyebrow: "Resume plan · in this tab", title: named(tabDraft), detail: planLine(tabDraft), href: "/plan", aria: `Resume plan: ${named(tabDraft)}` };
+    if (savedPlan) return { id: "saved", icon: "clock", eyebrow: "Resume plan · saved", title: named(savedPlan.draft), detail: `${planLine(savedPlan.draft)} · Mira checks it again when you open it`, onClick: () => { setPlanDraft({ ...savedPlan.draft, touched: true }); router.push("/plan"); }, aria: `Resume plan: ${named(savedPlan.draft)}` };
+    return null;
+  }, [journeyTo, staleSpot, tabDraft, savedPlan, router]);
+  const usual = habit ? places.find((p) => p.id === habit.placeId) : null;
 
   const [unread, setUnread] = useState(0);
   useEffect(() => {
@@ -169,70 +138,79 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, at mount
   }, []);
 
-  const greeting = clock ? greetingFor(clock) : null;
   const t = useT();
   const firstName = user?.name.split(" ")[0];
-  const cold = usage === "cold";
+  const [plan, around, ...more] = SITUATIONS;
 
   return (
     <div className="m-screen bg-companion">
       <div className="m-screen-inner">
         <RootHeader emailAlerts={emailAlerts} leading={<Link href="/" className="mira-wordmark" aria-label="Mira home">mira<span aria-hidden>↗</span></Link>} />
 
-        <div className="mt-7 flex items-center justify-between gap-3">
+        <div className="mt-6 flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-[1.625rem] font-semibold leading-tight tracking-[-0.035em]">{greeting && clock ? `${t(greetingKey(clock.getHours()))}${firstName ? `, ${firstName}` : ""}` : "Hello"}</h1>
-            <p className="mt-0.5 text-[0.875rem] text-ink-muted">
-              {journeyTo !== null ? `You’re on your way${journeyTo ? ` to ${journeyTo}` : ""} — I’m with you until you check in.${staleSpot ? " Open your journey to share where you are now." : ""}` : cold ? "Here’s what’s true around you right now." : "Here’s what I know around you."}
-            </p>
+            {clock ? <p className="text-[0.875rem] font-semibold text-ink-muted">{t(greetingKey(clock.getHours()))}{firstName ? `, ${firstName}` : ""}</p> : null}
+            <h1 className="mt-0.5 text-[1.625rem] font-semibold leading-tight tracking-[-0.035em]">{t("home.purpose")}</h1>
+            <p className="mt-1 text-[0.9375rem] text-ink-muted">{t("home.purposeLine")}</p>
           </div>
           {user ? (
             <div className="flex shrink-0 items-center gap-2">
               {/* Updates: a contact accepted, a journey needs you. The count clears when the inbox is opened. */}
-              <Link href="/inbox" aria-label={unread ? `Updates, ${unread} new` : "Updates"} className="relative grid size-10 place-items-center rounded-full bg-surface text-ink ring-1 ring-line">
+              <Link href="/inbox" aria-label={unread ? `Updates, ${unread} new` : "Updates"} className="relative grid size-11 place-items-center rounded-full bg-surface text-ink ring-1 ring-line">
                 <Icon name="bell" className="size-[18px]" />
                 {unread ? <span aria-hidden className="absolute -right-0.5 -top-0.5 grid min-w-[1.125rem] place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-[1.125rem] text-accent-ink ring-2 ring-canvas">{unread > 9 ? "9+" : unread}</span> : null}
               </Link>
-              <Link href="/me" aria-label="Your profile and settings"><Avatar name={user.name} src={user.avatarUrl} size={40} /></Link>
+              <Link href="/me" aria-label="Your profile and settings" className="grid size-11 place-items-center"><Avatar name={user.name} src={user.avatarUrl} size={40} /></Link>
             </div>
           ) : (
             <button type="button" onClick={() => setSignIn(true)} className="min-h-11 shrink-0 rounded-full px-1 text-[0.875rem] font-semibold text-accent-strong">Sign in</button>
           )}
         </div>
 
-        {/* First open only: may Mira use location? In the page, never over it. */}
-        <LocationAsk />
-
-        {/* 1. Mira knows: what's true around you, right now. */}
-        <div className="mt-5">
-          <LiveNowCard now={clock} point={point ? { lat: point.lat, lon: point.lon } : null} area={point ? loc.area : null} stats={stats} line={line} locating={loc.status === "asking"} locationState={loc.status} onLocate={() => { void chooseLocation(); }} />
-        </div>
-
-        {/* 2. Everyone makes it better: what's known here grows from what people add — one tap, right here. */}
-        <div className="mt-3">
-          <HelpNextCard check={contrib?.checks[0] ?? null} impactLine={contrib?.impact.line ?? null} signedIn={Boolean(user)} country={country.iso ?? null} />
-        </div>
-
-        {/* 3. Mira goes with you: where are you going? */}
-        <section aria-labelledby="going-h" className="mt-8">
-          <h2 id="going-h" className="text-[1.0625rem] font-semibold tracking-[-0.015em]">{t("home.going")}</h2>
-          <form onSubmit={(e) => { e.preventDefault(); submitAsk(ask); }} className="m-card mt-2.5 flex items-center gap-2 rounded-[1.5rem] p-1.5 pl-4 focus-within:ring-2 focus-within:ring-accent">
+        {/* 1. Ask Mira in her own words — works before the app has loaded (early-input capture). */}
+        <form onSubmit={(e) => { e.preventDefault(); submitAsk(ask); }} className="mt-5">
+          <label htmlFor="home-ask" className="block text-[0.9375rem] font-semibold">Where are you heading or what would you like to know?</label>
+          <div className="m-card mt-2 flex items-center gap-2 rounded-[1.5rem] p-1.5 pl-4 focus-within:ring-2 focus-within:ring-accent">
             <span aria-hidden><Icon name="sparkle" className="size-5 text-accent" /></span>
-            <label htmlFor="home-ask" className="sr-only">Tell Mira what you’re about to do</label>
-            <input id="home-ask" data-early-text="ask" value={ask} onChange={(e) => setAsk(e.target.value)} maxLength={1000} placeholder="Tell Mira — “a run at 5 AM”, “home at 11”…" autoComplete="off" className="min-h-12 min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-ink-subtle" />
-            <button type="submit" aria-label="Ask Mira" disabled={!ask.trim()} className={cx("grid size-11 shrink-0 place-items-center rounded-full transition-colors", ask.trim() ? "bg-accent text-accent-ink" : "bg-sunken text-ink-subtle")}>
-              <Icon name="arrow" className="size-5" />
-            </button>
-          </form>
-          <SituationChips className="mt-2.5" />
-        </section>
+            <input id="home-ask" data-early-text="ask" value={ask} onChange={(e) => setAsk(e.target.value)} maxLength={1000} placeholder="A run at 5 AM, heading home, a new neighbourhood…" autoComplete="off" className="min-h-12 min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-ink-subtle" />
+            <button type="submit" disabled={!ask.trim()} className={cx("min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold transition-colors", ask.trim() ? "bg-accent text-accent-ink" : "bg-sunken text-ink-subtle")}>Ask Mira</button>
+          </div>
+        </form>
 
-        {noticed.length ? (
+        {/* 2. The two structured paths, equally valid and without the model: an outing, or a place. */}
+        <nav aria-label="Start with" className="mt-3 grid grid-cols-2 gap-2">
+          {[plan, around].map((s) => (
+            <Link key={s.href} href={s.href} className="m-card m-press flex min-h-13 items-center gap-2.5 px-3.5 text-[0.9375rem] font-semibold">
+              <Icon name={s.icon} className="size-5 shrink-0 text-accent" />{s.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="mt-1 flex flex-wrap gap-x-4 px-1">
+          {more.map((s) => (
+            <Link key={s.href} href={s.href} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-ink-muted">
+              <Icon name={s.icon} className="size-4" />{s.label}
+            </Link>
+          ))}
+        </div>
+
+        {/* 3. One way back in. A plan is never being followed; only an open journey is. */}
+        {resume ? (
+          <ul className="mt-5">
+            <Row icon={resume.icon} tone={resume.id === "journey" ? "dusk" : "accent"} eyebrow={resume.eyebrow} title={resume.title} detail={resume.detail} href={"href" in resume ? resume.href : undefined} onClick={"onClick" in resume ? resume.onClick : undefined} ariaLabel={resume.aria} />
+          </ul>
+        ) : null}
+
+        {usual && habit ? (
           <RowList label={t("home.noticed")} id="noticed-h" className="mt-6">
-            {noticed.map((n) => (
-              <Row key={n.id} icon={n.icon} tone={n.tone} kind={n.kind} eyebrow={n.eyebrow} title={n.title} detail={n.detail} onClick={n.onOpen} ariaLabel={`${n.eyebrow}: ${n.title}`} />
-            ))}
+            <Row icon="route" tone="accent" kind="checked" eyebrow="Your usual" title={`${usual.label} around now`} detail={`${habit.times} of your journeys at this hour · from your own history`} onClick={() => startPlanTo(usual)} ariaLabel={`Your usual: ${usual.label} around now`} />
           </RowList>
+        ) : null}
+
+        {/* 4. Only after she chose location: what's true around her now, with its evidence one tap away. */}
+        {point ? (
+          <div className="mt-6">
+            <LiveNowCard now={clock} point={{ lat: point.lat, lon: point.lon }} area={loc.area} stats={[]} line={line} locating={false} locationState={loc.status} onLocate={() => undefined} />
+          </div>
         ) : null}
 
         <p className="mt-8 px-1 text-center text-[0.72rem] leading-relaxed text-ink-subtle">Mira never scores a place. Every fact shows where it came from, and what Mira can’t see is said too.</p>
