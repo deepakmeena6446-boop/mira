@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { outcomeMessage, type ContributionOutcome } from "@/components/app/CheckCard";
@@ -8,21 +8,35 @@ import { api } from "@/lib/api-client";
 import { recordUsage } from "@/lib/usage-signal";
 import { CORRECTIONS, CORRECTION_LABEL, type Correction } from "@/domain/contributions";
 
+/** Which place a correction is about: its name and position, so two places never share one form or result. */
+export const placeIdentity = (p: { name: string; lat: number; lon: number }) => `${p.name}|${p.lat.toFixed(5)},${p.lon.toFixed(5)}`;
+
+type Props = { place: { name: string; lat: number; lon: number }; canCorrect: boolean; signedIn: boolean; country: string | null; className?: string };
+
 /**
  * One secondary way to correct what Mira shows about a place she just looked at (sprint mira-companion-48h M6).
  * Optional: closing it never affects the brief. Uses the existing correction endpoint and its rules — one voice
  * per person, nothing changes on one person's word — and says the actual outcome, never "published".
+ * Each place gets its own form (keyed by identity): another place, or a new look at this one, starts fresh.
  */
-export function PlaceCorrection({ place, canCorrect, signedIn, country, className }: { place: { name: string; lat: number; lon: number }; canCorrect: boolean; signedIn: boolean; country: string | null; className?: string }) {
+export function PlaceCorrection(props: Props) {
+  return <CorrectionForm key={placeIdentity(props.place)} {...props} />;
+}
+
+function CorrectionForm({ place, canCorrect, signedIn, country, className }: Props) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<Correction | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // An answer that arrives after she moved to another place belongs to that earlier form, which is gone.
+  const current = useRef(true);
+  useEffect(() => { current.current = true; return () => { current.current = false; }; }, []);
 
   const send = async (claim: Correction) => {
     setBusy(claim);
     setError(null);
     const r = await api<{ outcome: ContributionOutcome; placeName: string }>("/api/contribute/correction", { body: { name: place.name.slice(0, 120), lat: place.lat, lon: place.lon, claim, country } });
+    if (!current.current) return;
     setBusy(null);
     if (r.ok) {
       recordUsage("correction");
