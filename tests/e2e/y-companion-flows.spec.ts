@@ -87,12 +87,18 @@ test("a movement question started in Mira stays private with its clarification, 
   const bodies: Array<Record<string, unknown>> = [];
   page.on("request", (r) => { if (r.url().endsWith("/api/mira") && r.method() === "POST") bodies.push(r.postDataJSON()); });
   const box = page.getByRole("textbox", { name: "Message Mira" });
-  await box.fill("I am going to dinner at Hauz Khas.");
-  await box.press("Enter");
+  // One message at a time: Send is enabled only when the box has text and no reply is still streaming.
+  const ask = async (text: string) => {
+    await box.fill(text);
+    await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
+    const sent = page.waitForRequest((r) => r.url().endsWith("/api/mira") && r.method() === "POST");
+    await box.press("Enter");
+    await sent;
+    await expect(page.locator("[aria-label='Mira is checking']")).toHaveCount(0);
+  };
+  await ask("I am going to dinner at Hauz Khas.");
   await expect(page.getByText("Private conversation: nothing here is saved. Mira remembers it only while this screen is open.")).toBeVisible();
-  await expect(box).toBeEnabled();
-  await box.fill("I mean near Science Faculty.");
-  await box.press("Enter");
+  await ask("I mean near Science Faculty.");
   await expect.poll(() => bodies.length).toBe(2);
   expect(bodies[0]).toMatchObject({ ephemeral: true, history: [] });
   expect(bodies[1]).toMatchObject({ ephemeral: true });
@@ -103,8 +109,7 @@ test("a movement question started in Mira stays private with its clarification, 
   // An explicit boundary ends it: the private turns leave the screen and the next general question is kept.
   await page.getByRole("button", { name: "New conversation" }).click();
   await expect(page.getByText("I am going to dinner at Hauz Khas.")).toHaveCount(0);
-  await box.fill("How do I add someone to my Circle?");
-  await box.press("Enter");
+  await ask("How do I add someone to my Circle?");
   await expect.poll(async () => ((await (await page.request.get("/api/mira")).json()).messages as unknown[]).length).toBe(2);
   expect(bodies[2]).not.toHaveProperty("ephemeral");
   await ctx.close();
