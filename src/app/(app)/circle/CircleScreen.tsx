@@ -207,7 +207,7 @@ function CircleHeader({ emailAlerts }: { emailAlerts: boolean }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <Link href="/me" aria-label="Back to You" className="grid size-11 shrink-0 place-items-center rounded-full bg-surface ring-1 ring-line"><Icon name="back" className="size-5" /></Link>
-      <SafetyAccess emailAlerts={emailAlerts} compact className="min-w-0" />
+      <SafetyAccess emailAlerts={emailAlerts} compact quiet className="min-w-0" />
     </div>
   );
 }

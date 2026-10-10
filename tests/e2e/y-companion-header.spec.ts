@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 // design/mira-companion-ux: on ordinary task screens the Support pair is quieter (one hairline group), but stays
 // labelled, in the same place, in the first screen, and a full 44 px target — at the smallest supported width.
-const ROOTS = ["/", "/mira", "/around", "/trips"];
+const ROOTS = ["/", "/mira", "/around", "/trips", "/plan?for=go", "/me"];
 
 test.use({ viewport: { width: 320, height: 568 } });
 

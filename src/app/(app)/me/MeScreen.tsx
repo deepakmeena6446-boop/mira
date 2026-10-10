@@ -73,7 +73,7 @@ export function MeScreen({ user, places: initialPlaces, contacts, modes, emailAl
   const header = (
     <header className="flex items-center justify-between gap-3">
       <button type="button" onClick={() => router.back()} aria-label="Back" className="grid size-11 shrink-0 place-items-center rounded-full bg-surface ring-1 ring-line"><Icon name="back" className="size-5" /></button>
-      <SafetyAccess emailAlerts={emailAlerts} compact className="min-w-0" />
+      <SafetyAccess emailAlerts={emailAlerts} compact quiet className="min-w-0" />
     </header>
   );
 

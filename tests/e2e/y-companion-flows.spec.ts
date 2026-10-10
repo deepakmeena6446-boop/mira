@@ -57,7 +57,7 @@ test("on foot in the dark, the calculated sky leads and the travel time keeps it
   await pick(page, /^To/, DEST);
   const sky = page.getByRole("region", { name: "Your plan, at that time" });
   await expect(sky).toContainText(/^.*Dark when you set off/);
-  await expect(sky).toContainText(/daylight from about \d{1,2}:\d{2} AM/i);
+  await expect(sky).toContainText(/Twilight from about \d{1,2}:\d{2} AM/); // the next change at 11 PM, on Delhi's clock
   await expect(sky).toContainText("Calculated · Solar calculation, not weather or visibility");
   await expect(sky).not.toContainText(/min walk/);
   const take = page.getByRole("region", { name: "Mira’s take" });

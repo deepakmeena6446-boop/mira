@@ -53,7 +53,7 @@ export function ReportScreen({ preset, from = null, emailAlerts = false }: { pre
   const header = (onBack: () => void) => (
     <header className="flex items-center justify-between gap-3">
       <button type="button" onClick={onBack} aria-label="Back" className="grid size-11 shrink-0 place-items-center rounded-full bg-surface ring-1 ring-line"><Icon name="back" className="size-5" /></button>
-      <SafetyAccess emailAlerts={emailAlerts} compact className="min-w-0" />
+      <SafetyAccess emailAlerts={emailAlerts} compact quiet className="min-w-0" />
     </header>
   );
   // Never asks for location by itself (audit P0-2): a position she already chose is used; otherwise she taps for one or picks the place.

@@ -39,7 +39,7 @@ test("while a place's zone is being checked, Around gives no clock times or open
   await expect(sky).toContainText("6:40 PM"); // Lisbon, not 11:10 PM on the phone's clock
   await expect(sky).not.toContainText("11:10 PM");
   await expect(take).toContainText("Daylight now · changes about 6:55 PM"); // the same solar change, on Lisbon's clock
-  await expect(help).toContainText("open until 9:00 PM");
+  await expect(help).toContainText("open until 9 PM") // listed Mo-Su 09:00-21:00, read on Lisbon's clock;
 });
 
 test("when a place's zone can't be found, Around says its local time is unknown instead of using the phone's", async ({ page }) => {

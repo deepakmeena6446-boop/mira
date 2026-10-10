@@ -153,6 +153,9 @@
 @media (max-width: 359px) {
   .mira-helpcluster { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .mira-helpcluster > * { white-space: normal; padding-inline: 0.5rem; text-align: center; font-size: 0.75rem; }
+  /* The quiet Support capsule keeps one row beside any title: each label may take two short lines, same 44 px. */
+  .mira-support > a, .mira-support > button { white-space: normal; max-width: 5.75rem; padding-inline: 0.625rem; text-align: center; font-size: 0.75rem; line-height: 1.15; }
+  .mira-support svg { display: none; }
 }
 
 @keyframes rise {

@@ -574,7 +574,7 @@ function Reply({ text, done }: { text: string; done: boolean }) {
   if (!l) return <p className="whitespace-pre-line text-[0.98rem] leading-relaxed text-mixed">{text}</p>;
   return (
     <div className="text-mixed">
-      <p className="text-[0.98rem] leading-relaxed">{l.answer.join(" ")}</p>
+      <div className="space-y-1.5 text-[0.98rem] leading-relaxed">{l.answer.map((s) => <p key={s}>{s}</p>)}</div>
       {l.next.length ? <p className="mt-2 text-[0.9375rem] font-semibold leading-snug">{l.next.join(" ")}</p> : null}
       {l.limits.length ? (
         <div className="mt-3 rounded-2xl bg-sunken px-3.5 py-2.5">

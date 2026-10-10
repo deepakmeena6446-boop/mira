@@ -367,7 +367,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
       <div className="m-screen-inner">
         <header className="flex items-center justify-between gap-2">
           <button type="button" onClick={() => router.back()} aria-label="Back" className="grid size-11 place-items-center rounded-full bg-surface ring-1 ring-line"><Icon name="back" className="size-5" /></button>
-          <SafetyAccess emailAlerts={emailAlerts} compact />
+          <SafetyAccess emailAlerts={emailAlerts} compact quiet />
         </header>
 
         {/* What kind of outing: chosen while planning; once the brief shows, Edit brings it back. */}
