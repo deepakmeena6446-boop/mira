@@ -288,13 +288,14 @@ NOT READY verdict is unchanged. Nothing was merged to `main` or deployed.
     sentence (including the first one, sent with `plan: null`), the device location,
     or the validated `ephemeral: true` flag are not stored.
   - Trip cards are never stored.
-  - Home, Plan and Around hand-offs set the flag; MiraChat carries it on follow-ups and
-    shows the mode from `x-mira-history`.
+  - Home, Plan and Around hand-offs set the flag. After the review pass, a conversation
+    that becomes private stays private until "New conversation" (see the review pass
+    below).
   - Offline saves say nothing was saved.
-- **C1/T03**: a new always-on `unsupported_assurance` output check. It catches asserted
-  place verdicts, "safest route", "no incidents", help "on its way" and "you're safe
-  with Mira", after the existing allowed refusals and questions. Bare safety words
-  stay allowed in chat, per the owner's decision.
+- **C1/T03**: a new always-on `unsupported_assurance` output check for chat. The first
+  pass matched only asserted shapes (place verdicts, "safest route", "no incidents",
+  help "on its way", "you're safe with Mira"). The review pass made it default-deny;
+  see below.
 - **C3**: `companionNewsEligibility` implements 03 §C. Current `SafetyUpdate` data has no
   source-supplied current action or expiry, so automatic news is **absent** from
   summaries by design.
@@ -303,7 +304,10 @@ NOT READY verdict is unchanged. Nothing was merged to `main` or deployed.
 - **C2/C4/C5**: no live provider is configured, so all runs use the existing OSM pilot,
   community and email paths. Mailpit delivery is simulated.
 
-### Verification (local container, Node 22.22.0)
+### Verification, first pass (local container, Node 22.22.0)
+
+These were the results at `0f0308a`. The review pass below supersedes the browser
+results.
 
 Environment:
 - Local PostGIS and Mailpit via `docker compose` on fresh volumes.
@@ -329,13 +333,13 @@ Browser runs used:
 - Fixture mode: the deterministic companion, the sourced pilot import, labelled
   sample news and Mailpit. This is simulation, not live or device evidence.
 
-Remaining e2e failures:
+e2e failures in the first pass:
 - `o-phase-four-journey.spec.ts:113` (S1 loop start after a permission is granted
-  mid-test) fails identically at base `9640f1b` (verified in a separate worktree). It
-  is pre-existing and was not changed.
-- `f-mobile-extras.spec.ts:76` on desktop reports the installability error
-  `in-incognito`. The substituted full Chromium treats test contexts as incognito, so
-  this is environmental. It was not verified against the pinned shell.
+  mid-test) failed identically at base `9640f1b` under the full Chromium binary. The
+  review pass resolved it as a browser substitution effect (below).
+- `f-mobile-extras.spec.ts:76` on desktop reported the installability error
+  `in-incognito` under the full Chromium binary. The review pass resolved it the same
+  way.
 - `a-share-trip.spec.ts:5` asserted the old follower invite wording. It is fixed in
   `0f0308a` and passed on rerun.
 - `d-reports.spec.ts:14` failed before `.env.local` existed, because the release CLI
@@ -347,7 +351,7 @@ Screenshots:
 - They were taken locally under the session scratchpad and shared in the session
   handoff. They are not committed.
 
-Acceptance IDs:
+Acceptance IDs (updated after the review pass):
 
 | Result | IDs and evidence |
 | --- | --- |
@@ -357,20 +361,19 @@ Acceptance IDs:
 | | A07 (unit transit caveat; `p-phase-five-travel`) |
 | | A09, A11 (`companion-news-gate.test.ts`) |
 | | A13 (existing `companion.test.ts`) |
-| | A14 (scripted, `companion-output.test.ts`; no live model evaluation) |
 | | A16, A21, A22, A23 (existing suites) |
 | | A24, A25 (`companion-save.test.ts`; `y-companion-flows`) |
-| | A31 (`v2.test.ts`, `audit.test.ts`) |
+| | A31 (`v2.test.ts`, `audit.test.ts`, `companion-private.test.ts`, `y-companion-flows`) |
 | | A32 (`e-privacy`) |
-| | A35 (except the pre-existing S1 failure above) |
+| | A06, A17 (S1 passes under the 1194 headless shell; unit daylight and missing-loop cases) |
+| | A35 (full mobile and desktop suites; see the review pass) |
 | **Partial** | A03: send-once from Home passes; browser back was not separately exercised. |
-| | A06: unit daylight and missing-loop cases pass; the e2e S1 loop start fails at base. |
 | | A12: existing community tests pass; no new surfacing. |
+| | A14: scripted only; no live model evaluation. |
 | | A15: a headline carrying instructions is withheld by the guard; no new tool-mock test. |
-| | A17: S1 fails at base; the other journey modes pass. |
 | | A19: Mailpit-simulated delivery only. |
 | | A26: mode precedence is tested in e2e; the Help Point exclusion filter has no automated test. |
-| | A27: optional correction and its account requirement are tested; a durable-account submit was not driven in a browser. |
+| | A27: the optional correction, its account requirement and per-place state (A→B delayed and completed) are tested; a durable-account submit was not driven in a browser. |
 | | A28: denied-location path tested; no device test. |
 | | A29: zone helper and keyed responses are tested; no slow-response browser test. |
 | | A33: 320/390 overflow and screenshots checked; 200% text relies on the existing `t-urgent-text-zoom`; keyboard-only was not walked. |
@@ -385,8 +388,9 @@ Acceptance IDs:
 
 - Google-backed account saving is still unsupported; it is explained before the
   save. Identifier rehydration is deferred.
-- Places handed over from Mira's cards (trip/places) carry no provider id. Their names
-  can still become a plan's query, as before this sprint.
+- Card places now carry provenance (review pass). Trip **journeys** started from a card
+  still record the destination name on the server, as before this sprint; journey
+  storage was outside this scope.
 - Old chat history is untouched; no bulk deletion was authorised. Signed-in turns sent
   with location are now never stored, so "nearby" questions no longer appear in
   history.
@@ -398,6 +402,102 @@ Acceptance IDs:
   - WhatsApp is a manual send.
   - No dispatch.
 - Stretch scope was not attempted.
+
+### Review pass (correctness fixes on top of `347b822`)
+
+Each issue was reproduced before it was fixed:
+- Guard: by the review probes.
+- Private mode: by an integration request sequence; the new tests also fail when the
+  old route is restored.
+- Correction: by the new component tests, which failed first.
+- Provenance: by tracing. The old `comparePlace` built a `selected_point` without an
+  id, which save eligibility accepts; the "her own map point stays savable" test shows
+  that acceptance.
+
+1. **Unsupported assurances bypassed the chat guard** (`112bfe5`).
+   - Reproduced: "You'll be safe on this route.", "This street is well-lit and safe."
+     and "The route has no safety concerns." returned no issue with
+     `checkVerdicts: false`.
+   - Chat mode is now default-deny. A verdict word is withheld unless it sits in a
+     construction that asserts nothing: a refusal, a question, her own feeling, a
+     movement imperative, a condition, or a chat-only wish ("stay safe", "safe
+     travels", "safe rehna").
+   - "well-lit", "no safety concerns" and "nothing to worry about" were added.
+   - The fixed fallback now says what Mira can check and where to see it.
+   - A mocked stream proves the rejected text is never sent: one rewrite is tried,
+     then the fixed line. Neither list is claimed to be complete. Consequential facts
+     still come from deterministic, sourced cards.
+2. **Private mode leaked on follow-ups** (`6df6df3`).
+   - Reproduced: "I am going to dinner at Hauz Khas." was `not_saved`; "I mean near
+     Science Faculty." was `saved` and stored.
+   - MiraChat now keeps a conversation private once any turn can't be kept, deciding
+     before the first request and also following the server's `not_saved`, until
+     "New conversation". The notice says that nothing is saved and that Mira remembers
+     it only while the screen is open.
+   - The server treats a signed-in request carrying its own context as private.
+3. **Private follow-ups lost context** (`6df6df3`).
+   - Signed-in private turns now send their own in-memory turns (8 turns, 2,000
+     characters each — the existing limits).
+   - The server uses those turns only for unsaved replies and reads stored history only
+     for saved ones, so unrelated stored chats don't mix in.
+   - Integration: neither turn is stored, and the clarification receives the first
+     private turn but not the saved chat. Unit: the context reaches the model. e2e:
+     the real client flow and the new-conversation boundary.
+4. **Correction state crossed places** (`fe276bc`).
+   - `PlaceCorrection` renders one form per place identity, so late answers are dropped.
+   - Component tests cover A→B during a delayed success and failure, A→B after a
+     completed submission, and B→A. All failed before the fix.
+5. **Card provenance was lost** (`2dd980a`).
+   - Trip, places and Help Point cards now carry `placeId` (never sent to the model).
+   - It travels through compare/show, the pending destination, Around, the map,
+     SafetyAccess and `planGoingTo`.
+   - A card place without an id is marked `x:unknown` and treated like Google content:
+     tab-only, scrubbed from session storage, blocked from account saving, and labelled
+     "Place you chose" instead of the provider's name.
+   - OSM results, saved places and points she picks on the map stay savable.
+   - This also fixed an empty query from a Google pick without typed text, which made
+     the plan's intent invalid.
+6. **Test wait** (`7fc1352`): the new private-flow e2e now waits for Send to be enabled
+   before each message (MiraChat correctly ignores a submit while a reply streams).
+
+S1 and installability investigation:
+- Both tests pass when Playwright launches the installed **1194 headless shell**
+  (`/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell`).
+- Both fail under the full Chromium 1194 binary used in the first pass. That includes
+  S1 at base `9640f1b`, and installability reports `in-incognito`.
+- Conclusion: browser substitution, not application behaviour.
+- The pinned 1243 headless shell is still not installed, and this environment forbids
+  `playwright install`. The runs are therefore against 1194, not the pinned version.
+
+Review-pass verification:
+- Full browser suites ran at `2dd980a`, with the 1194 headless shell and the same
+  fixture mode as before.
+- `7fc1352` changed only the e2e test; after it, the flows spec was rerun on both
+  projects.
+
+| Check | Result |
+| --- | --- |
+| `npm run lint` / `npm run typecheck` | exit 0 / exit 0 |
+| `npm run test:unit` | exit 0; 92/92 files, 987/987 tests |
+| `npm run test:integration` | exit 0; 37/37 files, 204/204 tests |
+| `npm run build` / `npm run audit:bundle` | exit 0 / exit 0 (130 files, no secrets) |
+| Playwright mobile (Pixel 7), full suite | 70 passed, 1 failed (the private-flow test's own wait, fixed in `7fc1352`), 1 skipped |
+| Playwright desktop (1280×900), full suite | 66 passed, 1 failed (the same test), 5 skipped (the specs' own project skips) |
+| Rerun after `7fc1352` | the private-flow test passed on mobile and desktop |
+
+Mobile layout:
+- The private-conversation notice in Mira and the open correction in Around were
+  captured at 320×568 and 390×844 and inspected.
+- Nothing overflows horizontally (asserted), and the notice and "New conversation" sit
+  above the tab bar without covering the input.
+- Screenshots are local and shared in the session handoff, not committed.
+
+Remaining gaps after the review pass:
+- No live model evaluation of the guard.
+- No real device, screen reader or human comprehension checks.
+- No durable-account correction submit in a browser.
+- Private-conversation context lives only in the open screen. Leaving Mira ends it,
+  which the notice says.
 
 ### Git and push
 
