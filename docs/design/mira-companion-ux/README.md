@@ -104,26 +104,68 @@ before (sprint head `513b734`) on the left and after on the right.
 | Journeys, guest and empty | `journeys-guest-390.jpg` |
 | After only: switching place mid-correction, revisiting a plan via Back, chat box focused, Go sheet, I feel unsafe sheet, saving blocked by a GPS start, desktop Home, forced light theme, empty plan, signed-in Journeys | `after-*.jpg` |
 
-## Verification (2026-10-10, local)
+## Refinement pass (2026-10-10)
+
+1. **Around keeps a chosen place on its own clock.** While its zone is being looked up ("Local time…") or after the
+   lookup fails ("Local time unknown"), nothing is said on the phone's or the country's clock: daylight changes are
+   given from now ("changes in about 15 min" — a solar calculation needs no zone), and listed opening hours aren't
+   read ("hours wait for local time" / "hours not checked: local time unknown"). Hours a provider marks open 24 h, and
+   a fresh provider open/closed flag, still show. Around her own position is unchanged.
+2. **Support stays in reach, quieter.** On ordinary task screens *I feel unsafe* and *Emergency* share one hairline
+   capsule (`role="group"` "Support") instead of two outlined pills with an ink ring — same labels, same place, 44 px
+   targets. Below 360 px the labels may take two short lines and the phone icon drops; with 200 % text the two stack
+   rather than squeeze. Journey screens and Welcome keep the stronger form.
+3. **The brief leads with the most decision-relevant fact, by fixed rules** (`chooseTakeaway`): a failed route check;
+   on foot, the calculated sky when it's dark at the start or turns before she's due to finish; a released note from
+   people whose day/evening/late band is the one she's going in; otherwise the travel-time estimate. Whatever doesn't
+   lead stays in "What matters" with its qualifier.
+4. **Chat answers scan.** A finished reply is grouped — facts first (a sentence each, qualifiers kept with their fact),
+   the next step, "What this doesn't check" (shown, not folded) and the source line — in the server's exact words, so
+   the output guard and provider attribution are untouched.
+5. **Apple touch icon** redrawn from `icon.svg` in the approved palette.
+
+New screenshots: `refine-zone-checking-390.jpg`, `refine-zone-unknown-390.jpg`, `refine-brief-night-390.jpg`,
+`refine-chat-grouped-390.jpg`, `refine-header-320.jpg`, `refine-header-text200-390.jpg`.
+
+## The two full-suite timeouts
+
+Both were diagnosed from preserved traces and server logs (local diagnostic config: server/worker stdout piped,
+`--output` outside `test-results`). Neither was a product defect; both were test-harness races. Timeouts and
+assertions are unchanged.
+
+- **`b-missed-alert` — "I'm here" detached.** The page at the timeout read "You made it." The server log had
+  `trip.arrived by:"auto"` for that trip at the moment of the click. The test's fixture position sits inside the 75 m
+  arrival radius, so after the 45 s dwell a routine location upload auto-arrived the journey, racing the test's
+  click after a fixed 25 s wait. Forced on demand by lengthening the wait to 40 s (fails every time); with the owner
+  ~550 m short of the destination — as someone who has missed her arrival is — the 40 s probe passes with
+  `by:"user"`. The two sibling tests had the same exposure through their reloads.
+- **`x-phase3-a11y` — "renderer stall".** The audit's `page.evaluate` was never sent. The test was in
+  `waitForLoadState("networkidle")`, which has no deadline without a navigation timeout. Five link prefetches from the
+  previous document were cancelled by the `goto("/")` and never reported finished, so Chromium's `networkIdle`
+  lifecycle event never fired; every server response completed and the page was quiet after ~8 s. A 30-iteration probe
+  of the same sequence didn't reproduce it (a rare race). The settle is now bounded at 10 s after the `main` landmark
+  exists — still best-effort, as its `catch` intended; every audit check still runs on every screen.
+
+## Verification (2026-10-10, local, at the head that carries this note)
 
 | Check | Result |
 | --- | --- |
 | `npm run lint` | clean |
 | `npm run typecheck` | clean |
-| Unit (`vitest --project unit`) | 987 passed |
-| Integration (`vitest --project integration`, local PostGIS) | 204 passed |
+| Unit (`vitest --project unit`) | 1004 passed (94 files) |
+| Integration (`vitest --project integration`, local PostGIS) | 204 passed (37 files) |
 | `npm run build` | passed |
-| `npm run audit:bundle` | passed — 132 files, 14 patterns, no secrets |
-| E2E full suite, mobile + desktop, run 1 | 137 passed, 6 skipped, 1 failed — `x-phase3-a11y` (320 px sweep) hit the 4-minute timeout inside its in-page audit on Home; alone it then passed 4/4 (≈17 s each) and passed in run 2 |
-| E2E full suite, run 2 | 137 passed, 6 skipped, 1 failed — `b-missed-alert` "accepted contact…" timed out with the *I'm here* button repeatedly detaching on the trip screen (not changed by this branch); alone it passed 2/2 (with its two siblings, 6/6), and it passed in run 1 |
-| Capture spec (`zz-capture`, local only) | 11/11 |
+| `npm run audit:bundle` | passed — 131 files, 14 patterns, no secrets |
+| E2E full suite, mobile + desktop, run 5 (final code) | **156 passed, 6 skipped, 0 failed** (15.7 min) |
+| New e2e | `y-companion-zone` (Lisbon from India time, delayed and failed zone lookup), `y-companion-header` (six screens at 320 px), night-brief case in `y-companion-flows` |
+| Capture spec (`zz-capture`, local only) | passed |
 
-Both e2e failures are 4-minute timeouts in different, unchanged-path tests that pass alone and in the other
-full run; the launch-UX plan already records trip-timing e2e as flaky. They are not shown fixed here: the
-cause (a renderer stall or re-render under a long serial run) was not found, and the traces were lost to a
-re-run.
+Earlier runs on this branch, for the record: run 1 — 1 failed (`x-phase3-a11y` stall); run 2 — 1 failed
+(`b-missed-alert`); run 3 (previous build) — 0 failed; run 4 — 5 failed (`b-missed-alert`, plus two regressions from
+this pass — the capsule overflowed at 200 % text, and a late-hours note led a midday brief — each on both projects);
+a targeted run after those fixes — 1 failed (`x-phase3-a11y` stall, the trace above). Run 5 is the first full run with
+every fix in place.
 
 Simulation only: Chromium 1194 headless shell (the pinned 1243 build isn't installed here), device emulation,
-deterministic companion and OSM fixtures. Not verified: a real phone (keyboard overlap, safe areas, iOS
-fixed-position behaviour), a screen reader, live Google/Anthropic providers, `apple-icon.png` (raster, not
-recoloured to the new palette).
+deterministic companion and OSM fixtures, synthetic labelled fixtures for the Lisbon place. Not verified: a real phone
+(keyboard overlap, safe areas, iOS fixed-position behaviour), a screen reader, live Google/Anthropic providers.
