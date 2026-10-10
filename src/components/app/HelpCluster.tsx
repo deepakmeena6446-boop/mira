@@ -13,14 +13,14 @@ export function HelpCluster({ onUnsafe, compact = false, quiet = false }: { onUn
   if (quiet) {
     // Ordinary task screens (design/mira-companion-ux): the same two anchors, labelled and in the same place, joined
     // in one hairline capsule so they're always one tap away without reading as the screen's main action. Journey
-    // screens keep the stronger compact form: there, support is the task.
+    // screens keep the stronger compact form: there, support is the task. With enlarged text (200%) the two stack
+    // instead of squeezing — words never break — and the 1px gap stays the divider either way.
     return (
-      <div role="group" aria-label="Support" className="mira-support inline-flex min-w-0 items-stretch rounded-full bg-surface/80 ring-1 ring-line-strong">
-        <button type="button" data-early-tap="unsafe" onClick={onUnsafe} className="min-h-11 whitespace-nowrap rounded-l-full pl-3.5 pr-3 text-[0.8125rem] font-semibold text-accent-strong hover:bg-sunken">
+      <div role="group" aria-label="Support" className="mira-support inline-flex max-w-full flex-wrap gap-px overflow-hidden rounded-[1.375rem] bg-line-strong/70 ring-1 ring-line-strong">
+        <button type="button" data-early-tap="unsafe" onClick={onUnsafe} className="min-h-11 flex-auto bg-surface px-3.5 text-center text-[0.8125rem] font-semibold leading-tight text-accent-strong hover:bg-sunken">
           {t("support.unsafe")}
         </button>
-        <span aria-hidden className="my-3 w-px shrink-0 bg-line-strong/60" />
-        <EmergencyPill variant="joined" className="min-w-0" />
+        <EmergencyPill variant="joined" className="flex-auto" />
       </div>
     );
   }

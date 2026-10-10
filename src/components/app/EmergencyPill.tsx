@@ -23,7 +23,7 @@ export function EmergencyPill({ className, variant = "pill" }: { className?: str
   const styles = {
     pill: "inline-flex min-h-12 shrink-0 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-sm font-semibold text-ink shadow-[var(--shadow-float)]",
     quiet: "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[0.8125rem] font-semibold text-ink ring-[1.5px] ring-ink/80",
-    joined: "inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-r-full pl-3 pr-3.5 text-[0.8125rem] font-semibold text-ink hover:bg-sunken",
+    joined: "inline-flex min-h-11 items-center justify-center gap-1.5 bg-surface px-3.5 text-center text-[0.8125rem] font-semibold leading-tight text-ink hover:bg-sunken",
     block: "flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-button)] bg-ink px-3 text-[0.95rem] font-semibold text-canvas",
     link: "font-semibold text-ink underline",
   }[variant];
