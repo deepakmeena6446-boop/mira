@@ -84,3 +84,22 @@ persistence limits (Google details never saved to the account); place-correction
 (keyed remount, late-response guard); explicit location consent; saving eligibility said before the tap;
 remembered preferences as defaults only. The e2e and unit tests that pin these were kept and pass; where
 copy moved, assertions were updated to the new copy without being loosened.
+
+## Screenshots
+
+`screenshots/` — Chromium emulation (Pixel 7 profile resized to each width) on the local stack with
+deterministic providers; the theme follows the time of capture (night). Paired images are
+before (sprint head `513b734`) on the left and after on the right.
+
+| Flow | File |
+| --- | --- |
+| Home at 390 / 320 | `home-390.jpg`, `home-320.jpg` |
+| Brief, first screen / whole page | `brief-390.jpg`, `brief-full-390.jpg` |
+| Brief with the route check failing | `brief-failed-390.jpg` |
+| Around a chosen place | `around-place-390.jpg` |
+| Around with no location | `around-denied-390.jpg` |
+| Place search failing | `search-failed-390.jpg` |
+| Correction, signed in without email | `correction-390.jpg` |
+| Mira, private conversation | `mira-private-390.jpg` |
+| Journeys, guest and empty | `journeys-guest-390.jpg` |
+| After only: switching place mid-correction, revisiting a plan via Back, chat box focused, Go sheet, I feel unsafe sheet, saving blocked by a GPS start, desktop Home, forced light theme, empty plan, signed-in Journeys | `after-*.jpg` |
