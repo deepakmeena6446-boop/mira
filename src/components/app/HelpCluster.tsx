@@ -8,8 +8,22 @@ import { useT } from "@/lib/i18n";
  * place on Home and on the journey screen. A stable anchor — never adaptive, never covered, and
  * rendered exactly once per screen. Neutral surfaces: calm, never alarm-coloured.
  */
-export function HelpCluster({ onUnsafe, compact = false }: { onUnsafe: () => void; compact?: boolean }) {
+export function HelpCluster({ onUnsafe, compact = false, quiet = false }: { onUnsafe: () => void; compact?: boolean; quiet?: boolean }) {
   const t = useT();
+  if (quiet) {
+    // Ordinary task screens (design/mira-companion-ux): the same two anchors, labelled and in the same place, joined
+    // in one hairline capsule so they're always one tap away without reading as the screen's main action. Journey
+    // screens keep the stronger compact form: there, support is the task.
+    return (
+      <div role="group" aria-label="Support" className="mira-helpcluster inline-flex min-w-0 items-stretch rounded-full bg-surface/80 ring-1 ring-line-strong/60">
+        <button type="button" data-early-tap="unsafe" onClick={onUnsafe} className="min-h-11 whitespace-nowrap rounded-l-full pl-3.5 pr-3 text-[0.8125rem] font-semibold text-accent-strong hover:bg-sunken">
+          {t("support.unsafe")}
+        </button>
+        <span aria-hidden className="my-3 w-px shrink-0 bg-line-strong/50" />
+        <EmergencyPill variant="joined" className="min-w-0" />
+      </div>
+    );
+  }
   if (compact) {
     // Root-screen header form (docs/phase1-ux/01 §2): same two anchors, quieter chrome, same place on every root.
     return (

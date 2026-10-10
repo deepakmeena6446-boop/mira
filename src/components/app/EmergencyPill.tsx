@@ -14,7 +14,7 @@ import { clockIn } from "@/domain/daylight";
 /** Cited country actions only. A direct dial is reserved for a verified all-service number;
  * service-specific and unknown profiles open a deterministic options sheet. No model call.
  */
-export function EmergencyPill({ className, variant = "pill" }: { className?: string; variant?: "pill" | "quiet" | "block" | "link" }) {
+export function EmergencyPill({ className, variant = "pill" }: { className?: string; variant?: "pill" | "quiet" | "joined" | "block" | "link" }) {
   const country = useCountry();
   const actions = emergencyActions(country);
   const direct = actions.length === 1 && actions[0].scope === "all" ? actions[0] : null;
@@ -23,10 +23,11 @@ export function EmergencyPill({ className, variant = "pill" }: { className?: str
   const styles = {
     pill: "inline-flex min-h-12 shrink-0 items-center gap-1.5 rounded-full border border-line-strong bg-surface px-3.5 text-sm font-semibold text-ink shadow-[var(--shadow-float)]",
     quiet: "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[0.8125rem] font-semibold text-ink ring-[1.5px] ring-ink/80",
+    joined: "inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-r-full pl-3 pr-3.5 text-[0.8125rem] font-semibold text-ink hover:bg-sunken",
     block: "flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-button)] bg-ink px-3 text-[0.95rem] font-semibold text-canvas",
     link: "font-semibold text-ink underline",
   }[variant];
-  const icon = variant === "link" ? null : <Icon name="phone" className={variant === "block" ? "size-5" : variant === "quiet" ? "size-3.5" : "size-4"} />;
+  const icon = variant === "link" ? null : <Icon name="phone" className={variant === "block" ? "size-5" : variant === "quiet" || variant === "joined" ? "size-3.5" : "size-4"} />;
 
   if (direct) {
     return <a href={`tel:${direct.number}`} aria-label={`Emergency call, ${direct.number}`} className={cx(styles, className)}>{icon}<span>{variant === "link" ? `call ${direct.number}` : `Emergency ${direct.number}`}</span></a>;
@@ -34,8 +35,8 @@ export function EmergencyPill({ className, variant = "pill" }: { className?: str
   return <>
     {/* In the compact header the unknown-country label is just "Emergency" so the Support pair stays on one line
         beside any title; the accessible name still says it opens options. */}
-    <button type="button" data-early-tap="emergency" onClick={() => setExplain(true)} aria-haspopup="dialog" aria-label={variant === "quiet" && !(actions.length === 1 && actions[0].scope === "service") ? "Emergency options" : undefined} className={cx(styles, className)}>
-      {icon}<span>{actions.length === 1 && actions[0].scope === "service" ? `${actions[0].label} ${actions[0].number}` : variant === "quiet" ? t("support.emergency") : "Emergency options"}</span>
+    <button type="button" data-early-tap="emergency" onClick={() => setExplain(true)} aria-haspopup="dialog" aria-label={(variant === "quiet" || variant === "joined") && !(actions.length === 1 && actions[0].scope === "service") ? "Emergency options" : undefined} className={cx(styles, className)}>
+      {icon}<span>{actions.length === 1 && actions[0].scope === "service" ? `${actions[0].label} ${actions[0].number}` : variant === "quiet" || variant === "joined" ? t("support.emergency") : "Emergency options"}</span>
     </button>
     <EmergencyOptionsSheet open={explain} onClose={() => setExplain(false)} country={country} actions={actions} />
   </>;

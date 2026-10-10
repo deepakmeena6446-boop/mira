@@ -96,7 +96,7 @@ export function MapScreen({ emailAlerts, places, tiles }: { emailAlerts: boolean
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="pointer-events-auto mx-auto flex max-w-xl items-center justify-between gap-2">
             <button type="button" onClick={() => (window.history.length > 1 ? router.back() : router.push("/around"))} aria-label="Back" className="grid size-11 shrink-0 place-items-center rounded-full bg-surface shadow-[var(--shadow-float)]"><Icon name="back" className="size-5" /></button>
-            <SafetyAccess emailAlerts={emailAlerts} compact className="min-w-0" />
+            <SafetyAccess emailAlerts={emailAlerts} compact quiet className="min-w-0" />
           </div>
         </div>
         {here ? <button type="button" onClick={() => { setFocus(null); setRecenter((n) => n + 1); }} aria-label="Centre on me" className="absolute bottom-10 right-3 z-20 grid size-11 place-items-center rounded-full bg-surface shadow-[var(--shadow-float)]"><Icon name="locate" className="size-5 text-accent" /></button> : null}

@@ -21,7 +21,7 @@ export function RootHeader({ title, eyebrow, leading, emailAlerts, className }: 
           {leading}
           {title ? <h1 className="m-title whitespace-nowrap">{title}</h1> : null}
         </div>
-        <SafetyAccess emailAlerts={emailAlerts} compact className="min-w-0" />
+        <SafetyAccess emailAlerts={emailAlerts} compact quiet className="min-w-0" />
       </div>
       {/* Context sits on its own line so a long area name never squeezes the title or the Support pair. */}
       {eyebrow ? <p className="m-meta mt-1 truncate">{eyebrow}</p> : null}
