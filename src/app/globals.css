@@ -1,22 +1,25 @@
 @import "tailwindcss";
 
 /*
- * Movement companion: off-white canvas, navy typography and cobalt actions.
- * Semantic colours describe operations, never the safety of a place or route.
+ * Mira companion design system (design/mira-companion-ux): a warm paper canvas, plum-ink type and one deep
+ * indigo for actions. Mira's voice and screen titles use Instrument Serif; everything she operates uses
+ * Instrument Sans. The calculated sky is the one signature surface, kept for the takeaway at a time.
+ * Semantic colours describe operations, never the safety of a place or route. Every text role is ≥ 4.5:1
+ * on canvas, surface and sunken in both themes; control borders (line-strong) are ≥ 3:1.
  */
 @theme {
-  --color-canvas: #f6f7fb;
-  --color-surface: #ffffff;
-  --color-sunken: #edf0f7;
-  --color-ink: #14213d;
-  --color-ink-muted: #52617b;
-  --color-ink-subtle: #66728a;
-  --color-line: #e0e5ef;
-  --color-line-strong: #b9c5da;
+  --color-canvas: #f7f3ec;
+  --color-surface: #fffdf9;
+  --color-sunken: #efe8dd;
+  --color-ink: #211b2e;
+  --color-ink-muted: #574f66;
+  --color-ink-subtle: #675f75;
+  --color-line: #e7dfd2;
+  --color-line-strong: #8f8270;
 
-  --color-accent: #315bf4;
-  --color-accent-strong: #2448cb;
-  --color-accent-soft: #e9eeff;
+  --color-accent: #4338ca;
+  --color-accent-strong: #3730a3;
+  --color-accent-soft: #ebe8fb;
   --color-accent-ink: #ffffff;
 
   /* Retired hues, aliased so nothing breaks: peach → sunken, mint (confirmed) → accent. */
@@ -26,8 +29,8 @@
   --color-mint-soft: #e9eeff;
 
   /* Attention: something needs her. Never "danger". */
-  --color-warm: #a95c25;
-  --color-warm-soft: #ffebd0;
+  --color-warm: #9a4a16;
+  --color-warm-soft: #fbe8d6;
 
   /* Failure of an operation only. Never a place, route or person. */
   --color-error: #b42318;
@@ -38,16 +41,17 @@
 
   /* Phase 1 evidence grammar (docs/phase1-ux/01 §1). Daylight/lighting facts and community facts get their
    * own calm tints so a brief reads at a glance; neither ever means good or bad. */
-  --color-dusk: #9a5b14;
-  --color-dusk-soft: #fbf1e3;
-  --color-people: #5b4bc4;
-  --color-people-soft: #efedfc;
+  --color-dusk: #8a4f0e;
+  --color-dusk-soft: #f8ecd9;
+  --color-people: #0f766e;
+  --color-people-soft: #ddf1ed;
   --radius-tile: 1.25rem;
   --radius-sheet: 1.75rem;
   --color-scrim: rgb(17 19 18 / 0.4);
 
   --color-glass-edge: rgb(255 255 255 / 0.7);
 
+  --font-display: var(--font-serif), var(--font-deva), ui-serif, Georgia, "Noto Serif", serif;
   --font-sans: var(--font-inst), var(--font-deva), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", sans-serif;
 
   --radius-xs: 0.5rem;
@@ -57,7 +61,7 @@
   --radius-lg: 1.5rem;
   /* Cards on the canvas get a hairline, not a floating shadow. Over-map chrome uses --shadow-float. */
   --shadow-card: 0 0 0 1px var(--color-line);
-  --shadow-float: 0 1px 2px rgb(0 0 0 / 0.08), 0 4px 12px rgb(0 0 0 / 0.1);
+  --shadow-float: 0 1px 2px rgb(33 27 46 / 0.08), 0 6px 16px rgb(33 27 46 / 0.1);
   --shadow-sheet: 0 -6px 24px rgb(0 0 0 / 0.1);
 
   --animate-rise: rise 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -71,8 +75,8 @@
 :root {
   --glass-bg: rgb(255 255 255 / 0.9);
   --pin-bg: #ffffff;
-  --map-route: #315bf4;
-  --map-route-glow: #8ca7ff;
+  --map-route: #4338ca;
+  --map-route-glow: #a5a0f0;
   --map-route-alt: #6b6961;
   --map-unknown: #7a776f;
   --map-lit: #ffc94d;
@@ -89,32 +93,29 @@
   --dur-sheet: 380ms;
   color-scheme: light;
 }
-:root[data-daypart="dawn"] {
-  --color-canvas: #f6f7fb;
-  --color-sunken: #edf0f7;
-}
+:root[data-daypart="dawn"],
 :root[data-daypart="evening"] {
-  --color-canvas: #f6f7fb;
-  --color-sunken: #edf0f7;
+  --color-canvas: #f7f3ec;
+  --color-sunken: #efe8dd;
 }
 :root[data-daypart="night"] {
   color-scheme: dark;
-  --color-canvas: #0d1426;
-  --color-surface: #151f35;
-  --color-sunken: #202c43;
-  --color-ink: #f0f3fc;
-  --color-ink-muted: #b7c3d9;
-  --color-ink-subtle: #99aac6;
-  --color-line: #2c3952;
-  --color-line-strong: #44526d;
-  --color-accent: #9cb4ff;
-  --color-accent-strong: #becdff;
-  --color-accent-soft: #22335d;
-  --color-accent-ink: #101b37;
-  --color-peach: #b7c3d9;
-  --color-peach-soft: #202c43;
-  --color-mint: #9cb4ff;
-  --color-mint-soft: #22335d;
+  --color-canvas: #14111d;
+  --color-surface: #1d1929;
+  --color-sunken: #29233a;
+  --color-ink: #f3f0f8;
+  --color-ink-muted: #c6bfd2;
+  --color-ink-subtle: #a9a1b8;
+  --color-line: #332c44;
+  --color-line-strong: #776d92;
+  --color-accent: #b4b0ff;
+  --color-accent-strong: #d4d1ff;
+  --color-accent-soft: #2d2856;
+  --color-accent-ink: #16123a;
+  --color-peach: #c6bfd2;
+  --color-peach-soft: #29233a;
+  --color-mint: #b4b0ff;
+  --color-mint-soft: #2d2856;
   --color-warm: #f2b872;
   --color-warm-soft: #352615;
   --color-error: #ff8a80;
@@ -122,18 +123,18 @@
   --color-light: #f2c45a;
   --color-dusk: #f2c27a;
   --color-dusk-soft: #33281a;
-  --color-people: #b9adff;
-  --color-people-soft: #29254a;
+  --color-people: #74d6c6;
+  --color-people-soft: #173431;
   --color-scrim: rgb(0 0 0 / 0.55);
   --color-glass-edge: rgb(255 255 255 / 0.06);
   --shadow-float: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 12px rgb(0 0 0 / 0.45);
   --shadow-sheet: 0 -6px 24px rgb(0 0 0 / 0.5);
   --glass-bg: rgb(26 28 27 / 0.9);
-  --pin-bg: #202c43;
-  --map-route: #9cb4ff;
-  --map-route-glow: #3555a2;
-  --map-route-alt: #99aac6;
-  --map-unknown: #99aac6;
+  --pin-bg: #29233a;
+  --map-route: #b4b0ff;
+  --map-route-glow: #4a43a0;
+  --map-route-alt: #a9a1b8;
+  --map-unknown: #a9a1b8;
   --map-me: #60a5fa;
 }
 
@@ -522,12 +523,23 @@
 }
 
 /* Flagship mobile workspace. Shared primitives keep contextual tools in one visual language. */
-.mira-wordmark { display:inline-flex; align-items:center; gap:.35rem; font-size:1.5rem; font-weight:750; letter-spacing:-.07em; color:var(--color-ink); }
-.mira-wordmark span { color:var(--color-accent); font-size:1.2rem; }
+.mira-wordmark { display:inline-flex; align-items:baseline; gap:.2rem; font-family:var(--font-display); font-size:1.75rem; font-weight:400; letter-spacing:-.02em; line-height:1; color:var(--color-ink); }
+.mira-wordmark span { color:var(--color-accent); font-family:var(--font-sans); font-size:1.05rem; font-weight:600; }
 .mira-eyebrow { font-size:.68rem; font-weight:650; text-transform:uppercase; letter-spacing:.14em; color:var(--color-ink-muted); }
-.mira-primary { display:inline-flex; min-height:3rem; align-items:center; justify-content:center; gap:.65rem; padding:.8rem 1.15rem; border-radius:1rem; background:var(--color-accent); color:var(--color-accent-ink); font-weight:650; transition:transform 150ms ease,background 150ms ease; }
+.mira-primary { display:inline-flex; min-height:3rem; align-items:center; justify-content:center; gap:.6rem; padding:.8rem 1.15rem; border-radius:999px; background:var(--color-accent); color:var(--color-accent-ink); font-weight:650; box-shadow:0 1px 0 rgb(255 255 255 / .18) inset, 0 6px 16px -8px var(--color-accent); transition:transform 150ms ease,background 150ms ease; }
+.mira-primary:hover { background:var(--color-accent-strong); }
+:root[data-daypart="night"] .mira-primary:hover { background:var(--color-accent-strong); }
 .mira-primary:active { transform:scale(.98); }
-.mira-primary:disabled { opacity:.45; }
+.mira-primary:disabled { opacity:.45; box-shadow:none; }
+/* The quieter companion of .mira-primary: one per action group at most. */
+.m-btn-secondary { display:inline-flex; min-height:3rem; align-items:center; justify-content:center; gap:.5rem; padding:.7rem 1.05rem; border-radius:999px; background:var(--color-surface); color:var(--color-ink); font-weight:600; box-shadow:inset 0 0 0 1px var(--color-line-strong); transition:background 150ms ease; }
+.m-btn-secondary:hover { background:var(--color-sunken); }
+.m-btn-secondary:disabled { opacity:.5; }
+/* Text actions inside a card or answer: never a competing main action. */
+.m-link { display:inline-flex; min-height:2.75rem; align-items:center; gap:.4rem; font-size:.875rem; font-weight:600; color:var(--color-accent-strong); text-underline-offset:3px; }
+.m-link:hover { text-decoration:underline; }
+/* Mira's own voice: the takeaway or the welcome, in the display face. */
+.m-voice { font-family:var(--font-display); font-weight:400; letter-spacing:-.01em; line-height:1.18; text-wrap:balance; }
 .mira-composer { padding:1.1rem; border:1px solid var(--color-line-strong); border-radius:1.6rem; background:var(--color-surface); box-shadow:0 10px 40px rgb(31 49 103 / .06); }
 .mira-composer:focus-within { border-color:var(--color-accent); }
 .mira-composer textarea { width:100%; resize:vertical; min-height:5rem; background:transparent; font-size:1.1rem; line-height:1.5; outline:none; padding:.2rem; }
@@ -551,11 +563,11 @@
  */
 .m-screen { min-height: 100dvh; padding: max(0.75rem, env(safe-area-inset-top)) 1rem calc(var(--tabbar-space) + 2rem); }
 .m-screen-inner { margin-inline: auto; width: 100%; max-width: 36rem; }
-.m-display { font-size: clamp(1.75rem, 7.4vw, 2.125rem); line-height: 1.12; font-weight: 650; letter-spacing: -0.035em; }
+.m-display { font-family: var(--font-display); font-size: clamp(1.875rem, 8vw, 2.375rem); line-height: 1.08; font-weight: 400; letter-spacing: -0.015em; }
 .m-title { font-size: 1.25rem; line-height: 1.3; font-weight: 650; letter-spacing: -0.02em; }
 .m-meta { font-size: 0.8125rem; line-height: 1.35; color: var(--color-ink-muted); }
 .m-label { font-size: 0.75rem; font-weight: 650; letter-spacing: 0.02em; color: var(--color-ink-subtle); }
-.m-card { border-radius: var(--radius-tile); background: var(--color-surface); box-shadow: 0 1px 2px rgb(20 33 61 / .04), 0 0 0 1px rgb(20 33 61 / .06); }
+.m-card { border-radius: var(--radius-tile); background: var(--color-surface); box-shadow: 0 1px 2px rgb(33 27 46 / .05), 0 0 0 1px var(--color-line); }
 :root[data-daypart="night"] .m-card { box-shadow: 0 0 0 1px var(--color-line); }
 /* A quiet section heading shared by every Phase 1 screen. */
 .m-h { font-size: 1.0625rem; line-height: 1.3; font-weight: 600; letter-spacing: -0.015em; }

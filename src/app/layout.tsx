@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Instrument_Sans, Noto_Sans_Devanagari } from "next/font/google";
+import { Instrument_Sans, Instrument_Serif, Noto_Sans_Devanagari } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
@@ -8,6 +8,8 @@ import { DaypartSync } from "@/lib/daypart-store";
 
 // Latin face preloaded; the Devanagari companion is fetched only when Devanagari text renders (unicode-range).
 const inst = Instrument_Sans({ subsets: ["latin", "latin-ext"], variable: "--font-inst", display: "swap" });
+// Mira's voice and screen titles (one weight; preloaded with the Latin face).
+const serif = Instrument_Serif({ subsets: ["latin", "latin-ext"], weight: "400", variable: "--font-serif", display: "swap" });
 const deva = Noto_Sans_Devanagari({ subsets: ["devanagari"], variable: "--font-deva", display: "swap", preload: false });
 
 export const metadata: Metadata = {
@@ -34,7 +36,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const nonce = (await headers()).get("x-nonce") ?? undefined; // per-request, from src/proxy.ts
   return (
     // data-daypart is set before paint by the inline script (device clock), so it differs from the server render.
-    <html lang="en" className={`${inst.variable} ${deva.variable}`} data-daypart="day" suppressHydrationWarning>
+    <html lang="en" className={`${inst.variable} ${serif.variable} ${deva.variable}`} data-daypart="day" suppressHydrationWarning>
       <head>
         {/* Blocking on purpose: sets the time-of-day theme before first paint (a few hundred bytes, cached). */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}

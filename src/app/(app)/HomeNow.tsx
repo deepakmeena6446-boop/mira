@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
-import { cx } from "@/components/ui/cx";
 import { Avatar } from "@/components/app/Avatar";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { RootHeader } from "@/components/mira/Frame";
 import { Row, RowList } from "@/components/mira/Rows";
-import { SITUATIONS } from "@/components/mira/Situations";
+import { StartChoices } from "@/components/mira/Situations";
 import { greetingKey, useT } from "@/lib/i18n";
 import { LiveNowCard } from "@/components/mira/LiveNow";
 import { api } from "@/lib/api-client";
@@ -30,6 +29,9 @@ import type { SavedPlace } from "@/server/account/places";
 import type { SavedPlan } from "@/server/account/saved-plans";
 
 type Near = { key: string; points: HelpPoint[]; failed: boolean };
+
+/** Ways people start, as she might say them. Tapping one fills the box; it's never sent for her. */
+const EXAMPLES = ["Run at 5 AM tomorrow", "Heading home at 11 PM", "Dinner in a new area"];
 
 /** A tab plan worth offering back: it names a place (or a named start for a loop), not just an opened form. */
 function resumable(draft: PlanDraft | null): PlanDraft | null {
@@ -140,19 +142,17 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
 
   const t = useT();
   const firstName = user?.name.split(" ")[0];
-  const [plan, around, ...more] = SITUATIONS;
+  const askBox = useRef<HTMLInputElement>(null);
+  // Examples fill the box (she can edit before asking); nothing is sent until she taps Ask Mira.
+  const fillExample = (text: string) => { setAsk(text); askBox.current?.focus(); };
 
   return (
     <div className="m-screen bg-companion">
       <div className="m-screen-inner">
         <RootHeader emailAlerts={emailAlerts} leading={<Link href="/" className="mira-wordmark" aria-label="Mira home">mira<span aria-hidden>↗</span></Link>} />
 
-        <div className="mt-6 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            {clock ? <p className="text-[0.875rem] font-semibold text-ink-muted">{t(greetingKey(clock.getHours()))}{firstName ? `, ${firstName}` : ""}</p> : null}
-            <h1 className="mt-0.5 text-[1.625rem] font-semibold leading-tight tracking-[-0.035em]">{t("home.purpose")}</h1>
-            <p className="mt-1 text-[0.9375rem] text-ink-muted">{t("home.purposeLine")}</p>
-          </div>
+        <div className="mt-3 flex min-h-11 items-center justify-between gap-3">
+          <p className="min-h-5 text-[0.875rem] font-semibold text-ink-muted">{clock ? `${t(greetingKey(clock.getHours()))}${firstName ? `, ${firstName}` : ""}` : ""}</p>
           {user ? (
             <div className="flex shrink-0 items-center gap-2">
               {/* Updates: a contact accepted, a journey needs you. The count clears when the inbox is opened. */}
@@ -163,35 +163,30 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
               <Link href="/me" aria-label="Your profile and settings" className="grid size-11 place-items-center"><Avatar name={user.name} src={user.avatarUrl} size={40} /></Link>
             </div>
           ) : (
-            <button type="button" onClick={() => setSignIn(true)} className="min-h-11 shrink-0 rounded-full px-1 text-[0.875rem] font-semibold text-accent-strong">Sign in</button>
+            <button type="button" onClick={() => setSignIn(true)} className="m-link shrink-0 px-1">Sign in</button>
           )}
         </div>
 
-        {/* 1. Ask Mira in her own words — works before the app has loaded (early-input capture). */}
-        <form onSubmit={(e) => { e.preventDefault(); submitAsk(ask); }} className="mt-5">
-          <label htmlFor="home-ask" className="block text-[0.9375rem] font-semibold">Where are you heading or what would you like to know?</label>
-          <div className="m-card mt-2 flex items-center gap-2 rounded-[1.5rem] p-1.5 pl-4 focus-within:ring-2 focus-within:ring-accent">
-            <span aria-hidden><Icon name="sparkle" className="size-5 text-accent" /></span>
-            <input id="home-ask" data-early-text="ask" value={ask} onChange={(e) => setAsk(e.target.value)} maxLength={1000} placeholder="A run at 5 AM, heading home, a new neighbourhood…" autoComplete="off" className="min-h-12 min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-ink-subtle" />
-            <button type="submit" disabled={!ask.trim()} className={cx("min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold transition-colors", ask.trim() ? "bg-accent text-accent-ink" : "bg-sunken text-ink-subtle")}>Ask Mira</button>
+        {/* Purpose first, in Mira's voice: what she helps with and where to begin. */}
+        <h1 className="m-voice text-[clamp(1.875rem,9vw,2.5rem)]">{t("home.purpose")}</h1>
+        <p className="mt-1.5 max-w-[34ch] text-[0.9375rem] leading-snug text-ink-muted">{t("home.purposeLine")}</p>
+
+        {/* 1. The primary task: say it in her own words. Works before the app has loaded (early-input capture). */}
+        <form onSubmit={(e) => { e.preventDefault(); submitAsk(ask); }} className="m-card mt-4 p-3.5">
+          <label htmlFor="home-ask" className="block font-semibold leading-snug">Where are you heading or what would you like to know?</label>
+          <div className="mt-2.5 flex items-center gap-2 rounded-2xl bg-sunken p-1.5 pl-3.5 ring-1 ring-transparent focus-within:bg-surface focus-within:ring-2 focus-within:ring-accent">
+            <input ref={askBox} id="home-ask" data-early-text="ask" value={ask} onChange={(e) => setAsk(e.target.value)} maxLength={1000} placeholder="A run at 5 AM, heading home, a new neighbourhood…" autoComplete="off" enterKeyHint="send" className="min-h-11 min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-ink-subtle" />
+            <button type="submit" disabled={!ask.trim()} className="mira-primary min-h-11 shrink-0 px-4 text-sm">Ask Mira</button>
+          </div>
+          <div className="m-scroll-x -mx-3.5 mt-1.5 px-3.5" role="group" aria-label="Examples you can edit before asking">
+            {EXAMPLES.map((e) => (
+              <button key={e} type="button" onClick={() => fillExample(e)} className="min-h-11 shrink-0 whitespace-nowrap rounded-full px-3 text-[0.8125rem] font-medium text-ink-muted ring-1 ring-inset ring-line hover:bg-sunken">{e}</button>
+            ))}
           </div>
         </form>
 
-        {/* 2. The two structured paths, equally valid and without the model: an outing, or a place. */}
-        <nav aria-label="Start with" className="mt-3 grid grid-cols-2 gap-2">
-          {[plan, around].map((s) => (
-            <Link key={s.href} href={s.href} className="m-card m-press flex min-h-13 items-center gap-2.5 px-3.5 text-[0.9375rem] font-semibold">
-              <Icon name={s.icon} className="size-5 shrink-0 text-accent" />{s.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="mt-1 flex flex-wrap gap-x-4 px-1">
-          {more.map((s) => (
-            <Link key={s.href} href={s.href} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-ink-muted">
-              <Icon name={s.icon} className="size-4" />{s.label}
-            </Link>
-          ))}
-        </div>
+        {/* 2. The two structured paths — each says what she gets — then the presets. No model needed. */}
+        <StartChoices className="mt-5" />
 
         {/* 3. One way back in. A plan is never being followed; only an open journey is. */}
         {resume ? (
@@ -213,7 +208,7 @@ export function HomeNow({ user, places, savedPlan, emailAlerts, journeyTo: serve
           </div>
         ) : null}
 
-        <p className="mt-8 px-1 text-center text-[0.72rem] leading-relaxed text-ink-subtle">Mira never scores a place. Every fact shows where it came from, and what Mira can’t see is said too.</p>
+        <p className="mt-8 px-1 text-center text-[0.75rem] leading-relaxed text-ink-subtle">Mira asks only for what it needs, and nothing starts or is shared until you choose. It never scores a place: every fact shows where it came from, and what Mira can’t see is said too.</p>
       </div>
       <SignInSheet open={signIn} onClose={() => setSignIn(false)} reason="Sign in to save plans and go with Mira" />
     </div>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { RootHeader, StateNote } from "@/components/mira/Frame";
 import { JourneyGlance } from "@/components/mira/JourneyGlance";
 import { Row, RowAction, RowList } from "@/components/mira/Rows";
-import { SituationChips } from "@/components/mira/Situations";
+import { StartChoices } from "@/components/mira/Situations";
 import { SignInSheet } from "@/components/app/SignInSheet";
 import { api } from "@/lib/api-client";
 import { useClock } from "@/lib/location-store";
@@ -102,7 +102,7 @@ export function JourneysScreen({ signedIn, emailAlerts, active, recent }: { sign
           ) : (
             <>
               <StateNote title="No journey right now">When you go with Mira, your journey shows here until a day after you arrive.</StateNote>
-              <SituationChips className="mt-2.5" />
+              <StartChoices className="mt-5" headingId="journeys-start-h" heading="Start something" />
             </>
           )}
         </section>
