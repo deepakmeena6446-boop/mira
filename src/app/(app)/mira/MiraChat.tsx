@@ -20,6 +20,7 @@ import { takeHandedOff } from "@/lib/ask-handoff";
 import { freshLocation, setPendingDestination, useClock, useLocation, usableLocationPoint } from "@/lib/location-store";
 import type { MiraCard } from "@/server/providers/companion/types";
 import { circleSharingLine } from "@/domain/companion-output";
+import { layoutAnswer } from "@/domain/answer-layout";
 import { clockIn } from "@/domain/daylight";
 import { useDaypart } from "@/lib/daypart-store";
 import { hasPlanWork, intentFromDraft, newPlanDraft, UNKNOWN_PROVENANCE } from "@/domain/plan-state";
@@ -514,7 +515,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
                 <MiraPulse size={16} state={m.failed ? "attention" : m.streaming && !m.text ? "thinking" : "observing"} className="mt-[5px]" />
                 <div className="min-w-0 flex-1">
                   <div className={cx(m.failed ? "rounded-2xl bg-warm-soft px-4 py-3 text-warm" : "")} role={m.failed ? "alert" : undefined}>
-                    {m.text ? <p className="whitespace-pre-line text-[0.98rem] leading-relaxed text-mixed">{m.text}</p> : <span className="inline-flex gap-1" aria-label="Mira is checking"><span className="size-2 animate-bounce rounded-full bg-ink-subtle" /><span className="size-2 animate-bounce rounded-full bg-ink-subtle [animation-delay:120ms]" /><span className="size-2 animate-bounce rounded-full bg-ink-subtle [animation-delay:240ms]" /></span>}
+                    {m.text ? <Reply text={m.text} done={!m.streaming && !m.failed} /> : <span className="inline-flex gap-1" aria-label="Mira is checking"><span className="size-2 animate-bounce rounded-full bg-ink-subtle" /><span className="size-2 animate-bounce rounded-full bg-ink-subtle [animation-delay:120ms]" /><span className="size-2 animate-bounce rounded-full bg-ink-subtle [animation-delay:240ms]" /></span>}
                   </div>
                   {m.cards.map((c, i) => (
                     <Card key={i} card={c} onTrip={startTrip} onComparePlace={comparePlace} onStartHere={() => void startHere()} />
@@ -559,6 +560,29 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
         </div>
       </div>
       <SignInSheet open={signIn} onClose={() => setSignIn(false)} reason="Sign in to talk to Mira" />
+    </div>
+  );
+}
+
+/**
+ * A finished reply, grouped for scanning (layoutAnswer): the facts first, then the next step, then what wasn't
+ * checked and the source — all of it shown, in the words the server sent. While it streams, or when there's
+ * nothing to separate, it stays one paragraph.
+ */
+function Reply({ text, done }: { text: string; done: boolean }) {
+  const l = done ? layoutAnswer(text) : null;
+  if (!l) return <p className="whitespace-pre-line text-[0.98rem] leading-relaxed text-mixed">{text}</p>;
+  return (
+    <div className="text-mixed">
+      <p className="text-[0.98rem] leading-relaxed">{l.answer.join(" ")}</p>
+      {l.next.length ? <p className="mt-2 text-[0.9375rem] font-semibold leading-snug">{l.next.join(" ")}</p> : null}
+      {l.limits.length ? (
+        <div className="mt-3 rounded-2xl bg-sunken px-3.5 py-2.5">
+          <p className="text-xs font-semibold text-ink-muted">What this doesn’t check</p>
+          <ul className="mt-1 list-disc space-y-1 pl-4 text-[0.875rem] leading-snug text-ink-muted">{l.limits.map((s) => <li key={s}>{s}</li>)}</ul>
+        </div>
+      ) : null}
+      {l.sources.length ? <p className="mt-2 text-[0.8125rem] leading-snug text-ink-muted">{l.sources.join(" ")}</p> : null}
     </div>
   );
 }
