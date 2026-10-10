@@ -12,6 +12,8 @@ async function pick(page: Page, field: RegExp, query: string) {
 }
 
 test("a guest plans between two named places without GPS and gets a short, qualified answer before the detail", async ({ page }) => {
+  // Midday in Delhi: daylight for the whole walk, so the travel time leads (design/mira-companion-ux chooseTakeaway).
+  await page.clock.setFixedTime(new Date("2026-10-10T06:30:00Z"));
   await page.addInitScript(() => {
     const state = window as unknown as { geoCalls: number };
     state.geoCalls = 0;
@@ -46,6 +48,22 @@ test("a guest plans between two named places without GPS and gets a short, quali
   // Two actions in the bar, and saving is offered honestly to a guest.
   await expect(page.getByRole("button", { name: /^(Sign in to save|Go with Mira)$/ }).first()).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { geoCalls: number }).geoCalls)).toBe(0);
+});
+
+test("on foot in the dark, the calculated sky leads and the travel time keeps its qualifier in the list", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-10T17:30:00Z")); // 11 PM in Delhi
+  await page.goto("/plan?for=go");
+  await pick(page, /^From/, "Hindu College");
+  await pick(page, /^To/, DEST);
+  const sky = page.getByRole("region", { name: "Your plan, at that time" });
+  await expect(sky).toContainText(/^.*Dark when you set off/);
+  await expect(sky).toContainText(/daylight from about \d{1,2}:\d{2} AM/i);
+  await expect(sky).toContainText("Calculated · Solar calculation, not weather or visibility");
+  await expect(sky).not.toContainText(/min walk/);
+  const take = page.getByRole("region", { name: "Mira’s take" });
+  await expect(take).toContainText(/About \d+ min · [\d.]+ km/);
+  await expect(take).toContainText("Estimate");
+  await expect(take).not.toContainText("Dark when you set off"); // said once, on the sky card
 });
 
 test("saving says what blocks it before the tap; the remembered mode is a default, never over her choice", async ({ browser }) => {

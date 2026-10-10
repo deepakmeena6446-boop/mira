@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { briefLimitation, routeTimeLimitation, selectBrief, type BriefCandidate } from "@/domain/companion-brief";
+import { briefLimitation, chooseTakeaway, routeTimeLimitation, selectBrief, splitLead, type BriefCandidate, type BriefItem } from "@/domain/companion-brief";
 import { daylightClaim, helpClaim, notesClaim, planBrief, updatesClaim, walkTimeClaim, blindSpotsClaim, type Claim } from "@/lib/brief";
 import type { SafetyUpdatesData } from "@/domain/safety-updates";
 import { departureForZone } from "@/domain/plan-options";
@@ -118,5 +118,44 @@ describe("departureForZone (A04/A29: the plan's time stays correct when the plac
   });
   it("keeps a chosen later time's clock digits", () => {
     expect(departureForZone("2026-10-09T22:00", "UTC", "Asia/Kolkata", now)).toBe("2026-10-09T22:00");
+  });
+});
+
+// design/mira-companion-ux: what the plan's sky card leads with, by fixed rules over the brief's own items.
+describe("chooseTakeaway", () => {
+  const item = (id: string, kind: BriefItem["kind"], text = `fact ${id}`): BriefItem => ({ id, kind, text, scopeLabel: "this way" });
+  const time = item("time", "estimate", "About 21 min · 1.6 km");
+  const dark = item("daylight", "calculation", "Dark when you set off · daylight from about 6:34 AM");
+  const people = item("notes", "community", "2 notes on this way · latest: “Gate 2 is shut after 9 PM”");
+  const help = item("help", "listed", "7 Help Points on this way");
+
+  it("keeps the travel time when nothing else on the evidence matters more (the honest fallback)", () => {
+    expect(chooseTakeaway([time, dark, help], { onFoot: true, skyMatters: false })).toBe(time);
+  });
+
+  it("leads with the calculated sky on foot when it's dark as she starts or turns before she finishes", () => {
+    expect(chooseTakeaway([time, dark, help], { onFoot: true, skyMatters: true })).toBe(dark);
+  });
+
+  it("doesn't lead with the sky for a ride or transit, where the minutes are what changes her plan", () => {
+    expect(chooseTakeaway([time, dark], { onFoot: false, skyMatters: true })).toBe(time);
+  });
+
+  it("leads with a released note from people over the travel time", () => {
+    expect(chooseTakeaway([time, people, help], { onFoot: true, skyMatters: false })).toBe(people);
+  });
+
+  it("always leads with a failed route check, so its retry sits with it", () => {
+    const failed = item("time", "failed", "Mira couldn’t check the way just now.");
+    expect(chooseTakeaway([failed, dark, people], { onFoot: true, skyMatters: true })).toBe(failed);
+  });
+
+  it("never promotes a listing or an unknown, and gives nothing when there's no time to give", () => {
+    expect(chooseTakeaway([item("route", "unknown", "No route found"), help], { onFoot: true, skyMatters: false })).toBeNull();
+  });
+
+  it("splits the lead into a headline and the rest of its sentence", () => {
+    expect(splitLead(dark.text)).toEqual({ head: "Dark when you set off", rest: "daylight from about 6:34 AM" });
+    expect(splitLead("No change")).toEqual({ head: "No change", rest: null });
   });
 });

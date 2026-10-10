@@ -55,6 +55,33 @@ export function selectBrief(candidates: BriefCandidate[], limit = BRIEF_LIMIT): 
   return { items: ranked.slice(0, Math.max(0, limit)).map(({ c }) => strip(c)), rest: ranked.slice(Math.max(0, limit)).map(({ c }) => strip(c)) };
 }
 
+/**
+ * The one fact a plan's sky card leads with (design/mira-companion-ux). Fixed rules over items the brief already
+ * holds — no model, nothing new — so the same evidence always leads the same way:
+ * 1. a failed route check: what to do next depends on it, and it's said once, beside its retry;
+ * 2. on foot, the calculated sky when it's dark or twilight as she starts, or turns before she's due to finish
+ *    (`skyMatters`) — it changes how the way will be, where the minutes don't;
+ * 3. a released note from people about the way: current, corroborated, and about this way;
+ * 4. otherwise the travel-time estimate — the honest fallback, as before.
+ * Null when there's no time to give: a missing route stays in the list as "not known". Whatever doesn't lead keeps
+ * its place, and its qualifier, in the list.
+ */
+export function chooseTakeaway(items: BriefItem[], signals: { onFoot: boolean; skyMatters: boolean }): BriefItem | null {
+  const time = items.find((i) => (i.id === "time" || i.id === "route") && i.kind !== "unknown") ?? null;
+  if (time?.kind === "failed") return time;
+  if (signals.onFoot && signals.skyMatters) {
+    const sky = items.find((i) => (i.id === "daylight" || i.id === "daylight-end") && i.kind === "calculation");
+    if (sky) return sky;
+  }
+  return items.find((i) => i.kind === "community") ?? time;
+}
+
+/** A lead item as a headline and the rest of its sentence: "Dark when you set off" · "daylight from about 6:34 AM". */
+export function splitLead(text: string): { head: string; rest: string | null } {
+  const at = text.indexOf(" · ");
+  return at < 0 ? { head: text, rest: null } : { head: text.slice(0, at), rest: text.slice(at + 3) };
+}
+
 /** Plain labels for the qualifier shown beside each item (never a verdict). */
 export const BRIEF_KIND_LABEL: Record<BriefKind, string> = {
   listed: "Listed",

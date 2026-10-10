@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 import { ActionBar, MiraVoice, QuestionRow, StateNote } from "@/components/mira/Frame";
 import { BriefSummary, EvidenceChip, EvidenceLedger, type EvidenceItem } from "@/components/mira/Evidence";
-import { BRIEF_KIND_LABEL } from "@/domain/companion-brief";
+import { BRIEF_KIND_LABEL, chooseTakeaway, splitLead } from "@/domain/companion-brief";
 import { Row, RowAction, RowList } from "@/components/mira/Rows";
 import { BriefMap } from "@/components/mira/BriefMap";
 import { SkyCard, skyAt } from "@/components/mira/LiveNow";
@@ -34,7 +34,7 @@ import { PlaceSheet, WhenSheet, queryFor, whenWords, type PickedPlace } from "./
 import { loopWord, placeName, planTitle } from "@/domain/plan-name";
 import { GoSheet, type GoTarget } from "./GoSheet";
 import { saveEligibility, TAB_PLAN_NOTE } from "@/domain/plan-save";
-import { clockIn } from "@/domain/daylight";
+import { clockIn, daylightOutlook } from "@/domain/daylight";
 
 export type Situation = "go" | "run" | "travel";
 type Mode = "walk" | "ride" | "transit";
@@ -344,9 +344,16 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
   const checking = (!loop && !currentWays) || (loop && loopPlan?.key !== loopKey);
   const verb = loop ? loopName.toLowerCase() : mode === "walk" ? "walk" : mode === "ride" ? "ride" : "by transit";
   const tripTitle = loop ? `${loopMinutes} min ${verb}` : minutes ? `${Math.round(minutes)} min ${verb}${arriveAt ? ` · arrive ${clockIn(arriveAt, zone)}` : ""}` : currentWays?.error ? "Couldn’t check the way" : currentWays?.noRoute ? "No travel time available" : "…";
-  // The travel time is the takeaway on the sky card, with its qualifier beside it; the list doesn't repeat it.
-  // A failed route check is said once, on the sky card, with its retry beside it.
-  const takeaway = brief.items.find((i) => (i.id === "time" || i.id === "route") && i.kind !== "unknown") ?? null;
+  // The sky card leads with one fact, chosen by fixed rules (chooseTakeaway): a failed route check; on foot, the sky
+  // when it's dark as she starts or turns before she's due to finish; a note from people; else the travel time.
+  // The list doesn't repeat the lead; whatever doesn't lead stays in it with its own qualifier.
+  const skyStart = departAt && sun ? skyAt(departAt, sun) : null;
+  const turn = departAt && sun ? daylightOutlook(departAt, sun) : null;
+  const finishAt = departAt ? (loop ? new Date(departAt.getTime() + loopMinutes * 60_000) : arriveAt) : null;
+  const skyMatters = (skyStart !== null && skyStart !== "daylight") || Boolean(turn?.changeAt && turn.changeTo !== "daylight" && finishAt && turn.changeAt <= finishAt);
+  const takeaway = chooseTakeaway(brief.items, { onFoot: loop || mode === "walk", skyMatters });
+  const timeLeads = takeaway?.id === "time" || takeaway?.id === "route";
+  const lead = takeaway && !timeLeads ? splitLead(takeaway.text) : null;
   const briefRest = takeaway ? brief.items.filter((i) => i !== takeaway) : brief.items;
   const fromWords = draft.origin.kind === "device" ? "where you are" : originLabel;
   const zoneNote = !sameClock(zone, deviceZone()) ? ` (${zone.split("/").pop()?.replace(/_/g, " ")} time)` : "";
@@ -439,9 +446,9 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
                 pulse={checking ? "thinking" : "noticed"}
                 eyebrow={checking ? "Checking that place at that time…" : "Your plan, at that time"}
                 aside={whenWords(draft.departureLocal, zone)}
-                title={tripTitle}
+                title={lead ? lead.head : tripTitle}
                 strip={departAt && sun ? { from: departAt, point: sun, hours: loop ? 3 : 6, startLabel: "set off", zone } : null}
-                line={takeaway?.kind === "failed" ? <><span className="block">{takeaway.text} Your plan is kept.</span><button type="button" onClick={() => setRetry((n) => n + 1)} className="mt-2 inline-flex min-h-11 items-center rounded-full bg-white/90 px-4 text-sm font-semibold text-[#211b2e]">Try again</button></> : takeaway ? <><span className="font-semibold">{BRIEF_KIND_LABEL[takeaway.kind]}</span>{takeaway.sourceLabel ? ` · ${takeaway.sourceLabel}` : ""}{takeaway.limitation ? <span className="mt-1 block">{takeaway.limitation}</span> : null}</> : null}
+                line={takeaway?.kind === "failed" ? <><span className="block">{takeaway.text} Your plan is kept.</span><button type="button" onClick={() => setRetry((n) => n + 1)} className="mt-2 inline-flex min-h-11 items-center rounded-full bg-white/90 px-4 text-sm font-semibold text-[#211b2e]">Try again</button></> : takeaway ? <>{lead?.rest ? <span className="mb-1 block text-[0.9375rem] font-semibold">{lead.rest[0].toUpperCase() + lead.rest.slice(1)}</span> : null}<span className="font-semibold">{BRIEF_KIND_LABEL[takeaway.kind]}</span>{takeaway.sourceLabel ? ` · ${takeaway.sourceLabel}` : ""}{takeaway.limitation ? <span className="mt-1 block">{takeaway.limitation}</span> : null}</> : null}
               />
               <BriefSummary className="mt-3" checking={checking} acknowledgement="What matters" items={briefRest} limitation={checking ? null : brief.limitation} onRetry={() => setRetry((n) => n + 1)}>
                 <div className="mt-1 flex flex-wrap gap-x-4 border-t border-line pt-1">
