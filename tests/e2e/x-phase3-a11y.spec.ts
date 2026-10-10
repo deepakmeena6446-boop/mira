@@ -29,7 +29,11 @@ test("every screen has one main heading, named controls, described images and no
   await page.setViewportSize({ width: 320, height: 700 });
   for (const path of SCREENS) {
     await page.goto(path);
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.locator("main").waitFor();
+    // Best-effort settle before the audit. "networkidle" is Chromium's own lifecycle signal; a trace (design/mira-
+    // companion-ux README) showed it never firing after a link prefetch was cancelled by this goto, so an unbounded
+    // wait hung the sweep for 4 minutes on Home. Bounded, it stays best-effort as the catch intends; every check runs.
+    await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
     const a = await audit(page);
     expect.soft(a.h1, `${path}: exactly one h1`).toHaveLength(1);
     expect.soft(a.unnamed, `${path}: controls without an accessible name`).toEqual([]);
