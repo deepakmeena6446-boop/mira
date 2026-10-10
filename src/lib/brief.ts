@@ -10,7 +10,7 @@ import { HELP_CLASSES, SOURCE_SHORT, hoursState, type HelpPoint, type HoursState
 import type { LocalTime } from "@/domain/opening-hours";
 import { clock12 } from "@/domain/opening-hours";
 import { daylightAt } from "@/domain/plan-options";
-import { clockIn, daylightOutlook } from "@/domain/daylight";
+import { aboutIn, clockIn, daylightOutlook } from "@/domain/daylight";
 import { lightingEvidenceLine, sourceList } from "@/components/app/LightingSummary";
 import { CATEGORY_LABEL, ageLabel, type SafetyUpdatesData } from "@/domain/safety-updates";
 import type { EvidenceKind } from "@/components/mira/Evidence";
@@ -30,15 +30,23 @@ export type CommunityNote = { id: string; text: string; polarity: "positive" | "
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /** Daylight at a planned instant, for open sky. */
-export function daylightClaim(at: Date | null, point: { lat: number; lon: number } | null, timeZone: string | null, label = "at that time"): Claim {
+/**
+ * Whether the place's own clock is known. A chosen place's zone is looked up; until it answers ("checking") or when
+ * it can't ("unknown"), no clock time is said in another zone (the phone's or her country's) — a change is said
+ * relative to now instead, and listed opening hours aren't read.
+ */
+export type PlaceClock = "known" | "checking" | "unknown";
+
+export function daylightClaim(at: Date | null, point: { lat: number; lon: number } | null, timeZone: string | null, label = "at that time", clock: PlaceClock = "known"): Claim {
   if (!at || !point) return { id: "daylight", kind: "none", topic: "Daylight", icon: "sun", claim: "Not calculated yet — choose a place and a time." };
   const outlook = daylightOutlook(at, point);
   if (!outlook) return { id: "daylight", kind: "none", topic: "Daylight", icon: "sun", claim: "Mira doesn’t calculate daylight this far north or south." };
   const state = daylightAt(at, point);
-  const next = outlook.changeTo === "daylight" ? "daylight from" : state === "dark" && outlook.changeTo === "uncertain" ? "twilight from" : outlook.changeTo === "dark" ? "dark from" : "changes";
-  const change = outlook.changeAt ? ` · ${next} about ${clockIn(outlook.changeAt, timeZone)}` : "";
+  const to = outlook.changeTo === "daylight" ? "daylight" : state === "dark" && outlook.changeTo === "uncertain" ? "twilight" : outlook.changeTo === "dark" ? "dark" : null;
+  const change = !outlook.changeAt ? "" : clock === "known" ? ` · ${to ? `${to} from` : "changes"} about ${clockIn(outlook.changeAt, timeZone)}` : ` · ${to ?? "changes"} ${aboutIn(at, outlook.changeAt)}`;
   const words = state === "daylight" ? `Daylight ${label}` : state === "dark" ? `Dark ${label}` : `Twilight ${label}`;
-  return { id: "daylight", kind: "checked", topic: "Daylight", icon: "sun", claim: `${words}${change}`, source: "Solar calculation" };
+  const source = clock === "known" ? "Solar calculation" : `Solar calculation · from now, not a clock time: ${clock === "checking" ? "checking this place’s local time" : "this place’s local time isn’t known"}`;
+  return { id: "daylight", kind: "checked", topic: "Daylight", icon: "sun", claim: `${words}${change}`, source };
 }
 
 /** Lighting along one way, from the route's own evidence. */
@@ -56,7 +64,7 @@ export function lightingClaim(o: WayOption | null): Claim {
 }
 
 /** Help Points along a way (or near a place), with what their listed hours say at that time. */
-export function helpClaim(points: HelpPoint[], evidence: EvidenceState<HelpPoint[]> | undefined, at: LocalTime | null, where = "on this way", atLabel = "then"): Claim {
+export function helpClaim(points: HelpPoint[], evidence: EvidenceState<HelpPoint[]> | undefined, at: LocalTime | null, where = "on this way", atLabel = "then", clock: PlaceClock = "known"): Claim {
   if (!evidence) return { id: "help", kind: "pending", topic: "Help Points", icon: "shield", claim: "Looking for Help Points…" };
   if (evidence.state === "failed") return { id: "help", kind: "failed", topic: "Help Points", icon: "shield", claim: "Mira couldn’t check Help Points just now." };
   if (evidence.state === "unavailable") return { id: "help", kind: "none", topic: "Help Points", icon: "shield", claim: "Help Point sources aren’t available here." };
@@ -65,7 +73,7 @@ export function helpClaim(points: HelpPoint[], evidence: EvidenceState<HelpPoint
   const open = states.filter((h) => h.kind === "open_24h" || h.kind === "listed_open" || h.kind === "open_now").length;
   const closed = states.filter((h) => h.kind === "closed").length;
   const kinds = [...new Set(points.map((p) => HELP_CLASSES[p.cls].label.toLowerCase()))].slice(0, 3).join(", ");
-  const timePart = at ? ` · ${open} open ${atLabel}${closed ? `, ${closed} closed` : ""}` : "";
+  const timePart = at ? ` · ${open} open ${atLabel}${closed ? `, ${closed} closed` : ""}` : clock === "checking" ? " · opening hours wait for this place’s local time" : clock === "unknown" ? " · opening hours not checked: this place’s local time isn’t known" : "";
   const sources = [...new Set(points.map((p) => SOURCE_SHORT[p.hoursSource ?? p.source]))].join(" + ");
   return { id: "help", kind: "checked", topic: "Help Points", icon: "shield", claim: `${plural(points.length, "Help Point")} ${where} (${kinds})${timePart}`, source: `${sources} · listed hours${evidence.state === "partial" ? " · some sources couldn’t be checked" : ""}` };
 }

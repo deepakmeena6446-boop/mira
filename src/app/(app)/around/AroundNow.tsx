@@ -20,7 +20,7 @@ import { handOffAsk } from "@/lib/ask-handoff";
 import { setPlanDraft } from "@/lib/plan-store";
 import { clearPendingDestination, peekPendingDestination, setPendingDestination, shouldAutoLocate, usableLocationPoint, useClock, useLocation } from "@/lib/location-store";
 import { useCountry } from "@/lib/locale-store";
-import { blindSpotsClaim, daylightClaim, helpClaim, hoursWords, lightingClaim, notesClaim, planBrief, updatesClaim, walkTimeClaim, type Claim, type CommunityNote, type WayOption } from "@/lib/brief";
+import { blindSpotsClaim, daylightClaim, helpClaim, hoursWords, lightingClaim, notesClaim, planBrief, updatesClaim, walkTimeClaim, type Claim, type CommunityNote, type PlaceClock, type WayOption } from "@/lib/brief";
 import { HELP_CLASSES, helpWeightsFor, hoursState, isNight, rankHelpPoints, type HelpPoint } from "@/domain/help-points";
 import { localTimeInZone } from "@/domain/opening-hours";
 import { haversineMeters } from "@/domain/pilot";
@@ -99,10 +99,15 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch, he
   }, [walkKey]);
   const walkNow = walk?.key === walkKey ? walk : null;
 
-  // The place's zone when known; around her, her country's (or the phone's).
-  const zone = (place ? now?.zone : null) ?? country.timezone ?? deviceZone();
-  const localNow = clock ? localTimeInZone(clock, zone) : null;
-  const ranked = focus && now?.help ? rankHelpPoints(now.help.points, focus, { situation: "nearby", night: localNow ? isNight(Math.floor(localNow.minute / 60)) : false, weights: helpWeightsFor(country.iso), timeZone: zone ?? undefined, now: localNow ?? undefined, at: clock?.getTime() }) : [];
+  // Around her: her country's zone (or the phone's) — it's where she is. Around a chosen place: only that place's own
+  // zone. While its lookup runs, or if it fails, there is no clock for it — never her phone's or her country's, which
+  // would put a Lisbon place on Delhi time — so clock times and listed opening hours wait or say they're unknown.
+  const placeClock: PlaceClock = !place ? "known" : typeof now?.zone === "string" ? "known" : now?.zone === null ? "unknown" : "checking";
+  const zone = place ? (placeClock === "known" ? (now!.zone as string) : null) : country.timezone ?? deviceZone();
+  const localNow = clock && (!place || zone) ? localTimeInZone(clock, zone) : null;
+  // Night for ranking: the place's clock when known, else the sky itself (a solar calculation needs no zone).
+  const night = localNow ? isNight(Math.floor(localNow.minute / 60)) : Boolean(clock && focus && skyAt(clock, focus) === "dark");
+  const ranked = focus && now?.help ? rankHelpPoints(now.help.points, focus, { situation: "nearby", night, weights: helpWeightsFor(country.iso), timeZone: zone ?? undefined, now: localNow ?? undefined, at: clock?.getTime() }) : [];
 
   const claims: Claim[] = [];
   if (focus) {
@@ -110,8 +115,8 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch, he
       if (walkNow?.error) claims.push({ id: "time", kind: "none", topic: "Walk there", icon: "clock", claim: walkNow.error });
       else { claims.push({ ...walkTimeClaim(walkNow?.way ?? null, "walk", null, zone), topic: "Walk there from you" }); claims.push(lightingClaim(walkNow?.way ?? null)); }
     }
-    claims.push(daylightClaim(clock, focus, zone, "now"));
-    claims.push(helpClaim(now?.help?.points ?? [], now?.help?.evidence, localNow, place ? "within a short walk of it" : "within a short walk", "now"));
+    claims.push(daylightClaim(clock, focus, zone, "now", placeClock));
+    claims.push(helpClaim(now?.help?.points ?? [], now?.help?.evidence, localNow, place ? "within a short walk of it" : "within a short walk", "now", placeClock));
     const notesRow = notesClaim(now?.notes ?? null, place ? "around it" : "around you");
     if (notesRow) claims.push(notesRow);
     claims.push(updatesClaim(now?.updates ?? null, place ? "near there" : "near you"));
@@ -186,7 +191,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch, he
             {/* 1. What's true here, now — the same sky card as Home, for you or for the place you chose. */}
             <div className="mt-5">
               {place ? (
-                <SkyCard state={skyAt(clock, focus)} label={`Around ${place.name}, now`} eyebrow="A place you chose" aside={clock ? clockIn(clock, zone) : null} titleAs="h2" title={<span className="line-clamp-3">{place.name}</span>} strip={clock ? { from: clock, point: focus, zone } : null} stats={stats.slice(1, 2).filter((st) => st.state === "loading" || (st.state === "ok" && st.value !== "—"))} />
+                <SkyCard state={skyAt(clock, focus)} label={`Around ${place.name}, now`} eyebrow="A place you chose" aside={!clock ? null : placeClock === "known" ? clockIn(clock, zone) : placeClock === "checking" ? "Local time…" : "Local time unknown"} titleAs="h2" title={<span className="line-clamp-3">{place.name}</span>} strip={clock ? { from: clock, point: focus, zone, relative: placeClock !== "known" } : null} stats={stats.slice(1, 2).filter((st) => st.state === "loading" || (st.state === "ok" && st.value !== "—"))} />
               ) : (
                 <LiveNowCard now={clock} point={focus} area={loc.area} stats={[]} line={line} footer={null} locating={false} locationState={loc.status} onLocate={() => undefined} />
               )}
@@ -227,7 +232,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch, he
                         <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-sunken"><Icon name={HELP_ICON[p.cls] ?? "pin"} className="size-4 text-ink-muted" /></span>
                         <span className="min-w-0 flex-1">
                           <span className="block font-semibold leading-snug [overflow-wrap:anywhere]">{p.name}</span>
-                          <span className="line-clamp-2 block text-[0.8125rem] text-ink-muted">{HELP_CLASSES[p.cls].label} · about {p.minutes} min walk · {hoursWords(h, { listed: false })}</span>
+                          <span className="line-clamp-2 block text-[0.8125rem] text-ink-muted">{HELP_CLASSES[p.cls].label} · about {p.minutes} min walk · {placeClock !== "known" && p.schedule && (h.kind === "listed" || h.kind === "unknown") ? (placeClock === "checking" ? "hours wait for local time" : "hours not checked: local time unknown") : hoursWords(h, { listed: false })}</span>
                         </span>
                         <a href={`https://www.google.com/maps/dir/?api=1&destination=${p.lat.toFixed(5)},${p.lon.toFixed(5)}&travelmode=walking`} target="_blank" rel="noopener noreferrer" aria-label={`Directions to ${p.name}`} className="grid size-11 shrink-0 place-items-center rounded-full bg-sunken"><Icon name="arrow" className="size-4" /></a>
                       </li>

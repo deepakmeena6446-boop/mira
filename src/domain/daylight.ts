@@ -28,6 +28,17 @@ export function daylightOutlook(at: Date, point: LatLon): DaylightOutlook | null
 }
 
 /**
+ * "in about 25 min" / "in about 3 h": a change said relative to now, for when the place's own clock isn't known.
+ * Needs no time zone, so it stays true whatever the phone's zone is.
+ */
+export function aboutIn(from: Date, to: Date): string {
+  const min = Math.max(0, (to.getTime() - from.getTime()) / 60_000);
+  if (min < 5) return "in a few minutes";
+  if (min < 90) return `in about ${Math.round(min / 5) * 5} min`;
+  return `in about ${Math.round(min / 60)} h`;
+}
+
+/**
  * "6:12 PM" in the given zone (or the device's when none is known). One clock everywhere (audit R14): always this
  * shape, never the device locale's "6:12 pm", "18:12" or native digits, so every screen, email and Mira agree.
  */
