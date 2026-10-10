@@ -256,6 +256,17 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
   const [loaded, setLoaded] = useState(false);
   const [signIn, setSignIn] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  // The dock (notices + box) changes height — the private banner, a long notice, a narrow screen — so the
+  // conversation is padded by its measured height, never a guess, and the latest reply always clears it.
+  const dockRef = useRef<HTMLDivElement>(null);
+  const [dockH, setDockH] = useState(0);
+  useEffect(() => {
+    const el = dockRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setDockH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   /**
    * A private conversation (signed in): once a turn can't be kept — a plan, a movement, her location, or a question
    * handed over from an outing or a place — every later turn stays private too, until "New conversation". Its turns
@@ -292,7 +303,7 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
 
   useEffect(() => {
     if (msgs.length) endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [msgs]);
+  }, [msgs, dockH]);
 
   const send = async (text: string) => {
     const message = text.trim();
@@ -448,14 +459,16 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
         <div className="mx-auto max-w-xl">
           <RootHeader emailAlerts={emailAlerts} leading={<MiraPulse size={22} state={sending ? "thinking" : "observing"} />} eyebrow={here ? `${loc.area ?? "Near you"}${clock ? ` · ${clockIn(clock)}` : ""}` : "Places, plans and what’s around"} title="Mira" />
           {planActive && (plan || planDraft?.loop || planDraft?.destination.query.trim() || (planDraft?.origin.kind === "named" && planDraft.origin.query.trim())) ? (
-            <div className="mt-3 flex items-center gap-3 rounded-2xl bg-accent-soft/70 px-3 py-2.5">
-              <Icon name="route" className="size-5 shrink-0 text-accent-strong" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold">Your movement plan · {planLine}</p>
-                <p className="truncate text-xs text-ink-muted">Movement plan questions use checked evidence and are not saved to chat history.</p>
+            <div className="m-card mt-3 px-3.5 py-2.5">
+              {/* Wraps instead of truncating: the name is how she knows which plan Mira means. */}
+              <div className="flex items-center gap-2.5">
+                <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-strong"><Icon name="route" className="size-4" /></span>
+                <p className="min-w-0 flex-1 text-sm leading-snug [overflow-wrap:anywhere]"><span className="font-semibold">Your movement plan</span> · {planLine}</p>
+                <Link href="/plan" className="grid min-h-11 shrink-0 place-items-center rounded-full bg-accent-soft px-3.5 text-sm font-semibold text-accent-strong">Open</Link>
+                <button type="button" onClick={clearPlanDraft} aria-label="Start a new plan" title="New plan" className="-mr-1.5 grid size-11 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-sunken"><Icon name="plus" className="size-[18px]" /></button>
               </div>
-              <Link href="/plan" className="min-h-10 shrink-0 rounded-full bg-surface px-3 py-2 text-sm font-semibold text-accent-strong">Open</Link>
-              <button type="button" onClick={clearPlanDraft} aria-label="Start a new plan" title="New plan" className="grid size-10 shrink-0 place-items-center rounded-full bg-surface text-accent-strong"><Icon name="plus" className="size-[18px]" /></button>
+              {/* Once the conversation is private, the banner by the box says it (once), and the evidence cards show what's checked. */}
+              {user && isPrivate ? null : <p className="mt-1 text-xs leading-snug text-ink-muted">Movement plan questions use checked evidence and are not saved to chat history.</p>}
             </div>
           ) : null}
         </div>
@@ -463,26 +476,28 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
 
       {/* The log isn't live (it would re-read every streamed word); each finished reply is announced once below. */}
       <p className="sr-only" aria-live="polite">{announce}</p>
-      <div role="log" aria-live="off" aria-label="Conversation with Mira" className="flex-1 overflow-y-auto px-4 pb-[calc(var(--tabbar-space)+8.5rem)] pt-3">
+      <div role="log" aria-live="off" aria-label="Conversation with Mira" style={dockH ? { paddingBottom: `calc(var(--tabbar-space) + ${dockH}px + 0.75rem)` } : undefined} className="flex-1 overflow-y-auto px-4 pb-[calc(var(--tabbar-space)+8.5rem)] pt-3">
         <div className="mx-auto flex max-w-xl flex-col gap-4">
           {empty ? (
             <div className="animate-rise">
               {here && clock ? (
                 <SkyCard state={skyAt(clock, here)} label="What Mira can see right now" eyebrow="What I can see right now" aside={loc.area ?? null} title={`${clockIn(clock)} · ${skyAt(clock, here) === "dark" ? "Dark now" : skyAt(clock, here) === "uncertain" ? "Twilight" : "Daylight"}`} strip={{ from: clock, point: here, hours: 12 }} className="mb-6" />
               ) : null}
-              <p className="text-[1.625rem] font-semibold leading-tight tracking-[-0.035em]">Ask about a place, a time, or a plan.</p>
+              <p className="m-display">Ask about a place, a time, or a plan.</p>
               <p className="mt-2 text-[0.9375rem] text-ink-muted">{night ? "It’s late. I can help you get home, find a Help Point, or check what’s open — and I’ll say what I can’t check." : "I answer with what I can check — daylight, lit streets, Help Points open then, local updates — and say what I can’t. I never call a place good or bad."}</p>
               <div className="mt-7 space-y-5">
                 {starters.map((g) => (
                   <section key={g.title} aria-label={g.title}>
                     <h2 className="m-label flex items-center gap-1.5"><Icon name={g.icon} className="size-3.5" />{g.title}</h2>
-                    <div className="mt-2 grid gap-2">
+                    <ul className="m-card mt-2 divide-y divide-line overflow-hidden">
                       {g.asks.map((q) => (
-                        <button key={q} type="button" onClick={() => void send(q)} disabled={sending} className="m-card m-press flex min-h-12 items-center gap-3 px-4 py-3 text-left text-[0.9375rem]">
-                          <span className="flex-1">{q}</span><Icon name="arrow" className="size-4 text-ink-subtle" />
-                        </button>
+                        <li key={q}>
+                          <button type="button" onClick={() => void send(q)} disabled={sending} className="m-press flex min-h-12 w-full items-center gap-3 px-4 py-3 text-left text-[0.9375rem] hover:bg-sunken/60 disabled:opacity-60">
+                            <span className="flex-1">{q}</span><Icon name="arrow" className="size-4 shrink-0 text-ink-subtle" />
+                          </button>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   </section>
                 ))}
               </div>
@@ -509,12 +524,23 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
             ),
           )}
           {!empty && !user ? <GuestNote onSignIn={() => setSignIn(true)} /> : null}
-          <div ref={endRef} className="h-px scroll-mb-56" />
+          <div ref={endRef} style={dockH ? { scrollMarginBottom: `calc(var(--tabbar-space) + ${dockH}px + 0.75rem)` } : undefined} className="h-px scroll-mb-56" />
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-[var(--tabbar-space)] z-30 bg-gradient-to-t from-canvas from-70% to-transparent px-4 pb-3 pt-5">
+      <div ref={dockRef} className="fixed inset-x-0 bottom-[var(--tabbar-space)] z-30 bg-gradient-to-t from-canvas from-70% to-transparent px-4 pb-3 pt-5">
         <div className="mx-auto max-w-xl">
+          {/* Above the box, so it stays in view with the keyboard open: she sees the mode she's typing in. */}
+          {user && isPrivate ? (
+            <div role="status" className="mb-2 flex items-start gap-2 rounded-2xl bg-people-soft px-3 py-2 text-people">
+              <Icon name="lock" className="mt-px size-4 shrink-0" />
+              <p className="min-w-0 flex-1 text-xs leading-snug text-ink">
+                <span className="font-semibold">Private conversation:</span> nothing here is saved. Mira remembers it only while this screen is open.{" "}
+                {/* Inline so the notice stays two lines; the ::after pad gives it a 44px target. */}
+                <button type="button" onClick={newConversation} disabled={sending} className="relative font-semibold text-people underline underline-offset-2 after:absolute after:-inset-x-2 after:-inset-y-3.5 after:content-['']">New conversation</button>
+              </p>
+            </div>
+          ) : null}
           {user && !here ? <button type="button" onClick={() => void loc.request()} className="mb-2 min-h-11 text-sm font-semibold text-accent-strong">Use current location for nearby questions</button> : null}
           <form
             onSubmit={(e) => {
@@ -529,12 +555,6 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
               <Icon name="send" className="size-5" />
             </button>
           </form>
-          {user && isPrivate ? (
-            <div role="status" className="mt-1.5 flex items-center justify-between gap-2 px-2">
-              <p className="text-[0.7rem] leading-snug text-ink-subtle">Private conversation: nothing here is saved. Mira remembers it only while this screen is open.</p>
-              <button type="button" onClick={newConversation} disabled={sending} className="min-h-11 shrink-0 text-xs font-semibold text-accent-strong">New conversation</button>
-            </div>
-          ) : null}
           <p className="mt-1.5 px-2 text-[0.7rem] leading-snug text-ink-subtle">Messages may be read by the configured AI provider. {!user ? "As a guest, nothing here is saved." : isPrivate ? "Your other chats are kept for 30 days." : "Questions about plans, places or where you are start a private conversation that isn’t saved; other chats are kept for 30 days."} <Link href="/privacy" className="underline">Data details</Link></p>
         </div>
       </div>

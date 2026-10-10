@@ -28,6 +28,7 @@ export const ICONS: Record<string, El[]> = {
   plus: [["path", "M12 5v14M5 12h14"]],
   flag: [["path", "M5 21V4"], ["path", "M5 4h11l-2 4 2 4H5"]],
   bell: [["path", "M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"], ["path", "M10 20a2 2 0 0 0 4 0"]],
+  lock: [["rect", 5, 11, 14, 10, 2], ["path", "M8 11V8a4 4 0 0 1 8 0v3"]],
   shield: [["path", "M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z"]],
   trash: [["path", "M4 7h16M10 11v6M14 11v6"], ["path", "M6 7l1 13h10l1-13M9 7V4h6v3"]],
   chevron: [["path", "m9 6 6 6-6 6"]],
