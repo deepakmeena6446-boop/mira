@@ -103,3 +103,27 @@ before (sprint head `513b734`) on the left and after on the right.
 | Mira, private conversation | `mira-private-390.jpg` |
 | Journeys, guest and empty | `journeys-guest-390.jpg` |
 | After only: switching place mid-correction, revisiting a plan via Back, chat box focused, Go sheet, I feel unsafe sheet, saving blocked by a GPS start, desktop Home, forced light theme, empty plan, signed-in Journeys | `after-*.jpg` |
+
+## Verification (2026-10-10, local)
+
+| Check | Result |
+| --- | --- |
+| `npm run lint` | clean |
+| `npm run typecheck` | clean |
+| Unit (`vitest --project unit`) | 987 passed |
+| Integration (`vitest --project integration`, local PostGIS) | 204 passed |
+| `npm run build` | passed |
+| `npm run audit:bundle` | passed — 132 files, 14 patterns, no secrets |
+| E2E full suite, mobile + desktop, run 1 | 137 passed, 6 skipped, 1 failed — `x-phase3-a11y` (320 px sweep) hit the 4-minute timeout inside its in-page audit on Home; alone it then passed 4/4 (≈17 s each) and passed in run 2 |
+| E2E full suite, run 2 | 137 passed, 6 skipped, 1 failed — `b-missed-alert` "accepted contact…" timed out with the *I'm here* button repeatedly detaching on the trip screen (not changed by this branch); alone it passed 2/2 (with its two siblings, 6/6), and it passed in run 1 |
+| Capture spec (`zz-capture`, local only) | 11/11 |
+
+Both e2e failures are 4-minute timeouts in different, unchanged-path tests that pass alone and in the other
+full run; the launch-UX plan already records trip-timing e2e as flaky. They are not shown fixed here: the
+cause (a renderer stall or re-render under a long serial run) was not found, and the traces were lost to a
+re-run.
+
+Simulation only: Chromium 1194 headless shell (the pinned 1243 build isn't installed here), device emulation,
+deterministic companion and OSM fixtures. Not verified: a real phone (keyboard overlap, safe areas, iOS
+fixed-position behaviour), a screen reader, live Google/Anthropic providers, `apple-icon.png` (raster, not
+recoloured to the new palette).
