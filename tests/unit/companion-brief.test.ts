@@ -130,28 +130,32 @@ describe("chooseTakeaway", () => {
   const help = item("help", "listed", "7 Help Points on this way");
 
   it("keeps the travel time when nothing else on the evidence matters more (the honest fallback)", () => {
-    expect(chooseTakeaway([time, dark, help], { onFoot: true, skyMatters: false })).toBe(time);
+    expect(chooseTakeaway([time, dark, help], { onFoot: true, skyMatters: false, noteTimely: false })).toBe(time);
   });
 
   it("leads with the calculated sky on foot when it's dark as she starts or turns before she finishes", () => {
-    expect(chooseTakeaway([time, dark, help], { onFoot: true, skyMatters: true })).toBe(dark);
+    expect(chooseTakeaway([time, dark, help], { onFoot: true, skyMatters: true, noteTimely: false })).toBe(dark);
   });
 
   it("doesn't lead with the sky for a ride or transit, where the minutes are what changes her plan", () => {
-    expect(chooseTakeaway([time, dark], { onFoot: false, skyMatters: true })).toBe(time);
+    expect(chooseTakeaway([time, dark], { onFoot: false, skyMatters: true, noteTimely: false })).toBe(time);
   });
 
-  it("leads with a released note from people over the travel time", () => {
-    expect(chooseTakeaway([time, people, help], { onFoot: true, skyMatters: false })).toBe(people);
+  it("leads with a released note from people over the travel time when it's about the part of the day she's going in", () => {
+    expect(chooseTakeaway([time, people, help], { onFoot: true, skyMatters: false, noteTimely: true })).toBe(people);
+  });
+
+  it("doesn't lead with a note about another part of the day (a late-hours note at noon); the time leads", () => {
+    expect(chooseTakeaway([time, people, help], { onFoot: true, skyMatters: false, noteTimely: false })).toBe(time);
   });
 
   it("always leads with a failed route check, so its retry sits with it", () => {
     const failed = item("time", "failed", "Mira couldn’t check the way just now.");
-    expect(chooseTakeaway([failed, dark, people], { onFoot: true, skyMatters: true })).toBe(failed);
+    expect(chooseTakeaway([failed, dark, people], { onFoot: true, skyMatters: true, noteTimely: true })).toBe(failed);
   });
 
   it("never promotes a listing or an unknown, and gives nothing when there's no time to give", () => {
-    expect(chooseTakeaway([item("route", "unknown", "No route found"), help], { onFoot: true, skyMatters: false })).toBeNull();
+    expect(chooseTakeaway([item("route", "unknown", "No route found"), help], { onFoot: true, skyMatters: false, noteTimely: false })).toBeNull();
   });
 
   it("splits the lead into a headline and the rest of its sentence", () => {

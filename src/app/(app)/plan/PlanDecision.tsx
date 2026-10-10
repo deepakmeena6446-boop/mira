@@ -35,6 +35,7 @@ import { loopWord, placeName, planTitle } from "@/domain/plan-name";
 import { GoSheet, type GoTarget } from "./GoSheet";
 import { saveEligibility, TAB_PLAN_NOTE } from "@/domain/plan-save";
 import { clockIn, daylightOutlook } from "@/domain/daylight";
+import { bandForHour } from "@/domain/contributions";
 
 export type Situation = "go" | "run" | "travel";
 type Mode = "walk" | "ride" | "transit";
@@ -351,7 +352,11 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
   const turn = departAt && sun ? daylightOutlook(departAt, sun) : null;
   const finishAt = departAt ? (loop ? new Date(departAt.getTime() + loopMinutes * 60_000) : arriveAt) : null;
   const skyMatters = (skyStart !== null && skyStart !== "daylight") || Boolean(turn?.changeAt && turn.changeTo !== "daylight" && finishAt && turn.changeAt <= finishAt);
-  const takeaway = chooseTakeaway(brief.items, { onFoot: loop || mode === "walk", skyMatters });
+  // A note leads only when it's about the part of the day she's going in (a "late hours" note doesn't lead at noon).
+  const shownNotes = !loop && mode === "walk" ? currentWays?.notes ?? null : aroundNow?.notes ?? null;
+  const latestNote = Array.isArray(shownNotes) ? shownNotes[0] ?? null : null;
+  const noteTimely = Boolean(latestNote && helpAt && latestNote.timeBand === bandForHour(Math.floor(helpAt.minute / 60)));
+  const takeaway = chooseTakeaway(brief.items, { onFoot: loop || mode === "walk", skyMatters, noteTimely });
   const timeLeads = takeaway?.id === "time" || takeaway?.id === "route";
   const lead = takeaway && !timeLeads ? splitLead(takeaway.text) : null;
   const briefRest = takeaway ? brief.items.filter((i) => i !== takeaway) : brief.items;

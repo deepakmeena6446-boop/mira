@@ -61,19 +61,20 @@ export function selectBrief(candidates: BriefCandidate[], limit = BRIEF_LIMIT): 
  * 1. a failed route check: what to do next depends on it, and it's said once, beside its retry;
  * 2. on foot, the calculated sky when it's dark or twilight as she starts, or turns before she's due to finish
  *    (`skyMatters`) — it changes how the way will be, where the minutes don't;
- * 3. a released note from people about the way: current, corroborated, and about this way;
+ * 3. a released note from people about the way, when it's about the part of the day she's going in (`noteTimely`:
+ *    its day / evening / late band is hers) — corroborated, current and about this way and this time;
  * 4. otherwise the travel-time estimate — the honest fallback, as before.
  * Null when there's no time to give: a missing route stays in the list as "not known". Whatever doesn't lead keeps
  * its place, and its qualifier, in the list.
  */
-export function chooseTakeaway(items: BriefItem[], signals: { onFoot: boolean; skyMatters: boolean }): BriefItem | null {
+export function chooseTakeaway(items: BriefItem[], signals: { onFoot: boolean; skyMatters: boolean; noteTimely: boolean }): BriefItem | null {
   const time = items.find((i) => (i.id === "time" || i.id === "route") && i.kind !== "unknown") ?? null;
   if (time?.kind === "failed") return time;
   if (signals.onFoot && signals.skyMatters) {
     const sky = items.find((i) => (i.id === "daylight" || i.id === "daylight-end") && i.kind === "calculation");
     if (sky) return sky;
   }
-  return items.find((i) => i.kind === "community") ?? time;
+  return (signals.noteTimely ? items.find((i) => i.kind === "community") : undefined) ?? time;
 }
 
 /** A lead item as a headline and the rest of its sentence: "Dark when you set off" · "daylight from about 6:34 AM". */
