@@ -32,7 +32,8 @@ import type { TileConfig } from "@/server/providers/geo/tiles";
 import { PlaceSheet, queryFor, type PickedPlace } from "../plan/PlanSheets";
 
 type Place = { name: string; lat: number; lon: number; source: "search" | "saved_place" | "selected_point"; placeId?: string; query: string };
-type Area = { key: string; help: { points: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> } | null; notes: CommunityNote[] | null | "failed"; updates: { evidence: EvidenceState<SafetyUpdatesData> } | "failed" | null };
+/** `zone`: the place's own time zone (undefined while checking, null when not known). */
+type Area = { key: string; help: { points: HelpPoint[]; evidence: EvidenceState<HelpPoint[]> } | null; notes: CommunityNote[] | null | "failed"; updates: { evidence: EvidenceState<SafetyUpdatesData> } | "failed" | null; zone?: string | null };
 type Walk = { key: string; way: WayOption | null; error: string | null };
 
 const deviceZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch { return null; } };
@@ -77,6 +78,8 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch, he
     });
     void api<{ notes: CommunityNote[] }>("/api/community/nearby", { body: at }).then((r) => { if (live) setArea(areaKey, { notes: r.ok ? r.data.notes : "failed" }); });
     void api<{ evidence: EvidenceState<SafetyUpdatesData> }>("/api/safety-updates", { body: { ...at, window: 7 } }).then((r) => { if (live) setArea(areaKey, { updates: r.ok ? r.data : "failed" }); });
+    // Times around a place are the place's (a Delhi place read from a phone on UTC said "daylight from 1:04 AM").
+    void api<{ timeZone: string | null }>("/api/geo/zone", { body: at }).then((r) => { if (live) setArea(areaKey, { zone: r.ok ? r.data.timeZone : null }); });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [areaKey, retry]);
@@ -96,9 +99,10 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch, he
   }, [walkKey]);
   const walkNow = walk?.key === walkKey ? walk : null;
 
-  const zone = deviceZone();
-  const localNow = clock ? localTimeInZone(clock, country.timezone ?? zone) : null;
-  const ranked = focus && now?.help ? rankHelpPoints(now.help.points, focus, { situation: "nearby", night: localNow ? isNight(Math.floor(localNow.minute / 60)) : false, weights: helpWeightsFor(country.iso), timeZone: country.timezone ?? zone ?? undefined, now: localNow ?? undefined, at: clock?.getTime() }) : [];
+  // The place's zone when known; around her, her country's (or the phone's).
+  const zone = (place ? now?.zone : null) ?? country.timezone ?? deviceZone();
+  const localNow = clock ? localTimeInZone(clock, zone) : null;
+  const ranked = focus && now?.help ? rankHelpPoints(now.help.points, focus, { situation: "nearby", night: localNow ? isNight(Math.floor(localNow.minute / 60)) : false, weights: helpWeightsFor(country.iso), timeZone: zone ?? undefined, now: localNow ?? undefined, at: clock?.getTime() }) : [];
 
   const claims: Claim[] = [];
   if (focus) {
@@ -106,7 +110,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch, he
       if (walkNow?.error) claims.push({ id: "time", kind: "none", topic: "Walk there", icon: "clock", claim: walkNow.error });
       else { claims.push({ ...walkTimeClaim(walkNow?.way ?? null, "walk", null, zone), topic: "Walk there from you" }); claims.push(lightingClaim(walkNow?.way ?? null)); }
     }
-    claims.push(daylightClaim(clock, focus, country.timezone ?? zone, "now"));
+    claims.push(daylightClaim(clock, focus, zone, "now"));
     claims.push(helpClaim(now?.help?.points ?? [], now?.help?.evidence, localNow, place ? "within a short walk of it" : "within a short walk", "now"));
     const notesRow = notesClaim(now?.notes ?? null, place ? "around it" : "around you");
     if (notesRow) claims.push(notesRow);
@@ -168,7 +172,7 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch, he
 
         <button type="button" onClick={() => setSearch(true)} className="m-card m-press mt-5 flex min-h-14 w-full items-center gap-3 px-4 text-left">
           <Icon name="search" className="size-5 text-accent" />
-          <span className={cx("min-w-0 flex-1 truncate", place ? "font-semibold" : "text-ink-subtle")}>{place ? place.name : "Check a place"}</span>
+          <span className={cx("min-w-0 flex-1 truncate", place ? "font-semibold" : "text-ink-muted")}>{place ? place.name : "Check a place"}</span>
           {place ? <span role="button" tabIndex={0} aria-label="Back to around me" onClick={(e) => { e.stopPropagation(); setPlace(null); }} onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setPlace(null); } }} className="grid size-9 place-items-center rounded-full bg-sunken"><Icon name="close" className="size-4" /></span> : <Icon name="chevron" className="size-4 text-ink-subtle" />}
         </button>
 
@@ -182,18 +186,21 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch, he
             {/* 1. What's true here, now — the same sky card as Home, for you or for the place you chose. */}
             <div className="mt-5">
               {place ? (
-                <SkyCard state={skyAt(clock, focus)} label={`Around ${place.name}, now`} eyebrow={`Around ${place.name}, not where you are`} aside={clock ? clockIn(clock) : null} titleAs="h2" title={<span className="line-clamp-2">{place.name}</span>} strip={clock ? { from: clock, point: focus } : null} stats={stats.slice(1, 2)} />
+                <SkyCard state={skyAt(clock, focus)} label={`Around ${place.name}, now`} eyebrow="A place you chose" aside={clock ? clockIn(clock, zone) : null} titleAs="h2" title={<span className="line-clamp-3">{place.name}</span>} strip={clock ? { from: clock, point: focus, zone } : null} stats={stats.slice(1, 2).filter((st) => st.state === "loading" || (st.state === "ok" && st.value !== "—"))} />
               ) : (
                 <LiveNowCard now={clock} point={focus} area={loc.area} stats={[]} line={line} footer={null} locating={false} locationState={loc.status} onLocate={() => undefined} />
               )}
               <BriefSummary className="mt-3" checking={briefChecking} acknowledgement={place ? `Around ${place.name}, right now — not your current position.` : "Around you, right now."} items={brief.items} limitation={briefChecking ? null : brief.limitation} />
             </div>
 
+            {/* What she can do next with this place: one main action, two labelled companions. */}
             {place ? (
-              <div className="mt-3 flex gap-2">
-                <button type="button" onClick={planHere} className="mira-primary min-h-12 flex-1"><Icon name="route" className="size-5" />Plan going here</button>
-                <button type="button" onClick={() => { handOffAsk(`What should I know before going to ${place.name}?`); router.push("/mira"); }} aria-label="Ask Mira about it" className="m-card grid size-12 shrink-0 place-items-center"><Icon name="sparkle" className="size-5 text-accent" /></button>
-                <button type="button" onClick={() => void savePlace()} disabled={saving} aria-label={saving ? "Saving" : "Save this place"} className="m-card grid size-12 shrink-0 place-items-center"><Icon name="star" className="size-5" /></button>
+              <div className="mt-3 grid gap-2">
+                <button type="button" onClick={planHere} className="mira-primary min-h-12 w-full"><Icon name="route" className="size-5" />Plan going here</button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => { handOffAsk(`What should I know before going to ${place.name}?`); router.push("/mira"); }} aria-label="Ask Mira about it" className="m-btn-secondary min-h-12 px-3 text-sm"><Icon name="sparkle" className="size-4 text-accent" />Ask Mira</button>
+                  <button type="button" onClick={() => void savePlace()} disabled={saving} aria-label={saving ? "Saving…" : "Save this place"} className="m-btn-secondary min-h-12 px-3 text-sm"><Icon name="star" className="size-4" />{saving ? "Saving…" : "Save"}</button>
+                </div>
               </div>
             ) : null}
 
@@ -213,16 +220,16 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch, he
                   <span className="text-xs text-ink-subtle">listed hours · minutes by distance</span>
                 </div>
                 <ul className="m-card mt-3 divide-y divide-line overflow-hidden">
-                  {ranked.slice(0, 4).map((p) => {
+                  {ranked.slice(0, 3).map((p) => {
                     const h = hoursState(p, localNow ?? undefined, 0, clock?.getTime());
                     return (
                       <li key={p.id} className="flex items-center gap-3 px-4 py-3">
                         <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-sunken"><Icon name={HELP_ICON[p.cls] ?? "pin"} className="size-4 text-ink-muted" /></span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate font-semibold">{p.name}</span>
+                          <span className="block font-semibold leading-snug [overflow-wrap:anywhere]">{p.name}</span>
                           <span className="line-clamp-2 block text-[0.8125rem] text-ink-muted">{HELP_CLASSES[p.cls].label} · about {p.minutes} min walk · {hoursWords(h, { listed: false })}</span>
                         </span>
-                        <a href={`https://www.google.com/maps/dir/?api=1&destination=${p.lat.toFixed(5)},${p.lon.toFixed(5)}&travelmode=walking`} target="_blank" rel="noopener noreferrer" aria-label={`Directions to ${p.name}`} className="grid size-10 shrink-0 place-items-center rounded-full bg-sunken"><Icon name="arrow" className="size-4" /></a>
+                        <a href={`https://www.google.com/maps/dir/?api=1&destination=${p.lat.toFixed(5)},${p.lon.toFixed(5)}&travelmode=walking`} target="_blank" rel="noopener noreferrer" aria-label={`Directions to ${p.name}`} className="grid size-11 shrink-0 place-items-center rounded-full bg-sunken"><Icon name="arrow" className="size-4" /></a>
                       </li>
                     );
                   })}
@@ -247,13 +254,17 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch, he
               </section>
             ) : null}
 
-            <EvidenceLedger className="mt-8" title="The details" label="What Mira knows here" items={claims.map((c) => (c.kind === "failed" ? { ...c, action: { label: "Try again", onClick: () => setRetry((n) => n + 1) } } : c))} />
+            <EvidenceLedger collapsible className="mt-8" title="What Mira checked" label="What Mira knows here" items={claims.map((c) => (c.kind === "failed" ? { ...c, action: { label: "Try again", onClick: () => setRetry((n) => n + 1) } } : c))} />
 
             {/* After the context, never ahead of it: correct what Mira shows, or add what you noticed. Both optional. */}
-            {place ? <PlaceCorrection className="mt-4" place={place} canCorrect={canCorrect} signedIn={signedIn} country={country.iso ?? null} /> : null}
-            <div className="mt-3">
-              <HelpNextCard from="around" check={null} impactLine={null} signedIn={signedIn} country={country.iso ?? null} spot={place ? { lat: place.lat, lon: place.lon, name: place.name } : null} title={place ? "Add what you know about it" : "Add what you see here"} />
-            </div>
+            <section aria-labelledby="know-h" className="mt-8">
+              <h2 id="know-h" className="m-h">{place ? "Know this place?" : "Noticed something here?"}</h2>
+              <p className="mt-0.5 text-[0.8125rem] text-ink-muted">Optional. What you send is private, and Mira uses a correction only once someone else says the same.</p>
+              {place ? <PlaceCorrection className="mt-3" place={place} canCorrect={canCorrect} signedIn={signedIn} country={country.iso ?? null} /> : null}
+              <div className="mt-3">
+                <HelpNextCard from="around" check={null} impactLine={null} signedIn={signedIn} country={country.iso ?? null} spot={place ? { lat: place.lat, lon: place.lon, name: place.name } : null} title={place ? "Add what you know about it" : "Add what you see here"} />
+              </div>
+            </section>
 
             <div id="updates" className="mt-8 scroll-mt-4">
               <SafetyUpdatesSection point={focus} heading={place ? `Local updates near ${place.name}` : "Local updates near you"} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { outcomeMessage, type ContributionOutcome } from "@/components/app/CheckCard";
@@ -45,11 +45,18 @@ function CorrectionForm({ place, canCorrect, signedIn, country, className }: Pro
     } else setError(r.network ? "Not sent — you’re offline. Nothing was recorded; try again when you’re connected." : r.message);
   };
 
+  const detailId = useId();
+
   return (
     <section aria-label="Correct this information" className={className}>
       {!open ? (
-        <button type="button" aria-expanded={false} onClick={() => { setOpen(true); setResult(null); }} className="inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-semibold text-accent-strong">
-          <Icon name="flag" className="size-4" />Correct this information
+        <button type="button" aria-expanded={false} aria-label="Correct this information" aria-describedby={detailId} onClick={() => { setOpen(true); setResult(null); }} className="m-card m-press flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left">
+          <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-sunken text-ink-muted"><Icon name="flag" className="size-[18px]" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Correct this information</span>
+            <span id={detailId} className="block text-[0.8125rem] leading-snug text-ink-muted">Hours wrong, entrance closed, place gone or not this kind of place</span>
+          </span>
+          <Icon name="chevron" className="size-4 shrink-0 text-ink-subtle" />
         </button>
       ) : (
         <div className="m-card p-4">
@@ -72,7 +79,8 @@ function CorrectionForm({ place, canCorrect, signedIn, country, className }: Pro
           {canCorrect ? <p className="mt-1 text-xs text-ink-subtle">Mira changes nothing on one person’s word: a correction counts once someone else says the same.</p> : null}
         </div>
       )}
-      {result ? <p role="status" className="mt-1 px-1 text-sm text-ink-muted">{result}</p> : null}
+      {/* Sent is not verified: the outcome says whether it's waiting for someone else, matched, or contradicted. */}
+      {result ? <p role="status" className="mt-2 rounded-2xl bg-sunken px-4 py-3 text-sm text-ink-muted"><span className="font-semibold text-ink">Sent privately.</span> {result}</p> : null}
     </section>
   );
 }

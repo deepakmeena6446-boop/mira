@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
@@ -77,6 +78,8 @@ export function StateNote({ tone = "quiet", title, children, action, className, 
   );
 }
 
+const noSubscribe = () => () => {};
+
 /**
  * Modal bottom sheet. Keep it mounted and flip `open` (a sheet mounted already open closes itself
  * under React dev double-effects — see mira-next16-gotchas). Portalled so it rises above the tab bar.
@@ -84,7 +87,10 @@ export function StateNote({ tone = "quiet", title, children, action, className, 
 export function Sheet({ open, onClose, title, children, labelledBy = "m-sheet-title", footer }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; labelledBy?: string; footer?: React.ReactNode }) {
   useOverlay(open, onClose);
   const scrimClose = useScrimClose(open, onClose);
-  if (!open || typeof document === "undefined") return null;
+  // The portal needs document.body, which the server doesn't have: render it only after hydration, so a page
+  // that opens with its sheet up (/around?check=1) hydrates the same markup the server sent.
+  const hydrated = useSyncExternalStore(noSubscribe, () => true, () => false);
+  if (!open || !hydrated) return null;
   return createPortal(
     <div role="dialog" aria-modal="true" aria-labelledby={labelledBy} className="fixed inset-0 z-[55] flex items-end justify-center bg-scrim animate-fade sm:items-center" onClick={scrimClose}>
       <div onClick={(e) => e.stopPropagation()} className="flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-[var(--radius-sheet)] bg-surface shadow-[var(--shadow-sheet)] animate-rise sm:rounded-[var(--radius-sheet)]">
