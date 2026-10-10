@@ -103,13 +103,16 @@ export function Sheet({ open, onClose, title, children, labelledBy = "m-sheet-ti
 }
 
 /** A tappable plan question: label, the answer (or a prompt), and its state. */
-export function QuestionRow({ label, value, placeholder, icon, onClick, state = "idle", hint }: { label: string; value?: string | null; placeholder: string; icon: string; onClick: () => void; state?: "idle" | "needs" | "loading"; hint?: string | null }) {
+export function QuestionRow({ label, value, placeholder, icon, onClick, state = "idle", hint }: { label: string; value?: string | null; placeholder: string; icon: string; onClick: () => void; state?: "idle" | "needs" | "loading" | "next"; hint?: string | null }) {
+  // "next": the one question that comes next, marked so the sequence is obvious on a small screen.
+  const next = state === "next";
   return (
-    <button type="button" onClick={onClick} className="m-press flex min-h-[4rem] w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-sunken/50">
-      <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-xl bg-sunken text-ink-muted"><Icon name={icon} className="size-[18px]" /></span>
+    <button type="button" onClick={onClick} className={cx("m-press relative flex min-h-[4rem] w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-sunken/50", next && "bg-accent-soft/50")}>
+      {next ? <span aria-hidden className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-accent" /> : null}
+      <span aria-hidden className={cx("grid size-9 shrink-0 place-items-center rounded-full", next ? "bg-accent text-accent-ink" : value ? "bg-accent-soft text-accent-strong" : "bg-sunken text-ink-muted")}><Icon name={value && !next ? "check" : icon} className="size-[18px]" /></span>
       <span className="min-w-0 flex-1">
-        <span className="m-label block">{label}</span>
-        <span className={cx("block truncate text-[1rem]", value ? "font-semibold text-ink" : "text-ink-subtle")}>{value || placeholder}</span>
+        <span className="m-label block">{label}{next ? <span className="ml-1.5 font-semibold text-accent-strong">· Next</span> : null}</span>
+        <span className={cx("block text-[1rem] leading-snug [overflow-wrap:anywhere]", value ? "font-semibold text-ink" : next ? "text-ink-muted" : "text-ink-subtle")}>{value || placeholder}</span>
         {hint ? <span className={cx("block text-xs", state === "needs" ? "text-warm" : "text-ink-muted")}>{hint}</span> : null}
       </span>
       {state === "loading" ? <span aria-hidden className="size-4 animate-spin rounded-full border-2 border-ink-subtle border-t-transparent" /> : <Icon name="chevron" className="size-4 text-ink-subtle" />}

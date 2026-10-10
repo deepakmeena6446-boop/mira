@@ -82,9 +82,33 @@ export function EvidenceRow({ item }: { item: EvidenceItem }) {
 }
 
 /** A brief's ledger: checked claims first, then what Mira could not see. Always ends honestly. */
-export function EvidenceLedger({ items, title = "What Mira checked", label, className }: { items: EvidenceItem[]; title?: string; label?: string; className?: string }) {
+export function EvidenceLedger({ items, title = "What Mira checked", label, className, collapsible = false }: { items: EvidenceItem[]; title?: string; label?: string; className?: string;
+  /** Behind a disclosure with a count (the short answer above carries the material limitation). */
+  collapsible?: boolean }) {
   const order: EvidenceKind[] = ["checked", "estimate", "people", "pending", "failed", "nodata", "none"];
   const sorted = [...items].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind));
+  if (collapsible) {
+    const failed = items.filter((i) => i.kind === "failed").length;
+    const unknown = items.filter((i) => i.kind === "none" || i.kind === "nodata").length;
+    return (
+      <section aria-label={label ?? title} className={cx("m-card overflow-hidden", className)}>
+        <details className="group">
+          <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-sunken text-ink-muted"><Icon name="eye" className="size-[18px]" /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">{title}</span>
+              <span className="block text-[0.8125rem] text-ink-muted">{items.length} checks{failed ? ` · ${failed} couldn’t be checked` : ""}{unknown ? ` · ${unknown} not known` : ""} · sources and limits</span>
+            </span>
+            <Icon name="chevron" className="size-4 shrink-0 text-ink-subtle transition-transform group-open:rotate-90" />
+          </summary>
+          <div className="border-t border-line px-4">
+            <div className="flex justify-end"><EvidenceKey /></div>
+            <ul className="divide-y divide-line">{sorted.map((item) => <EvidenceRow key={item.id} item={item} />)}</ul>
+          </div>
+        </details>
+      </section>
+    );
+  }
   return (
     <section aria-label={label ?? title} className={cx("m-card px-4 pt-3.5", className)}>
       <div className="flex items-center justify-between gap-2">
@@ -134,7 +158,9 @@ const BRIEF_GLYPH: Record<BriefKind, EvidenceKind> = { listed: "checked", commun
  * The short answer at the top of a brief (sprint 02): what she asked, up to three qualified items, and
  * one limitation — each qualifier beside its own claim. Everything else stays in "What Mira checked".
  */
-export function BriefSummary({ acknowledgement, items, limitation, checking, label = "Mira’s take", className, children }: { acknowledgement: React.ReactNode; items: BriefItem[]; limitation: string | null; checking?: boolean; label?: string; className?: string; children?: React.ReactNode }) {
+export function BriefSummary({ acknowledgement, items, limitation, checking, label = "Mira’s take", className, children, onRetry }: { acknowledgement: React.ReactNode; items: BriefItem[]; limitation: string | null; checking?: boolean; label?: string; className?: string; children?: React.ReactNode;
+  /** Shown beside the limitation when a check failed, so recovery sits next to what it fixes. */
+  onRetry?: () => void }) {
   return (
     <section aria-label={label} className={cx("m-card px-4 py-3.5", className)}>
       <p className="text-[0.95rem] font-semibold leading-snug">{acknowledgement}</p>
@@ -153,7 +179,12 @@ export function BriefSummary({ acknowledgement, items, limitation, checking, lab
           ))}
         </ul>
       ) : null}
-      {limitation ? <p className="mt-1 border-t border-line pt-2.5 text-sm text-ink-muted">{limitation}</p> : null}
+      {limitation ? (
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 border-t border-line pt-2.5">
+          <p className="min-w-0 flex-1 text-sm text-ink-muted">{limitation}</p>
+          {onRetry && /couldn’t check/i.test(limitation) ? <button type="button" onClick={onRetry} className="m-link">Try again</button> : null}
+        </div>
+      ) : null}
       {children}
     </section>
   );

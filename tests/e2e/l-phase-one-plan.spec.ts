@@ -40,7 +40,9 @@ test("guest retains a future named-origin plan across Around, map, Mira, back an
   // The same tab plan opens in the Phase 1 decision screen (D39): named places kept, no GPS asked.
   await page.goto("/plan");
   await expect(page.getByRole("heading", { level: 1, name: "To South Library" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Your plan", exact: true })).toContainText("North Gate → South Library");
+  // The plan card says where from; the heading says where to (design/mira-companion-ux: each said once).
+  await expect(page.getByRole("region", { name: "Your plan", exact: true })).toContainText("From North Gate");
+  await expect(page.getByRole("region", { name: "Your plan", exact: true })).toContainText("to South Library");
   await expect(page.getByRole("region", { name: "Your plan, at that time" })).toBeVisible();
   await page.goto("/around/map");
   await page.goBack();

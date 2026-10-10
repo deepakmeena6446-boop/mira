@@ -22,15 +22,24 @@ test("a guest plans between two named places without GPS and gets a short, quali
   await page.getByRole("link", { name: "Plan an outing" }).click();
   await pick(page, /^From/, "Hindu College");
   await pick(page, /^To/, DEST);
+  // Her request is said back once: where from, when and how (the heading says where to).
+  await expect(page.getByRole("region", { name: "Your plan", exact: true })).toContainText(/^Planning a walk.*From Hindu College/);
+  // The takeaway carries its qualifier on the sky card; at most two more items follow, each qualified; never news.
+  const sky = page.getByRole("region", { name: "Your plan, at that time" });
+  await expect(sky).toContainText(/min walk/);
+  await expect(sky).toContainText(/Estimate · Mapped route/);
   const take = page.getByRole("region", { name: "Mira’s take" });
-  await expect(take).toContainText(/^You’re planning a walk from .+ to .+ · /);
-  // At most three items, each with its own qualifier; never a news count in the short answer.
   await expect(take.locator("li")).not.toHaveCount(0);
-  expect(await take.locator("li").count()).toBeLessThanOrEqual(3);
-  await expect(take).toContainText(/Estimate|Calculated|Listed|From people|Not known|Couldn’t check/);
+  expect(await take.locator("li").count()).toBeLessThanOrEqual(2);
+  await expect(take).toContainText(/Calculated|Listed|From people|Not known|Couldn’t check/);
   await expect(take).not.toContainText(/report|indexed/i);
-  // The detail keeps everything, including what Mira can't see; the map waits behind "View map".
-  await expect(page.getByRole("region", { name: "What Mira checked" })).toContainText("What Mira can’t see");
+  await expect(sky).not.toContainText(/report|indexed/i);
+  // The detail keeps everything, including what Mira can't see, one tap away; the map waits behind "View map".
+  const checked = page.getByRole("region", { name: "What Mira checked" });
+  await expect(checked).toContainText("What Mira can’t see");
+  await expect(checked.getByText("Whether a Help Point is staffed", { exact: false })).toBeHidden();
+  await checked.getByText(/\d+ checks/).click();
+  await expect(checked.getByText("Whether a Help Point is staffed", { exact: false })).toBeVisible();
   await expect(page.getByRole("region", { name: /The chosen way/ })).toHaveCount(0);
   await take.getByRole("button", { name: "View map" }).click();
   await expect(take.getByRole("button", { name: "Hide map" })).toHaveAttribute("aria-expanded", "true");

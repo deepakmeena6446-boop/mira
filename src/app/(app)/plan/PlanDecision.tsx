@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 import { ActionBar, MiraVoice, QuestionRow, StateNote } from "@/components/mira/Frame";
 import { BriefSummary, EvidenceChip, EvidenceLedger, type EvidenceItem } from "@/components/mira/Evidence";
+import { BRIEF_KIND_LABEL } from "@/domain/companion-brief";
 import { Row, RowAction, RowList } from "@/components/mira/Rows";
 import { BriefMap } from "@/components/mira/BriefMap";
 import { SkyCard, skyAt } from "@/components/mira/LiveNow";
@@ -343,6 +344,10 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
   const checking = (!loop && !currentWays) || (loop && loopPlan?.key !== loopKey);
   const verb = loop ? loopName.toLowerCase() : mode === "walk" ? "walk" : mode === "ride" ? "ride" : "by transit";
   const tripTitle = loop ? `${loopMinutes} min ${verb}` : minutes ? `${Math.round(minutes)} min ${verb}${arriveAt ? ` · arrive ${clockIn(arriveAt, zone)}` : ""}` : currentWays?.error ? "Couldn’t check the way" : currentWays?.noRoute ? "No travel time available" : "…";
+  // The travel time is the takeaway on the sky card, with its qualifier beside it; the list doesn't repeat it.
+  // A failed route check is said once, on the sky card, with its retry beside it.
+  const takeaway = brief.items.find((i) => (i.id === "time" || i.id === "route") && i.kind !== "unknown") ?? null;
+  const briefRest = takeaway ? brief.items.filter((i) => i !== takeaway) : brief.items;
   const fromWords = draft.origin.kind === "device" ? "where you are" : originLabel;
   const zoneNote = !sameClock(zone, deviceZone()) ? ` (${zone.split("/").pop()?.replace(/_/g, " ")} time)` : "";
   const acknowledgement = loop
@@ -358,34 +363,37 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
           <SafetyAccess emailAlerts={emailAlerts} compact />
         </header>
 
-        <div className="m-scroll-x -mx-4 mt-5 px-4" role="radiogroup" aria-label="What are you doing?">
+        {/* What kind of outing: chosen while planning; once the brief shows, Edit brings it back. */}
+        {!complete || editing ? <div className="mt-4 grid grid-cols-3 gap-1 rounded-2xl bg-sunken p-1" role="radiogroup" aria-label="What are you doing?">
           {SITUATIONS.map((s) => (
-            <button key={s.id} type="button" role="radio" aria-checked={situation === s.id} onClick={() => chooseSituation(s.id)} className={cx("inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-semibold ring-1", situation === s.id ? "bg-ink text-canvas ring-ink" : "bg-surface text-ink-muted ring-line")}>
-              <Icon name={s.icon} className="size-4" />{s.label}
+            <button key={s.id} type="button" role="radio" aria-checked={situation === s.id} onClick={() => chooseSituation(s.id)} className={cx("flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-1.5 py-1 text-center text-[0.8125rem] font-semibold leading-tight", situation === s.id ? "bg-surface text-ink shadow-[var(--shadow-float)]" : "text-ink-muted")}>
+              <Icon name={s.icon} className="hidden size-4 shrink-0 min-[360px]:block" /><span className="min-w-0 [overflow-wrap:normal]">{s.label}</span>
             </button>
           ))}
-        </div>
+        </div> : null}
 
-        <h1 className="m-display mt-5">{complete ? planTitle(draft) : situation === "run" ? "Plan a run or walk" : situation === "travel" ? "Plan your arrival" : "Where are you going?"}</h1>
-        {complete ? <p className="mt-1 text-[0.95rem] text-ink-muted">From {draft.origin.kind === "device" ? "where you are" : originLabel} · {whenWords(draft.departureLocal, zone)}{!sameClock(zone, deviceZone()) ? ` (${zone.split("/").pop()?.replace(/_/g, " ")} time)` : ""}</p> : null}
-
-        {/* The few questions that change the answer; once answered they fold into one line so the brief leads. */}
+        <h1 className={cx("m-display mt-5", complete && "text-[clamp(1.625rem,7.2vw,2.125rem)]")}>{complete ? planTitle(draft) : situation === "run" ? "Plan a run or walk" : situation === "travel" ? "Plan your arrival" : "Where are you going?"}</h1>
+        {/* The few questions that change the answer; once answered they fold into one card — her request, said
+            back once (place names wrap, never cut) — so the brief leads. */}
         {complete && !editing ? (
-          <section aria-label="Your plan" className="m-card mt-4 flex items-center gap-2 p-1.5 pl-3">
-            <div className="m-scroll-x min-w-0 flex-1 py-1">
+          <section aria-label="Your plan" className="m-card mt-3 px-4 pb-3.5 pt-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="m-label">{acknowledgement.replace(/ from .*$/, "").replace(/^You’re planning /, "Planning ")}</p>
+              <button type="button" onClick={() => setEditing(true)} className="m-link -my-2 px-2">Edit</button>
+            </div>
+            <p className="mt-1 text-[1.0625rem] font-semibold leading-snug [overflow-wrap:anywhere]">From {fromWords}{!loop ? <span className="sr-only"> to {destLabel}</span> : null}</p>
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
               {[
-                { label: loop ? `From ${originLabel}` : `${originLabel} → ${destLabel}`, icon: "route", on: () => setSheet(loop ? "origin" : "destination") },
-                { label: whenWords(draft.departureLocal, zone), icon: "clock", on: () => setSheet("when") },
-                { label: loop ? `${loopMinutes} min ${loopName.toLowerCase()}` : MODES.find((m) => m.id === mode)?.label ?? "Walk", icon: loop ? "walk" : mode === "walk" ? "walk" : mode === "ride" ? "transit" : "bus", on: () => setEditing(true) },
+                { label: `${whenWords(draft.departureLocal, zone)}${zoneNote}`, icon: "clock", aria: "Change time", on: () => setSheet("when") },
+                { label: loop ? `${loopMinutes} min ${loopName.toLowerCase()}` : MODES.find((m) => m.id === mode)?.label ?? "Walk", icon: loop ? "walk" : mode === "walk" ? "walk" : mode === "ride" ? "transit" : "bus", aria: "Change how you’re going", on: () => setEditing(true) },
               ].map((c) => (
-                <button key={c.label} type="button" onClick={c.on} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-sunken px-3 text-[0.8125rem] font-semibold"><Icon name={c.icon} className="size-4 text-ink-muted" />{c.label}</button>
+                <button key={c.label} type="button" onClick={c.on} aria-label={`${c.label} — ${c.aria}`} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-sunken px-3 text-[0.8125rem] font-semibold"><Icon name={c.icon} className="size-4 text-ink-muted" />{c.label}</button>
               ))}
             </div>
-            <button type="button" onClick={() => setEditing(true)} className="min-h-10 shrink-0 rounded-full px-3 text-sm font-semibold text-accent-strong">Edit</button>
           </section>
         ) : (
         <section aria-label="Your plan" className="m-card mt-5 divide-y divide-line overflow-hidden">
-          <QuestionRow label={situation === "travel" ? "Arriving at" : situation === "run" ? "Start" : "From"} icon={draft.origin.kind === "device" ? "locate" : "pin"} value={originLabel && !unresolvedOrigin ? originLabel : null} placeholder={situation === "travel" ? "Airport, station…" : "Where you are, or a place"} hint={unresolvedOrigin ? `Which “${draft.origin.kind === "named" ? draft.origin.query : ""}” did you mean? Tap to choose.` : null} state={unresolvedOrigin ? "needs" : "idle"} onClick={() => setSheet("origin")} />
+          <QuestionRow label={situation === "travel" ? "Arriving at" : situation === "run" ? "Start" : "From"} icon={draft.origin.kind === "device" ? "locate" : "pin"} value={originLabel && !unresolvedOrigin ? originLabel : null} placeholder={situation === "travel" ? "Airport, station…" : "Where you are, or a place"} hint={unresolvedOrigin ? `Which “${draft.origin.kind === "named" ? draft.origin.query : ""}” did you mean? Tap to choose.` : null} state={unresolvedOrigin ? "needs" : !origin ? "next" : "idle"} onClick={() => setSheet("origin")} />
           {loop ? (
             <div className="px-4 py-3">
               <p className="m-label">How long</p>
@@ -397,9 +405,9 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
               </div>
             </div>
           ) : (
-            <QuestionRow label={situation === "travel" ? "Staying at" : "To"} icon="pin" value={destLabel && !unresolvedDest ? destLabel : null} placeholder={situation === "travel" ? "Hotel, home, address…" : "Search a place"} hint={unresolvedDest ? `Which “${draft.destination.query}” did you mean? Tap to choose.` : null} state={unresolvedDest ? "needs" : "idle"} onClick={() => setSheet("destination")} />
+            <QuestionRow label={situation === "travel" ? "Staying at" : "To"} icon="pin" value={destLabel && !unresolvedDest ? destLabel : null} placeholder={situation === "travel" ? "Hotel, home, address…" : "Search a place"} hint={unresolvedDest ? `Which “${draft.destination.query}” did you mean? Tap to choose.` : null} state={unresolvedDest ? "needs" : origin && !dest ? "next" : "idle"} onClick={() => setSheet("destination")} />
           )}
-          <QuestionRow label={situation === "travel" ? "Landing / arriving" : draft.timeKind === "arrive_by" ? "Arrive by" : "When"} icon="clock" value={instant ? whenWords(draft.departureLocal, zone) : null} placeholder="Choose a time" hint={draft.timeHint && !instant ? `You said ${draft.timeHint} — choose the day` : !instant && clockChangeAt(draft.departureLocal, zone) === "repeated" ? "Clocks go back then, so that time happens twice. Choose a time a little before or after." : !instant && clockChangeAt(draft.departureLocal, zone) === "skipped" ? "Clocks go forward then, so that time doesn't exist. Choose a time a little later." : zoneUnsure ? `Times are in your phone’s zone (${zone.replace(/_/g, " ")}). This place may be in a different one — set it here.` : !sameClock(zone, deviceZone()) ? `${zone.replace(/_/g, " ")} time` : null} state={draft.timeHint && !instant ? "needs" : "idle"} onClick={() => setSheet("when")} />
+          <QuestionRow label={situation === "travel" ? "Landing / arriving" : draft.timeKind === "arrive_by" ? "Arrive by" : "When"} icon="clock" value={instant ? whenWords(draft.departureLocal, zone) : null} placeholder="Choose a time" hint={draft.timeHint && !instant ? `You said ${draft.timeHint} — choose the day` : !instant && clockChangeAt(draft.departureLocal, zone) === "repeated" ? "Clocks go back then, so that time happens twice. Choose a time a little before or after." : !instant && clockChangeAt(draft.departureLocal, zone) === "skipped" ? "Clocks go forward then, so that time doesn't exist. Choose a time a little later." : zoneUnsure ? `Times are in your phone’s zone (${zone.replace(/_/g, " ")}). This place may be in a different one — set it here.` : !sameClock(zone, deviceZone()) ? `${zone.replace(/_/g, " ")} time` : null} state={draft.timeHint && !instant ? "needs" : origin && (loop || dest) && !instant ? "next" : "idle"} onClick={() => setSheet("when")} />
           {!loop ? (
             <div className="px-4 py-3">
               <p className="m-label">How</p>
@@ -408,13 +416,13 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
               </div>
             </div>
           ) : null}
-          {complete ? <button type="button" onClick={() => setEditing(false)} className="flex min-h-12 w-full items-center justify-center text-sm font-semibold text-accent-strong">Done — show the brief</button> : null}
+          {complete ? <div className="p-3"><button type="button" onClick={() => setEditing(false)} className="mira-primary w-full">Done — show the brief</button></div> : null}
         </section>
         )}
 
         {!complete ? (
           <MiraVoice className="mt-5" state="observing">
-            {nextQuestion ?? "Choose your places and time."} <span className="text-ink-muted">Then I’ll check daylight, {situation === "run" ? "Help Points near your start" : "lighting and Help Points on the way"}, and local updates for that time — and tell you what I can’t see.</span>
+            <span className="font-semibold">{nextQuestion ?? "Choose your places and time."}</span> <span className="text-ink-muted">Then you’ll get a short brief for that time: {situation === "run" ? "daylight and Help Points near your start" : "travel time, daylight, lighting and Help Points on the way"}, and what Mira can’t check.</span>
           </MiraVoice>
         ) : (
           <>
@@ -432,9 +440,10 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
                 eyebrow={checking ? "Checking that place at that time…" : "Your plan, at that time"}
                 aside={whenWords(draft.departureLocal, zone)}
                 title={tripTitle}
-                strip={departAt && sun ? { from: departAt, point: sun, hours: loop ? 3 : 6, startLabel: "set off" } : null}
+                strip={departAt && sun ? { from: departAt, point: sun, hours: loop ? 3 : 6, startLabel: "set off", zone } : null}
+                line={takeaway?.kind === "failed" ? <><span className="block">{takeaway.text} Your plan is kept.</span><button type="button" onClick={() => setRetry((n) => n + 1)} className="mt-2 inline-flex min-h-11 items-center rounded-full bg-white/90 px-4 text-sm font-semibold text-[#211b2e]">Try again</button></> : takeaway ? <><span className="font-semibold">{BRIEF_KIND_LABEL[takeaway.kind]}</span>{takeaway.sourceLabel ? ` · ${takeaway.sourceLabel}` : ""}{takeaway.limitation ? <span className="mt-1 block">{takeaway.limitation}</span> : null}</> : null}
               />
-              <BriefSummary className="mt-3" checking={checking} acknowledgement={acknowledgement} items={brief.items} limitation={checking ? null : brief.limitation}>
+              <BriefSummary className="mt-3" checking={checking} acknowledgement="What matters" items={briefRest} limitation={checking ? null : brief.limitation} onRetry={() => setRetry((n) => n + 1)}>
                 <div className="mt-1 flex flex-wrap gap-x-4 border-t border-line pt-1">
                   <button type="button" onClick={() => setSheet("when")} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-accent-strong"><Icon name="clock" className="size-4" />Change time</button>
                   <button type="button" onClick={askAbout} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-accent-strong"><Icon name="sparkle" className="size-4" />Ask Mira about this plan</button>
@@ -472,7 +481,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
               </section>
             ) : null}
 
-            <EvidenceLedger className="mt-4" items={claims.map((c): EvidenceItem => ({ ...c, ...(c.kind === "failed" ? { action: { label: "Try again", onClick: () => setRetry((n) => n + 1) } } : {}) }))} title={loop ? "Your start, at that time" : "That way, at that time"} label="What Mira checked" />
+            <EvidenceLedger collapsible className="mt-4" items={claims.map((c): EvidenceItem => ({ ...c, ...(c.kind === "failed" ? { action: { label: "Try again", onClick: () => setRetry((n) => n + 1) } } : {}) }))} title="What Mira checked" label="What Mira checked" />
 
             {saveState.text ? <StateNote className="mt-3">{saveState.text}</StateNote> : null}
             {blocked ? (
@@ -497,7 +506,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
           </>
         )}
 
-        <div className="mt-6 flex flex-wrap gap-x-5 text-sm">
+        <div className="mt-8 flex flex-wrap items-center gap-x-5 border-t border-line pt-2 text-sm">
           <button type="button" onClick={() => { clearPlanDraft(); ensurePlanDraft(); const d = newPlanDraft(new Date(), deviceZone()); setPlanDraft(preset(d, situation, currentLocation().point ? { lat: currentLocation().point!.lat, lon: currentLocation().point!.lon } : null)); setSelected(0); setSaveState({ busy: false, text: null }); }} className="inline-flex min-h-11 items-center font-semibold text-ink-muted">Clear plan</button>
         </div>
         <p className="mt-1 text-xs text-ink-subtle">This plan stays in this tab for 2 hours after your last change. Saving and sharing are always your choice.</p>
@@ -510,7 +519,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
           ) : (
             <button type="button" onClick={() => void save()} disabled={saveState.busy || Boolean(blocked)} className="mira-primary min-h-13 flex-1 text-base">{saveState.busy ? "Saving…" : blocked ? "Can’t save yet" : signedIn ? "Save this plan" : "Sign in to save"}</button>
           )}
-          {soon ? <button type="button" onClick={() => void save()} disabled={saveState.busy || Boolean(blocked)} aria-label={blocked ? "Can’t save yet" : "Save this plan"} className="grid size-13 shrink-0 place-items-center rounded-2xl bg-surface ring-1 ring-line-strong"><Icon name="star" className="size-5" /></button> : <button type="button" onClick={() => setSheet("go")} className="min-h-13 shrink-0 rounded-2xl bg-surface px-4 text-sm font-semibold ring-1 ring-line-strong">Go now</button>}
+          {soon ? <button type="button" onClick={() => void save()} disabled={saveState.busy || Boolean(blocked)} aria-label={blocked ? "Can’t save yet" : "Save this plan"} className="m-btn-secondary min-h-13 shrink-0 px-4"><Icon name="star" className="size-5" /><span aria-hidden>Save</span></button> : <button type="button" onClick={() => setSheet("go")} className="m-btn-secondary min-h-13 shrink-0 px-4 text-sm">Go now</button>}
         </ActionBar>
       ) : null}
 

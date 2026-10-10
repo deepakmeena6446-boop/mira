@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { cx } from "@/components/ui/cx";
 import { MiraPulse, type PulseState } from "@/components/app/MiraPulse";
 import { daylightAt } from "@/domain/plan-options";
-import { clockIn, type DaylightState } from "@/domain/daylight";
+import { clockIn, daylightOutlook, type DaylightState } from "@/domain/daylight";
 
 /** Sky for the card, from the calculated daylight state — information, not decoration. */
 export const SKY: Record<DaylightState, { bg: string; ink: string; muted: string; chip: string }> = {
@@ -83,7 +83,8 @@ export function SkyCard({ state, label, eyebrow, aside, title, titleAs = "div", 
   title?: React.ReactNode;
   /** Render the title as a heading when it names the screen's subject (e.g. a chosen place). */
   titleAs?: "div" | "h1" | "h2";
-  strip?: { from: Date; point: { lat: number; lon: number }; hours?: number; startLabel?: string } | null;
+  /** `zone`: the time zone the strip's clock times are said in (the place's, not the phone's). */
+  strip?: { from: Date; point: { lat: number; lon: number }; hours?: number; startLabel?: string; zone?: string | null } | null;
   stats?: LiveStat[];
   line?: React.ReactNode | null;
   footer?: { label: string; href?: string; onClick?: () => void } | null;
@@ -94,7 +95,9 @@ export function SkyCard({ state, label, eyebrow, aside, title, titleAs = "div", 
   const sky = SKY[state];
   const hours = strip?.hours ?? 12;
   const segments = strip && Math.abs(strip.point.lat) <= 72 ? daylightSegments(strip.from, strip.point, hours) : null;
-  const firstChange = segments && segments.length > 1 ? segments[1] : null;
+  // The label uses the same solar calculation as the brief's daylight line (the bar itself is drawn in 15-min steps).
+  const outlook = strip && segments ? daylightOutlook(strip.from, strip.point) : null;
+  const firstChange = outlook?.changeAt && outlook.changeTo && outlook.changeAt.getTime() <= strip!.from.getTime() + hours * 3_600_000 ? { state: outlook.changeTo, start: outlook.changeAt } : null;
   const foot = "-mx-5 mt-4 flex min-h-13 w-[calc(100%+2.5rem)] items-center justify-between border-t px-5 text-left text-sm font-semibold";
   const titleRef = useFitOneLine<HTMLHeadingElement & HTMLDivElement>(typeof title === "string" ? title : null);
   const Title = titleAs;
@@ -108,13 +111,13 @@ export function SkyCard({ state, label, eyebrow, aside, title, titleAs = "div", 
       ) : null}
       {title ? <Title ref={titleRef} className="mt-4 text-[1.75rem] font-medium leading-tight tracking-[-0.035em] text-balance">{title}</Title> : null}
       {segments ? (
-        <div className="mt-3" aria-label={firstChange ? `${word(firstChange.state)} from about ${clockIn(firstChange.start)}` : `No change in the next ${hours} hours`}>
+        <div className="mt-3" aria-label={firstChange ? `${word(firstChange.state)} from about ${clockIn(firstChange.start, strip?.zone ?? null)}` : `No change in the next ${hours} hours`}>
           <div className="flex h-1.5 gap-px overflow-hidden rounded-full" aria-hidden>
             {segments.map((s, i) => <span key={i} style={{ width: `${s.share * 100}%`, background: SEG[s.state] }} />)}
           </div>
           <div className="mt-1.5 flex justify-between text-[0.72rem] font-medium" style={{ color: sky.muted }}>
             <span>{strip?.startLabel ?? "now"}</span>
-            {firstChange ? <span>{word(firstChange.state)} from {clockIn(firstChange.start)}</span> : null}
+            {firstChange ? <span>{word(firstChange.state)} from {clockIn(firstChange.start, strip?.zone ?? null)}</span> : null}
             <span>+{hours} h</span>
           </div>
         </div>
