@@ -1,5 +1,5 @@
 import { expect, test, type Browser } from "@playwright/test";
-import { acceptContactInvite, addContact, db, dockerCompose, mailText, mailsTo, newUser, openRoute, waitFor } from "./helpers";
+import { GEO, acceptContactInvite, addContact, db, dockerCompose, mailText, mailsTo, newUser, openRoute, waitFor } from "./helpers";
 
 async function shareTrip(browser: Browser, name: string, accept: boolean) {
   const owner = await newUser(browser, name);
@@ -14,6 +14,9 @@ async function shareTrip(browser: Browser, name: string, accept: boolean) {
   } else await expect(go.getByRole("button", { name: "Didi", exact: true })).toHaveCount(0);
   await go.getByRole("button", { name: /^Start/ }).click();
   await owner.page.waitForURL("**/trip");
+  // She hasn't arrived: ~550 m short of the destination. Left at GEO (inside the 75 m arrival radius), the phone's own
+  // fixes auto-arrive the journey after the 45 s dwell — racing the test's late "I'm here" and its missed-state checks.
+  await owner.ctx.setGeolocation({ ...GEO, latitude: GEO.latitude - 0.005 });
   const { trip } = await (await owner.page.request.get("/api/trips/current")).json();
   expect(trip.sharedWith.map((recipient: { name: string }) => recipient.name)).toEqual(accept ? ["Didi"] : []);
   return { owner, contact, address, id: trip.id as string };
