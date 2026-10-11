@@ -219,6 +219,34 @@ describe("MIRA 2.0 accounts, trips, Mira (placeholders)", () => {
     expect(bad.status).toBe(400);
   });
 
+  it("keeps no chat turn while a journey of hers exists, so its destination never outlives it (audit F2)", async () => {
+    await signIn("Noor");
+    const ctx = { localTime: new Date().toISOString(), tzOffsetMin: -330, location: null };
+    const send = async (message: string) => {
+      const r = await miraPOST(jsonRequest("/api/mira", { message, context: ctx }));
+      const events = (await r.text()).trim().split("\n").map((l) => JSON.parse(l));
+      return { history: r.headers.get("x-mira-history"), text: events.filter((e) => e.type === "text").map((e) => e.delta).join(""), cards: events.filter((e) => e.type === "card").map((e) => e.card.type) };
+    };
+    const messages = async () => (await (await miraGET()).json()).messages as unknown[];
+    const { trip } = await (await tripsPOST(jsonRequest("/api/trips", { from: START, to: { ...HOME, name: "Hostel" }, share: false }))).json();
+    // A status question has no movement words, yet the reply names where she's going: it is shown, never kept.
+    const running = await send("How long is left on my journey?");
+    expect(running.text).toMatch(/Hostel/);
+    expect(running.cards).toContain("trip_status");
+    expect(running.history).toBe("not_saved");
+    expect(await send("When am I due?")).toMatchObject({ history: "not_saved" });
+    expect(await messages()).toEqual([]);
+    // Closed but not yet deleted: the reply could still recall it, so turns still aren't kept.
+    await tripActionPOST(jsonRequest(`/api/trips/${trip.id}/end`, {}), { params: Promise.resolve({ id: trip.id, action: "end" }) });
+    expect(await send("Is my trip still on?")).toMatchObject({ history: "not_saved" });
+    expect(await messages()).toEqual([]);
+    // Once the journey is deleted, ordinary questions are kept again — with nothing about the journey in them.
+    await getSql()`UPDATE journeys SET purge_at = now() - interval '1 minute' WHERE id = ${trip.id}`;
+    expect(await send("How do I add someone to my Circle?")).toMatchObject({ history: "saved" });
+    const stored = JSON.stringify(await messages());
+    expect(stored).not.toMatch(/Hostel|trip_status/);
+  });
+
   it("works worldwide: honest approximate routes and geohash reports anywhere", async () => {
     switchJar(newJar());
     const r = await (await routePOST(jsonRequest("/api/geo/route", { from: { lat: 51.5007, lon: -0.1246 }, to: { lat: 51.5033, lon: -0.1196 } }))).json();

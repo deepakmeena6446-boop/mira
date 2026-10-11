@@ -90,9 +90,11 @@ export const POST = handle(async (req: Request) => {
   const withinDaily = (await consume(sql, actor, { bucket: user ? "mira:d" : "mira:guest:d", max: user ? MIRA_DAILY_MAX : MIRA_GUEST_DAILY_MAX, windowMs: 86_400_000 }, now))
     && (user ? true : await consume(sql, dailyKey("ip", ip, now), { bucket: "mira:guest:ip:d", max: MIRA_GUEST_NETWORK_DAILY_MAX, windowMs: 86_400_000 }, now));
   const modelAllowed = withinDaily && (await consume(sql, dailyKey("global", "mira", now), { bucket: "mira:global:d", max: Number(getEnv().MIRA_GLOBAL_DAILY_MAX ?? MIRA_GLOBAL_DAILY_DEFAULT), windowMs: 86_400_000 }, now));
-  // Plan, movement, location and place-context turns are never saved; other turns are saved scrubbed of location.
+  // Plan, movement, location, place-context and journey-time turns are never saved; other turns are saved scrubbed of location.
   // A signed-in client that sends its own turns is in a private conversation: that alone keeps the turn unsaved.
-  const keep = keepTurn({ signedIn: Boolean(user), message, plan, location: context.location, ephemeral: ephemeral || (Boolean(user) && clientHistory !== undefined) });
+  // While a journey of hers exists (running, or closed and awaiting deletion), a reply can name its destination.
+  const journey = user ? (await sql`SELECT 1 FROM journeys WHERE user_id = ${user.id} AND (state IN ('active', 'missed') OR purge_at > ${now}) LIMIT 1`).length > 0 : false;
+  const keep = keepTurn({ signedIn: Boolean(user), message, plan, location: context.location, ephemeral: ephemeral || (Boolean(user) && clientHistory !== undefined), journey });
   // Context for the reply. A saved conversation reads her own stored turns; a private one reads only the turns the
   // client kept in memory for it — never stored chats, so unrelated history doesn't mix in (sprint 03 §E).
   const recent = user && keep
