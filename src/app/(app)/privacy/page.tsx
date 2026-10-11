@@ -143,7 +143,7 @@ export default function PrivacyPage() {
           </Item>
           <Item icon="sparkle" title="Chatting with Mira">
             <p>
-              Signed-in nearby, reporting and general product chat is saved to your account for 30 days so Mira can follow the conversation. Questions about a plan you have open in Plan follow the temporary-plan handling above and aren&apos;t saved. Mira&apos;s replies are saved without area names, walking times or
+              Signed-in general and reporting chat is saved to your account for 30 days so Mira can follow the conversation. Chats about a plan, about getting somewhere, sent with your location, started from Plan or Around, or held while a journey of yours exists are private: they aren&apos;t saved, and Mira remembers them only while the chat screen is open. Mira&apos;s replies are saved without area names, walking times or
               nearby places. <strong className="text-ink">Your own messages are saved exactly as you typed them</strong>, so don&apos;t type addresses you&apos;d rather not
               keep. Clear it any time in You.
             </p>

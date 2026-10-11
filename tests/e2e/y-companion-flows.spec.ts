@@ -141,3 +141,20 @@ test("a movement question started in Mira stays private with its clarification, 
   expect(bodies[2]).not.toHaveProperty("ephemeral");
   await ctx.close();
 });
+
+test("the chat's privacy line says what is kept, and storage matches it (audit F3)", async ({ browser }) => {
+  const { ctx, page } = await newUser(browser, "Meher");
+  await ctx.clearPermissions();
+  await page.goto("/mira");
+  await expect(page.getByText("Chats about a plan, getting somewhere, a journey or your location are private and aren’t saved; other chats, including place names you type, are kept for 30 days.", { exact: false })).toBeVisible();
+  // A place named without a plan, a movement or her location is an ordinary chat: kept, as the line says.
+  const box = page.getByRole("textbox", { name: "Message Mira" });
+  await box.fill("Which pharmacy near Connaught Place is open late?");
+  await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
+  await box.press("Enter");
+  await expect(page.locator("[aria-label='Mira is checking']")).toHaveCount(0);
+  await expect(page.getByText(/Private conversation:/)).toHaveCount(0);
+  await expect.poll(async () => ((await (await page.request.get("/api/mira")).json()).messages as Array<{ role: string; text: string }>).filter((m) => m.role === "user").map((m) => m.text)).toEqual(["Which pharmacy near Connaught Place is open late?"]);
+  await page.request.delete("/api/mira", { headers: SAME_ORIGIN });
+  await ctx.close();
+});

@@ -20,7 +20,11 @@ describe("Privacy notification claims", () => {
     expect(html).toContain("does not add your device location, account, saved places, contacts or chat history");
     expect(html).toContain("An AI failure can use built-in rules after the text has already been sent");
     expect(html).toContain("two-hour tab expiry applies to your draft, not to an AI provider");
-    expect(html).toContain("Signed-in nearby, reporting and general product chat is saved");
+    // What's kept matches the server's rule (audit F3): general chat is kept; plan, movement, location, Plan/Around and
+    // journey-time chats aren't — and nearby (location) chat is not described as saved.
+    expect(html).toContain("Signed-in general and reporting chat is saved to your account for 30 days");
+    expect(html).toContain("held while a journey of yours exists are private: they aren&#x27;t saved");
+    expect(html).not.toContain("nearby, reporting and general product chat is saved");
     expect(html).not.toContain("zero retention");
   });
   it("discloses deterministic extraction when AI is absent", () => {

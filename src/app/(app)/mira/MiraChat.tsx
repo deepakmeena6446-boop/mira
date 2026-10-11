@@ -456,17 +456,22 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
 
   return (
     <div className="flex h-dvh flex-col bg-canvas">
-      <div className="z-10 bg-canvas px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      {/* Capped so the fixed message dock never covers it: at normal text it's well under the cap; at 200 % it scrolls,
+          so the plan strip's Open stays reachable (audit, A33). */}
+      <div className="z-10 max-h-[45dvh] shrink-0 overflow-y-auto overscroll-contain bg-canvas px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className="mx-auto max-w-xl">
           <RootHeader emailAlerts={emailAlerts} leading={<MiraPulse size={22} state={sending ? "thinking" : "observing"} />} eyebrow={here ? `${loc.area ?? "Near you"}${clock ? ` · ${clockIn(clock)}` : ""}` : "Places, plans and what’s around"} title="Mira" />
           {planActive && (plan || planDraft?.loop || planDraft?.destination.query.trim() || (planDraft?.origin.kind === "named" && planDraft.origin.query.trim())) ? (
             <div className="m-card mt-3 px-3.5 py-2.5">
               {/* Wraps instead of truncating: the name is how she knows which plan Mira means. */}
-              <div className="flex items-center gap-2.5">
+              {/* Wraps under enlarged text: Open and + move below the plan's name rather than squeezing it to a sliver. */}
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
                 <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-strong"><Icon name="route" className="size-4" /></span>
-                <p className="min-w-0 flex-1 text-sm leading-snug [overflow-wrap:anywhere]"><span className="font-semibold">Your movement plan</span> · {planLine}</p>
-                <Link href="/plan" className="grid min-h-11 shrink-0 place-items-center rounded-full bg-accent-soft px-3.5 text-sm font-semibold text-accent-strong">Open</Link>
-                <button type="button" onClick={clearPlanDraft} aria-label="Start a new plan" title="New plan" className="-mr-1.5 grid size-11 shrink-0 place-items-center rounded-full text-ink-muted hover:bg-sunken"><Icon name="plus" className="size-[18px]" /></button>
+                <p className="min-w-0 flex-1 basis-[7rem] text-sm leading-snug [overflow-wrap:anywhere]"><span className="font-semibold">Your movement plan</span> · {planLine}</p>
+                <div className="ml-auto flex shrink-0 items-center">
+                  <Link href="/plan" className="grid min-h-11 place-items-center rounded-full bg-accent-soft px-3.5 text-sm font-semibold text-accent-strong">Open</Link>
+                  <button type="button" onClick={clearPlanDraft} aria-label="Start a new plan" title="New plan" className="-mr-1.5 grid size-11 place-items-center rounded-full text-ink-muted hover:bg-sunken"><Icon name="plus" className="size-[18px]" /></button>
+                </div>
               </div>
               {/* Once the conversation is private, the banner by the box says it (once), and the evidence cards show what's checked. */}
               {user && isPrivate ? null : <p className="mt-1 text-xs leading-snug text-ink-muted">Movement plan questions use checked evidence and are not saved to chat history.</p>}
@@ -551,12 +556,12 @@ export function MiraChat({ user, emailAlerts }: { user: { name: string; avatarUr
             className="flex items-center gap-2 rounded-[1.5rem] bg-surface p-1.5 pl-4 shadow-[var(--shadow-float)] ring-1 ring-line-strong focus-within:ring-2 focus-within:ring-accent"
           >
             <label htmlFor="mira-input" className="sr-only">Message Mira</label>
-            <input id="mira-input" value={input} onChange={(e) => setInput(e.target.value)} maxLength={1000} placeholder="Message Mira…" autoComplete="off" className="min-h-11 flex-1 bg-transparent text-base outline-none" />
-            <button type="submit" disabled={!input.trim() || sending} aria-label="Send" className={cx("grid size-11 place-items-center rounded-full transition-colors", input.trim() ? "bg-accent text-accent-ink" : "bg-sunken text-ink-subtle")}>
+            <input id="mira-input" value={input} onChange={(e) => setInput(e.target.value)} maxLength={1000} placeholder="Message Mira…" autoComplete="off" className="min-h-11 min-w-0 flex-1 bg-transparent text-base outline-none" />
+            <button type="submit" disabled={!input.trim() || sending} aria-label="Send" className={cx("grid size-11 shrink-0 place-items-center rounded-full transition-colors", input.trim() ? "bg-accent text-accent-ink" : "bg-sunken text-ink-subtle")}>
               <Icon name="send" className="size-5" />
             </button>
           </form>
-          <p className="mt-1.5 px-2 text-[0.7rem] leading-snug text-ink-subtle">Messages may be read by the configured AI provider. {!user ? "As a guest, nothing here is saved." : isPrivate ? "Your other chats are kept for 30 days." : "Questions about plans, places or where you are start a private conversation that isn’t saved; other chats are kept for 30 days."} <Link href="/privacy" className="underline">Data details</Link></p>
+          <p className="mt-1.5 px-2 text-[0.7rem] leading-snug text-ink-subtle">Messages may be read by the configured AI provider. {!user ? "As a guest, nothing here is saved." : isPrivate ? "Your other chats are kept for 30 days." : "Chats about a plan, getting somewhere, a journey or your location are private and aren’t saved; other chats, including place names you type, are kept for 30 days."} <Link href="/privacy" className="underline">Data details</Link></p>
         </div>
       </div>
       <SignInSheet open={signIn} onClose={() => setSignIn(false)} reason="Sign in to talk to Mira" />
