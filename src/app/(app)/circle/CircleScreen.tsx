@@ -205,9 +205,9 @@ export function CircleScreen({ user, contacts: initialContacts, emailAlerts }: {
 /** Same frame as You: back, and the Support pair in its usual place. */
 function CircleHeader({ emailAlerts }: { emailAlerts: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <Link href="/me" aria-label="Back to You" className="grid size-11 shrink-0 place-items-center rounded-full bg-surface ring-1 ring-line"><Icon name="back" className="size-5" /></Link>
-      <SafetyAccess emailAlerts={emailAlerts} compact quiet className="min-w-0" />
+      <SafetyAccess emailAlerts={emailAlerts} compact quiet className="flex min-w-0 grow basis-[10rem] justify-end" />
     </div>
   );
 }

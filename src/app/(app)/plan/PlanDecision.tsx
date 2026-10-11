@@ -525,11 +525,13 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
       </div>
 
       {complete ? (
-        <ActionBar>
+        <ActionBar className="flex-wrap">
+          {/* Wraps under enlarged text: the primary's basis is in rem, so at 200 % it takes the row and the secondary
+              moves below it instead of being clipped off-screen (audit F4). At normal size both share one row. */}
           {soon ? (
-            <button type="button" onClick={() => setSheet("go")} className="mira-primary min-h-13 flex-1 text-base"><Icon name="footsteps" className="size-5" />Go with Mira</button>
+            <button type="button" onClick={() => setSheet("go")} className="mira-primary min-h-13 min-w-0 grow basis-[11rem] text-base"><Icon name="footsteps" className="size-5" />Go with Mira</button>
           ) : (
-            <button type="button" onClick={() => void save()} disabled={saveState.busy || Boolean(blocked)} className="mira-primary min-h-13 flex-1 text-base">{saveState.busy ? "Saving…" : blocked ? "Can’t save yet" : signedIn ? "Save this plan" : "Sign in to save"}</button>
+            <button type="button" onClick={() => void save()} disabled={saveState.busy || Boolean(blocked)} className="mira-primary min-h-13 min-w-0 grow basis-[11rem] text-base">{saveState.busy ? "Saving…" : blocked ? "Can’t save yet" : signedIn ? "Save this plan" : "Sign in to save"}</button>
           )}
           {soon ? <button type="button" onClick={() => void save()} disabled={saveState.busy || Boolean(blocked)} aria-label={blocked ? "Can’t save yet" : "Save this plan"} className="m-btn-secondary min-h-13 shrink-0 px-4"><Icon name="star" className="size-5" /><span aria-hidden>Save</span></button> : <button type="button" onClick={() => setSheet("go")} className="m-btn-secondary min-h-13 shrink-0 px-4 text-sm">Go now</button>}
         </ActionBar>

@@ -40,9 +40,9 @@ export function InboxScreen({ signedIn, initial, emailAlerts }: { signedIn: bool
   return (
     <div className="m-screen bg-companion">
       <div className="m-screen-inner">
-        <header className="flex items-center justify-between gap-3">
+        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <button type="button" onClick={() => (window.history.length > 1 ? router.back() : router.push("/"))} aria-label="Back" className="grid size-11 shrink-0 place-items-center rounded-full bg-surface ring-1 ring-line"><Icon name="back" className="size-5" /></button>
-          <SafetyAccess emailAlerts={emailAlerts} compact quiet className="min-w-0" />
+          <SafetyAccess emailAlerts={emailAlerts} compact quiet className="flex min-w-0 grow basis-[10rem] justify-end" />
         </header>
         <h1 className="m-display mt-5">Updates</h1>
         <p className="mt-1 text-[0.95rem] text-ink-muted">When someone accepts your invite, or a journey needs you. Never anything about where you are.</p>

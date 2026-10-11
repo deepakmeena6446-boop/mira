@@ -40,9 +40,9 @@ export function ContributeScreen({ signedIn, durable, checks, impact, pendingChe
     <div className="m-screen bg-companion">
       <div className="m-screen-inner flex flex-col gap-7">
         <header>
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <button type="button" onClick={() => (window.history.length > 1 ? router.back() : router.push("/"))} aria-label="Back" className="grid size-11 shrink-0 place-items-center rounded-full bg-surface ring-1 ring-line"><Icon name="back" className="size-5" /></button>
-            <SafetyAccess emailAlerts={emailAlerts} compact quiet className="min-w-0" />
+            <SafetyAccess emailAlerts={emailAlerts} compact quiet className="flex min-w-0 grow basis-[10rem] justify-end" />
           </div>
           <h1 className="m-display mt-5">Add what you know</h1>
           <p className="mt-1 text-[0.95rem] text-ink-muted">A small detail helps the next person. Only what several people agree on ever shows as a note.</p>

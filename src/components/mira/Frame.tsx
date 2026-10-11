@@ -16,12 +16,14 @@ import { useOverlay, useScrimClose } from "@/lib/use-overlay";
 export function RootHeader({ title, eyebrow, leading, emailAlerts, className }: { title?: React.ReactNode; eyebrow?: React.ReactNode; leading?: React.ReactNode; emailAlerts: boolean; className?: string }) {
   return (
     <header className={className}>
-      <div className="flex items-center justify-between gap-3">
+      {/* Wraps under enlarged text: the Support pair's basis is in rem, so at 200 % it moves under the title instead of
+          clipping "Emergency" (audit, A33). At normal sizes it sits beside the title as before. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="flex min-w-0 shrink-0 items-center gap-2.5">
           {leading}
           {title ? <h1 className="m-title whitespace-nowrap">{title}</h1> : null}
         </div>
-        <SafetyAccess emailAlerts={emailAlerts} compact quiet className="min-w-0" />
+        <SafetyAccess emailAlerts={emailAlerts} compact quiet className="flex min-w-0 grow basis-[10rem] justify-end" />
       </div>
       {/* Context sits on its own line so a long area name never squeezes the title or the Support pair. */}
       {eyebrow ? <p className="m-meta mt-1 truncate">{eyebrow}</p> : null}
