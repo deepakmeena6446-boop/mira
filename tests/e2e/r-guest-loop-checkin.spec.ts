@@ -3,8 +3,8 @@ import type { MovementIntent } from "../../src/domain/plan-contract";
 import { fixtureOptions } from "./plan-fixtures";
 
 test.use({ serviceWorkers: "block", timezoneId: "Asia/Kolkata" });
-const NORTH = { id: "fictional-north", name: "Fictional North Gate", kind: "entrance", lat: 28.6951, lon: 77.2143 };
-const VENUE = { id: "fictional-venue", name: "Fictional Evening Venue", kind: "venue", lat: 28.6991, lon: 77.2183 };
+const NORTH = { id: "osm:node/9101", name: "Fictional North Gate", kind: "entrance", lat: 28.6951, lon: 77.2143 };
+const VENUE = { id: "osm:node/9102", name: "Fictional Evening Venue", kind: "venue", lat: 28.6991, lon: 77.2183 };
 
 async function forbidGps(page: import("@playwright/test").Page) {
   let calls = 0;

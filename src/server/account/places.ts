@@ -6,6 +6,7 @@ import { decryptText, encryptText } from "@/server/crypto";
 
 export { MAX_SAVED_PLACES } from "@/domain/limits";
 import { MAX_SAVED_PLACES } from "@/domain/limits";
+import { isRestrictedPlaceId } from "@/domain/plan-state";
 
 export const savedPlaceSchema = z
   .object({
@@ -14,6 +15,8 @@ export const savedPlaceSchema = z
     lat: z.number().min(-90).max(90),
     lon: z.number().min(-180).max(180),
     address: z.string().max(160).optional(),
+    /** Where the place came from, when it came from a search: checked, never stored. */
+    placeId: z.string().max(300).optional(),
   })
   .strict();
 
@@ -56,6 +59,8 @@ export async function listPlaces(sql: postgres.Sql, userId: string): Promise<Sav
  * per-user lock so two tabs can't exceed the limit.
  */
 export async function addPlace(sql: postgres.Sql, userId: string, p: z.infer<typeof savedPlaceSchema>): Promise<SavedPlace> {
+  // A Google result (or a place of unknown origin) is display content Mira may not keep as hers (audit M1-c).
+  if (isRestrictedPlaceId(p.placeId)) throw new ApiError(422, "place_not_keepable", "This place came from a map service Mira can’t keep places from. Save a spot you pick on the map instead.");
   return sql.begin(async (tx) => {
     await tx`SELECT pg_advisory_xact_lock(hashtext(${`places:${userId}`}))`;
     const [same] = await tx<Row[]>`

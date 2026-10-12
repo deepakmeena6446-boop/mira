@@ -3,9 +3,9 @@ import { expect, test } from "@playwright/test";
 // Place-search failure fixtures must reach Playwright's route handler, not a PWA service worker.
 test.use({ serviceWorkers: "block" });
 
-const ORIGIN = { id: "origin-1", name: "North Gate", kind: "entrance", lat: 28.6962, lon: 77.2142 };
-const OTHER_ORIGIN = { id: "origin-2", name: "North Gate Road", kind: "road", lat: 28.6968, lon: 77.215 };
-const DESTINATION = { id: "destination-1", name: "South Library", kind: "library", lat: 28.691, lon: 77.218 };
+const ORIGIN = { id: "osm:node/9201", name: "North Gate", kind: "entrance", lat: 28.6962, lon: 77.2142 };
+const OTHER_ORIGIN = { id: "osm:way/9202", name: "North Gate Road", kind: "road", lat: 28.6968, lon: 77.215 };
+const DESTINATION = { id: "osm:node/9203", name: "South Library", kind: "library", lat: 28.691, lon: 77.218 };
 
 test("guest retains a future named-origin plan across Around, map, Mira, back and reload without asking for location", async ({ page }) => {
   await page.addInitScript(() => {

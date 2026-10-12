@@ -5,10 +5,10 @@ import { fixtureOptions } from "./plan-fixtures";
 
 test.use({ serviceWorkers: "block" });
 
-const AIRPORT = { id: "airport-1", name: "Arrival Airport Terminal", kind: "airport", lat: 51.47, lon: -0.45 };
-const HOTEL = { id: "hotel-1", name: "Harbour Hotel", kind: "hotel", lat: 51.52, lon: -0.12 };
-const STATION = { id: "station-1", name: "City Station", kind: "station", lat: 51.53, lon: -0.12 };
-const VENUE = { id: "venue-1", name: "Conference Venue", kind: "venue", lat: 51.54, lon: -0.12 };
+const AIRPORT = { id: "osm:way/9001", name: "Arrival Airport Terminal", kind: "airport", lat: 51.47, lon: -0.45 };
+const HOTEL = { id: "osm:node/9002", name: "Harbour Hotel", kind: "hotel", lat: 51.52, lon: -0.12 };
+const STATION = { id: "osm:node/9003", name: "City Station", kind: "station", lat: 51.53, lon: -0.12 };
+const VENUE = { id: "osm:way/9004", name: "Conference Venue", kind: "venue", lat: 51.54, lon: -0.12 };
 
 test("S5 late remote arrival retains named places and gives honest destination coverage and transfer handoff", async ({ page }) => {
   await page.addInitScript(() => {

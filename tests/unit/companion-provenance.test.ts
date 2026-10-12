@@ -22,7 +22,12 @@ beforeEach(() => clearPlanDraft());
 
 describe("provider provenance rules", () => {
   it("treats Google and unknown-source places as content Mira can't keep; OSM, saved places and her own points stay savable", () => {
-    expect([isRestrictedPlaceId("g:abc"), isRestrictedPlaceId(UNKNOWN_PROVENANCE), isRestrictedPlaceId("osm:node/1"), isRestrictedPlaceId("3f6d…saved"), isRestrictedPlaceId(undefined)]).toEqual([true, true, false, false, false]);
+    expect([isRestrictedPlaceId("g:abc"), isRestrictedPlaceId(UNKNOWN_PROVENANCE), isRestrictedPlaceId("osm:node/1"), isRestrictedPlaceId("3f6d2a10-8c1e-4b6a-9d2f-0a1b2c3d4e5f"), isRestrictedPlaceId(undefined)]).toEqual([true, true, false, false, false]);
+  });
+
+  it("keeps only places whose origin it knows: an id of any other kind is treated like Google content (audit L3)", () => {
+    expect(["fsq:4b0588", "here:pds:place:356", "mapbox.poi.123", "osm:", "3f6d…saved", "OSM-node-1"].map(isRestrictedPlaceId)).toEqual([true, true, true, true, true, true]);
+    expect(["osm:way/42", "osm:relation/7", "OSM:node/1", "EA9B00DD-287B-7E13-6EEA-B4C511271B0F"].map(isRestrictedPlaceId)).toEqual([false, false, false, false]);
   });
 
   it("a card place without a recorded source can't be saved, and its name isn't kept as her query", () => {

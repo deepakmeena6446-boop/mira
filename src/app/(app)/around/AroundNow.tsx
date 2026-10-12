@@ -24,7 +24,7 @@ import { blindSpotsClaim, daylightClaim, helpClaim, hoursWords, lightingClaim, n
 import { HELP_CLASSES, helpWeightsFor, hoursState, isNight, rankHelpPoints, type HelpPoint } from "@/domain/help-points";
 import { localTimeInZone } from "@/domain/opening-hours";
 import { haversineMeters } from "@/domain/pilot";
-import { newPlanDraft, providerPlace } from "@/domain/plan-state";
+import { isRestrictedPlaceId, newPlanDraft, providerPlace } from "@/domain/plan-state";
 import type { EvidenceState } from "@/domain/evidence-state";
 import type { SafetyUpdatesData } from "@/domain/safety-updates";
 import type { SavedPlace } from "@/server/account/places";
@@ -138,11 +138,12 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch, he
     setPlanDraft({ ...newPlanDraft(new Date(), z), touched: true, activity: (place.query ? `Go to ${place.query}` : "Go to a place you chose").slice(0, 160), ...(here ? { origin: { kind: "device" as const, use: "from_here" as const, point: { lat: here.lat, lon: here.lon } } } : {}), destination: { query: place.query, resolution: { source: place.source, name: place.name, point: { lat: place.lat, lon: place.lon }, ...(place.placeId ? { placeId: place.placeId } : {}) } } });
     router.push("/plan?for=go");
   };
+  const keepable = Boolean(place && !isRestrictedPlaceId(place.placeId));
   const savePlace = async () => {
-    if (!place) return;
+    if (!place || !keepable) return;
     if (!signedIn) return setSignIn(true);
     setSaving(true);
-    const r = await api<{ place: SavedPlace }>("/api/me/places", { body: { label: place.name.slice(0, 40), lat: place.lat, lon: place.lon, address: place.name.slice(0, 160) } });
+    const r = await api<{ place: SavedPlace }>("/api/me/places", { body: { label: place.name.slice(0, 40), lat: place.lat, lon: place.lon, address: place.name.slice(0, 160), ...(place.placeId ? { placeId: place.placeId } : {}) } });
     setSaving(false);
     toast(r.ok ? `Saved ${place.name} to your places` : r.message, r.ok ? undefined : "error");
   };
@@ -202,9 +203,10 @@ export function AroundNow({ signedIn, emailAlerts, places, tiles, openSearch, he
             {place ? (
               <div className="mt-3 grid gap-2">
                 <button type="button" onClick={planHere} className="mira-primary min-h-12 w-full"><Icon name="route" className="size-5" />Plan going here</button>
-                <div className="grid grid-cols-2 gap-2">
+                {/* A Google result can be looked at and planned to, not kept as hers (audit M1-c): no Save for it. */}
+                <div className={cx("grid gap-2", keepable && "grid-cols-2")}>
                   <button type="button" onClick={() => { handOffAsk(`What should I know before going to ${place.name}?`); router.push("/mira"); }} aria-label="Ask Mira about it" className="m-btn-secondary min-h-12 px-3 text-sm"><Icon name="sparkle" className="size-4 text-accent" />Ask Mira</button>
-                  <button type="button" onClick={() => void savePlace()} disabled={saving} aria-label={saving ? "Saving…" : "Save this place"} className="m-btn-secondary min-h-12 px-3 text-sm"><Icon name="star" className="size-4" />{saving ? "Saving…" : "Save"}</button>
+                  {keepable ? <button type="button" onClick={() => void savePlace()} disabled={saving} aria-label={saving ? "Saving…" : "Save this place"} className="m-btn-secondary min-h-12 px-3 text-sm"><Icon name="star" className="size-4" />{saving ? "Saving…" : "Save"}</button> : null}
                 </div>
               </div>
             ) : null}

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { hasPlanWork, intentFromDraft, newPlanDraft, parsePlanSession, PLAN_SESSION_TTL_MS, resolvedDestination, resolvedOrigin, serializePlanSession } from "@/domain/plan-state";
 
 const now = new Date("2026-11-02T04:00:00Z");
-const origin = { source: "search" as const, name: "Station", point: { lat: 51.5, lon: -0.12 }, placeId: "station-1" };
-const destination = { source: "search" as const, name: "Museum", point: { lat: 51.51, lon: -0.11 }, placeId: "museum-1" };
+const origin = { source: "search" as const, name: "Station", point: { lat: 51.5, lon: -0.12 }, placeId: "osm:node/101" };
+const destination = { source: "search" as const, name: "Museum", point: { lat: 51.51, lon: -0.11 }, placeId: "osm:way/202" };
 
 describe("Phase 1 transient plan state", () => {
   it("round trips a remote future intent with its origin, time zone, mode and constraints", () => {

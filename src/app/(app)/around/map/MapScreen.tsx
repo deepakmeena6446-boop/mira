@@ -76,7 +76,8 @@ export function MapScreen({ emailAlerts, places, tiles }: { emailAlerts: boolean
   const pressed = async (p: { lat: number; lon: number }) => {
     openedAt.current = Date.now();
     setSpot({ lat: p.lat, lon: p.lon, name: null });
-    const r = await api<{ label: string | null }>("/api/geo/reverse", { body: { lat: p.lat, lon: p.lon } });
+    // Named from OpenStreetMap whatever the tiles: "Go here" makes this name her plan's place, which she may keep (audit L3).
+    const r = await api<{ label: string | null }>("/api/geo/reverse", { body: { lat: p.lat, lon: p.lon, source: "osm" } });
     setSpot((s) => (s && s.lat === p.lat && s.lon === p.lon ? { ...s, name: r.ok ? r.data.label : null } : s));
   };
   const planTo = (to: { name: string; lat: number; lon: number; source: Focus["source"]; placeId?: string }) => { planGoingTo(to, here ? { lat: here.lat, lon: here.lon } : null); router.push("/plan?for=go"); };

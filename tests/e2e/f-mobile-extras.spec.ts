@@ -16,6 +16,9 @@ test.describe("Mobile extras — long-press report, inbox, time of day, installa
       return null;
     }, { w: size.width, h: size.height });
     expect(spot).not.toBeNull();
+    // The spot's name becomes her plan's place on "Go here", so it is always looked up on OpenStreetMap (audit L3).
+    const reverse: Array<{ source?: string }> = [];
+    page.on("request", (r) => { if (new URL(r.url()).pathname === "/api/geo/reverse") reverse.push(r.postDataJSON()); });
     const cdp = await ctx.newCDPSession(page);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [spot!] });
     await page.waitForTimeout(750);
@@ -23,6 +26,8 @@ test.describe("Mobile extras — long-press report, inbox, time of day, installa
     const card = page.getByRole("dialog", { name: "This spot" });
     await expect(card).toBeVisible();
     await expect(page).toHaveURL(/\/around\/map$/); // lifting the finger didn't "ghost tap" a button
+    await expect.poll(() => reverse.length).toBeGreaterThan(0);
+    expect(reverse.every((b) => b.source === "osm")).toBe(true);
     await card.getByRole("button", { name: /Report here/ }).click();
     await expect(page).toHaveURL(/\/report\?from=map$/); // the spot travels in memory, not the URL (only a UI entry hint)
     await expect(page.getByText(/^Reporting /)).toBeVisible();

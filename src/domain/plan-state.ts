@@ -133,15 +133,17 @@ export function resolvedDestination(intent: MovementIntent): { name: string; lat
 
 /**
  * Place provenance (sprint mira-companion-48h review, issue 5). A resolution's placeId names where a place came from:
- * "g:" is a Google result (display content Mira may show but not keep), "osm:" OpenStreetMap, a bare id a saved place.
- * "x:unknown" marks a provider-derived place whose source wasn't recorded (e.g. a chat card saved before cards carried
- * ids): it is treated like Google content. A point she picked on the map has no placeId and stays hers.
+ * "osm:" is OpenStreetMap and a UUID is one of MIRA's own (her saved place, or the local OpenStreetMap snapshot) —
+ * those she may keep. Anything else is not: "g:" is a Google result (display content Mira may show but not keep),
+ * "x:unknown" a provider-derived place whose source wasn't recorded, and an id of a kind Mira doesn't know is treated
+ * the same (an allow-list, audit L3). A point she picked on the map has no placeId and stays hers.
  */
 export const UNKNOWN_PROVENANCE = "x:unknown";
 /** What a plan calls a place whose provider name it may not keep: her words, not the provider's. */
 export const CHOSEN_PLACE = "Place you chose";
+const KEEPABLE_PLACE_ID = /^(?:osm:\S+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 export function isRestrictedPlaceId(id: string | undefined | null): boolean {
-  return Boolean(id && (id.startsWith("g:") || id.startsWith("x:")));
+  return Boolean(id) && !KEEPABLE_PLACE_ID.test(id!);
 }
 
 /** A place that came from a provider via a card or hand-off: its id when known, otherwise marked unknown. */

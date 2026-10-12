@@ -13,7 +13,7 @@ import { addLocation, sharedTrip, tripsOverview, ARRIVAL_DWELL_MS } from "@/serv
 import { purgeExpired } from "@/server/retention";
 import { POST as demoPOST } from "@/app/api/auth/demo/route";
 import { DELETE as meDELETE } from "@/app/api/me/route";
-import { POST as placesPOST } from "@/app/api/me/places/route";
+import { GET as placesGET, POST as placesPOST } from "@/app/api/me/places/route";
 import { POST as contactsPOST } from "@/app/api/me/contacts/route";
 import { POST as acceptPOST } from "@/app/api/invites/accept/route";
 import { POST as tripsPOST } from "@/app/api/trips/route";
@@ -363,5 +363,22 @@ describe("Journey companion: time zones, habits, Trips", () => {
     await signIn("Other");
     const [{ id: otherId }] = await getSql()`SELECT id FROM users WHERE name = 'Other' ORDER BY created_at DESC LIMIT 1`;
     expect(await tripsOverview(getSql(), otherId, new Date())).toEqual({ active: null, recent: [] });
+  });
+});
+
+describe("Saved places keep only places whose origin Mira knows (audit M1-c)", () => {
+  it("refuses a Google or unknown-source place, stores no place id, and still saves OpenStreetMap places and her own points", async () => {
+    await signIn("Keeper");
+    for (const placeId of ["g:ChIJsynthetic", "x:unknown", "fsq:4b0588"]) {
+      const r = await placesPOST(jsonRequest("/api/me/places", { label: "Synthetic Café", lat: HOME.lat, lon: HOME.lon, address: "Synthetic Café", placeId }));
+      expect(r.status, placeId).toBe(422);
+      expect((await r.json()).error.code).toBe("place_not_keepable");
+    }
+    expect((await (await placesGET()).json()).places).toEqual([]);
+    expect((await placesPOST(jsonRequest("/api/me/places", { label: "Fixture Pharmacy", ...HOME, address: "Fixture Pharmacy", placeId: "osm:node/1" }))).status).toBe(201);
+    expect((await placesPOST(jsonRequest("/api/me/places", { label: "Spot I picked", ...START }))).status).toBe(201);
+    const kept = (await (await placesGET()).json()).places as Array<Record<string, unknown>>;
+    expect(kept.map((p) => p.label).sort()).toEqual(["Fixture Pharmacy", "Spot I picked"]);
+    expect(JSON.stringify(kept)).not.toContain("osm:node/1");
   });
 });
