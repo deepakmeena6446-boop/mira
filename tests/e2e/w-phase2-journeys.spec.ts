@@ -10,7 +10,7 @@ async function seedPlan(page: Page) {
   const tomorrow = new Date(Date.now() + 86_400_000).toLocaleDateString("sv-SE", { timeZone: "Asia/Kolkata" });
   await page.addInitScript(({ from, to, day }) => {
     if (sessionStorage.getItem("mira.plan.v1")) return;
-    sessionStorage.setItem("mira.plan.v1", JSON.stringify({ savedAt: Date.now(), draft: { version: 2, touched: true, activity: "Dinner with Riya", origin: { kind: "named", query: "North Gate", resolution: { source: "search", name: "North Gate", point: from, placeId: "north" } }, destination: { query: "South Library", resolution: { source: "search", name: "South Library", point: to, placeId: "south" } }, loop: false, departureLocal: `${day}T21:00`, timeZone: "Asia/Kolkata", mode: "walk", constraints: "", timeKind: "depart_at", destinationCountryIso: null, legs: [] } }));
+    sessionStorage.setItem("mira.plan.v1", JSON.stringify({ savedAt: Date.now(), draft: { version: 2, touched: true, activity: "Dinner with Riya", origin: { kind: "named", query: "North Gate", resolution: { source: "search", name: "North Gate", point: from, placeId: "osm:node/9501" } }, destination: { query: "South Library", resolution: { source: "search", name: "South Library", point: to, placeId: "osm:node/9502" } }, loop: false, departureLocal: `${day}T21:00`, timeZone: "Asia/Kolkata", mode: "walk", constraints: "", timeKind: "depart_at", destinationCountryIso: null, legs: [] } }));
   }, { from, to, day: tomorrow });
 }
 

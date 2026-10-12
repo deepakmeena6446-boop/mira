@@ -11,7 +11,7 @@ async function seed(page: import("@playwright/test").Page, mode: "walk" | "ride"
   await page.addInitScript(({ mode, departureLocal, from, to, loop }) => {
     localStorage.setItem("mira.welcomed", "1");
     // Seed once: later navigations keep the tab plan (and its chosen option), as in real use.
-    if (!sessionStorage.getItem("mira.plan.v1")) sessionStorage.setItem("mira.plan.v1", JSON.stringify({ savedAt: Date.now(), draft: { version: 1, touched: true, activity: "Get to the library", origin: { kind: "named", query: "North Gate", resolution: { source: "search", name: "North Gate", point: from, placeId: "north" } }, destination: { query: "South Library", resolution: { source: "search", name: "South Library", point: to, placeId: "south" } }, loop, departureLocal, timeZone: "Asia/Kolkata", mode, constraints: "" } }));
+    if (!sessionStorage.getItem("mira.plan.v1")) sessionStorage.setItem("mira.plan.v1", JSON.stringify({ savedAt: Date.now(), draft: { version: 1, touched: true, activity: "Get to the library", origin: { kind: "named", query: "North Gate", resolution: { source: "search", name: "North Gate", point: from, placeId: "osm:node/9501" } }, destination: { query: "South Library", resolution: { source: "search", name: "South Library", point: to, placeId: "osm:node/9502" } }, loop, departureLocal, timeZone: "Asia/Kolkata", mode, constraints: "" } }));
   }, { mode, departureLocal, from, to, loop });
 }
 

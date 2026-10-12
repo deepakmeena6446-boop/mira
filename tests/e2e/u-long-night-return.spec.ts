@@ -55,7 +55,7 @@ test("S4 a saved midnight return survives a real three-hour draft expiry and nee
   await page.getByRole("dialog").getByRole("checkbox", { name: /I confirm I.m 18 or older/ }).check();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
-  const place = (query: string, lat: number) => ({ query, resolution: { source: "search" as const, name: query, placeId: `fictional:${query}`, point: { lat, lon: 77.21 } } });
+  const place = (query: string, lat: number) => ({ query, resolution: { source: "search" as const, name: query, placeId: `osm:node/${Math.round(lat * 1000)}`, point: { lat, lon: 77.21 } } });
   const draft: PlanDraft = {
     version: 2, touched: true, activity: EVENT, origin: { kind: "named", ...place(HOME, 28.69) }, destination: place(VENUE, 28.70),
     loop: false, departureLocal: format(evening), timeZone: ZONE, mode: "walk", constraints: "Confirm access directly", timeKind: "depart_at",
