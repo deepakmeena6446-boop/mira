@@ -181,7 +181,8 @@ describe("emergency numbers", () => {
 
   it("ignores times, distances and walking minutes", () => {
     expect(companionOutputIssue("It's 10:05 pm. Call Priya — it's a 12-minute walk, about 800 m.", ["999"])).toBeNull();
-    expect(companionOutputIssue("Call 999; the pharmacy is open 24/7 and 350 metres away.", ["999"])).toBeNull();
+    // "24/7" is never a phone number. (Hours are said as a listing: an unqualified "is open 24/7" is withheld — audit F1.)
+    expect(companionOutputIssue("Call 999; the pharmacy is listed as open 24/7 and 350 metres away.", ["999"])).toBeNull();
   });
 });
 
@@ -263,4 +264,34 @@ describe("consequential assurances (chat, word filter off)", () => {
   it("still catches an invented dispatch phrased as done", () => {
     expect(chat("I've called the police for you.")).toBe("invented_action");
   });
+});
+
+// Audit F1: what the chat guard (checkVerdicts: false, as in claude.ts) withholds and lets through. Each line in the
+// first list passed the guard before the fix; each line in the second is an honest reply that must still reach her.
+describe("chat guard: consequential claims without a listed verdict word (audit F1)", () => {
+  const chat = (t: string) => companionOutputIssue(t, ["112"], { checkVerdicts: false });
+  it.each([
+    "You'll be safe.", "You'll be fine walking there.", "You're going to be safe.", "I've checked and you're good.",
+    "It's a perfectly secure area.", "That neighbourhood has low crime.", "Crime is rare there.", "The walk is risk-free.",
+    "The area's fine.", "Nothing bad happens there.", "It's safe, right?", "This place is safe enough, isn't it?",
+    "Tension mat lo, area theek hai.", "Koi dikkat nahi hogi.", "Darr ki koi baat nahi.",
+    "The police will come if you call.", "Help will reach you within minutes.", "Police respond within minutes there.",
+    "I'm tracking you until you arrive.", "I'll keep an eye on you the whole way.",
+    "The pharmacy is open 24/7.", "The pharmacy is open until 11 PM tonight.", "Directions are below. It closes at 10.",
+  ])("withholds %j", (t) => expect(chat(t)).toBe("unsupported_assurance"));
+
+  it("checks a spelled-out number like digits", () => {
+    expect(chat("Dial nine one one.")).toBe("unsupported_emergency_number");
+    expect(chat("Dial one one two.")).toBeNull(); // 112 is reviewed for this country
+  });
+
+  it.each([
+    "Is it safe to walk at night?", "I can't say whether it's safe.", "Stay safe!", "Safe rehna!", "Be safe!",
+    "I can check daylight and listed hours, but not whether a place is safe.",
+    "I can't promise help will come quickly; call 112 yourself.", "If you call 112, I can't say how quickly police will come.",
+    "I don't know whether help would reach you there quickly.", "Nobody will come from Mira — it can't dispatch anyone.",
+    "I'm not tracking you; your live link only updates while the trip screen is open.", "Mira can't track you in the background.",
+    "The pharmacy is listed as open until 9 PM; hours can change.", "OpenStreetMap lists it as open 24 hours, but that isn't checked.",
+    "Is the pharmacy open now? I can't check live hours.", "Theek hai, main plan bana deti hoon.", "Koi baat nahi, dobara try karte hain.",
+  ])("lets through %j", (t) => expect(chat(t)).toBeNull());
 });

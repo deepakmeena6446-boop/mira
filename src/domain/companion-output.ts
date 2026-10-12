@@ -57,11 +57,19 @@ const EN_ALLOWED = [
   rx(String.raw`(?<!\b(?:will|'ll|would|'d|make you|makes you)\s)\b(?:feel|feels|feeling|felt)\s+(?:un)?safer?${E}`),
   // Movement imperatives: "get somewhere safe", "go to a safe place" (no place is being labelled).
   rx(String.raw`\b(?:get|go|head|move|run|walk|stay|wait|find|reach)\s+(?:to\s+|into\s+)?(?:(?:somewhere|someplace|some place|anywhere)\s+safer?|a\s+safer?\s+place)${E}`),
+  // Honest uncertainty about help: "I can't promise help will come quickly", "I don't know whether help would reach you".
+  rx(String.raw`\b(?:can't|cannot|can not|couldn't|could not|don't|do not|won't|will not|never|not able to|unable to|no way to)\s+(?:[\w']+\s+){0,2}?(?:promise|guarantee|say|tell|know|confirm|predict|be sure)\w*\s+(?:(?:how\s+(?:quickly|fast|soon|long)|whether|if|that|when)\s+)?(?:the\s+)?(?:police|ambulance|help|someone|security|anyone|guards?|staff)\s+(?:will|'ll|would|can)\s+[\w']+(?:\s+[\w']+){0,3}`),
+  // An honest limitation: "I can check daylight and listed hours, but not whether a place is safe".
+  rx(String.raw`\bnot\s+(?:whether|if)\s+[^.!?\n,;]{0,80}?${B}${EN_VERDICT}${E}(?:\s+or\s+(?:not|${EN_VERDICT}))?`),
   // Her state as a condition: "once you're safe, call Priya".
   rx(String.raw`\b(?:once|when|until|if|as soon as|after)\s+you(?:'re| are| feel)\s+(?:safe|safer)${E}`),
 ];
 /** A question ("Are you safe right now?") asserts nothing — unless it ranks (safer / safest). */
 const EN_QUESTION = rx(String.raw`[^.!?\n]*${B}(?:safe|unsafe|dangerous|risky)${E}[^.!?\n]*\?`);
+/** …but a tag question asserts and asks for agreement: "It's safe, right?", "safe enough, isn't it?", "safe hai na?". */
+const TAG_QUESTION = /(?:,\s*|\s)(?:right|isn'?t it|is it not|aren'?t they|won'?t it|wouldn'?t it|don'?t you think|yeah|yes|ok|okay|correct|na|hai na|hai naa)\s*\?\s*$/iu;
+/** Removed from the text before a verdict/assurance check: true questions only; rankings and tag questions stay. */
+const keepAsserting = (q: string) => (/\b(?:safer|safest)\b/i.test(q) || TAG_QUESTION.test(q) ? q : " ");
 
 const VERDICT_PATTERNS: RegExp[] = [
   rx(`${B}${EN_VERDICT}${E}`),
@@ -110,7 +118,7 @@ const OTHER_ALLOWED = [
  * safely"). Allowed in Mira's chat only: the strict check (briefs, eval) still rejects them.
  */
 const WISH_ALLOWED = [
-  rx(String.raw`${B}(?:stay|keep|be)\s+safe${E}(?!\s+(?:on|in|at|along|through|there|here|with)${E})`),
+  rx(String.raw`(?<!\b(?:will|'ll|going to|gonna|would|'d|should|must)\s)${B}(?:stay|keep|be)\s+safe${E}(?!\s+(?:on|in|at|along|through|there|here|with)${E})`),
   rx(String.raw`${B}safe\s+(?:travels?|trip|journey|run|walk)${E}(?!\s+(?:on|in|at|along|through|there|here)${E})`),
   rx(String.raw`${B}(?:i\s+)?hope\s+(?:you\s+)?(?:get|got|make it|reach|are|'re|feel)\s+(?:(?:home|back|there)\s+)?(?:safe|safely)${E}`),
   rx(String.raw`${B}(?:travel|get home|get back|get there|reach home|go home)\s+safe(?:ly)?${E}(?!\s+(?:on|in|at|along|through|via|by)${E})`),
@@ -120,7 +128,7 @@ const WISH_ALLOWED = [
 function hasVerdict(view: string, { wishes = false }: { wishes?: boolean } = {}): boolean {
   let t = view;
   for (const a of [...EN_ALLOWED, ...OTHER_ALLOWED, ...(wishes ? WISH_ALLOWED : [])]) t = t.replace(a, " ");
-  t = t.replace(EN_QUESTION, (q) => (/\b(?:safer|safest)\b/i.test(q) ? q : " "));
+  t = t.replace(EN_QUESTION, keepAsserting);
   return VERDICT_PATTERNS.some((p) => {
     p.lastIndex = 0;
     return p.test(t);
@@ -136,7 +144,13 @@ function hasVerdict(view: string, { wishes = false }: { wishes?: boolean } = {})
 const PLACE = String.raw`(?:route|way|road|street|area|place|neighbou?rhood|park|path|station|locality|lane|campus|stretch|walk|option|spot|rasta|raasta|jagah|ilaka|ilaaka)s?`;
 const ASSURANCE_PATTERNS: RegExp[] = [
   // "This route is safe", "the area looks fine", "that street should be secure", "the park is dangerous"
-  rx(String.raw`${B}${PLACE}\s+(?:is|are|'s|looks|look|seems|seem|will be|should be|would be|feels|stays)\s+(?:(?:completely|totally|perfectly|very|quite|pretty|really|generally|usually|definitely|absolutely|fairly|mostly|reasonably)\s+)?(?:safe|fine|secure|dangerous|unsafe|risky)${E}`),
+  rx(String.raw`${B}${PLACE}(?:'s|\s+(?:is|are|'s|looks|look|seems|seem|will be|should be|would be|feels|stays))\s+(?:(?:completely|totally|perfectly|very|quite|pretty|really|generally|usually|definitely|absolutely|fairly|mostly|reasonably)\s+)?(?:safe|fine|secure|dangerous|unsafe|risky|risk-free|crime-free|okay|ok|alright|all right)${E}`),
+  // The same verdict as an adjective: "a perfectly secure area", "a risk-free walk", "a low-crime neighbourhood"
+  rx(String.raw`${B}(?:secure|risk-free|riskless|crime-free|low[- ]crime|trouble-free)\s+(?:[\p{L}-]+\s+)?${PLACE}${E}|${B}(?:is|'s|are|it's)\s+(?:completely\s+|totally\s+|perfectly\s+)?(?:risk-free|crime-free)${E}`),
+  // Crime and trouble said to be absent or rare: "low crime", "crime is rare there", "nothing bad happens"
+  rx(String.raw`${B}(?:low|little|hardly any|almost no|very little|no real)\s+crime${E}|${B}crime\s+(?:is|'s)\s+(?:rare|low|uncommon|unheard of|not a problem)${E}|${B}nothing\s+bad\s+(?:ever\s+)?(?:happens|will happen|has happened|happened)${E}|${B}(?:women|girls)\s+(?:walk|go|travel)\s+(?:there\s+)?alone\s+all\s+the\s+time${E}`),
+  // Personal outcome promised: "you'll be fine walking there", "you'll be safe", "I've checked and you're good"
+  rx(String.raw`${B}you(?:'ll|\s+will|'re going to|\s+are going to|\s+should|'d|\s+would)\s+be\s+(?:completely\s+|totally\s+|perfectly\s+|absolutely\s+|just\s+)?(?:fine|safe|okay|ok|alright|all right|good)${E}|${B}you(?:'re|\s+are)\s+(?:completely\s+|totally\s+|perfectly\s+)?(?:good|covered|safe)${E}(?!\s+(?:to\s+(?:ask|change|edit|try)|with\s+(?:me|your)))`),
   // Rankings: "the safest route", "a safer way"
   rx(String.raw`${B}(?:safest|safer)\s+(?:[\p{L}-]+\s+)?${PLACE}${E}`),
   // Absence presented as reassurance: "no safety concerns", "nothing to worry about"
@@ -144,17 +158,26 @@ const ASSURANCE_PATTERNS: RegExp[] = [
   // Absence presented as reassurance: "no incidents", "zero crime here"
   rx(String.raw`${B}(?:no|zero|never any)\s+(?:recent\s+|reported\s+)?(?:incidents?|crimes?)${E}(?!\s+(?:data|information|info|records?|statistics|stats|sources?|feeds?|maps?))`),
   // Help that Mira can't establish: available, staffed or on its way
+  // Help that will come or respond: "the police will come if you call", "help will reach you within minutes"
+  rx(String.raw`${B}(?:the\s+)?(?:police|ambulance|help|someone|security|a guard|guards|staff|they)\s+(?:will|'ll|would|always)\s+(?:come|arrive|reach you|get to you|be there|respond|show up|turn up|help you)${E}|${B}help\s+(?:will|'ll|can|would)\s+(?:reach|get to)\s+you${E}|${B}(?:police|ambulance|security|guards?)\s+(?:respond|arrive|come)\s+(?:within|in)\s+(?:minutes|a few minutes|\d+)`),
   rx(String.raw`${B}help\s+is\s+(?:always\s+)?(?:available|nearby|close by|close|on (?:its|the) way|coming)${E}|${B}(?:police|ambulance|help|someone|security|a guard|staff)\s+(?:is|are|will be|'s|'re)\s+(?:already\s+)?(?:on (?:its|their|the|her) way|coming|being sent|dispatched|sent)${E}|${B}staff\s+(?:will|can|would)\s+help${E}`),
   // Personal safety and vigilance Mira doesn't provide
   rx(String.raw`${B}you(?:'re|\s+are|'ll be|\s+will be)\s+(?:completely\s+|totally\s+|perfectly\s+)?safe\s+(?:with|there|here|now|tonight)${E}|${B}i(?:'m|\s+am)\s+(?:watching over you|with you until)${E}`),
+  // Vigilance Mira doesn't provide: "I'm tracking you until you arrive", "I'll keep an eye on you the whole way"
+  rx(String.raw`${B}(?:i|mira|we)(?:'m|\s+am|\s+is|'re|\s+are|'ll|\s+will|\s+can)\s+(?:be\s+)?(?:tracking|track|monitoring|monitor|watching|watch|keeping an eye on|keep an eye on|keeping track of|keep track of|looking out for|look out for|following|follow)\s+(?:over\s+)?you${E}`),
+  // Opening hours stated as fact rather than as a listing: "the pharmacy is open 24/7", "open until 11 PM tonight".
+  // Hours come from the sourced cards; prose may only say what a source lists ("listed as open until 9 PM").
+  rx(String.raw`(?:^|(?<=[.!?\n]\s*))(?![^.!?\n]*\b(?:list|lists|listed|listing|according to|says|shows|marked|mapped|reported)\b)[^.!?\n]*?(?:${B}(?:is|are|'s|stays|remains|will be)\s+open\s+(?:now|until|till|tonight|late|all night|round the clock|24)|${B}open\s+24\s*(?:\/\s*7|hours|hrs)|${B}(?:closes|shuts)\s+at\s+\d)`),
   // Hinglish: "ye route bilkul safe hai", "area surakshit hai"
   rx(String.raw`${B}(?:${PLACE}|ye|yeh|wo|woh|vo)\s+(?:(?:bilkul|ekdum|poori tarah|kaafi|bahut)\s+)?(?:safe|surakshit|khatarnaa?k)\s+(?:hai|he|h|hain|rahega|rahegi)${E}`),
+  // Hinglish reassurance without a verdict word: "area theek hai", "tension mat lo", "koi dikkat nahi hogi"
+  rx(String.raw`${B}(?:${PLACE}|ye|yeh|wo|woh|vo|sab|sab kuch|bilkul|ekdum)\s+(?:(?:bilkul|ekdum|poori tarah|kaafi|bahut)\s+)?(?:theek|thik|theek-thaak|thik-thak)\s+(?:hai|he|h|hain|rahega|rahegi|hoga|hogi)${E}|${B}tension\s+(?:mat|na|nahi|mt)\s+(?:lo|lena|lijiye|lijie)${E}|${B}(?:koi\s+)?(?:dikkat|dikkatt|problem|pareshani|khatra|dar|darr)\s+(?:ki\s+koi\s+baat\s+)?(?:nahi|nahin|nhi)\s+(?:hogi|hoga|hai)${E}|${B}(?:dar|darr)\s+ki\s+koi\s+baat\s+(?:nahi|nahin|nhi)${E}`),
 ];
 
 function hasAssurance(view: string): boolean {
   let t = view;
   for (const a of [...EN_ALLOWED, ...OTHER_ALLOWED]) t = t.replace(a, " ");
-  t = t.replace(EN_QUESTION, (q) => (/\b(?:safer|safest)\b/i.test(q) ? q : " "));
+  t = t.replace(EN_QUESTION, keepAsserting);
   return ASSURANCE_PATTERNS.some((p) => {
     p.lastIndex = 0;
     return p.test(t);
@@ -206,7 +229,13 @@ const NOT_A_PHONE_AFTER = /^\s*(?:%|:\d|\/\d|-?\s*(?:min|mins|minutes?|m|km|metr
 
 const digitsOnly = (s: string) => s.replace(/\D/g, "");
 
-function unsupportedNumber(view: string, allowed: Set<string>): boolean {
+const DIGIT_WORDS: Record<string, string> = { zero: "0", oh: "0", one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9" };
+const SPELLED_RUN = /\b(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)(?:[\s-]+(?:zero|oh|one|two|three|four|five|six|seven|eight|nine))+\b/giu;
+/** "nine one one" → "911", so a spelled-out number meets the same check as digits. */
+const spelledDigits = (view: string) => view.replace(SPELLED_RUN, (m) => m.toLowerCase().split(/[\s-]+/).map((w) => DIGIT_WORDS[w]).join(""));
+
+function unsupportedNumber(rawView: string, allowed: Set<string>): boolean {
+  const view = spelledDigits(rawView);
   for (const m of view.matchAll(DIGIT_RUN)) {
     const digits = digitsOnly(m[0]);
     if (digits.length < 2 || digits.length > 15) continue;
