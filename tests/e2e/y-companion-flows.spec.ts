@@ -52,18 +52,28 @@ test("a guest plans between two named places without GPS and gets a short, quali
 
 test("on foot in the dark, the calculated sky leads and the travel time keeps its qualifier in the list", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-10T17:30:00Z")); // 11 PM in Delhi
+  // Every clock time the sky card ever shows, from its first render: the phone here is on UTC, and before Delhi's zone
+  // arrived the card briefly read "Twilight from about 12:20 AM" (audit F6).
+  await page.addInitScript(() => {
+    const seen = new Set<string>();
+    const times = () => { const card = document.querySelector('section[aria-label="Your plan, at that time"]'); return card ? [card.textContent ?? "", ...[...card.querySelectorAll("[aria-label]")].map((e) => e.getAttribute("aria-label") ?? "")].join(" ").match(/\d{1,2}:\d{2}\s?[AP]M/gi) ?? [] : []; };
+    Object.assign(window, { skyTimes: seen, skyTimesNow: times });
+    new MutationObserver(() => { for (const t of times()) seen.add(t); }).observe(document, { subtree: true, childList: true, characterData: true, attributes: true });
+  });
   await page.goto("/plan?for=go");
   await pick(page, /^From/, "Hindu College");
   await pick(page, /^To/, DEST);
   const sky = page.getByRole("region", { name: "Your plan, at that time" });
   await expect(sky).toContainText(/^.*Dark when you set off/);
-  await expect(sky).toContainText(/Twilight from about \d{1,2}:\d{2} AM/); // the next change at 11 PM, on Delhi's clock
+  await expect(sky).toContainText("Twilight from about 5:50 AM"); // the next change after 11 PM, on Delhi's clock
   await expect(sky).toContainText("Calculated · Solar calculation, not weather or visibility");
   await expect(sky).not.toContainText(/min walk/);
   const take = page.getByRole("region", { name: "Mira’s take" });
   await expect(take).toContainText(/About \d+ min · [\d.]+ km/);
   await expect(take).toContainText("Estimate");
   await expect(take).not.toContainText("Dark when you set off"); // said once, on the sky card
+  const { settled, shown } = await page.evaluate(() => { const w = window as unknown as { skyTimes: Set<string>; skyTimesNow: () => string[] }; return { settled: w.skyTimesNow(), shown: [...w.skyTimes] }; });
+  expect(shown.filter((t) => !settled.includes(t)), "no time on the phone's clock, even before the zone arrived").toEqual([]);
 });
 
 test("saving says what blocks it before the tap; the remembered mode is a default, never over her choice", async ({ browser }) => {

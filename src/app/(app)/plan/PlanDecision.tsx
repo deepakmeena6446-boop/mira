@@ -207,6 +207,11 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
   }, [countryZone, draft]);
   // Zone not known, but the place is far east or west of the phone's clock: say so rather than plan on the phone's time.
   const zoneUnsure = Boolean(focus && aroundNow && aroundNow.zone === null && !countryZone && Math.abs(focus.lon / 15 - -new Date().getTimezoneOffset() / 60) > 2.5);
+  // The plan's clock is settled once she chose its zone, or the place's zone has been looked up (found, or not known) and
+  // the plan is on it. Until then the brief shows no time at all: a UTC phone planning a Delhi evening first read
+  // "Twilight from about 12:20 AM" before the zone arrived (audit F6).
+  const herZone = Boolean(draft?.timeZone && draft.timeZone !== deviceZone() && !draft.timeZoneAuto);
+  const zoneSettled = herZone || Boolean(aroundNow && aroundNow.zone !== undefined && (!countryZone || !validZone(countryZone) || sameClock(zone, countryZone)));
 
   // ── Derived brief ─────────────────────────────────────────────────────────────────────────
   const loopReady = loopPlan?.key === loopKey && loopPlan.data?.state === "ready" ? loopPlan.data : null;
@@ -219,7 +224,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
   const arriveAt = departAt && minutes ? new Date(departAt.getTime() + minutes * 60_000) : null;
   const helpAt = departAt ? localTimeInZone(departAt, zone) : null;
   const sun = origin ?? dest;
-  const later = draft && origin && departAt && sun && daylightAt(departAt, sun) === "dark" ? laterDaylight(localTimeForInstant(departAt, zone), zone, sun) : null;
+  const later = zoneSettled && draft && origin && departAt && sun && daylightAt(departAt, sun) === "dark" ? laterDaylight(localTimeForInstant(departAt, zone), zone, sun) : null;
   const helpPointsShown: HelpPoint[] = loop ? (startHelp?.key === loopKey ? allowed(startHelp.points).slice(0, 6) : []) : way?.helpPoints ?? [];
 
   const claims: Claim[] = (() => {
@@ -256,7 +261,7 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
   })();
 
   // The short answer: at most three qualified items and one limitation; the ledger keeps everything.
-  const brief = complete && draft ? planBrief(claims, { mode, loop, constraints: draft.constraints, departClock: departAt ? clockIn(departAt, zone) : null, compare: !loop && wayList.length > 1 ? compareWays(wayList, selected) : null, notesPending: (!loop && mode === "walk" ? currentWays?.notes ?? null : aroundNow?.notes ?? null) === null }) : { items: [], limitation: null };
+  const brief = complete && draft && zoneSettled ? planBrief(claims, { mode, loop, constraints: draft.constraints, departClock: departAt ? clockIn(departAt, zone) : null, compare: !loop && wayList.length > 1 ? compareWays(wayList, selected) : null, notesPending: (!loop && mode === "walk" ? currentWays?.notes ?? null : aroundNow?.notes ?? null) === null }) : { items: [], limitation: null };
 
   // ── Actions ───────────────────────────────────────────────────────────────────────────────
   const soon = departAt && clock ? Math.abs(departAt.getTime() - clock.getTime()) <= 30 * 60_000 : false;
@@ -342,9 +347,9 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
   // A share is shown only when some of the way has lighting evidence at all; otherwise it's "not known", never 0%.
   const loopName = loopWord(draft);
   // ── Sky card facts ────────────────────────────────────────────────────────────────────────
-  const checking = (!loop && !currentWays) || (loop && loopPlan?.key !== loopKey);
+  const checking = !zoneSettled || (!loop && !currentWays) || (loop && loopPlan?.key !== loopKey);
   const verb = loop ? loopName.toLowerCase() : mode === "walk" ? "walk" : mode === "ride" ? "ride" : "by transit";
-  const tripTitle = loop ? `${loopMinutes} min ${verb}` : minutes ? `${Math.round(minutes)} min ${verb}${arriveAt ? ` · arrive ${clockIn(arriveAt, zone)}` : ""}` : currentWays?.error ? "Couldn’t check the way" : currentWays?.noRoute ? "No travel time available" : "…";
+  const tripTitle = loop ? `${loopMinutes} min ${verb}` : minutes ? `${Math.round(minutes)} min ${verb}${arriveAt && zoneSettled ? ` · arrive ${clockIn(arriveAt, zone)}` : ""}` : currentWays?.error ? "Couldn’t check the way" : currentWays?.noRoute ? "No travel time available" : "…";
   // The sky card leads with one fact, chosen by fixed rules (chooseTakeaway): a failed route check; on foot, the sky
   // when it's dark as she starts or turns before she's due to finish; a note from people; else the travel time.
   // The list doesn't repeat the lead; whatever doesn't lead stays in it with its own qualifier.
@@ -439,20 +444,20 @@ export function PlanDecision({ signedIn, emailAlerts, places, tiles, initialFor,
         ) : (
           <>
             {/* A reopened plan whose time has gone: everything below was checked again, for that past time. */}
-            {instant && clock && instant.getTime() < clock.getTime() - 15 * 60_000 ? (
+            {zoneSettled && instant && clock && instant.getTime() < clock.getTime() - 15 * 60_000 ? (
               <StateNote tone="attention" className="mt-5" title="This plan’s time has passed" action={<button type="button" onClick={() => setSheet("when")} className="min-h-11 text-sm font-semibold text-accent-strong">Choose a new time</button>}>Mira checked it again for {whenWords(draft.departureLocal, zone)}. Choose when you’ll actually go to see it for then.</StateNote>
             ) : null}
             {/* The plan at that time, then the short answer, then the options and the full detail. */}
             <section aria-label="Your plan at that time" className="mt-5">
               {/* The plan's own sky: coloured by the calculated sky when she sets off. */}
               <SkyCard
-                state={skyAt(departAt, sun)}
+                state={skyAt(zoneSettled ? departAt : null, sun)}
                 label="Your plan, at that time"
                 pulse={checking ? "thinking" : "noticed"}
                 eyebrow={checking ? "Checking that place at that time…" : "Your plan, at that time"}
-                aside={whenWords(draft.departureLocal, zone)}
+                aside={zoneSettled ? whenWords(draft.departureLocal, zone) : null}
                 title={lead ? lead.head : tripTitle}
-                strip={departAt && sun ? { from: departAt, point: sun, hours: loop ? 3 : 6, startLabel: "set off", zone } : null}
+                strip={zoneSettled && departAt && sun ? { from: departAt, point: sun, hours: loop ? 3 : 6, startLabel: "set off", zone } : null}
                 line={takeaway?.kind === "failed" ? <><span className="block">{takeaway.text} Your plan is kept.</span><button type="button" onClick={() => setRetry((n) => n + 1)} className="mt-2 inline-flex min-h-11 items-center rounded-full bg-white/90 px-4 text-sm font-semibold text-[#211b2e]">Try again</button></> : takeaway ? <>{lead?.rest ? <span className="mb-1 block text-[0.9375rem] font-semibold">{lead.rest[0].toUpperCase() + lead.rest.slice(1)}</span> : null}<span className="font-semibold">{BRIEF_KIND_LABEL[takeaway.kind]}</span>{takeaway.sourceLabel ? ` · ${takeaway.sourceLabel}` : ""}{takeaway.limitation ? <span className="mt-1 block">{takeaway.limitation}</span> : null}</> : null}
               />
               <BriefSummary className="mt-3" checking={checking} acknowledgement="What matters" items={briefRest} limitation={checking ? null : brief.limitation} onRetry={() => setRetry((n) => n + 1)}>
