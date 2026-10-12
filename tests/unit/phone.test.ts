@@ -35,11 +35,13 @@ describe("normalizePhone: what she types → E.164", () => {
 describe("WhatsApp links", () => {
   it("open a chat with the message ready, and never carry anything but the number and the text", () => {
     const url = whatsappLink("+919876543210", journeyMessage("https://mira.test/t/abc", "Kamla Nagar Market", "walk"));
-    expect(url).toBe(`https://wa.me/919876543210?text=${encodeURIComponent("I'm walking to Kamla Nagar Market. Follow along live on MIRA until I arrive: https://mira.test/t/abc")}`);
+    expect(url).toBe(`https://wa.me/919876543210?text=${encodeURIComponent("I'm walking to Kamla Nagar Market. My location on MIRA updates while I have the app open, until I arrive: https://mira.test/t/abc")}`);
     expect(new URL(url).searchParams.get("text")).toContain("https://mira.test/t/abc");
   });
   it("word sharing-where-I-am and check-on-me in her voice, without alarm", () => {
-    expect(journeyMessage("https://mira.test/t/x", null)).toBe("Here's where I am. Follow along live on MIRA until I stop sharing: https://mira.test/t/x");
+    expect(journeyMessage("https://mira.test/t/x", null)).toBe("Here's where I am. My location on MIRA updates while I have the app open, until I stop sharing: https://mira.test/t/x");
+    // Never "live": the spot updates only while her app is open (audit M3-c).
+    for (const m of [journeyMessage("https://mira.test/t/x", "Home", "walk"), journeyMessage("https://mira.test/t/x", null), checkOnMeMessage("https://mira.test/t/x")]) expect(m).not.toMatch(/\blive\b/i);
     expect(checkOnMeMessage("https://mira.test/t/x")).toMatch(/^Can you check on me\?/);
     expect(checkOnMeMessage("https://mira.test/t/x")).not.toMatch(/\b(SOS|emergency|danger|safe)\b/i);
   });

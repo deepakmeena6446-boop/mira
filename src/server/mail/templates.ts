@@ -81,7 +81,7 @@ export function tripSharedEmail(args: { contactName: string; ownerName: string; 
       `Hi ${args.contactName},`,
       "",
       `${args.ownerName} ${journeyVerb(args.mode)} ${args.destination} and shared the trip with you on MIRA.`,
-      `They expect to arrive in ${about(args.minutesToEta)}${theirTime(args.etaAt, args.tz)}. Follow along live until they arrive:`,
+      `They expect to arrive in ${about(args.minutesToEta)}${theirTime(args.etaAt, args.tz)}. See where they are (it updates while they have MIRA open):`,
       args.liveUrl,
       "",
       "The link stops working once the trip ends. MIRA will email you once if they don't check in.",

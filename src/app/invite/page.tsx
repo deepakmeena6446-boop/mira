@@ -21,8 +21,9 @@ export default async function InvitePage() {
           {contact.owner} wants you as a trusted contact
         </h1>
         <ul className="mt-4 space-y-2 text-ink-muted">
-          <li>• When {contact.owner} shares a trip, you get a link to follow along live until they arrive.</li>
-          <li>• If they don&apos;t check in on time, Mira lets you know.</li>
+          {/* Said as it works (audit M3-c): their spot updates only while MIRA is open on their phone, and a missed check-in is an email. */}
+          <li>• When {contact.owner} shares a trip, you get a link to see where they are. It updates while they have MIRA open, and says when it&apos;s paused.</li>
+          <li>• If they don&apos;t check in on time, Mira emails you once. Email can arrive late, so call them if you&apos;re worried.</li>
           <li>• You only see their location during a trip they choose to share. Never otherwise.</li>
         </ul>
         <div className="mt-6">

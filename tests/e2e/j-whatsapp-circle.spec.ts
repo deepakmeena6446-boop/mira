@@ -27,7 +27,7 @@ test("a WhatsApp contact gets a one-tap live link on the journey screen", async 
   await expect(send).toBeVisible();
   const href = (await send.getAttribute("href"))!;
   expect(href).toMatch(/^https:\/\/wa\.me\/919876543210\?text=/);
-  expect(decodeURIComponent(href)).toMatch(/Follow along live on MIRA until I arrive: http\S+\/t\/[A-Za-z0-9_-]+$/);
+  expect(decodeURIComponent(href)).toMatch(/My location on MIRA updates while I have the app open, until I arrive: http\S+\/t\/[A-Za-z0-9_-]+$/);
   await expect(page.getByText(/Couldn.t email your link/)).toHaveCount(0); // a WhatsApp contact is never an email failure
 
   // Tapping opens WhatsApp (a new tab here); the screen says "opened", never "sent".

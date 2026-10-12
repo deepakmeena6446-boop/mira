@@ -72,7 +72,7 @@ describe("Circle on WhatsApp: she sends her link in one tap; MIRA never claims i
     expect(ravi).toMatchObject({ name: "Ravi", notified: false, viaEmail: false });
     expect(ravi.whatsapp).toMatch(/^https:\/\/wa\.me\/442079460958\?text=/);
     const text = new URL(ravi.whatsapp).searchParams.get("text")!;
-    expect(text).toMatch(/^I'm walking to Home\. Follow along live on MIRA until I arrive: http/);
+    expect(text).toMatch(/^I'm walking to Home\. My location on MIRA updates while I have the app open, until I arrive: http/);
     expect(text).not.toMatch(/\d+\.\d{4,}/); // a link, never coordinates
 
     // The friend opens it with no account: latest spot only, and no promise that MIRA will email them.

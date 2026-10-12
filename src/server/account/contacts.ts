@@ -174,7 +174,7 @@ export async function addContact(sql: postgres.Sql, userId: string, userName: st
       "Hello,",
       "",
       `${userName} would like you to be one of their trusted contacts on MIRA.`,
-      "When they share a journey, MIRA emails you a link to follow along live until they arrive — and emails you if they don't check in.",
+      "When they share a journey, MIRA emails you a link to see where they are (it updates while they have MIRA open) — and emails you if they don't check in.",
       "",
       "Accept here:",
       link,
@@ -236,7 +236,7 @@ export async function acceptContactInvite(sql: postgres.Sql, token: string): Pro
     await notifyInApp(sql, first.user_id, {
       kind: "contact_accepted",
       title: `${first.name} accepted your invite`,
-      body: `${first.name} can now follow along live whenever you share a trip.`,
+      body: `${first.name} can now see where you are whenever you share a trip.`,
       href: "/circle",
     });
     return true;

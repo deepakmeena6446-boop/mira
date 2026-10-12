@@ -154,11 +154,18 @@ export async function acceptContactInvite(browser: Browser, address: string): Pr
     const m = await mailsTo(address);
     return m.length ? m : null;
   });
-  const link = /http:\/\/localhost:\d+\/invite\/[A-Za-z0-9_-]+/.exec(await mailText(invite.ID))![0];
+  const text = await mailText(invite.ID);
+  const link = /http:\/\/localhost:\d+\/invite\/[A-Za-z0-9_-]+/.exec(text)![0];
+  // What a contact is promised is how it works (audit M3-c): updates while her app is open, an email if she's late — never "live".
+  expect(text).toContain("it updates while they have MIRA open");
+  expect(text).not.toMatch(/\blive\b/i);
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await page.goto(link);
   await expect(page).toHaveURL(/\/invite$/); // token moves into a cookie, out of the URL
+  await expect(page.getByText(/It updates while they have MIRA open, and says when it’s paused|It updates while they have MIRA open, and says when it's paused/)).toBeVisible();
+  await expect(page.getByText(/Mira emails you once\. Email can arrive late/)).toBeVisible();
+  await expect(page.getByText(/follow along live|lets you know/i)).toHaveCount(0);
   await page.getByRole("button", { name: "Accept" }).click();
   await expect(page.getByText("You've accepted")).toBeVisible();
   return { ctx, page };

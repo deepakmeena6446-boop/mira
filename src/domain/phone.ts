@@ -82,10 +82,11 @@ export function whatsappLink(e164: string, text: string): string {
 /** The message she sends when a journey starts, in her own voice (the link is that contact's own, revocable one). */
 export function journeyMessage(liveUrl: string, destination: string | null, mode?: string): string {
   const lead = destination ? `${mode === "walk" ? "I'm walking to" : "I'm on my way to"} ${destination}.` : "Here's where I am.";
-  return `${lead} Follow along live on MIRA until I ${destination ? "arrive" : "stop sharing"}: ${liveUrl}`;
+  // Never "live": her spot is sent only while MIRA is open on her phone (audit M3-c).
+  return `${lead} My location on MIRA updates while I have the app open, until I ${destination ? "arrive" : "stop sharing"}: ${liveUrl}`;
 }
 
 /** "Tell my people now": care wording, not SOS — she's asking them to check on her. */
 export function checkOnMeMessage(liveUrl: string): string {
-  return `Can you check on me? Call or message me. Here's where I am, live on MIRA: ${liveUrl}`;
+  return `Can you check on me? Call or message me. Here's where I am on MIRA: ${liveUrl}`;
 }
