@@ -143,19 +143,31 @@ describe("audit regressions", () => {
   it("Mira's saved history never records where you were", async () => {
     await signIn("Esha");
     await placesPOST(jsonRequest("/api/me/places", { label: "Home", emoji: "🏠", ...HOME }));
-    const streamed = async (message: string) => (await (await miraPOST(jsonRequest("/api/mira", { message, context: ctx({ area: "Kamla Nagar" }) }))).text()).trim().split("\n").map((l) => JSON.parse(l));
+    const streamed = async (message: string, context: Record<string, unknown>) => {
+      const r = await miraPOST(jsonRequest("/api/mira", { message, context }));
+      const events = (await r.text()).trim().split("\n").map((l) => JSON.parse(l));
+      return { history: r.headers.get("x-mira-history"), text: events.filter((e) => e.type === "text").map((e) => e.delta).join(""), cards: events.filter((e) => e.type === "card").map((e) => e.card) };
+    };
+    const saved = async () => (await (await miraGET()).json()).messages as Array<{ role: string; text: string; cards: Array<{ type: string }> }>;
 
-    const hi = await streamed("hi");
-    expect(hi.filter((e) => e.type === "text").map((e) => e.delta).join("")).toMatch(/Kamla Nagar/); // you see it live…
-    const home = await streamed("take me home");
-    expect(home.find((e) => e.type === "card").card.minutes).toEqual(expect.any(Number));
+    // Turns sent with her coordinates aren't kept at all (audit T1: this used to pass only because nothing was stored).
+    const hi = await streamed("hi", ctx({ area: "Kamla Nagar" }));
+    expect(hi.text).toMatch(/Kamla Nagar/); // you see it live…
+    const home = await streamed("take me home", ctx({ area: "Kamla Nagar" }));
+    expect(home.cards.find((c) => c.type === "trip").minutes).toEqual(expect.any(Number));
+    expect([hi.history, home.history]).toEqual(["not_saved", "not_saved"]);
+    expect(await saved()).toEqual([]);
 
-    const { messages } = await (await miraGET()).json();
-    const saved = JSON.stringify(messages);
-    expect(saved).not.toMatch(/Kamla Nagar|minute walk/); // …but it isn't saved
+    // A turn without her coordinates is kept, scrubbed of the area she's in, which she still sees live.
+    const kept = await streamed("hi", ctx({ location: null, area: "Kamla Nagar" }));
+    expect(kept.text).toMatch(/Kamla Nagar/);
+    expect(kept.history).toBe("saved");
+    const messages = await saved();
+    expect(messages.map((m) => m.role)).toEqual(["user", "assistant"]);
+    expect(messages[1].text.length).toBeGreaterThan(0);
+    expect(JSON.stringify(messages)).not.toMatch(/Kamla Nagar|minute walk/); // …but it isn't saved
     // Trip cards carry the destination's coordinates, so they are never stored (sprint mira-companion-48h 03 §E).
-    const tripCard = messages.flatMap((m: { cards: Array<{ type: string; minutes?: number | null }> }) => m.cards).find((c: { type: string }) => c.type === "trip");
-    expect(tripCard).toBeUndefined();
+    expect(messages.flatMap((m) => m.cards).filter((c) => c.type === "trip")).toEqual([]);
   });
 
   it("one bad trip can't block everyone else's alert, and contacts hear when the person arrives", async () => {

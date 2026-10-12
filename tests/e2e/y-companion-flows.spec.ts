@@ -168,3 +168,65 @@ test("the chat's privacy line says what is kept, and storage matches it (audit F
   await page.request.delete("/api/mira", { headers: SAME_ORIGIN });
   await ctx.close();
 });
+
+test("Around offers Save only for a place Mira may keep; a Google result can be planned to, not saved (audit M1-c)", async ({ browser }) => {
+  const { ctx, page } = await newUser(browser, "Keeper");
+  // Synthetic search results standing in for each provider: names and ids are test-only.
+  const hits: Record<string, { id: string; name: string; kind: string; lat: number; lon: number }> = {
+    google: { id: "g:ChIJsyntheticTestOnly", name: "Synthetic Google Cafe", kind: "cafe", lat: 28.6905, lon: 77.2115 },
+    osm: { id: "osm:node/9301", name: "Synthetic Mapped Cafe", kind: "cafe", lat: 28.6908, lon: 77.2118 },
+  };
+  await page.route("**/api/geo/search", (route) => { const q = (route.request().postDataJSON() as { q: string }).q.toLowerCase(); return route.fulfill({ json: { places: Object.values(hits).filter((h) => h.name.toLowerCase().includes(q)) } }); });
+  const saves: unknown[] = [];
+  page.on("request", (r) => { if (r.method() === "POST" && new URL(r.url()).pathname === "/api/me/places") saves.push(r.postDataJSON()); });
+  const check = async (name: string) => {
+    await page.getByRole("button", { name: /Check a place/ }).first().click();
+    await page.getByRole("dialog").getByRole("textbox").fill(name);
+    await page.getByRole("dialog").getByRole("button", { name: new RegExp(name) }).first().click();
+    await expect(page.getByRole("button", { name: "Plan going here" })).toBeVisible();
+  };
+  await page.goto("/around");
+  await check("Synthetic Google Cafe");
+  await expect(page.getByRole("button", { name: "Ask Mira about it" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save this place" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Back to around me", exact: true }).click();
+  await check("Synthetic Mapped Cafe");
+  await page.getByRole("button", { name: "Save this place" }).click();
+  await expect(page.getByText("Saved Synthetic Mapped Cafe to your places")).toBeVisible();
+  expect(saves).toEqual([expect.objectContaining({ label: "Synthetic Mapped Cafe", placeId: "osm:node/9301" })]);
+  await ctx.close();
+});
+
+test("a saved plan, edited, updates the same copy; reopened from Journeys it is checked again and starts nothing (audit T3)", async ({ browser }) => {
+  const { ctx, page } = await newUser(browser, "Revisit");
+  await page.evaluate(() => sessionStorage.removeItem("mira.plan.v1"));
+  await page.goto("/plan?for=go");
+  await page.getByRole("radio", { name: "Walk", exact: true }).click();
+  await pick(page, /^From/, "Hindu College");
+  await pick(page, /^To/, DEST);
+  await page.getByRole("button", { name: "Save this plan" }).first().click();
+  await expect(page.getByText(/Saved to Journeys for 30 days/)).toBeVisible();
+  const plans = async () => (await (await page.request.get("/api/me/plans")).json()).plans as Array<{ id: string; draft: { mode: string } }>;
+  const [first] = await plans();
+  expect(first.draft.mode).toBe("walk");
+
+  await page.getByRole("region", { name: "Your plan", exact: true }).getByRole("button", { name: /Edit/ }).first().click();
+  await page.getByRole("radio", { name: "Transit", exact: true }).click();
+  await page.getByRole("button", { name: /Done — show the brief/ }).click();
+  await page.getByRole("button", { name: "Save this plan" }).first().click();
+  await expect(page.getByText(/Updated in Journeys for 30 days/)).toBeVisible();
+  expect((await plans()).map((p) => [p.id, p.draft.mode])).toEqual([[first.id, "transit"]]);
+
+  // Reopened in a fresh tab state: the way is fetched again for now, and opening it starts no journey.
+  await page.evaluate(() => sessionStorage.removeItem("mira.plan.v1"));
+  await page.goto("/trips");
+  const calls: string[] = [];
+  page.on("request", (r) => { const path = new URL(r.url()).pathname; if (path === "/api/geo/route" || path.startsWith("/api/trips")) calls.push(`${r.method()} ${path}`); });
+  await page.getByRole("link", { name: /^Open plan:/ }).or(page.getByRole("button", { name: /^Open plan:/ })).first().click();
+  await expect(page).toHaveURL(/\/plan/);
+  await expect(page.getByRole("region", { name: "Your plan, at that time" })).toBeVisible();
+  await expect.poll(() => calls).toContain("POST /api/geo/route");
+  expect(calls.filter((c) => c.startsWith("POST /api/trips"))).toEqual([]);
+  expect((await (await page.request.get("/api/trips/current")).json()).trip).toBeNull();
+  await ctx.close();
+});
