@@ -62,11 +62,13 @@ export async function submitCorrection(
 ): Promise<{ outcome: ReceiptOutcome; placeName: string }> {
   if (!user.durable) throw forbidden("Add an email to your account in You to correct places — it keeps it to one voice per person.");
   const at = { lat: input.lat, lon: input.lon };
-  const hits = (await geo.search(input.name, at)).filter((h) => PLACE_KEY_RE.test(h.id) && haversineMeters(at, h) <= 150);
+  // Nearest first: two places can share a name within 150 m (two "ICICI Bank" branches), and the one she picked is
+  // named by its key when she sends it, else by being closest to where she picked it (audit M2-c).
+  const hits = (await geo.search(input.name, at)).filter((h) => PLACE_KEY_RE.test(h.id) && haversineMeters(at, h) <= 150).sort((a, b) => haversineMeters(at, a) - haversineMeters(at, b));
   const place =
     hits.find((h) => h.id === input.placeKey) ??
     hits.find((h) => norm(h.name) === norm(input.name)) ??
-    hits.filter((h) => haversineMeters(at, h) <= 60).sort((a, b) => haversineMeters(at, a) - haversineMeters(at, b))[0];
+    hits.filter((h) => haversineMeters(at, h) <= 60)[0];
   if (!place) throw badRequest("place_unknown", "MIRA couldn't match that place. Try choosing it from the search results.");
   const outcome = await recordPlaceSignal(sql, {
     userId: user.id,

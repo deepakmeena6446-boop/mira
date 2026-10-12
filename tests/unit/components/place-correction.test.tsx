@@ -12,7 +12,7 @@ import { PlaceCorrection } from "@/components/app/PlaceCorrection";
 const A = { name: "Hindu College", lat: 28.6889, lon: 77.2107 };
 const B = { name: "Vishwavidyalaya Metro Gate No. 3", lat: 28.6951, lon: 77.2143 };
 const ok = { ok: true, data: { outcome: "pending", placeName: "x" } };
-const view = (place: typeof A) => <PlaceCorrection place={place} canCorrect signedIn country="IN" />;
+const view = (place: typeof A & { placeId?: string }) => <PlaceCorrection place={place} canCorrect signedIn country="IN" />;
 
 afterEach(() => { cleanup(); mocks.api.mockReset(); });
 
@@ -64,5 +64,18 @@ describe("PlaceCorrection across places", () => {
     rerender(view(B));
     await act(async () => { resolve({ ok: false, status: 0, code: "network", message: "x", network: true }); });
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("names the place she picked by its key, so a same-named neighbour isn't corrected instead (audit M2-c)", async () => {
+    mocks.api.mockResolvedValue(ok);
+    const { rerender } = render(view({ ...A, placeId: "osm:node/9402" }));
+    fireEvent.click(screen.getByRole("button", { name: "Correct this information" }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "The place has closed down or moved" })); });
+    expect(mocks.api).toHaveBeenLastCalledWith("/api/contribute/correction", { body: expect.objectContaining({ placeKey: "osm:node/9402", name: A.name, claim: "gone" }) });
+    // A spot without a provider key sends none; the server finds the nearest place of that name.
+    rerender(view(B));
+    fireEvent.click(screen.getByRole("button", { name: "Correct this information" }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "The place has closed down or moved" })); });
+    expect(mocks.api.mock.lastCall?.[1].body).not.toHaveProperty("placeKey");
   });
 });

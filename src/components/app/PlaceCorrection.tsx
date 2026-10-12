@@ -11,7 +11,7 @@ import { CORRECTIONS, CORRECTION_LABEL, type Correction } from "@/domain/contrib
 /** Which place a correction is about: its name and position, so two places never share one form or result. */
 export const placeIdentity = (p: { name: string; lat: number; lon: number }) => `${p.name}|${p.lat.toFixed(5)},${p.lon.toFixed(5)}`;
 
-type Props = { place: { name: string; lat: number; lon: number }; canCorrect: boolean; signedIn: boolean; country: string | null; className?: string };
+type Props = { place: { name: string; lat: number; lon: number; placeId?: string }; canCorrect: boolean; signedIn: boolean; country: string | null; className?: string };
 
 /**
  * One secondary way to correct what Mira shows about a place she just looked at (sprint mira-companion-48h M6).
@@ -35,7 +35,7 @@ function CorrectionForm({ place, canCorrect, signedIn, country, className }: Pro
   const send = async (claim: Correction) => {
     setBusy(claim);
     setError(null);
-    const r = await api<{ outcome: ContributionOutcome; placeName: string }>("/api/contribute/correction", { body: { name: place.name.slice(0, 120), lat: place.lat, lon: place.lon, claim, country } });
+    const r = await api<{ outcome: ContributionOutcome; placeName: string }>("/api/contribute/correction", { body: { ...(place.placeId ? { placeKey: place.placeId.slice(0, 280) } : {}), name: place.name.slice(0, 120), lat: place.lat, lon: place.lon, claim, country } });
     if (!current.current) return;
     setBusy(null);
     if (r.ok) {

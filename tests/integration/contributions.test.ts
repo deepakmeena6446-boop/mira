@@ -13,7 +13,7 @@ import { getGeo, type GeoProvider } from "@/server/providers/geo";
 import { parseOpeningHours } from "@/domain/opening-hours";
 import { encodeGeohash } from "@/domain/geohash";
 import type { HelpPoint } from "@/domain/help-points";
-import { decidePending, placeStatusFor, prepareChecks, recordPlaceSignal } from "@/server/contributions";
+import { decidePending, placeStatusFor, prepareChecks, recordPlaceSignal, submitCorrection } from "@/server/contributions";
 import { recordLitVote, lightingForRoute } from "@/server/lighting";
 import { cellsForRoute } from "@/domain/lighting";
 import { hmacHex } from "@/server/crypto";
@@ -300,6 +300,23 @@ describe("Contribute: MIRA Checks, receipts, corroboration, privacy", () => {
     expect(statuses.slice(0, 10).every((s) => s === 200)).toBe(true);
     expect(statuses[10]).toBe(429);
     void h;
+  });
+
+  it("a correction lands on the place she picked when two places share a name nearby (audit M2-c)", async () => {
+    const sql = getSql();
+    const u = await signIn("Lata");
+    // Two synthetic branches with one name, ~40 m and ~110 m from where she picked; search lists the farther first.
+    const far = { id: "osm:node/9401", name: "Synthetic Twin Bank", kind: "bank", lat: PHARMACY.lat + 0.001, lon: PHARMACY.lon };
+    const near = { id: "osm:node/9402", name: "Synthetic Twin Bank", kind: "bank", lat: PHARMACY.lat + 0.00036, lon: PHARMACY.lon };
+    const geo = { ...getGeo(), search: async () => [far, near] } as GeoProvider;
+    const keyOf = async () => (await sql<{ place_key: string }[]>`SELECT place_key FROM place_signals ORDER BY day DESC LIMIT 1`)[0]?.place_key;
+    const correct = (placeKey?: string) => submitCorrection(sql, geo, { id: u.id, durable: true }, { ...(placeKey ? { placeKey } : {}), name: "Synthetic Twin Bank", ...PHARMACY, claim: "gone", country: "IN" }, new Date());
+    // Without a key, the nearer of the two; with one, exactly the place she picked, even the farther.
+    await correct();
+    expect(await keyOf()).toBe(near.id);
+    await sql`DELETE FROM place_signals`;
+    await correct(far.id);
+    expect(await keyOf()).toBe(far.id);
   });
 
   it("an incident report never creates a receipt or any reward", async () => {
